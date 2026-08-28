@@ -69,6 +69,8 @@ function playthroughSource(): string {
     return r.events || [];
   };
   const skills = async () => agent.call("corealm_skills");
+  /** What the last findNear actually tried, so a failure explains itself. */
+  let lastSearchTrail = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /** Walks to an entity and performs an interaction, handling the walk-then-act round trip. */
@@ -76,7 +78,7 @@ function playthroughSource(): string {
     let started = await agent.call("corealm_interact", { entityId, interaction });
     if (started.error) return started;
     if (String(started.started || "").startsWith("walking")) {
-      await waitFor(["navigation.completed", "navigation.failed"], 60000);
+      await waitFor(["navigation.completed", "navigation.failed"], 30000);
       started = await agent.call("corealm_interact", { entityId, interaction });
       if (started.error) return started;
     }
@@ -98,16 +100,19 @@ function playthroughSource(): string {
       }
       const places = await agent.call("corealm_observe", { scope: "known", limit: 40 });
       const towns = (places || []).filter((x) => /town|square|centre|hamlet|outpost|coldbrace|rootfall|highcairn/i.test(x.id + " " + x.name));
-      const target = towns[attempt % Math.max(1, towns.length)] || (places || [])[attempt % Math.max(1, (places || []).length)];
+      const target = towns[attempt] ?? (places || [])[attempt];
       if (!target) break;
-      await agent.call("corealm_move_to", { locationId: target.id });
-      await waitFor(["navigation.completed", "navigation.failed"], 90000);
+      const moved = await agent.call("corealm_move_to", { locationId: target.id });
+      if (moved.error) continue;
+      await waitFor(["navigation.completed", "navigation.failed"], 25000);
     }
     return null;
   };
 
   /** Finds the nearest usable entity of a kind, travelling to known locations if none is in sight. */
   const findNear = async (archetypes, interaction, hint) => {
+    const trail = [];
+    lastSearchTrail = trail;
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const found = await agent.call("corealm_observe", {
         archetypes, interaction, requirementsMet: true, radius: 140, limit: 12,
@@ -116,16 +121,24 @@ function playthroughSource(): string {
       // silently rejected farm plots (state "empty"), stations, and anything else with its own
       // vocabulary — and then reported "no plot found anywhere" as if the world were missing them.
       const usable = (found || []).filter((e) => e.state !== "depleted" && e.state !== "dead");
+      trail.push("saw " + (found || []).length + "/" + usable.length + " usable");
       if (usable.length) return usable[0];
       const places = await agent.call("corealm_observe", { scope: "known", limit: 40 });
       const ranked = (places || []).sort((a, b) => {
         const score = (x) => (hint && new RegExp(hint, "i").test(x.id + " " + x.name) ? 0 : 1);
         return score(a) - score(b) || a.distance - b.distance;
       });
-      const target = ranked[attempt % Math.max(1, ranked.length)];
+      // Walk the ranked list in order rather than modulo, so a hinted match is tried first and a
+      // failure moves on instead of retrying the same place twelve times.
+      const target = ranked[attempt];
       if (!target) break;
-      await agent.call("corealm_move_to", { locationId: target.id });
-      await waitFor(["navigation.completed", "navigation.failed"], 90000);
+      const moved = await agent.call("corealm_move_to", { locationId: target.id });
+      // Waiting on an event that will never arrive costs REAL seconds, not sim seconds: a move that
+      // was refused used to burn the full timeout, twelve times over, before the check gave up and
+      // reported the world as empty.
+      if (moved.error) { trail.push("move " + target.id + " -> " + moved.error); continue; }
+      const arrived = await waitFor(["navigation.completed", "navigation.failed"], 25000);
+      trail.push("moved " + target.id + " -> " + (arrived.map((e) => e.type).join(",") || "timeout"));
     }
     return null;
   };
@@ -140,7 +153,7 @@ function playthroughSource(): string {
     const moved = target ? await agent.call("corealm_move_to", { locationId: target.id }) : { error: "NO_TARGET" };
     const nav = dbg.getNavigationState();
     const pathed = !moved.error && nav.hasPath && nav.pathPoints > 1 && nav.destination !== null;
-    await waitFor(["navigation.completed", "navigation.failed"], 90000);
+    await waitFor(["navigation.completed", "navigation.failed"], 30000);
     const after = dbg.getPlayerPosition();
     const travelled = Math.hypot(after.x - before.x, after.z - before.z);
     note("navigation", pathed && travelled > 5,
@@ -150,12 +163,15 @@ function playthroughSource(): string {
   // ------------------------------------------------------- gathering skills
   for (const [skill, archetype, verb, hint] of [
     ["mining", "ore", "mine", "pit|seam|mine|quarry"],
-    ["woodcutting", "tree", "chop", "copse|wood|stand|palewood"],
-    ["fishing", "fishing_spot", "fish", "shallow|pool|water|tarn"],
+    // Hints name the TIER 1 sites specifically. "wood" matched Vellenwood's gates first, whose
+    // Duskoaks need Woodcutting 5, so requirementsMet correctly filtered them out and the check
+    // read "no tree reachable" while standing in a forest. Same for the tier 10 tarns vs Redsill.
+    ["woodcutting", "tree", "chop", "palewood|copse"],
+    ["fishing", "fishing_spot", "fish", "redsill|shallow"],
   ]) {
     const before = (await skills())[skill].xp;
     const node = await findNear([archetype], verb, hint);
-    if (!node) { note(skill, false, "no " + archetype + " found anywhere"); continue; }
+    if (!node) { note(skill, false, "no " + archetype + " reachable :: " + lastSearchTrail.slice(0, 8).join(" | ")); continue; }
     await doInteract(node.id, verb, ["item.received", "activity.stopped", "resource.depleted"], 60000);
     await sleep(1200);
     const after = (await skills())[skill].xp;
@@ -176,7 +192,7 @@ function playthroughSource(): string {
           const banks = await agent.call("corealm_observe", { scope: "known", archetypes: ["bank"], limit: 2 });
           if (banks && banks[0]) {
             await agent.call("corealm_move_to", { entityId: banks[0].id });
-            await waitFor(["navigation.completed", "navigation.failed"], 90000);
+            await waitFor(["navigation.completed", "navigation.failed"], 30000);
             await agent.call("corealm_bank", { op: "depositAll" });
           }
         }
@@ -228,7 +244,7 @@ function playthroughSource(): string {
       if (!stationEntity) evidence = "no " + station + " station reachable";
       if (stationEntity) {
         await agent.call("corealm_move_to", { entityId: stationEntity.id });
-        await waitFor(["navigation.completed", "navigation.failed"], 60000);
+        await waitFor(["navigation.completed", "navigation.failed"], 30000);
         const made = await agent.call("corealm_produce", { recipeId, quantity: 2 });
         if (made.error) evidence = recipeId + " refused: " + made.error + " " + made.message;
         else { await waitFor(["production.completed", "activity.stopped"], 45000); await sleep(900); }
@@ -250,7 +266,7 @@ function playthroughSource(): string {
     let killed = false;
     if (enemy) {
       await agent.call("corealm_move_to", { entityId: enemy.id });
-      await waitFor(["navigation.completed", "navigation.failed"], 60000);
+      await waitFor(["navigation.completed", "navigation.failed"], 30000);
       await agent.call("corealm_attack", { entityId: enemy.id });
       for (let i = 0; i < 40 && !killed; i += 1) {
         await sleep(600);
@@ -275,7 +291,7 @@ function playthroughSource(): string {
     let evidence = "no enemy found";
     if (enemy) {
       await agent.call("corealm_move_to", { entityId: enemy.id });
-      await waitFor(["navigation.completed", "navigation.failed"], 60000);
+      await waitFor(["navigation.completed", "navigation.failed"], 30000);
       for (let i = 0; i < 12; i += 1) {
         const cast = await agent.call("corealm_attack", { entityId: enemy.id, spellId: "emberlash" });
         if (cast.error) { evidence = "cast refused: " + cast.error + " " + cast.message; break; }
@@ -344,7 +360,7 @@ function playthroughSource(): string {
       .find((p) => /town_center|town_entrance|coldbrace/i.test(p.id));
     if (town) {
       await agent.call("corealm_move_to", { locationId: town.id });
-      await waitFor(["navigation.completed", "navigation.failed"], 120000);
+      await waitFor(["navigation.completed", "navigation.failed"], 30000);
     }
     const npcs = await agent.call("corealm_observe", { scope: "visible", archetypes: ["npc"], radius: 140, limit: 40 });
     let giver = null;
@@ -357,7 +373,7 @@ function playthroughSource(): string {
         .find((p) => /town|square|centre/i.test(p.id + " " + p.name));
       if (town) {
         await agent.call("corealm_move_to", { locationId: town.id });
-        await waitFor(["navigation.completed", "navigation.failed"], 90000);
+        await waitFor(["navigation.completed", "navigation.failed"], 30000);
         const again = await agent.call("corealm_observe", { scope: "visible", archetypes: ["npc"], radius: 140, limit: 40 });
         for (const npc of (again || [])) {
           const detail = await agent.call("corealm_inspect", { entityId: npc.id });
@@ -415,18 +431,26 @@ function playthroughSource(): string {
     const bossBefore = dbg.getEntity("ordrun");
     let bossHp = bossBefore && bossBefore.combat ? bossBefore.combat.health : 0;
     const startHp = bossHp;
-    await agent.call("corealm_attack", { entityId: "ordrun" });
+    const opened = await agent.call("corealm_attack", { entityId: "ordrun" });
+    let bossNote = opened.error ? ("attack refused: " + opened.error + " " + opened.message) : "engaged";
+    let deaths = 0;
     for (let i = 0; i < 60; i += 1) {
       await sleep(500);
-      if (dbg.getState().health < 30) dbg.setHealth(999);
+      const st = dbg.getState();
+      if (st.health <= 0) { deaths += 1; dbg.teleport({ locationId: "gravelmaw_arena" }); }
+      if (st.health < 40) dbg.setHealth(999);
       const now = dbg.getEntity("ordrun");
       bossHp = now && now.combat ? now.combat.health : 0;
       if (bossHp <= 0) break;
-      if (!dbg.getState().combatTargetId) await agent.call("corealm_attack", { entityId: "ordrun" });
+      if (!st.combatTargetId) {
+        const again = await agent.call("corealm_attack", { entityId: "ordrun" });
+        if (again.error) bossNote = "re-attack refused: " + again.error + " " + again.message;
+      }
     }
     note("dungeon", entered, "entered dungeon=" + entered + ", region on entry=" + enteredRegion);
     note("boss", bossHp <= 0 || bossHp < startHp,
-      "ordrun " + startHp + " -> " + bossHp + (bossHp <= 0 ? " (killed)" : " (damaged)"));
+      "ordrun " + startHp + " -> " + bossHp + (bossHp <= 0 ? " KILLED" : "")
+      + " :: " + bossNote + ", player deaths " + deaths);
   }
 
   // ------------------------------------------------------------ persistence
