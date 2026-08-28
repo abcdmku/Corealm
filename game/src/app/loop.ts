@@ -64,6 +64,7 @@ export class GameLoop {
   private playerRig: CharacterRig | null = null;
   private vfx: Vfx | null = null;
   private ui: Ui | null = null;
+  private interiors: { group: { visible: boolean }; visible: () => boolean }[] = [];
   private lastPlayerPos: [number, number, number] | null = null;
 
   constructor(private readonly deps: LoopDeps) {}
@@ -98,6 +99,17 @@ export class GameLoop {
   /** The human UI. `update()` is internally throttled, so calling it every frame is correct. */
   setUi(ui: Ui): void {
     this.ui = ui;
+  }
+
+  /**
+   * An interior that should only render while the player is inside it.
+   *
+   * The Gravelmaw sits a few metres below Karrowmoor, so its floors, walls and ceilings were being
+   * drawn from every surface pose — six draw calls over budget at Highcairn for geometry nobody
+   * could see through the moor.
+   */
+  addInterior(group: { visible: boolean }, visible: () => boolean): void {
+    this.interiors.push({ group, visible });
   }
 
   /** Later rounds register their systems here. Kept sorted by declared order. */
@@ -162,6 +174,7 @@ export class GameLoop {
     const state = store.get();
 
     input.update();
+    for (const interior of this.interiors) interior.group.visible = interior.visible();
     this.syncEntityViews();
     // Animation advances on real time, not sim time: a paused sim should still idle, and a
     // time-scaled test run should not play idles at 100x.

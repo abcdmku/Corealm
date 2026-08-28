@@ -235,7 +235,13 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   }
 
   // 11. Entity views. The render layer reads `SemanticEntity.view`; it never invents an appearance.
-  const entityViews = new EntityViews(scene, assets, scene.materials);
+  // Rigged characters bypass instancing, so they are the single largest draw-call line item: ten
+  // full rigs in the Highcairn frame put that pose 6 calls over the 400 budget. 64 leaves room for
+  // the settlement geometry while still dressing every NPC a player is close enough to talk to.
+  const entityViews = new EntityViews(scene, assets, scene.materials, {
+    maxUniqueDrawCalls: 64,
+    maxUniqueViews: 16,
+  });
   await preloadEntityAssets(assets, entityStore, errors, atMs);
   try {
     entityViews.sync(entityStore.all());
@@ -596,6 +602,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.addSystem(productionSystem);
   loop.addSystem(questSystem);
 
+  if (dungeon) loop.addInterior(dungeon.group, () => store.get().player.regionId === "gravelmaw");
   loop.setOverlays(overlays);
   loop.setVfx(vfx);
   loop.setUi(ui);
