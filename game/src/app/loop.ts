@@ -19,6 +19,8 @@ import type { CorealmGameApi } from "../api/gameApi.js";
 import type { SaveService } from "../persistence/storage.js";
 import type { InputController } from "../input/mouse.js";
 import type { EntityViews } from "../render/entityViews.js";
+import type { Overlays } from "../render/overlays.js";
+import type { CharacterRig } from "../render/characterRig.js";
 import type { SemanticEntity } from "../contracts.js";
 import { SIM_TICK_MS } from "../core/time.js";
 import { AUTOSAVE_INTERVAL_MS } from "./config.js";
@@ -56,6 +58,9 @@ export class GameLoop {
   private entityViews: EntityViews | null = null;
   private entitySource: (() => SemanticEntity[]) | null = null;
   private viewSyncAccumulatorMs = 0;
+  private overlays: Overlays | null = null;
+  private playerRig: CharacterRig | null = null;
+  private lastPlayerPos: [number, number, number] | null = null;
 
   constructor(private readonly deps: LoopDeps) {}
 
@@ -69,6 +74,16 @@ export class GameLoop {
   setEntityViews(views: EntityViews, entities: () => SemanticEntity[]): void {
     this.entityViews = views;
     this.entitySource = entities;
+  }
+
+  /** Overlays tick every frame: they expire on a timer and follow entities that move. */
+  setOverlays(overlays: Overlays): void {
+    this.overlays = overlays;
+  }
+
+  /** The player's skinned rig, when one built successfully. */
+  setPlayerRig(rig: CharacterRig): void {
+    this.playerRig = rig;
   }
 
   /** Later rounds register their systems here. Kept sorted by declared order. */
@@ -137,11 +152,44 @@ export class GameLoop {
     // Animation advances on real time, not sim time: a paused sim should still idle, and a
     // time-scaled test run should not play idles at 100x.
     this.entityViews?.update(realDeltaMs / 1000, renderer.camera.position);
+    this.overlays?.update(this.deps.clock.elapsedMs);
+    this.syncPlayerRig(state.player.position, state.player.facingRad, realDeltaMs);
     scene.syncPlayer(state.player.position, state.player.facingRad);
     camera.update(state.player.position[0], state.player.position[1], state.player.position[2]);
     renderer.followShadow(renderer.camera.position.clone().setY(state.player.position[1]));
     renderer.camera.updateMatrixWorld();
     renderer.render(nowMs);
+  }
+
+  /**
+   * Drives the player rig: position, facing, and the pose implied by what the player is doing.
+   *
+   * Speed is measured from actual movement between frames rather than read from a config constant,
+   * so a walk animation never plays while the character is standing against a wall.
+   */
+  private syncPlayerRig(position: readonly number[], facingRad: number, realDeltaMs: number): void {
+    const rig = this.playerRig;
+    if (!rig) return;
+
+    const current: [number, number, number] = [position[0] ?? 0, position[1] ?? 0, position[2] ?? 0];
+    let speed = 0;
+    if (this.lastPlayerPos && realDeltaMs > 0) {
+      const dx = current[0] - this.lastPlayerPos[0];
+      const dz = current[2] - this.lastPlayerPos[2];
+      speed = Math.hypot(dx, dz) / (realDeltaMs / 1000);
+    }
+    this.lastPlayerPos = current;
+
+    const player = this.deps.api.getPlayer();
+    rig.setPosition(current as never, facingRad);
+    rig.play(rig.poseFor({
+      moving: speed > 0.25,
+      speed,
+      dead: player.dead,
+      inCombat: player.inCombat,
+      activityKind: player.activityKind,
+    }));
+    rig.update(realDeltaMs / 1000);
   }
 
   /** Diffs semantic entities into the render layer a few times a second, not every frame. */

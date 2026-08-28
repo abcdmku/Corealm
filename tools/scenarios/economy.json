@@ -1,0 +1,139 @@
+{
+  "name": "inventory-bank-shop",
+  "actions": [
+    {
+      "debug": "clearInventory"
+    },
+    {
+      "debug": "giveItem",
+      "args": [
+        "grithe_ore",
+        10
+      ],
+      "label": "Ten ore into the pack"
+    },
+    {
+      "inspect": "getState",
+      "label": "Inventory holds ten"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "bank_interior"
+        }
+      ],
+      "label": "Walk to the Coldbrace bank"
+    },
+    {
+      "waitMs": 500
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_bank",
+        {
+          "op": "depositAll"
+        }
+      ],
+      "label": "Deposit everything"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getState",
+      "label": "Inventory empty, bank holds ten"
+    },
+    {
+      "screenshot": "r3-bank"
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_bank",
+        {
+          "op": "withdraw",
+          "itemId": "grithe_ore",
+          "quantity": 4
+        }
+      ],
+      "label": "Withdraw four"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getState",
+      "label": "Four back in the pack"
+    },
+    {
+      "debug": "setCurrency",
+      "args": [
+        500
+      ],
+      "label": "Give the player marks"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "town_center"
+        }
+      ],
+      "label": "Go to the shop"
+    },
+    {
+      "waitMs": 500
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_shop",
+        {
+          "op": "list",
+          "shopId": "coldbrace_general"
+        }
+      ],
+      "label": "Read the stock"
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_shop",
+        {
+          "op": "sell",
+          "shopId": "coldbrace_general",
+          "itemId": "grithe_ore",
+          "quantity": 4
+        }
+      ],
+      "label": "Sell the ore"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getState",
+      "label": "Marks went up, ore went out"
+    },
+    {
+      "screenshot": "r3-shop"
+    },
+    {
+      "debug": "saveNow",
+      "label": "Force a save"
+    },
+    {
+      "reload": true,
+      "label": "Reload the browser"
+    },
+    {
+      "waitMs": 1500
+    },
+    {
+      "inspect": "getState",
+      "label": "Progression survived the reload"
+    }
+  ]
+}

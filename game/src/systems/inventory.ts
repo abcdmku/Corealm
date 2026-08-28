@@ -1,0 +1,300 @@
+/**
+ * The 28-slot inventory: the constraint the whole economy hangs off.
+ *
+ * Slot pressure is the reason a route matters. Ore, logs, fish, bars and equipment each burn a real
+ * slot, so a trip to Karrowmoor is a decision about what you carry back, not a formality. Only the
+ * kinds PRD 2.10 calls stackable (currency, essence shards, seeds, shafts, gems) collapse into one
+ * slot, and that is read straight off `ItemDef.stackable` rather than re-listed here — the content
+ * table is the single source of truth for it.
+ *
+ * Nothing in this file throws. Every public entry point returns `Result<T>`.
+ *
+ * Owner: W-INV. State lives in `state.inventory.slots` and `state.currency`; this file adds none.
+ */
+import type { EntityId, EquipSlot, InventorySlot, ItemDef, ItemId, Result } from "../contracts.js";
+import { err, ok } from "../contracts.js";
+import type { GameState, Store } from "../state/store.js";
+import { INVENTORY_SLOTS } from "../state/store.js";
+import { content, healAmount } from "../content/index.js";
+import type { EventBus } from "../core/events.js";
+
+/** PRD 2.7: eating occupies the player for 1.8 s. */
+export const EAT_DURATION_MS = 1_800;
+
+/** PRD 2.10: a bank slot stacks to int32 max. The inventory uses the same ceiling for stackables. */
+export const MAX_STACK = 2_147_483_647;
+
+export interface InventoryDeps {
+  store: Store;
+  events: EventBus;
+  /** Sim clock milliseconds, for event timestamps. */
+  now: () => number;
+  /**
+   * Optional. The activity system takes ownership of the 1.8 s eat delay and returns true when it
+   * accepted. When it is absent or refuses, the heal lands immediately and the delay is skipped.
+   */
+  beginEating?: (itemId: ItemId, durationMs: number) => boolean;
+  /**
+   * Optional. Lets `use()` on a wearable equip it, which is what a player expects from a click.
+   * The root wires `EquipmentSystem.equip`; without it, `use()` on gear returns UNAVAILABLE.
+   */
+  equip?: (itemId: ItemId) => Result<{ slot: EquipSlot; replaced: ItemId | null }>;
+}
+
+export class InventorySystem {
+  private currencyItemId: ItemId | null = null;
+
+  constructor(private readonly deps: InventoryDeps) {}
+
+  private get state(): GameState {
+    return this.deps.store.get();
+  }
+
+  private emit(type: "item.received" | "item.lost" | "inventory.full", data: Record<string, unknown>): void {
+    this.deps.events.emit(type, data, undefined, this.deps.now());
+  }
+
+  // ------------------------------------------------------------ SystemHooks
+
+  /** A defensive copy. Callers outside the game must never hold the live array. */
+  slots(): (InventorySlot | null)[] {
+    return this.state.inventory.slots.map((slot) => (slot ? { ...slot } : null));
+  }
+
+  freeSlots(): number {
+    let free = 0;
+    for (const slot of this.state.inventory.slots) if (slot === null) free += 1;
+    return free;
+  }
+
+  /**
+   * Use an item on itself or on a target. Today that means eating food, and equipping gear when the
+   * equipment system is wired. Combination recipes (knife on logs) belong to production, not here.
+   */
+  use(itemId: ItemId, target?: { itemId: ItemId } | { entityId: EntityId }): Result<{ effect: string }> {
+    const def = content.item(itemId);
+    if (!def) return err("NOT_FOUND", `No item with id ${itemId}`);
+    if (target) {
+      return err("INVALID_ARGUMENT", `${def.name} does nothing when used on that`);
+    }
+    if (def.food) return this.eat(def);
+    if (def.equip) {
+      const equip = this.deps.equip;
+      if (!equip) return err("UNAVAILABLE", "Equipment system is not available yet");
+      const result = equip(itemId);
+      if (!result.ok) return { ok: false, error: result.error };
+      return ok({ effect: `equipped ${def.name} in ${result.value.slot}` });
+    }
+    return err("INVALID_ARGUMENT", `${def.name} has no use on its own`);
+  }
+
+  // ----------------------------------------------- the gathering-side surface
+
+  /**
+   * Adds up to `quantity` of an item and reports how many actually landed.
+   *
+   * Partial adds are deliberate. Non-stackables consume one slot per unit, so a gather that yields
+   * three logs into a two-slot inventory stores two, returns ok(2), and emits `inventory.full` — the
+   * gathering loop reads the shortfall and stops rather than silently voiding drops. Stackables
+   * merge into their single existing stack and only clip at MAX_STACK. When nothing at all fits the
+   * call fails with INVENTORY_FULL, so "no room" is never mistaken for "success, zero items".
+   */
+  addItem(itemId: ItemId, quantity: number): Result<number> {
+    const def = content.item(itemId);
+    if (!def) return err("NOT_FOUND", `No item with id ${itemId}`);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      return err("INVALID_ARGUMENT", "Quantity must be at least 1");
+    }
+    const wanted = Math.floor(quantity);
+
+    // Marks are a balance, not a slot. See addCurrency for why.
+    if (def.category === "currency") return this.addCurrency(wanted);
+
+    const slots = this.state.inventory.slots;
+    let added = 0;
+
+    if (def.stackable) {
+      const existing = slots.find((slot): slot is InventorySlot => slot !== null && slot.itemId === itemId);
+      if (existing) {
+        added = Math.min(wanted, Math.max(0, MAX_STACK - existing.quantity));
+        existing.quantity += added;
+      } else {
+        const free = slots.indexOf(null);
+        if (free >= 0) {
+          added = Math.min(wanted, MAX_STACK);
+          slots[free] = { slotIndex: free, itemId, quantity: added };
+        }
+      }
+    } else {
+      for (let i = 0; i < slots.length && added < wanted; i += 1) {
+        if (slots[i] === null) {
+          slots[i] = { slotIndex: i, itemId, quantity: 1 };
+          added += 1;
+        }
+      }
+    }
+
+    if (added === 0) {
+      this.emit("inventory.full", { itemId, name: def.name, attempted: wanted, added: 0 });
+      return err("INVENTORY_FULL", `No room for ${def.name}: all ${INVENTORY_SLOTS} slots are full`);
+    }
+
+    this.deps.store.markDirty();
+    this.emit("item.received", { itemId, name: def.name, quantity: added });
+    if (added < wanted) {
+      this.emit("inventory.full", { itemId, name: def.name, attempted: wanted, added });
+    }
+    return ok(added);
+  }
+
+  /**
+   * Removes exactly `quantity`, or nothing at all. All-or-nothing keeps callers from having to
+   * unwind a half-consumed recipe input.
+   */
+  removeItem(itemId: ItemId, quantity: number): Result<number> {
+    const def = content.item(itemId);
+    if (!def) return err("NOT_FOUND", `No item with id ${itemId}`);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      return err("INVALID_ARGUMENT", "Quantity must be at least 1");
+    }
+    const wanted = Math.floor(quantity);
+
+    if (def.category === "currency") return this.spendCurrency(wanted);
+
+    const held = this.countOf(itemId);
+    if (held < wanted) {
+      return err("NOT_ENOUGH_ITEMS", `You have ${held} ${def.name}, not ${wanted}`);
+    }
+
+    const slots = this.state.inventory.slots;
+    let left = wanted;
+    for (let i = 0; i < slots.length && left > 0; i += 1) {
+      const slot = slots[i];
+      if (!slot || slot.itemId !== itemId) continue;
+      const taken = Math.min(slot.quantity, left);
+      slot.quantity -= taken;
+      left -= taken;
+      if (slot.quantity <= 0) slots[i] = null;
+    }
+
+    this.deps.store.markDirty();
+    this.emit("item.lost", { itemId, name: def.name, quantity: wanted });
+    return ok(wanted);
+  }
+
+  countOf(itemId: ItemId): number {
+    if (itemId === this.resolveCurrencyItemId()) return this.state.currency;
+    let total = 0;
+    for (const slot of this.state.inventory.slots) {
+      if (slot && slot.itemId === itemId) total += slot.quantity;
+    }
+    return total;
+  }
+
+  /** True when the full quantity fits. A partial fit reports false; use addItem's return for that. */
+  hasSpaceFor(itemId: ItemId, quantity: number): boolean {
+    const def = content.item(itemId);
+    if (!def) return false;
+    if (!Number.isFinite(quantity) || quantity < 1) return false;
+    if (def.category === "currency") return true;
+
+    const wanted = Math.floor(quantity);
+    if (def.stackable) {
+      const existing = this.state.inventory.slots.find(
+        (slot): slot is InventorySlot => slot !== null && slot.itemId === itemId,
+      );
+      if (existing) return MAX_STACK - existing.quantity >= wanted;
+      return this.freeSlots() >= 1 && wanted <= MAX_STACK;
+    }
+    return this.freeSlots() >= wanted;
+  }
+
+  // Aliases matching `InventoryPort` in systems/activity.ts, so the root can hand this system
+  // straight to the gathering, farming and production drivers without an adapter object.
+  countItem(itemId: ItemId): number {
+    return this.countOf(itemId);
+  }
+
+  hasRoomFor(itemId: ItemId, quantity: number): boolean {
+    return this.hasSpaceFor(itemId, quantity);
+  }
+
+  /** Distinct item ids currently carried, in slot order. Bank deposit-all walks this. */
+  distinctItemIds(): ItemId[] {
+    const seen: ItemId[] = [];
+    for (const slot of this.state.inventory.slots) {
+      if (slot && !seen.includes(slot.itemId)) seen.push(slot.itemId);
+    }
+    return seen;
+  }
+
+  // ---------------------------------------------------------------- currency
+
+  /**
+   * Marks live in `state.currency` and nowhere else.
+   *
+   * PRD 2.10 also describes marks as "carried in inventory". Honouring both would double-count:
+   * `GameApi.getCurrency()` and `ShopView.currency` read `state.currency`, while a mirrored stack
+   * would be a second, drifting copy of the same number, and reconciling them on every sale is a
+   * bug farm. The balance wins because it is the one the frozen contract already reads. The visible
+   * consequence is that marks never occupy one of the 28 slots — which costs nothing, because a
+   * single always-stacked coin pile was never the constraint that made a route interesting.
+   */
+  addCurrency(amount: number): Result<number> {
+    if (!Number.isFinite(amount) || amount < 1) return err("INVALID_ARGUMENT", "Amount must be at least 1");
+    const gained = Math.min(Math.floor(amount), MAX_STACK - this.state.currency);
+    if (gained <= 0) return ok(0);
+    this.state.currency += gained;
+    this.deps.store.markDirty();
+    this.emit("item.received", { itemId: this.resolveCurrencyItemId(), name: "marks", quantity: gained });
+    return ok(gained);
+  }
+
+  spendCurrency(amount: number): Result<number> {
+    if (!Number.isFinite(amount) || amount < 1) return err("INVALID_ARGUMENT", "Amount must be at least 1");
+    const cost = Math.floor(amount);
+    if (this.state.currency < cost) {
+      return err("NOT_ENOUGH_CURRENCY", `You have ${this.state.currency} marks, not ${cost}`);
+    }
+    this.state.currency -= cost;
+    this.deps.store.markDirty();
+    this.emit("item.lost", { itemId: this.resolveCurrencyItemId(), name: "marks", quantity: cost });
+    return ok(cost);
+  }
+
+  /** The content id of the currency item, discovered once from the registry. */
+  resolveCurrencyItemId(): ItemId {
+    if (this.currencyItemId !== null) return this.currencyItemId;
+    const found = content.allItems().find((item) => item.category === "currency");
+    if (found) this.currencyItemId = found.id;
+    return found ? found.id : "marks";
+  }
+
+  // -------------------------------------------------------------------- food
+
+  private eat(def: ItemDef): Result<{ effect: string }> {
+    const state = this.state;
+    if (state.player.health <= 0) return err("DEAD", "The player is dead");
+    if (state.activity?.kind === "eating") return err("BUSY", "Still eating");
+    if (this.countOf(def.id) < 1) return err("NOT_ENOUGH_ITEMS", `You have no ${def.name}`);
+
+    // The authored heal wins when the table supplies one; otherwise fall back to the PRD 2.7 curve.
+    const authored = def.food?.healAmount;
+    const heal = typeof authored === "number" && Number.isFinite(authored) && authored > 0
+      ? Math.round(authored)
+      : healAmount(def.tier);
+
+    const removed = this.removeItem(def.id, 1);
+    if (!removed.ok) return { ok: false, error: removed.error };
+
+    const before = state.player.health;
+    // Overheal is burned, not banked: eating at full health wastes the item, exactly as PRD 2.7 says.
+    state.player.health = Math.min(state.player.maxHealth, before + heal);
+    const restored = state.player.health - before;
+    this.deps.store.markDirty();
+
+    const timed = this.deps.beginEating?.(def.id, EAT_DURATION_MS) ?? false;
+    const suffix = timed ? "" : " (instantly — the 1.8 s eat delay is not wired to the activity system)";
+    return ok({ effect: `ate ${def.name}, restored ${restored} health${suffix}` });
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "name": "gathering-loop",
+  "actions": [
+    {
+      "debug": "setSkillLevel",
+      "args": [
+        "mining",
+        1
+      ],
+      "label": "Fresh miner"
+    },
+    {
+      "debug": "clearInventory",
+      "label": "Empty pack"
+    },
+    {
+      "inspect": "getState",
+      "label": "Mining 1, 0 xp, 0 items"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "bracken_pit"
+        }
+      ],
+      "label": "Stand at the Bracken Pit"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "debug": "listEntities",
+      "args": [
+        {
+          "archetype": "ore",
+          "regionId": "fallowmarch"
+        }
+      ],
+      "label": "Find a Grithe seam"
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_interact",
+        {
+          "entityId": "bracken_pit_grithe_1",
+          "interaction": "mine"
+        }
+      ],
+      "label": "Begin mining through the agent interface"
+    },
+    {
+      "waitMs": 1200
+    },
+    {
+      "inspect": "getCurrentActivity",
+      "label": "A gathering activity is running"
+    },
+    {
+      "waitMs": 8000
+    },
+    {
+      "inspect": "getState",
+      "label": "Ore gathered and Mining XP gained"
+    },
+    {
+      "debug": "getEvents",
+      "args": [
+        0
+      ],
+      "label": "item.received events fired"
+    },
+    {
+      "waitMs": 9000
+    },
+    {
+      "inspect": "getState",
+      "label": "More ore"
+    },
+    {
+      "debug": "getEntity",
+      "args": [
+        "bracken_pit_grithe_1"
+      ],
+      "label": "Node remaining has dropped"
+    },
+    {
+      "screenshot": "r3-mining"
+    },
+    {
+      "debug": "depleteNode",
+      "args": [
+        "bracken_pit_grithe_1"
+      ],
+      "label": "Force depletion"
+    },
+    {
+      "waitMs": 600
+    },
+    {
+      "debug": "getEntity",
+      "args": [
+        "bracken_pit_grithe_1"
+      ],
+      "label": "Node is depleted"
+    },
+    {
+      "inspect": "getCurrentActivity",
+      "label": "Activity stopped on depletion"
+    },
+    {
+      "screenshot": "r3-depleted"
+    },
+    {
+      "debug": "advanceGameTime",
+      "args": [
+        40
+      ],
+      "label": "Wait out the 21s respawn"
+    },
+    {
+      "waitMs": 600
+    },
+    {
+      "debug": "getEntity",
+      "args": [
+        "bracken_pit_grithe_1"
+      ],
+      "label": "Node respawned with a fresh yield count"
+    }
+  ]
+}

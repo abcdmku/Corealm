@@ -1,0 +1,234 @@
+/**
+ * The canonical content registry.
+ *
+ * This is the seam that lets systems be built against content that does not exist yet: a worker
+ * imports `content` and codes against these accessors, while another worker authors the tables
+ * behind them. Round 1 lost time to two workers inventing the same coordinate frame; freezing the
+ * accessor up front is the fix.
+ *
+ * Every table is registered once at boot and never mutated afterwards. An unknown id returns
+ * `undefined` rather than throwing, so a content gap degrades to a `NOT_FOUND` Result at the API
+ * boundary instead of crashing a frame.
+ *
+ * FROZEN. Only the root edits this file.
+ */
+import type {
+  EquipSlot, ItemDef, ItemId, RecipeId, SkillId, SpellId,
+} from "../contracts.js";
+
+// ---------------------------------------------------------------- resources
+
+/** A gatherable node archetype: what it yields, what it needs, how long it lasts. */
+export interface ResourceDef {
+  id: string;
+  name: string;
+  skill: SkillId;
+  tier: number;
+  reqLevel: number;
+  itemId: ItemId;
+  /** Secondary drops, rolled independently per successful gather. */
+  bonus?: { itemId: ItemId; chance: number }[];
+}
+
+// ------------------------------------------------------------------ recipes
+
+export type RecipeKind =
+  | "smelt" | "smith" | "cook" | "craft" | "fletch";
+
+export interface RecipeDef {
+  id: RecipeId;
+  name: string;
+  kind: RecipeKind;
+  skill: SkillId;
+  reqLevel: number;
+  tier: number;
+  /** Station kind this recipe needs. Null means it can be made anywhere. */
+  station: "furnace" | "anvil" | "range" | "crafting_table" | "fletching_bench" | null;
+  inputs: { itemId: ItemId; quantity: number }[];
+  output: { itemId: ItemId; quantity: number };
+  durationMs: number;
+  xp: number;
+  /** Cooking only. Burn chance is computed from level; this marks the burnt result. */
+  burntItemId?: ItemId;
+}
+
+// ------------------------------------------------------------------- spells
+
+export interface SpellDef {
+  id: SpellId;
+  name: string;
+  reqLevel: number;
+  tier: number;
+  baseMax: number;
+  divisor: number;
+  baseXp: number;
+  castMs: number;
+  /** Essence shards consumed per cast. */
+  cost: { itemId: ItemId; quantity: number };
+  description: string;
+}
+
+// ------------------------------------------------------------------ enemies
+
+export interface EnemyDef {
+  id: string;
+  name: string;
+  family: string;
+  tier: number;
+  maxHealth: number;
+  attackLevel: number;
+  defenceLevel: number;
+  accuracy: number;
+  armour: number;
+  magicArmour: number;
+  maxHit: number;
+  attackSpeedMs: number;
+  aggroRadius: number;
+  /** Behaviour selector. Bosses add phases on top. */
+  behaviour: "passive" | "aggressive" | "territorial";
+  drops: { itemId: ItemId; quantity: [number, number]; chance: number }[];
+  /** Currency drop range. */
+  marks?: [number, number];
+}
+
+// -------------------------------------------------------------------- shops
+
+export interface ShopDef {
+  id: string;
+  name: string;
+  stock: { itemId: ItemId; quantity: number }[];
+  /** Multiplier on ItemDef.value when buying from the shop. */
+  buyMultiplier: number;
+  /** Multiplier on ItemDef.value when selling to the shop. */
+  sellMultiplier: number;
+}
+
+// ----------------------------------------------------------------- registry
+
+export interface ContentTables {
+  items: readonly ItemDef[];
+  resources: readonly ResourceDef[];
+  recipes: readonly RecipeDef[];
+  spells: readonly SpellDef[];
+  enemies: readonly EnemyDef[];
+  shops: readonly ShopDef[];
+}
+
+const EMPTY: ContentTables = { items: [], resources: [], recipes: [], spells: [], enemies: [], shops: [] };
+
+class ContentRegistry {
+  private tables: ContentTables = EMPTY;
+  private itemsById = new Map<ItemId, ItemDef>();
+  private resourcesById = new Map<string, ResourceDef>();
+  private recipesById = new Map<RecipeId, RecipeDef>();
+  private spellsById = new Map<SpellId, SpellDef>();
+  private enemiesById = new Map<string, EnemyDef>();
+  private shopsById = new Map<string, ShopDef>();
+
+  /** Called once at boot, before any system ticks. */
+  register(tables: Partial<ContentTables>): void {
+    this.tables = { ...this.tables, ...tables };
+    this.itemsById = new Map(this.tables.items.map((row) => [row.id, row]));
+    this.resourcesById = new Map(this.tables.resources.map((row) => [row.id, row]));
+    this.recipesById = new Map(this.tables.recipes.map((row) => [row.id, row]));
+    this.spellsById = new Map(this.tables.spells.map((row) => [row.id, row]));
+    this.enemiesById = new Map(this.tables.enemies.map((row) => [row.id, row]));
+    this.shopsById = new Map(this.tables.shops.map((row) => [row.id, row]));
+  }
+
+  item(id: ItemId): ItemDef | undefined { return this.itemsById.get(id); }
+  resource(id: string): ResourceDef | undefined { return this.resourcesById.get(id); }
+  recipe(id: RecipeId): RecipeDef | undefined { return this.recipesById.get(id); }
+  spell(id: SpellId): SpellDef | undefined { return this.spellsById.get(id); }
+  enemy(id: string): EnemyDef | undefined { return this.enemiesById.get(id); }
+  shop(id: string): ShopDef | undefined { return this.shopsById.get(id); }
+
+  allItems(): readonly ItemDef[] { return this.tables.items; }
+  allResources(): readonly ResourceDef[] { return this.tables.resources; }
+  allRecipes(): readonly RecipeDef[] { return this.tables.recipes; }
+  allSpells(): readonly SpellDef[] { return this.tables.spells; }
+  allEnemies(): readonly EnemyDef[] { return this.tables.enemies; }
+  allShops(): readonly ShopDef[] { return this.tables.shops; }
+
+  /** Recipes a station can make, for the production UI. */
+  recipesForStation(station: RecipeDef["station"]): RecipeDef[] {
+    return this.tables.recipes.filter((row) => row.station === station);
+  }
+
+  /** Recipes for a skill, ordered by requirement. The skill guide reads this. */
+  recipesForSkill(skill: SkillId): RecipeDef[] {
+    return this.tables.recipes.filter((row) => row.skill === skill).sort((a, b) => a.reqLevel - b.reqLevel);
+  }
+
+  /** Every item that equips into a slot, ordered by tier. */
+  equipmentForSlot(slot: EquipSlot): ItemDef[] {
+    return this.tables.items.filter((row) => row.equip?.slot === slot).sort((a, b) => a.tier - b.tier);
+  }
+
+  isRegistered(): boolean {
+    return this.tables.items.length > 0;
+  }
+}
+
+/** The single shared registry. Import this, not the tables. */
+export const content = new ContentRegistry();
+
+// --------------------------------------------------------------- formulas
+
+/** PRD 2.5. Tier-independent on purpose, so an agent can reason about it in one line. */
+export function gatherSuccessChance(effectiveLevel: number, reqLevel: number): number {
+  return Math.max(0.05, Math.min(0.95, 0.30 + 0.016 * (effectiveLevel - reqLevel)));
+}
+
+/** PRD 2.5. XP for one successful gather at a tier. */
+export function gatherXp(tier: number): number {
+  return Math.round(10 * Math.pow(tier, 0.55));
+}
+
+/** PRD 2.6, with the root's correction R3: the low-tier floor is 8, matching the brief's band. */
+export function yieldRange(tier: number): readonly [number, number] {
+  return [
+    Math.max(4, Math.round(8.5 - 0.052 * tier)),
+    Math.max(8, Math.round(15 - 0.052 * tier)),
+  ];
+}
+
+/** PRD 2.6. */
+export function respawnSeconds(tier: number): number {
+  return Math.round(18 + 3.2 * Math.pow(tier, 0.9));
+}
+
+/** PRD 2.7. Food restores this much health. */
+export function healAmount(tier: number): number {
+  return Math.round(2 + 1.35 * Math.pow(tier, 0.85));
+}
+
+/** PRD 2.7. Cooking is the only production skill that can fail. */
+export function burnChance(cookingLevel: number, reqLevel: number): number {
+  return Math.max(0, Math.min(0.45, 0.45 - 0.030 * (cookingLevel - reqLevel)));
+}
+
+/** PRD 2.7. */
+export function recipeXp(tier: number, craftWeight: number): number {
+  return Math.round(gatherXp(tier) * craftWeight);
+}
+
+/** PRD 2.8. */
+export function agilityXp(tier: number): number {
+  return Math.round(10 * Math.pow(tier, 0.55) * 1.8);
+}
+
+/** PRD 2.8. */
+export function agilitySuccessChance(agilityLevel: number, reqLevel: number): number {
+  return Math.max(0.5, Math.min(1, 0.60 + 0.02 * (agilityLevel - reqLevel)));
+}
+
+/** PRD 2.5. Tool bonus in effective levels, capped at 40. */
+export function toolBonus(tier: number): number {
+  return Math.min(40, Math.round(1.6 + 0.75 * tier));
+}
+
+/** Sell price is 60% of the item's value, per the frozen ItemDef contract. */
+export function sellPrice(value: number): number {
+  return Math.round(value * 0.6);
+}

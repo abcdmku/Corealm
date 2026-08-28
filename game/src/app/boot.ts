@@ -36,6 +36,10 @@ import { InteractionDispatcher } from "../world/interactions.js";
 import { REGIONS, getRegion, validateRegions } from "../content/regions.js";
 import { scatterWorld, worldExclusions } from "../world/scatter.js";
 import { findShot, shotIds } from "../debug/shots.js";
+import { installAgentSurface } from "../agent/index.js";
+import { Overlays } from "../render/overlays.js";
+import { CharacterRig } from "../render/characterRig.js";
+import { DocSearch, buildDocs } from "../api/docs.js";
 
 export interface BootResult {
   loop: GameLoop;
@@ -197,7 +201,21 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   store.get().player.position = spawn;
   store.get().player.regionId = spawnSpec.regionId;
   store.get().player.facingRad = spawnFacing;
-  scene.createPlaceholderPlayer();
+  // A real skinned character rather than the round-0 capsule. If the rig fails to build for any
+  // reason the capsule stays as the fallback, because a missing player is unrecoverable and an
+  // ugly player is not.
+  const playerRig = new CharacterRig(assets);
+  const rigged = await playerRig.build({
+    bodyAssetId: "base_male",
+    outfitAssetIds: ["outfit_male_peasant_chest", "outfit_male_peasant_legs", "outfit_male_peasant_boots"],
+  });
+  if (rigged) {
+    scene.entityGroup.add(playerRig.root);
+    playerRig.setPosition(spawn, spawnFacing);
+  } else {
+    errors.push({ atMs: atMs(), source: "characterRig", message: "Player rig failed to build; using the placeholder" });
+    scene.createPlaceholderPlayer();
+  }
   scene.syncPlayer(spawn, spawnFacing, true);
   camera.setPose(spawnFacing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
   camera.update(spawn[0], spawn[1], spawn[2], true);
@@ -228,6 +246,26 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
   api.register("interactions", { run: (id, interaction) => interactions.run(id, interaction) });
 
+  // Assistance overlays. Presentation only: drawing one never changes canonical state, which is
+  // what makes it safe to let an agent write here.
+  const labelRoot = document.getElementById("ui-root") ?? document.body;
+  const overlays = new Overlays({
+    scene,
+    camera: renderer.camera,
+    entityPosition: (entityId) => entityStore.get(entityId)?.position ?? null,
+    labelRoot,
+  });
+  api.register("overlays", {
+    set: (spec) => overlays.set(spec, clock.elapsedMs),
+    clear: (id) => overlays.clear(id),
+  });
+
+  // Documentation, generated from the same canonical content the runtime uses, so the docs cannot
+  // drift from the game. Public knowledge only — hidden quest state never reaches this index.
+  const docs = new DocSearch();
+  docs.build(buildDocs());
+  api.register("docs", { search: (query, limit) => docs.search(query, limit) });
+
   // 15. Input.
   const input = new InputController(canvas, renderer, camera, api, movement);
   input.setEntityPickSource((raycaster) => {
@@ -243,6 +281,11 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
   const keyboard = new KeyboardController({ api });
 
+  // The agent surface. Always installed at window.corealm.agent, and mirrored onto whichever
+  // model-context container the browser provides. One implementation, three ways in.
+  const version = { build: "phase1-round2", contracts: "3", content: "1" };
+  const agent = installAgentSurface(api, { version });
+
   const loop = new GameLoop({
     store, events, clock, rng, renderer, camera, scene, physics, nav, movement, api, saves, input,
   });
@@ -251,6 +294,8 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // terrace. That single pose measured 803 draw calls against a 400 budget. The dungeon is only
   // visible from inside it.
   const playerInDungeon = (): boolean => store.get().player.regionId === "gravelmaw";
+  loop.setOverlays(overlays);
+  if (rigged) loop.setPlayerRig(playerRig);
   loop.setEntityViews(entityViews, () => {
     const inside = playerInDungeon();
     return entityStore.all().filter((entity) => (entity.regionId === "gravelmaw") === inside);
@@ -285,7 +330,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   installGameDebug({
     store, events, clock, nav, movement, api, renderer, camera, assets, errors,
-    version: { build: "phase1-round1", contracts: "2", content: "1" },
+    version,
     resetWorld,
     isIdle: () => store.get().player.movement.mode === "idle" && store.get().activity === null,
     teleport: (to: Vec3) => {
@@ -324,7 +369,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       return true;
     },
     listShots: () => shotIds(),
-    callTool: () => Promise.reject(new Error("Agent tools arrive in round 6")),
+    callTool: (name: string, args: unknown) => agent.call(name, (args ?? {}) as Record<string, unknown>),
   });
 
   void keyboard;
