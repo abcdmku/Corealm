@@ -62,6 +62,8 @@ export interface DebugDeps {
   focusCamera(shotId: string): boolean;
   listShots(): string[];
   callTool(name: string, args: unknown): Promise<unknown>;
+  /** Test-only item grant. Goes through the real inventory so slot limits still apply. */
+  giveItem(itemId: ItemId, quantity: number, to: "inventory" | "bank"): unknown;
 }
 
 function xyz(value: Vec3): { x: number; y: number; z: number } {
@@ -375,9 +377,7 @@ export function installGameDebug(deps: DebugDeps): void {
     },
 
     giveItem(itemId: ItemId, quantity: number, to: "inventory" | "bank" = "inventory"): unknown {
-      const hook = (api.hooks as { debugGive?: (id: ItemId, qty: number, to: string) => unknown }).debugGive;
-      if (!hook) return { ok: false, error: { code: "UNAVAILABLE", message: "Inventory system is not available yet" } };
-      return hook(itemId, quantity, to);
+      return deps.giveItem(itemId, quantity, to);
     },
   };
 

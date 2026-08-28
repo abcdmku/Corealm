@@ -33,10 +33,28 @@ import { CAMERA } from "./config.js";
 import { buildWorld, type BuildingBox } from "../world/regionBuilder.js";
 import { EntityStore, straightLineDistance } from "../world/entities.js";
 import { InteractionDispatcher } from "../world/interactions.js";
+import { InventorySystem } from "../systems/inventory.js";
+import { BankSystem } from "../systems/bank.js";
+import { EquipmentSystem } from "../systems/equipment.js";
+import { EconomySystem } from "../systems/economy.js";
+import { ActivitySystem } from "../systems/activity.js";
+import { GatheringSystem } from "../systems/gathering.js";
+import { FarmingSystem } from "../systems/farming.js";
+import { AgilitySystem } from "../systems/agility.js";
+import { INTERACT_RANGE } from "./config.js";
+import { distanceXZ } from "../core/math.js";
 import { REGIONS, getRegion, validateRegions } from "../content/regions.js";
+import { content } from "../content/index.js";
+import { ALL_ITEMS } from "../content/items.js";
+import { RESOURCES } from "../content/resources.js";
+import { RECIPES } from "../content/recipes.js";
+import { SPELLS } from "../content/spells.js";
+import { ENEMIES } from "../content/enemies.js";
+import { SHOPS } from "../content/shops.js";
 import { scatterWorld, worldExclusions } from "../world/scatter.js";
 import { findShot, shotIds } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
+import { createUi } from "../ui/panels.js";
 import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
 import { Vfx } from "../render/vfx.js";
@@ -67,8 +85,25 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   const clock = new SimClock();
   const rng = new RngStreams(store.get().meta.seed);
 
+  // Canonical content is registered before anything can ask for it. Systems and the docs index all
+  // read through `content`, so this has to happen before the first tick and before buildDocs().
+  content.register({
+    items: ALL_ITEMS,
+    resources: RESOURCES,
+    recipes: RECIPES,
+    spells: SPELLS,
+    enemies: ENEMIES,
+    shops: SHOPS,
+  });
+
   for (const problem of validateRegions()) {
     errors.push({ atMs: atMs(), source: "content.regions", message: problem });
+  }
+
+  // Cross-table integrity: a recipe naming an ingredient that does not exist, or a shop stocking a
+  // phantom item, is invisible until a player tries it mid-session.
+  for (const problem of validateContentTables()) {
+    errors.push({ atMs: atMs(), source: "content.tables", message: problem });
   }
 
   // 3 + 4. WASM libraries. Both must finish before any world building.
@@ -245,6 +280,74 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     skillLevels,
   });
 
+  // ---- Round 2 systems. Construction order follows the dependency chain: inventory first, then
+  // the systems that move items, then the activity spine, then the activities themselves.
+
+  const now = (): number => clock.elapsedMs;
+
+  /** True when the player is close enough to interact with any entity of a given archetype. */
+  const nearArchetype = (archetype: string): boolean => {
+    const position = store.get().player.position;
+    for (const entity of entityStore.all()) {
+      if (entity.archetype !== archetype) continue;
+      if (distanceXZ(position, entity.position) <= INTERACT_RANGE * 2.2) return true;
+    }
+    return false;
+  };
+
+  // `use()` on a wearable should equip it, which is what clicking a sword means. Equipment does not
+  // exist yet at this point, so the dep is a late-bound closure rather than a direct reference.
+  let equipmentSystem: EquipmentSystem | undefined;
+  const inventorySystem = new InventorySystem({
+    store, events, now,
+    equip: (itemId) => equipmentSystem
+      ? equipmentSystem.equip(itemId)
+      : { ok: false as const, error: { code: "UNAVAILABLE" as const, message: "Equipment is not ready" } },
+  });
+  equipmentSystem = new EquipmentSystem({ store, events, inventory: inventorySystem, now });
+  const bankSystem = new BankSystem({
+    store, events, inventory: inventorySystem, now,
+    inRangeOfBank: () => nearArchetype("bank"),
+  });
+  const economySystem = new EconomySystem({
+    store, events, inventory: inventorySystem, now,
+    resolveShop: (shopId) => {
+      const position = store.get().player.position;
+      const shops = entityStore.all().filter((entity) => entity.archetype === "shop");
+      const chosen = shopId
+        ? shops.find((entity) => entity.id === shopId)
+        // With no id, the nearest shop is what the player is obviously standing at.
+        : shops.sort((a, b) => distanceXZ(position, a.position) - distanceXZ(position, b.position))[0];
+      if (!chosen) return undefined;
+      return {
+        entityId: chosen.id,
+        contentShopId: String(chosen.meta?.shopId ?? chosen.id),
+        inRange: distanceXZ(position, chosen.position) <= INTERACT_RANGE * 2.2,
+      };
+    },
+  });
+
+  const activitySystem = new ActivitySystem(store, events);
+  const gatheringSystem = new GatheringSystem({
+    store, events, clock, rng, entities: entityStore,
+    inventory: inventorySystem, activity: activitySystem, dispatcher: interactions,
+  });
+  const farmingSystem = new FarmingSystem({
+    store, events, clock, rng, entities: entityStore,
+    inventory: inventorySystem, activity: activitySystem, dispatcher: interactions,
+    gathering: gatheringSystem,
+  });
+  const agilitySystem = new AgilitySystem({
+    store, events, clock, rng, entities: entityStore,
+    activity: activitySystem, dispatcher: interactions, nav,
+  });
+
+  api.register("inventory", inventorySystem);
+  api.register("equipment", equipmentSystem);
+  api.register("bank", bankSystem);
+  api.register("shop", economySystem);
+  api.register("activity", activitySystem.hook());
+
   api.register("entities", {
     get: (id) => entityStore.get(id),
     all: () => entityStore.all(),
@@ -308,6 +411,22 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   // The agent surface. Always installed at window.corealm.agent, and mirrored onto whichever
   // model-context container the browser provides. One implementation, three ways in.
+  // The human UI. Everything it does goes through GameApi, the same object the agent tools call.
+  const ui = createUi(api, {
+    // OrbitCamera yaw is measured from +z clockwise; the compass wants a heading in the same frame.
+    getHeadingRad: () => camera.yaw,
+  });
+  ui.mount(labelRoot);
+
+  // A bank or shop interaction has no event of its own, so the panel opens off the successful
+  // interaction rather than off a signal that does not exist.
+  events.subscribe((event) => {
+    if (event.type !== "activity.started" || !event.entityId) return;
+    const entity = entityStore.get(event.entityId);
+    if (entity?.archetype === "bank") ui.openBank(entity.id);
+    else if (entity?.archetype === "shop") ui.openShop(entity.id);
+  });
+
   const version = { build: "phase1-round2", contracts: "3", content: "1" };
   const agent = installAgentSurface(api, { version });
 
@@ -319,8 +438,15 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // terrace. That single pose measured 803 draw calls against a 400 budget. The dungeon is only
   // visible from inside it.
   const playerInDungeon = (): boolean => store.get().player.regionId === "gravelmaw";
+  // Tick order is each system's own `order` field, following the PRD's documented update order.
+  loop.addSystem(activitySystem);
+  loop.addSystem(agilitySystem);
+  loop.addSystem(gatheringSystem);
+  loop.addSystem(farmingSystem);
+
   loop.setOverlays(overlays);
   loop.setVfx(vfx);
+  loop.setUi(ui);
   if (rigged) loop.setPlayerRig(playerRig);
   loop.setEntityViews(entityViews, () => {
     const inside = playerInDungeon();
@@ -380,6 +506,11 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
      * Moves the camera to a named repeatable pose. Screenshots and the perf budget both use these,
      * so a shot points at the thing it is named after rather than at a fixed compass bearing.
      */
+    giveItem: (itemId: string, quantity: number, to: string) => (
+      to === "bank"
+        ? bankSystem.op("deposit", { itemId, quantity })
+        : inventorySystem.addItem(itemId, quantity)
+    ),
     focusCamera: (shotId: string) => {
       const shot = findShot(shotId);
       if (!shot) return false;
@@ -402,6 +533,46 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   document.getElementById("boot-screen")?.remove();
   loop.start();
   return { loop, api };
+}
+
+/**
+ * Cross-checks the canonical tables against each other.
+ *
+ * Each table is authored in its own file, so nothing but a pass like this catches a recipe whose
+ * ingredient id was renamed, an enemy dropping an item that was never defined, or a spell costing
+ * a reagent that does not exist.
+ */
+function validateContentTables(): string[] {
+  const problems: string[] = [];
+  const itemIds = new Set(content.allItems().map((item) => item.id));
+
+  const requireItem = (itemId: string, where: string): void => {
+    if (!itemIds.has(itemId)) problems.push(`${where} references unknown item "${itemId}"`);
+  };
+
+  for (const resource of content.allResources()) {
+    requireItem(resource.itemId, `resource ${resource.id}`);
+    for (const bonus of resource.bonus ?? []) requireItem(bonus.itemId, `resource ${resource.id} bonus`);
+  }
+  for (const recipe of content.allRecipes()) {
+    for (const input of recipe.inputs) requireItem(input.itemId, `recipe ${recipe.id} input`);
+    requireItem(recipe.output.itemId, `recipe ${recipe.id} output`);
+    if (recipe.burntItemId) requireItem(recipe.burntItemId, `recipe ${recipe.id} burnt`);
+  }
+  for (const spell of content.allSpells()) requireItem(spell.cost.itemId, `spell ${spell.id} cost`);
+  for (const enemy of content.allEnemies()) {
+    for (const drop of enemy.drops) requireItem(drop.itemId, `enemy ${enemy.id} drop`);
+  }
+  for (const shop of content.allShops()) {
+    for (const entry of shop.stock) requireItem(entry.itemId, `shop ${shop.id} stock`);
+  }
+
+  const seen = new Set<string>();
+  for (const item of content.allItems()) {
+    if (seen.has(item.id)) problems.push(`duplicate item id "${item.id}"`);
+    seen.add(item.id);
+  }
+  return problems;
 }
 
 /**

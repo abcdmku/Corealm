@@ -22,6 +22,7 @@ import type { EntityViews } from "../render/entityViews.js";
 import type { Overlays } from "../render/overlays.js";
 import type { CharacterRig } from "../render/characterRig.js";
 import type { Vfx } from "../render/vfx.js";
+import type { Ui } from "../ui/panels.js";
 import type { SemanticEntity } from "../contracts.js";
 import { SIM_TICK_MS } from "../core/time.js";
 import { AUTOSAVE_INTERVAL_MS } from "./config.js";
@@ -62,6 +63,7 @@ export class GameLoop {
   private overlays: Overlays | null = null;
   private playerRig: CharacterRig | null = null;
   private vfx: Vfx | null = null;
+  private ui: Ui | null = null;
   private lastPlayerPos: [number, number, number] | null = null;
 
   constructor(private readonly deps: LoopDeps) {}
@@ -91,6 +93,11 @@ export class GameLoop {
   /** Floating combat and XP feedback. Ticked on real time so it reads the same at any time scale. */
   setVfx(vfx: Vfx): void {
     this.vfx = vfx;
+  }
+
+  /** The human UI. `update()` is internally throttled, so calling it every frame is correct. */
+  setUi(ui: Ui): void {
+    this.ui = ui;
   }
 
   /** Later rounds register their systems here. Kept sorted by declared order. */
@@ -161,6 +168,7 @@ export class GameLoop {
     this.entityViews?.update(realDeltaMs / 1000, renderer.camera.position);
     this.overlays?.update(this.deps.clock.elapsedMs);
     this.vfx?.update(nowMs);
+    this.ui?.update();
     this.syncPlayerRig(state.player.position, state.player.facingRad, realDeltaMs);
     scene.syncPlayer(state.player.position, state.player.facingRad);
     camera.update(state.player.position[0], state.player.position[1], state.player.position[2]);

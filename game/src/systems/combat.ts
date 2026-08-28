@@ -20,7 +20,7 @@
  * seeded `loot` stream (drop rolls), so a fight replays identically from a seed and a tick count.
  */
 import type {
-  EntityId, EquipSlot, EquipmentBonuses, InteractionId, ItemId, ItemStack, Result,
+  EntityId, EquipSlot, EquipmentBonuses, GameErrorCode, ItemId, ItemStack, Result,
   SemanticEntity, SkillId, SpellId, Vec3,
 } from "../contracts.js";
 import { err, ok } from "../contracts.js";
@@ -276,7 +276,7 @@ export class CombatSystem implements TickSystem {
     if (!entity) return err("NOT_FOUND", `No entity with id ${entityId}`, entityId);
 
     const problem = this.rejectTarget(entity);
-    if (problem) return problem;
+    if (problem) return err(problem.code, problem.message, entity.id);
 
     const gap = distanceXZ(state.player.position, entity.position);
     if (gap > MAX_PURSUE_METRES) {
@@ -311,7 +311,7 @@ export class CombatSystem implements TickSystem {
     if (!entity) return err("NOT_FOUND", `No entity with id ${entityId}`, entityId);
 
     const problem = this.rejectTarget(entity);
-    if (problem) return problem as Result<{ targetId: EntityId; castMs: number }>;
+    if (problem) return err(problem.code, problem.message, entity.id);
 
     const gap = distanceXZ(state.player.position, entity.position);
     if (gap > MAX_PURSUE_METRES) {
@@ -830,12 +830,12 @@ export class CombatSystem implements TickSystem {
 
   // ------------------------------------------------------------- internals
 
-  private rejectTarget<T>(entity: SemanticEntity): Result<T> | undefined {
+  private rejectTarget(entity: SemanticEntity): { code: GameErrorCode; message: string } | undefined {
     if (entity.archetype !== "enemy" && entity.archetype !== "boss") {
-      return err("INVALID_ARGUMENT", `${entity.name} is not something you can attack.`, entity.id);
+      return { code: "INVALID_ARGUMENT", message: `${entity.name} is not something you can attack.` };
     }
     if (entity.state === "dead") {
-      return err("INVALID_ARGUMENT", `${entity.name} is already dead.`, entity.id);
+      return { code: "INVALID_ARGUMENT", message: `${entity.name} is already dead.` };
     }
     return undefined;
   }

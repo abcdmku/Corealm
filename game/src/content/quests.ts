@@ -1,0 +1,974 @@
+/**
+ * The ten Phase 1 quests, as pure data.
+ *
+ * Design rules this file is written against, from the brief and PRD 7.3:
+ *
+ *  1. **Every objective is a sentence a player and an agent can both act on.** "Mine 6 Grithe ore
+ *     at the Bracken Pit (item `grithe_ore`)", never "Help Dorn". Where an objective names a place,
+ *     an entity, or an item, it names the *id*, because `moveTo({ locationId })`,
+ *     `interact(entityId, ...)` and `getInventory()` all take ids and an external agent has no
+ *     other way to turn prose into an action.
+ *  2. **Every completion is a machine-checkable predicate** over quest counters, quest flags,
+ *     inventory, the bank, skills, or live entity state. There is no "the player did the thing"
+ *     boolean that only a human can judge.
+ *  3. **Nothing depends on a visual cue.** No stage says "look for the glowing rock". The three
+ *     Gravelmaw levers are a real inference puzzle whose entire input is dialogue text, so an agent
+ *     reading `corealm_dialogue` can solve it with no pixels at all.
+ *  4. **Requirements gate, they never soft-lock.** Every requirement listed on a quest is reachable
+ *     from a fresh character with no other quest completed, and every stage that needs a consumable
+ *     either grants it in `onStart` or names a place to gather it.
+ *
+ * `systems/quests.ts` evaluates the predicates; this file never imports it.
+ */
+import type { EntityId, ItemId, ItemStack, QuestId, RecipeId, RegionId, SkillId } from "../contracts.js";
+
+// ------------------------------------------------------------------- shapes
+
+/**
+ * A stage completion test.
+ *
+ * Every arm is decidable from `GameState` plus the entity table, which is what lets the quest
+ * system re-evaluate on an event rather than asking a system "did you just do a thing".
+ */
+export type QuestPredicate =
+  /** The player reached a specific dialogue node with a specific NPC. */
+  | { kind: "talk"; npcId: EntityId; dialogueNodeId: string }
+  /** Carrying at least this many, right now. */
+  | { kind: "have"; itemId: ItemId; quantity: number }
+  /** Stored in the bank, right now. */
+  | { kind: "banked"; itemId: ItemId; quantity: number }
+  /** Worn in any equipment slot. */
+  | { kind: "equipped"; itemId: ItemId }
+  /** Kills of an enemy family since the stage began, counted off `combat.ended`. */
+  | { kind: "kill"; enemyFamily: string; count: number }
+  /** Units of an item received since the stage began, counted off `item.received`. */
+  | { kind: "gather"; itemId: ItemId; count: number }
+  /** Successful, unburnt productions of a recipe, counted off `production.completed`. */
+  | { kind: "produce"; recipeId: RecipeId; count: number }
+  /** Nodes of this resource worked to exhaustion, counted off `resource.depleted`. */
+  | { kind: "deplete"; itemId: ItemId; count: number }
+  /** Player is within `radius` metres (XZ) of a route-graph location. Default 14 m. */
+  | { kind: "reach"; locationId: string; radius?: number }
+  /** Player is within `radius` metres (XZ) of a named entity. Default 12 m. */
+  | { kind: "nearEntity"; entityId: EntityId; radius?: number }
+  /** The agility obstacle has been traversed at least once, per `world.obstaclesUsed`. */
+  | { kind: "traverse"; obstacleId: EntityId }
+  /** A live entity is in a given state, e.g. a door that is now "open". */
+  | { kind: "entityState"; entityId: EntityId; state: string }
+  | { kind: "skill"; skill: SkillId; level: number }
+  /** A flag on this quest's own record. */
+  | { kind: "flag"; flag: string; value?: boolean }
+  /** A counter on this quest's own record. */
+  | { kind: "counter"; counter: string; atLeast: number }
+  /** Every child must hold. Used where one objective genuinely has two halves. */
+  | { kind: "all"; of: QuestPredicate[] };
+
+/** What a stage or a completion hands over. Applied exactly once. */
+export interface QuestGrant {
+  xp?: Partial<Record<SkillId, number>>;
+  items?: ItemStack[];
+  /** Taken out of the inventory, e.g. handing over a delivery. Missing items are not an error. */
+  takeItems?: ItemStack[];
+  currency?: number;
+  /** Flags set on this quest's record. */
+  flags?: string[];
+  /** World writes, e.g. unbarring a door. Applied through the injected world port. */
+  worldState?: { entityId: EntityId; state: string; lockedReason?: string }[];
+  /** Plain text for the quest panel and the docs index. */
+  unlocks?: string[];
+}
+
+export interface QuestStageDef {
+  index: number;
+  /** Shown in the quest panel and returned by `getQuests().currentObjective`. */
+  objective: string;
+  /** One line of "how", surfaced through docs search and the quest panel. */
+  hint: string;
+  completion: QuestPredicate;
+  /** Applied when this stage completes, before the next stage starts. */
+  grants?: QuestGrant;
+  /**
+   * Mid-stage reactions. Applied at most once each, the first time the named flag is true while
+   * this stage is the current one. This is how a dialogue choice reaches back into the world
+   * without the dialogue system needing world access: the choice sets a flag, the flag unbars a
+   * door. The Long Cairn's stage 5 is the only user in Phase 1.
+   */
+  onFlag?: { flag: string; grant: QuestGrant }[];
+}
+
+export interface QuestDef {
+  id: QuestId;
+  name: string;
+  regionId: RegionId;
+  kind: "local" | "skill" | "puzzle" | "dungeon" | "chain";
+  /** One paragraph for the journal and the docs index. Never leaks a later stage. */
+  summary: string;
+  /** The NPC id that starts it. `npcGivingQuest` in content/npcs.ts agrees with this. */
+  giverNpcId: EntityId;
+  requirements: Partial<Record<SkillId, number>>;
+  prerequisiteQuestIds: QuestId[];
+  /** Handed over the moment the quest starts, so no stage can strand a fresh character. */
+  onStart?: QuestGrant;
+  stages: QuestStageDef[];
+  /** PRD 7.3 shape. Applied once, on completion, on top of every stage grant. */
+  rewards: {
+    xp: Partial<Record<SkillId, number>>;
+    items: ItemStack[];
+    currency: number;
+    unlocks: string[];
+    worldState?: { entityId: EntityId; state: string; lockedReason?: string }[];
+  };
+}
+
+// ------------------------------------------------------------------ quest 1
+
+/**
+ * The starter, and the only quest whose numbers are load-bearing for a test.
+ *
+ * PRD acceptance F2 starts it by id and F3 asserts the exact reward XP per skill, the exact item
+ * stacks, and the exact mark amount, so `cold_iron` deliberately has **no per-stage grants**: every
+ * number a test can see lives in one `rewards` block.
+ *
+ * It also teaches the whole material loop in four stages and nothing else: gather, smelt, smith,
+ * use. Stage 4 requires the dagger to be equipped as well as swung, because the equipment slot is
+ * the step new players skip.
+ */
+const COLD_IRON: QuestDef = {
+  id: "cold_iron",
+  name: "Cold Iron",
+  regionId: "fallowmarch",
+  kind: "skill",
+  summary:
+    "Harrow the smith will not sell a weapon to somebody who has never made one. Pull Grithe out "
+    + "of the Bracken Pit, melt it, beat it into a dagger, and go and find out whether it holds.",
+  giverNpcId: "npc_smith_harrow",
+  requirements: {},
+  prerequisiteQuestIds: [],
+  stages: [
+    {
+      index: 0,
+      objective: "Mine 6 Grithe ore (item `grithe_ore`) at the Bracken Pit (locationId `bracken_pit`).",
+      hint:
+        "Six seams stand at the pit, 160 m north of Coldbrace. `moveTo({ locationId: "
+        + "\"bracken_pit\" })`, then `interact(<ore entity id>, \"mine\")`. Mining 1 is enough.",
+      completion: { kind: "gather", itemId: "grithe_ore", count: 6 },
+    },
+    {
+      index: 1,
+      objective: "Smelt 2 Grithe bars (item `grithe_bar`) at the Coldbrace Furnace (entity `coldbrace_furnace`).",
+      hint:
+        "Stand at the furnace and `produce(\"smelt_grithe_bar\", 2)`. The furnace is in the forge "
+        + "yard on the east side of Coldbrace Square.",
+      completion: { kind: "have", itemId: "grithe_bar", quantity: 2 },
+    },
+    {
+      index: 2,
+      objective: "Smith a Grithe dagger (item `grithe_dagger`) at the Coldbrace Anvil (entity `coldbrace_anvil`).",
+      hint: "The anvil stands four metres from the furnace. The dagger is the cheapest thing on it.",
+      completion: { kind: "have", itemId: "grithe_dagger", quantity: 1 },
+    },
+    {
+      index: 3,
+      objective:
+        "Equip the Grithe dagger and kill 3 Rill Skitterlings (enemy family `skitterling`) on the "
+        + "brook flats south-east of town.",
+      hint:
+        "`equipItem(\"grithe_dagger\")` first - the stage checks the slot, not just the bag. The "
+        + "Rill Skitterlings are passive and sit around (-88, -70), between town and the shallows.",
+      completion: {
+        kind: "all",
+        of: [
+          { kind: "equipped", itemId: "grithe_dagger" },
+          { kind: "kill", enemyFamily: "skitterling", count: 3 },
+        ],
+      },
+    },
+    {
+      index: 4,
+      objective: "Tell Harrow the Smith (entity `npc_smith_harrow`) that the dagger held.",
+      hint: "Walk back into Coldbrace Square and `interact(\"npc_smith_harrow\", \"talk\")`.",
+      completion: { kind: "talk", npcId: "npc_smith_harrow", dialogueNodeId: "harrow_cold_iron_done" },
+    },
+  ],
+  rewards: {
+    xp: { mining: 120, smithing: 140, melee: 60 },
+    items: [
+      { itemId: "grithe_hatchet", quantity: 1 },
+      { itemId: "seared_minnow", quantity: 5 },
+    ],
+    currency: 150,
+    unlocks: [
+      "Harrow will talk about the higher tiers.",
+      "The rest of Coldbrace will give you work.",
+    ],
+  },
+};
+
+// ------------------------------------------------------------------ quest 2
+
+/**
+ * The counting puzzle. Dorn's ledger says a Grithe seam holds one number and the pit says another,
+ * and the only way to settle it is to work a seam dry and read what the world reports.
+ *
+ * The answer is not authored into the dialogue: the quest system records the real `yieldsTaken`
+ * from the `resource.depleted` event into the `last_seam_yield` counter, and Dorn's three answers
+ * are checked against it. A player who guesses gets sent back to the pit; nobody is locked out.
+ */
+const DORNS_TALLY: QuestDef = {
+  id: "dorns_tally",
+  name: "Dorn's Tally",
+  regionId: "fallowmarch",
+  kind: "puzzle",
+  summary:
+    "The March Company ledger says a Grithe seam is worth four loads. Pitmaster Dorn has been "
+    + "signing that figure for nine years and has never once believed it. Work a seam to the "
+    + "bottom, count what it actually gave, and settle the argument with a number.",
+  giverNpcId: "npc_pitmaster_dorn",
+  requirements: {},
+  prerequisiteQuestIds: [],
+  stages: [
+    {
+      index: 0,
+      objective:
+        "Work one Grithe seam at the Bracken Pit (locationId `bracken_pit`) until it is worked "
+        + "out - keep mining the same node until `resource.depleted` fires for `grithe_ore`.",
+      hint:
+        "Pick one seam and stay on it. `inspect` the node while you work: its `resource.remaining` "
+        + "counts down, and the event that ends it carries `yieldsTaken`, which is the number Dorn "
+        + "wants.",
+      completion: { kind: "deplete", itemId: "grithe_ore", count: 1 },
+      grants: { xp: { mining: 40 } },
+    },
+    {
+      index: 1,
+      objective:
+        "Tell Pitmaster Dorn (entity `npc_pitmaster_dorn`) how many loads the seam actually gave. "
+        + "He offers three bands; pick the one your seam fell into.",
+      hint:
+        "The exact figure was in the `resource.depleted` event, and the quest kept it: it is the "
+        + "`last_seam_yield` counter on this quest's record. Guess wrong and Dorn sends you back "
+        + "to check, which costs nothing but a walk.",
+      completion: { kind: "talk", npcId: "npc_pitmaster_dorn", dialogueNodeId: "dorn_tally_correct" },
+      grants: { xp: { mining: 60 }, flags: ["ledger_corrected"] },
+    },
+    {
+      index: 2,
+      objective:
+        "Make the vault agree with the ledger: bank 15 Grithe ore (item `grithe_ore`) at the "
+        + "Coldbrace Bank (entity `coldbrace_bank`).",
+      hint:
+        "Walk to the bank counter and `bank(\"deposit\", { itemId: \"grithe_ore\", quantity: -1 })`. "
+        + "The stage counts what is in the bank, not what you carried in.",
+      completion: { kind: "banked", itemId: "grithe_ore", quantity: 15 },
+    },
+    {
+      index: 3,
+      objective: "Sign the corrected page with Pitmaster Dorn (entity `npc_pitmaster_dorn`).",
+      hint: "Back to the square. He will have a pen ready; he always has a pen ready.",
+      completion: { kind: "talk", npcId: "npc_pitmaster_dorn", dialogueNodeId: "dorn_tally_signed" },
+    },
+  ],
+  rewards: {
+    xp: { mining: 260 },
+    items: [{ itemId: "grithe_pickaxe", quantity: 1 }],
+    currency: 220,
+    unlocks: ["Dorn will quote you real seam figures instead of the ledger's."],
+  },
+};
+
+// ------------------------------------------------------------------ quest 3
+
+/**
+ * Three skill introductions in one tier-1 quest: farming, fishing, cooking. The seeds are handed
+ * over at the start so a fresh character never has to find a shop that sells them first.
+ */
+const BRIGHT_WATER: QuestDef = {
+  id: "bright_water",
+  name: "Bright Water",
+  regionId: "fallowmarch",
+  kind: "skill",
+  summary:
+    "Ranger Syb has walked the march for eleven weeks and eaten cold things for eleven weeks. "
+    + "She has stopped complaining about it, which everyone agrees is worse.",
+  giverNpcId: "npc_ranger_syb",
+  requirements: {},
+  prerequisiteQuestIds: [],
+  onStart: {
+    items: [{ itemId: "bittergrain_seed", quantity: 4 }],
+    unlocks: ["Syb hands you four Bittergrain seeds."],
+  },
+  stages: [
+    {
+      index: 0,
+      objective:
+        "Rake a plot at Marchfield (locationId `marchfield_farm`), plant a Bittergrain seed, and "
+        + "harvest 3 Bittergrain (item `bittergrain`).",
+      hint:
+        "Six plots sit inside the old wall line. `interact(<plot>, \"rake\")`, then `\"plant\"`, "
+        + "then wait for the plot to read `ready` and `\"harvest\"`. Bittergrain takes about four "
+        + "minutes of game time.",
+      completion: { kind: "have", itemId: "bittergrain", quantity: 3 },
+      grants: { xp: { farming: 45 } },
+    },
+    {
+      index: 1,
+      objective:
+        "Catch 4 Silt Minnow (item `silt_minnow`) at Redsill Shallows (locationId "
+        + "`redsill_shallows`).",
+      hint:
+        "Four fishing spots on the red silt, 120 m east of town. `interact(<spot>, \"fish\")`. "
+        + "Fishing 1 is enough; a rod is not required, only slower without one.",
+      completion: { kind: "gather", itemId: "silt_minnow", count: 4 },
+      grants: { xp: { fishing: 45 } },
+    },
+    {
+      index: 2,
+      objective:
+        "Cook 2 Seared Minnow (item `seared_minnow`) at the Coldbrace Cooking Range (entity "
+        + "`coldbrace_range`).",
+      hint:
+        "At Cooking 1 nearly half of them burn. That is the rule, not bad luck - cook spares. "
+        + "Burnt Minnow does not count.",
+      completion: { kind: "have", itemId: "seared_minnow", quantity: 2 },
+      grants: { xp: { cooking: 45 } },
+    },
+    {
+      index: 3,
+      objective:
+        "Give Ranger Syb (entity `npc_ranger_syb`) 2 Seared Minnow and 3 Bittergrain, and watch "
+        + "her eat a hot meal.",
+      hint: "She is in Coldbrace Square. The handover takes the food out of your bag.",
+      completion: { kind: "talk", npcId: "npc_ranger_syb", dialogueNodeId: "syb_meal_eaten" },
+    },
+  ],
+  rewards: {
+    xp: { farming: 90, fishing: 120, cooking: 120 },
+    items: [
+      { itemId: "palewood_rod", quantity: 1 },
+      { itemId: "bittergrain_seed", quantity: 6 },
+    ],
+    currency: 180,
+    unlocks: ["Syb will tell you where the water is in every region she has walked."],
+  },
+};
+
+// ------------------------------------------------------------------ quest 4
+
+/**
+ * The comedy, and the Agility introduction.
+ *
+ * Stage 1 completes on **Agility 3**, not on a fixed number of traversals: the Brookvault Planks
+ * are requirement level 1 and hand out Agility XP every time, so a fresh character trains the skill
+ * by doing the thing the quest is about. That also means the Wall Vault's level 3 gate in stage 2
+ * can never strand anyone.
+ */
+const THE_CARTERS_WAGER: QuestDef = {
+  id: "the_carters_wager",
+  name: "The Carter's Wager",
+  regionId: "fallowmarch",
+  kind: "local",
+  summary:
+    "Carter Bel has bet Warden Ilse two weeks of cart duty that the pit road is slower than going "
+    + "over things. Warden Ilse has cited three regulations. Carter Bel has cited a cousin.",
+  giverNpcId: "npc_carter_bel",
+  requirements: {},
+  prerequisiteQuestIds: [],
+  stages: [
+    {
+      index: 0,
+      objective:
+        "Train Agility to level 3 on the Brookvault Planks (entity `brookvault_planks`) - vault "
+        + "them until the skill comes up.",
+      hint:
+        "The planks cross Corven Brook at (-78, -30) and need Agility 1. Every successful vault "
+        + "pays Agility XP; a failure costs a few health and nothing else. `interact"
+        + "(\"brookvault_planks\", \"vault\")`.",
+      completion: { kind: "skill", skill: "agility", level: 3 },
+      grants: { xp: { agility: 30 } },
+    },
+    {
+      index: 1,
+      objective: "Vault the Coldbrace north wall (entity `wall_vault`) at least once.",
+      hint:
+        "It sits on the town's north wall at (-160, -56) and needs Agility 3, which stage 1 just "
+        + "bought you. It saves 44 m on the run to the pit, which is Bel's entire argument.",
+      completion: { kind: "traverse", obstacleId: "wall_vault" },
+      grants: { xp: { agility: 60 } },
+    },
+    {
+      index: 2,
+      objective:
+        "Report your time to Carter Bel (entity `npc_carter_bel`) at the south gate. He will "
+        + "believe whatever you say. Warden Ilse is standing directly behind him.",
+      hint:
+        "Every answer finishes the quest. Only one of them survives contact with the Warden, and "
+        + "the difference shows up in what those two say to you afterwards.",
+      completion: { kind: "talk", npcId: "npc_carter_bel", dialogueNodeId: "bel_wager_settled" },
+    },
+  ],
+  rewards: {
+    xp: { agility: 180 },
+    items: [{ itemId: "seared_minnow", quantity: 4 }],
+    currency: 260,
+    unlocks: [
+      "Warden Ilse will tell you where every shortcut in Fallowmarch is.",
+      "Carter Bel will tell you about a cousin.",
+    ],
+  },
+};
+
+// ------------------------------------------------------------------ quest 5
+
+const CROOKED_GRAIN: QuestDef = {
+  id: "crooked_grain",
+  name: "Crooked Grain",
+  regionId: "vellenwood",
+  kind: "skill",
+  summary:
+    "Woodward Ansel will let you take eight Duskoak out of his stand. He would like you to "
+    + "understand, first, which one you are not taking.",
+  giverNpcId: "npc_woodward_ansel",
+  requirements: { woodcutting: 5 },
+  prerequisiteQuestIds: [],
+  stages: [
+    {
+      index: 0,
+      objective:
+        "Fell Duskoak at the Duskoak Stand (locationId `vellenwood_canopy`) until you hold 8 "
+        + "Duskoak logs (item `duskoak_log`).",
+      hint:
+        "Ten trees stand there and Woodcutting 5 is the gate. Logs do not stack, so eight logs is "
+        + "eight inventory slots - bank anything else first.",
+      completion: { kind: "gather", itemId: "duskoak_log", count: 8 },
+      grants: { xp: { woodcutting: 120 } },
+    },
+    {
+      index: 1,
+      objective:
+        "Go and stand at the Split Duskoak (entity `split_duskoak`), the one tree Ansel will not "
+        + "let anybody cut.",
+      hint:
+        "It is at (170, 112), east of Rootfall past the Blackwater Pools. `observe({ radius: 140, "
+        + "archetypes: [\"landmark\"] })` finds it, then `moveTo({ entityId: \"split_duskoak\" })`. "
+        + "`inspect` it when you get there; it is still alive on one side.",
+      completion: { kind: "nearEntity", entityId: "split_duskoak", radius: 12 },
+      grants: { flags: ["saw_the_split_oak"] },
+    },
+    {
+      index: 2,
+      objective:
+        "Bring the 8 Duskoak logs back to Woodward Ansel (entity `npc_woodward_ansel`) in "
+        + "Rootfall and tell him what you saw.",
+      hint: "The handover takes the logs. He counts them; he counts everything from this stand.",
+      completion: { kind: "talk", npcId: "npc_woodward_ansel", dialogueNodeId: "ansel_logs_taken" },
+    },
+  ],
+  rewards: {
+    xp: { woodcutting: 420 },
+    items: [{ itemId: "corven_hatchet", quantity: 1 }],
+    currency: 400,
+    unlocks: ["Ansel will name the trees you are allowed to fell in the deep stand."],
+  },
+};
+
+// ------------------------------------------------------------------ quest 6
+
+const KNOTS_AND_NAMES: QuestDef = {
+  id: "knots_and_names",
+  name: "Knots and Names",
+  regionId: "vellenwood",
+  kind: "skill",
+  summary:
+    "Seamer Juno makes the parts of things: shafts, cord, hide, and the small bright shards that "
+    + "make a staff do anything at all. She will teach both trades to anyone who brings her the "
+    + "raw material and does not pretend to already know.",
+  giverNpcId: "npc_seamer_juno",
+  requirements: {},
+  prerequisiteQuestIds: [],
+  onStart: {
+    items: [{ itemId: "pale_quartz", quantity: 3 }],
+    unlocks: ["Juno hands you three Pale Quartz to start on."],
+  },
+  stages: [
+    {
+      index: 0,
+      objective:
+        "Fletch 4 Palewood shafts (item `palewood_shaft`) at a fletching bench (entity "
+        + "`coldbrace_fletching`).",
+      hint:
+        "Shafts come from Palewood logs, cut at the Palewood Copse in Fallowmarch (locationId "
+        + "`palewood_copse`). Coldbrace has the only fletching bench in Phase 1.",
+      completion: { kind: "have", itemId: "palewood_shaft", quantity: 4 },
+      grants: { xp: { fletching: 60 } },
+    },
+    {
+      index: 1,
+      objective:
+        "Craft 5 Essence Shards (item `essence_shard`) at a crafting table (entity "
+        + "`coldbrace_crafting`).",
+      hint:
+        "Shards come off gems. Pale Quartz drops as a bonus while mining Grithe, and Juno already "
+        + "gave you three to be going on with. Shards stack, so this is one inventory slot.",
+      completion: { kind: "have", itemId: "essence_shard", quantity: 5 },
+      grants: { xp: { crafting: 60 } },
+    },
+    {
+      index: 2,
+      objective:
+        "Bring Seamer Juno (entity `npc_seamer_juno`) the 4 shafts and 5 shards so she can show "
+        + "you what they are for.",
+      hint: "She works the trade post side of the Rootfall stump. The handover takes both.",
+      completion: { kind: "talk", npcId: "npc_seamer_juno", dialogueNodeId: "juno_parts_taken" },
+    },
+  ],
+  rewards: {
+    xp: { crafting: 240, fletching: 240 },
+    items: [
+      { itemId: "bramblehide_wraps", quantity: 1 },
+      { itemId: "essence_shard", quantity: 10 },
+    ],
+    currency: 300,
+    unlocks: ["Juno will explain what an essence shard is actually doing inside a spell."],
+  },
+};
+
+// ------------------------------------------------------------------ quest 7
+
+/**
+ * The exploration quest, and the second joke. Four `reach` predicates in one stage: the objective
+ * lists all four location ids, so an agent can plan the circuit in one read rather than being fed
+ * one waypoint at a time.
+ */
+const ELEVEN_EMPTY_DAYS: QuestDef = {
+  id: "eleven_empty_days",
+  name: "Eleven Empty Days",
+  regionId: "vellenwood",
+  kind: "local",
+  summary:
+    "Trapper Mott has eleven traps in the deep wood. In eleven days they have caught eleven "
+    + "nothings. He would like a second opinion, and he would like it delivered gently.",
+  giverNpcId: "npc_trapper_mott",
+  requirements: {},
+  prerequisiteQuestIds: [],
+  stages: [
+    {
+      index: 0,
+      objective:
+        "Walk Mott's trap line: reach `blackwater_pools`, `gorge_head`, `thornline_camp`, and "
+        + "`gorge_ford`, in any order.",
+      hint:
+        "All four are route-graph nodes: `moveTo({ locationId })` reaches each one directly. The "
+        + "Thornline is where the Thornbound Husks keep to the edge, so go there with health to "
+        + "spare or take the long way round by the ford.",
+      completion: {
+        kind: "all",
+        of: [
+          { kind: "reach", locationId: "blackwater_pools" },
+          { kind: "reach", locationId: "gorge_head" },
+          { kind: "reach", locationId: "thornline_camp" },
+          { kind: "reach", locationId: "gorge_ford" },
+        ],
+      },
+      grants: { xp: { agility: 90 }, flags: ["walked_the_line"] },
+    },
+    {
+      index: 1,
+      objective:
+        "Something has been going through the bait. Kill 3 Bramble Skitterlings (enemy family "
+        + "`skitterling`) between Rootfall and the Thornline.",
+      hint: "They sit around (150, 128) and they are aggressive, so they will find you first.",
+      completion: { kind: "kill", enemyFamily: "skitterling", count: 3 },
+      grants: { xp: { melee: 150 } },
+    },
+    {
+      index: 2,
+      objective:
+        "Report to Trapper Mott (entity `npc_trapper_mott`) in Rootfall. Decide on the way "
+        + "whether to mention the thing you noticed about how his traps are set.",
+      hint:
+        "Both answers finish the quest. One of them changes what Mott says to you for the rest of "
+        + "the game, and it is not the kind one.",
+      completion: { kind: "talk", npcId: "npc_trapper_mott", dialogueNodeId: "mott_verdict_given" },
+    },
+  ],
+  rewards: {
+    xp: { melee: 200, agility: 120 },
+    items: [{ itemId: "seared_trout", quantity: 5 }],
+    currency: 420,
+    unlocks: ["Mott will tell you what is moving in the deep wood, at length, whether you ask or not."],
+  },
+};
+
+// ------------------------------------------------------------------ quest 8
+
+/**
+ * The route-optimisation quest. PRD 2.8's flip, made explicit: the same sixteen ore, once by road
+ * and once over Sunder Ledge, and Arden times both because Arden times everything.
+ */
+const BAD_GROUND: QuestDef = {
+  id: "bad_ground",
+  name: "Bad Ground",
+  regionId: "karrowmoor",
+  kind: "skill",
+  summary:
+    "Foreman Arden has a crew that stopped digging and a camp that still has to eat. He wants "
+    + "sixteen Kaldite in the Highcairn vault and he wants to know which way you walked to get it.",
+  giverNpcId: "npc_foreman_arden",
+  requirements: { mining: 10, agility: 10 },
+  prerequisiteQuestIds: [],
+  stages: [
+    {
+      index: 0,
+      objective:
+        "Mine 10 Kaldite ore (item `kaldite_ore`) at the Lower Quarry (locationId "
+        + "`karrowmoor_terraces`).",
+      hint:
+        "Five Kaldite faces on terrace one, next to the Gravelmaw mouth. Mining 10 is the gate. "
+        + "Ore does not stack: ten ore is ten slots.",
+      completion: { kind: "gather", itemId: "kaldite_ore", count: 10 },
+      grants: { xp: { mining: 150 } },
+    },
+    {
+      index: 1,
+      objective: "Climb Sunder Ledge (entity `sunder_ledge`) at least once.",
+      hint:
+        "It runs from the Highcairn bank at (170, -74) up to the Upper Karrow Seam and needs "
+        + "Agility 10. By road that trip is 188 m; over the ledge it is 46 m plus a six-second "
+        + "climb. Compare `moveTo` path lengths before and after if you want to see the flip.",
+      completion: { kind: "traverse", obstacleId: "sunder_ledge" },
+      grants: { xp: { agility: 120 }, flags: ["knows_the_ledge"] },
+    },
+    {
+      index: 2,
+      objective:
+        "Put 16 Kaldite ore (item `kaldite_ore`) into the Highcairn Bank (entity "
+        + "`highcairn_bank_counter`).",
+      hint:
+        "The Upper Karrow Seam is only three nodes and genuinely runs dry above Mining 20 - the "
+        + "Lower Quarry is the reliable half of the circuit. The stage counts the bank, not the bag.",
+      completion: { kind: "banked", itemId: "kaldite_ore", quantity: 16 },
+    },
+    {
+      index: 3,
+      objective: "Tell Foreman Arden (entity `npc_foreman_arden`) which route you used.",
+      hint: "He is at the middle of the camp. He will have the figure already; he always does.",
+      completion: { kind: "talk", npcId: "npc_foreman_arden", dialogueNodeId: "arden_route_reported" },
+    },
+  ],
+  rewards: {
+    xp: { mining: 900, agility: 400 },
+    items: [{ itemId: "kaldite_pickaxe", quantity: 1 }],
+    currency: 900,
+    unlocks: ["Arden will quote you the real distance between any two things on the moor."],
+  },
+};
+
+// ------------------------------------------------------------------ quest 9
+
+/**
+ * The Magic introduction. Vess hands over a staff on start, so a player who has never cast can
+ * reach the skill gate from a standing start with nothing borrowed.
+ */
+const SPARKING_STONE: QuestDef = {
+  id: "sparking_stone",
+  name: "The Sparking Stone",
+  regionId: "karrowmoor",
+  kind: "skill",
+  summary:
+    "Quarrier Vess has been cutting Kaldite for nine years and she has never liked what it does "
+    + "in the dark. She would like somebody who is not her to find out what is in it.",
+  giverNpcId: "npc_quarrier_vess",
+  requirements: { mining: 10 },
+  prerequisiteQuestIds: [],
+  onStart: {
+    items: [
+      { itemId: "palewood_staff", quantity: 1 },
+      { itemId: "essence_shard", quantity: 12 },
+    ],
+    unlocks: ["Vess lends you her brother's old staff and a dozen shards."],
+  },
+  stages: [
+    {
+      index: 0,
+      objective: "Equip the staff (item `palewood_staff`) Vess lent you.",
+      hint:
+        "`equipItem(\"palewood_staff\")`. A staff in the main hand is what lets `cast` resolve at "
+        + "all; the shards are the ammunition.",
+      completion: { kind: "equipped", itemId: "palewood_staff" },
+    },
+    {
+      index: 1,
+      objective: "Raise Magic to level 5 by casting Emberlash (`cast(\"emberlash\", <enemy>)`).",
+      hint:
+        "Every cast eats one Essence Shard and pays Magic XP for the damage. Skitterlings on the "
+        + "moor around (170, -160) are the cheap target; Cairnwights are not. Craft more shards at "
+        + "a crafting table if you run out - gems drop while mining.",
+      completion: { kind: "skill", skill: "magic", level: 5 },
+      grants: { xp: { magic: 60 } },
+    },
+    {
+      index: 2,
+      objective:
+        "Bring Quarrier Vess (entity `npc_quarrier_vess`) 6 Kaldite ore (item `kaldite_ore`) so "
+        + "she can watch what a live spell does to it.",
+      hint: "She is at the middle of Highcairn. The handover takes the ore.",
+      completion: { kind: "talk", npcId: "npc_quarrier_vess", dialogueNodeId: "vess_stone_tested" },
+    },
+  ],
+  rewards: {
+    xp: { magic: 700, mining: 200 },
+    items: [
+      { itemId: "amber_focus", quantity: 1 },
+      { itemId: "essence_shard", quantity: 25 },
+    ],
+    currency: 700,
+    unlocks: ["Vess stops calling the Kaldite \"that\" and starts calling it by its name."],
+  },
+};
+
+// ----------------------------------------------------------------- quest 10
+
+/**
+ * THE LONG CAIRN - the seven-stage chain, and the only quest an external agent is graded on end to
+ * end (PRD F18). Every stage is discoverable and completable through `observe`, `inspect`,
+ * `interact` and `dialogue` alone.
+ *
+ * Stage 5 is the three-lever stone door in chamber 2, which PRD section 4 says is described in this
+ * quest's stage-5 dialogue. The description lives on Cairnkeeper Ode's `ode_long_cairn_levers` node
+ * and it is a genuine inference: Ode names the three mason's marks and the crew's rule for ordering
+ * them, and the six possible orders are all offered as live options. Nothing about the answer is
+ * visual, positional, or cultural - it is derivable from the text alone, which is exactly what an
+ * agent needs. Two wrong answers unlock a "just tell me" option, so the chain cannot dead-end.
+ *
+ * Completion opens `ordrun_gate`, the sealed door onto the boss arena. Ordrun himself is a separate
+ * fight; this chain earns the door, it does not fight what is behind it.
+ */
+const LONG_CAIRN: QuestDef = {
+  id: "long_cairn",
+  name: "The Long Cairn",
+  regionId: "karrowmoor",
+  kind: "chain",
+  summary:
+    "Somebody has been re-stacking the cairns on Karrowmoor. Cairnkeeper Ode knows every stone on "
+    + "this moor by name and she did not move them. The line of re-stacked cairns runs from terrace "
+    + "four down the ramps and into a hole the quarry crew stopped digging six months ago.",
+  giverNpcId: "npc_cairnkeeper_ode",
+  requirements: { melee: 10, mining: 10 },
+  prerequisiteQuestIds: [],
+  stages: [
+    {
+      index: 0,
+      objective:
+        "Go and look at the Great Cairn on terrace four: reach locationId `great_cairn` (entity "
+        + "`great_cairn_stone`).",
+      hint:
+        "`moveTo({ locationId: \"great_cairn\" })` from Highcairn goes bank -> Second Ramp -> Third "
+        + "Ramp -> the cairn. Cairnwights hold the ground around (100, -110) on the way, so travel "
+        + "fed and armed. `inspect(\"great_cairn_stone\")` when you arrive.",
+      completion: { kind: "reach", locationId: "great_cairn", radius: 16 },
+      grants: { xp: { mining: 120 }, flags: ["saw_great_cairn"] },
+    },
+    {
+      index: 1,
+      objective:
+        "Tell Cairnkeeper Ode (entity `npc_cairnkeeper_ode`) at Highcairn that the Great Cairn has "
+        + "been re-stacked.",
+      hint: "She stands on the west side of the camp, at (138, -68).",
+      completion: { kind: "talk", npcId: "npc_cairnkeeper_ode", dialogueNodeId: "ode_long_cairn_reported" },
+      grants: { xp: { melee: 120 }, currency: 150, flags: ["ode_knows"] },
+    },
+    {
+      index: 2,
+      objective:
+        "Ask Watcher Hale (entity `npc_watcher_hale`) what the rota has seen come out of the "
+        + "Gravelmaw.",
+      hint:
+        "Hale is at (152, -74), the east side of Highcairn. He watches the mouth for a living and "
+        + "he will tell you what is in the first chamber if you ask him directly.",
+      completion: { kind: "talk", npcId: "npc_watcher_hale", dialogueNodeId: "hale_gravelmaw_told" },
+      grants: { xp: { magic: 90 }, flags: ["knows_gravelmaw"] },
+    },
+    {
+      index: 3,
+      objective:
+        "Enter the Gravelmaw (entity `gravelmaw_mouth_portal`), kill 4 Cairnwights (enemy family "
+        + "`cairnwight`) in the Lit Gallery, and reach The Collapse (locationId "
+        + "`gravelmaw_chamber2`).",
+      hint:
+        "The mouth is at (46, -24) on terrace one, next to the Lower Quarry. Inside, "
+        + "`moveTo({ locationId: \"gravelmaw_chamber1\" })` then `\"gravelmaw_chamber2\"`. The "
+        + "gallery is lit; the collapse is not.",
+      completion: {
+        kind: "all",
+        of: [
+          { kind: "kill", enemyFamily: "cairnwight", count: 4 },
+          { kind: "reach", locationId: "gravelmaw_chamber2", radius: 16 },
+        ],
+      },
+      grants: { xp: { melee: 400 }, flags: ["cleared_gallery"] },
+    },
+    {
+      index: 4,
+      objective:
+        "Ask Cairnkeeper Ode (entity `npc_cairnkeeper_ode`) about the three levers, work out the "
+        + "order she describes, then open the Three-Lever Door (entity `gravelmaw_stone_door`) in "
+        + "The Collapse.",
+      hint:
+        "Ode describes all three mason's marks and the crew's rule for ordering them on her "
+        + "`ode_long_cairn_levers` node; the answer is in what she says, not in anything you have "
+        + "to see. Get it right and the door unbars, at which point "
+        + "`interact(\"gravelmaw_stone_door\", \"open\")` inside chamber 2 swings it. Get it wrong "
+        + "twice and she will simply tell you.",
+      completion: { kind: "entityState", entityId: "gravelmaw_stone_door", state: "open" },
+      onFlag: [
+        {
+          // Ode's correct answer sets this flag. Unbarring the door is what turns the answer into
+          // something the world can be interacted with: `InteractionDispatcher` refuses `open` on
+          // a door whose state is "locked", so until the levers are understood the door is not a
+          // thing you can try, it is a thing you are told about.
+          flag: "lever_order_known",
+          grant: {
+            worldState: [
+              {
+                entityId: "gravelmaw_stone_door",
+                state: "unbarred",
+                lockedReason: "The levers are set in the order Ode gave. It will open now.",
+              },
+            ],
+            unlocks: ["The Three-Lever Door will answer `interact(\"gravelmaw_stone_door\", \"open\")`."],
+          },
+        },
+      ],
+      grants: {
+        xp: { agility: 200, mining: 200 },
+        flags: ["door_open"],
+        unlocks: ["The Collapse now walks straight through into The Cairn Hall."],
+      },
+    },
+    {
+      index: 5,
+      objective:
+        "Go back to Cairnkeeper Ode (entity `npc_cairnkeeper_ode`) and ask for the keeping-stone "
+        + "she means to leave in the hall.",
+      hint:
+        "She will hand you a Cairn Garnet (item `cairn_garnet`). Do not sell it; stage 7 checks "
+        + "that you are still carrying it.",
+      completion: { kind: "talk", npcId: "npc_cairnkeeper_ode", dialogueNodeId: "ode_long_cairn_stone_given" },
+      grants: {
+        items: [{ itemId: "cairn_garnet", quantity: 1 }],
+        currency: 300,
+        flags: ["has_keeping_stone"],
+      },
+    },
+    {
+      index: 6,
+      objective:
+        "Carry the Cairn Garnet (item `cairn_garnet`) into The Cairn Hall (locationId "
+        + "`gravelmaw_chamber3`), kill the 2 Thornbound Elders (enemy family `thornbound`) "
+        + "standing over the cairn, and set the stone on it.",
+      hint:
+        "With the door open, chamber 2 walks straight through to chamber 3. The stage completes "
+        + "the moment all three hold at once: both Elders dead, you inside the hall, garnet still "
+        + "in your bag. Completing it takes the garnet and unseals the Quarrykeeper's Gate.",
+      completion: {
+        kind: "all",
+        of: [
+          { kind: "kill", enemyFamily: "thornbound", count: 2 },
+          { kind: "reach", locationId: "gravelmaw_chamber3", radius: 16 },
+          { kind: "have", itemId: "cairn_garnet", quantity: 1 },
+        ],
+      },
+      grants: {
+        takeItems: [{ itemId: "cairn_garnet", quantity: 1 }],
+        flags: ["cairn_laid"],
+      },
+    },
+  ],
+  rewards: {
+    xp: { melee: 1600, magic: 600, mining: 600, agility: 300 },
+    items: [
+      { itemId: "kaldite_dagger", quantity: 1 },
+      { itemId: "seared_cragfin", quantity: 8 },
+    ],
+    currency: 2400,
+    unlocks: [
+      "The Quarrykeeper's Gate (entity `ordrun_gate`) is unsealed. Ordrun is behind it.",
+      "Cairnkeeper Ode will speak plainly about what is under the Great Cairn.",
+    ],
+    worldState: [
+      {
+        entityId: "ordrun_gate",
+        state: "open",
+        lockedReason: "The Long Cairn is finished. The gate stands open.",
+      },
+    ],
+  },
+};
+
+// ------------------------------------------------------------------ registry
+
+/** The ten quests, in the order the quest panel lists them. */
+export const QUESTS: readonly QuestDef[] = [
+  COLD_IRON,
+  DORNS_TALLY,
+  BRIGHT_WATER,
+  THE_CARTERS_WAGER,
+  CROOKED_GRAIN,
+  KNOTS_AND_NAMES,
+  ELEVEN_EMPTY_DAYS,
+  BAD_GROUND,
+  SPARKING_STONE,
+  LONG_CAIRN,
+];
+
+const BY_ID = new Map<QuestId, QuestDef>(QUESTS.map((row) => [row.id, row]));
+
+export function quest(id: QuestId): QuestDef | undefined {
+  return BY_ID.get(id);
+}
+
+export function questsForRegion(regionId: RegionId): QuestDef[] {
+  return QUESTS.filter((row) => row.regionId === regionId);
+}
+
+export function questsGivenBy(npcId: EntityId): QuestDef[] {
+  return QUESTS.filter((row) => row.giverNpcId === npcId);
+}
+
+export function stageOf(id: QuestId, index: number): QuestStageDef | undefined {
+  const def = BY_ID.get(id);
+  if (!def) return undefined;
+  return def.stages.find((row) => row.index === index);
+}
+
+/**
+ * Every item id this file references, so the root can reconcile authored content against the item
+ * tables in one call instead of grepping ten quest definitions.
+ */
+export function referencedItemIds(): ItemId[] {
+  const out = new Set<ItemId>();
+  const walk = (predicate: QuestPredicate): void => {
+    if (predicate.kind === "all") {
+      for (const child of predicate.of) walk(child);
+      return;
+    }
+    if (predicate.kind === "have" || predicate.kind === "banked" || predicate.kind === "gather") {
+      out.add(predicate.itemId);
+    }
+    if (predicate.kind === "equipped" || predicate.kind === "deplete") out.add(predicate.itemId);
+  };
+  const collect = (grant: QuestGrant | undefined): void => {
+    if (!grant) return;
+    for (const stack of grant.items ?? []) out.add(stack.itemId);
+    for (const stack of grant.takeItems ?? []) out.add(stack.itemId);
+  };
+  for (const def of QUESTS) {
+    collect(def.onStart);
+    for (const stage of def.stages) {
+      walk(stage.completion);
+      collect(stage.grants);
+    }
+    for (const stack of def.rewards.items) out.add(stack.itemId);
+  }
+  return [...out].sort();
+}
