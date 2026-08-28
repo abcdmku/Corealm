@@ -212,6 +212,12 @@ export interface PanelFrameOptions {
   onClose?(): void;
 }
 
+/** Matches `--z-panel` in styles.css. A raised panel stays inside the band above it. */
+const PANEL_Z_BASE = 20;
+
+/** How far a raise may climb before it wraps. Keeps panels below `--z-menu` at 30. */
+const PANEL_STACK_DEPTH = 9;
+
 let panelZCounter = 0;
 
 /**
@@ -247,7 +253,11 @@ export class PanelFrame {
     if (place.right !== undefined) root.style.right = place.right;
     if (place.bottom !== undefined) root.style.bottom = place.bottom;
     if (place.width !== undefined) root.style.width = place.width;
-    root.style.maxHeight = place.maxHeight ?? "calc(100vh - 96px)";
+    // Only when a panel asks for one. Writing the default inline made it beat every stylesheet
+    // rule, including the `@media (max-height: 800px)` block in styles.css that exists to shrink
+    // panels on a short screen — which had therefore never done anything since it was written.
+    // The default now lives on `.panel--float`, where a media query can reach it.
+    if (place.maxHeight !== undefined) root.style.maxHeight = place.maxHeight;
 
     const header = document.createElement("header");
     header.className = "panel__header";
@@ -346,10 +356,21 @@ export class PanelFrame {
     else this.open();
   }
 
-  /** Brings this panel above the others without reordering the DOM. */
+  /**
+   * Brings this panel above the others without reordering the DOM.
+   *
+   * The counter is clamped. Unbounded, it climbed past every layer in the stylesheet — the context
+   * menu at 30, the tooltip at 40, the boot screen and the pause menu at 50 — so after enough panel
+   * opens an ordinary panel would cover the menu that opened it. That is not hypothetical: the
+   * settings panel is opened FROM the pause screen and drew underneath it, and the only fix
+   * available from a stylesheet was `!important`, because an inline style outranks a rule.
+   *
+   * Nine steps of ordering is more than any real stack of panels needs, and it keeps every raise
+   * inside the band the tokens reserve for panels.
+   */
   raise(): void {
-    panelZCounter += 1;
-    this.root.style.zIndex = String(20 + panelZCounter);
+    panelZCounter = (panelZCounter + 1) % PANEL_STACK_DEPTH;
+    this.root.style.zIndex = String(PANEL_Z_BASE + panelZCounter);
   }
 
   focusFirst(): void {

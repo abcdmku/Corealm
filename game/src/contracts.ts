@@ -152,6 +152,16 @@ export interface ObservedEntity {
   position: Vec3;
   /** Path distance in metres, not straight line. */
   distance: number;
+  /**
+   * The route-graph place this row stands at, when it is one.
+   *
+   * `id` is the ENTITY's id, and for a place backed by an entity the two differ: the Coldbrace bank
+   * comes back as `coldbrace_bank` at the location `bank_interior`, the Gravelmaw's mouth as
+   * `gravelmaw_mouth_portal` at `gravelmaw_entrance`. So `id` cannot be handed to
+   * `moveTo({ locationId })`, and every caller that wanted to was reduced to matching positions.
+   * This is that join, stated rather than guessed.
+   */
+  locationId?: string;
   state: string;
   interactions: InteractionId[];
   requirementsMet: boolean;
@@ -228,6 +238,8 @@ export interface PlayerView {
   regionId: RegionId;
   health: number;
   maxHealth: number;
+  /** Which way the player is facing, radians, 0 = +Z (north), increasing toward +X. */
+  facingRad: number;
   /**
    * A fight is happening right now: the player has a target, or an enemy has engaged them.
    * It clears on the frame the last enemy dies or disengages, so `waitFor(() => !inCombat)` is a

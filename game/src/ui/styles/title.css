@@ -1,1 +1,414 @@
 /* title — owned by the title worker. Nothing else writes to this file. */
+
+/*
+ * Three things live here, because the same worker owns all three: the title-and-pause screen, the
+ * settings panel, and what `.is-compact` actually does.
+ *
+ * The title screen is continuous with the boot screen on purpose. The player has been staring at
+ * #boot-screen — a radial wash, COREALM in brass at 0.42em tracking — for the last second and a
+ * half, so the pause menu uses the same wash and the same mark rather than introducing a second
+ * identity two seconds into the game.
+ *
+ * The one rule in here that can break the whole game: `.title` covers the screen and takes pointer
+ * events, so `.title[hidden]` MUST put it back to display:none. `#ui-root > *` sets pointer-events
+ * to auto, and a class rule with `display: flex` beats the user-agent [hidden] rule, so without the
+ * line below a closed menu leaves an invisible sheet over the world and every click in the game
+ * stops working.
+ *
+ * No new colours. Everything below is a :root token from styles.css.
+ */
+
+/* ====================================================== the title and pause screen */
+
+.title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  /* The boot screen's wash, darkened so the world reads as "behind glass" rather than as clutter. */
+  background: radial-gradient(circle at 50% 42%, rgba(35, 32, 28, 0.86) 0%, rgba(14, 13, 11, 0.95) 68%);
+  /*
+   * Above every panel. `PanelFrame.raise()` counts up from --z-panel with each raise and has no
+   * ceiling, so matching --z-boot exactly would lose to a long session's worth of panel opens.
+   * #ui-root has its own z-index, so nothing here can climb over #boot-screen either way.
+   */
+  z-index: calc(var(--z-boot) + 50);
+}
+
+/* Load-bearing. See the note at the top of the file. */
+.title[hidden] { display: none; }
+
+/* The backdrop is a focus holder, not a control: no ring on it. */
+.title:focus { outline: none; }
+
+.title__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0)),
+    linear-gradient(180deg, rgba(38, 34, 30, 0.95), rgba(20, 18, 16, 0.97));
+  border: var(--border-bright);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  text-align: center;
+}
+
+.title__eyebrow {
+  margin: 0;
+  color: var(--ink-faint);
+}
+
+/* The boot mark, one step down: the same letterform, no longer the only thing on screen. */
+.title__mark {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.42em;
+  /* The tracking is trailing space on the last letter; the indent puts the word back on centre. */
+  text-indent: 0.42em;
+  color: var(--accent);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.title__tagline {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--size-sm);
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.title__warning {
+  margin: 0;
+  font-size: var(--size-lg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f0b4a8;
+}
+
+.title__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(280px, 100%);
+  margin-top: var(--space-2);
+}
+
+/* Menu buttons are big because there are three of them and one of them is the one you always want. */
+.title__action {
+  width: 100%;
+  min-height: 40px;
+  font-size: var(--size-md);
+  letter-spacing: 0.04em;
+}
+
+.title__actions--confirm { width: min(320px, 100%); }
+
+.title__hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: var(--space-2) 0 0;
+  font-size: var(--size-xs);
+  color: var(--ink-faint);
+}
+
+/* A key drawn as a key, same recipe as .dock__key. */
+.title__cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 1px 5px 2px;
+  background: linear-gradient(180deg, #2a2521, var(--panel-sunken));
+  border: 1px solid var(--panel-edge);
+  border-bottom-width: 2px;
+  border-bottom-color: #100e0c;
+  border-radius: 3px;
+  font-family: var(--font-numeric);
+  font-size: var(--size-xs);
+  font-weight: 700;
+  line-height: 14px;
+  color: var(--ink);
+}
+
+/* ---- the confirmation step */
+
+/*
+ * The acknowledgement is the deliberate act. It is a full row, in the danger colour, and the
+ * destructive button stays disabled — greyed by the shared .btn[disabled] rule — until it is
+ * ticked. Two separate movements, and the safe answer sits above it holding the focus ring.
+ */
+.title__ack {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: min(360px, 100%);
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(201, 85, 61, 0.08);
+  border: 1px solid var(--danger-dim);
+  border-left-width: 2px;
+  border-radius: var(--radius);
+  font-size: var(--size-sm);
+  line-height: 1.45;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.title__ack-box {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.title__card[data-view="confirm"] .title__eyebrow { color: #d98d7a; }
+
+/* ================================================================ the settings panel */
+
+/* The frame is placed at left: 50%, which is the left EDGE. This is what centres it. */
+#panel-settings { transform: translateX(-50%); }
+
+/*
+ * Above the pause menu, because the pause menu is what opens it.
+ *
+ * `PanelFrame.raise()` writes the z-index as an INLINE style, and a stylesheet cannot outrank an
+ * inline declaration without !important. This is the one place in the game that needs it: without
+ * it the settings window opens behind the menu that opened it — invisible, and Playwright reports
+ * the menu intercepting every click on it, which is exactly what a player would experience.
+ */
+#panel-settings { z-index: calc(var(--z-boot) + 60) !important; }
+
+/*
+ * ...and opaque, for the same reason. `.panel` is 92% alpha, which is right for a window over the
+ * world and wrong for a window over the pause card: at 92% the mark and the menu buttons ghost
+ * through the rows, and a screenshot of it reads as two screens printed on top of each other.
+ */
+#panel-settings {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0)),
+    var(--panel-solid);
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings__group-title {
+  margin: 0 0 var(--space-1);
+  padding-bottom: 3px;
+  border-bottom: var(--border);
+}
+
+/*
+ * Label, then what it does to the picture, then the control. The sentence is the point: a settings
+ * screen that only names its flags teaches nothing about what turning one off will look like.
+ */
+.settings__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.settings__row + .settings__row { border-top: 1px solid rgba(255, 255, 255, 0.04); }
+
+.settings__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings__label { font-size: var(--size-sm); font-weight: 600; color: var(--ink); }
+.settings__hint { font-size: var(--size-xs); line-height: 1.45; color: var(--ink-dim); }
+
+.settings__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: var(--border);
+}
+
+.settings__note { margin: 0; font-size: var(--size-xs); line-height: 1.45; color: var(--ink-faint); }
+
+/* ---- the switch */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  font: inherit;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.switch__track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 20px;
+  background: var(--panel-sunken);
+  border: 1px solid var(--panel-edge);
+  border-radius: 999px;
+  box-shadow: var(--inset-well);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(180deg, #6b6154, #453e35);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  transition: transform var(--transition), background var(--transition);
+}
+
+/* The state is spelled out. Brass says on, and so does the word, for anyone the brass fails. */
+.switch__state {
+  min-width: 62px;
+  text-align: left;
+  font-size: var(--size-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.switch:hover .switch__track { border-color: var(--accent-dim); }
+.switch.is-on .switch__track { background: linear-gradient(180deg, #6d5615, #4a3a0e); border-color: var(--accent-dim); }
+.switch.is-on .switch__knob { transform: translateX(18px); background: linear-gradient(180deg, #f0d475, var(--accent)); }
+.switch.is-on .switch__state { color: var(--accent); }
+
+/* ---- the two-way choice, following .qty__btn */
+
+.seg { display: flex; flex: 0 0 auto; gap: 2px; }
+
+.seg__btn {
+  min-width: 64px;
+  min-height: 26px;
+  padding: 3px var(--space-2);
+  border-color: var(--panel-edge);
+}
+
+.seg__btn.is-active {
+  color: var(--accent-ink);
+  background: linear-gradient(180deg, #e0bb42, #b48c1c);
+  border-color: #f0d475;
+}
+
+/* ================================================================= compact density */
+
+/*
+ * `uiScale: "compact"` puts .is-compact on #ui-root, and this is the whole of what that means.
+ *
+ * Most of it is done by re-declaring the spacing and type tokens on #ui-root itself: every panel,
+ * the HUD and the dock read those through var(), so one block tightens all of them at once and a
+ * panel written next round gets compact support for free. The rules after it are the places that
+ * carry a fixed pixel size and cannot follow a token.
+ *
+ * Panel widths are inline styles from `PanelPlacement`, which a stylesheet cannot outrank — but
+ * max-width is applied after width, so the edge-anchored panels narrow without !important. The
+ * centre-anchored ones (bank, shop, map, dialogue) are left alone: they are positioned from a
+ * computed left edge, so narrowing them would push them off centre.
+ */
+#ui-root.is-compact {
+  --size-xs: 10px;
+  --size-sm: 11px;
+  --size-md: 12px;
+  --size-lg: 15px;
+  --size-xl: 19px;
+
+  --space-1: 3px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 11px;
+  --space-5: 16px;
+}
+
+/* ---- HUD clusters hug the edges harder */
+#ui-root.is-compact .hud__vitals { width: 196px; }
+#ui-root.is-compact .hud__compass { width: 252px; }
+#ui-root.is-compact .bar { height: 8px; }
+#ui-root.is-compact .bar--tall { height: 15px; }
+#ui-root.is-compact .bar--thin { height: 3px; }
+#ui-root.is-compact .compass__tape { height: 14px; }
+
+#ui-root.is-compact .dock { gap: 5px; }
+#ui-root.is-compact .dock__btn { width: 48px; padding: 4px 3px 3px; }
+#ui-root.is-compact .dock__glyph { font-size: 15px; line-height: 15px; }
+#ui-root.is-compact .dock__key { font-size: 8px; line-height: 11px; }
+
+/* ---- controls and slots */
+#ui-root.is-compact .btn { min-height: 24px; padding: 4px 9px; }
+#ui-root.is-compact .panel__title { font-size: var(--size-md); }
+#ui-root.is-compact .panel__header { padding: 5px var(--space-3); }
+#ui-root.is-compact .slot { min-width: 32px; }
+#ui-root.is-compact .slot-grid { gap: 3px; }
+#ui-root.is-compact .equip-grid {
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(4, 46px);
+  gap: 5px;
+}
+#ui-root.is-compact .switch__track { width: 34px; height: 18px; }
+#ui-root.is-compact .switch__knob { width: 12px; height: 12px; }
+#ui-root.is-compact .switch.is-on .switch__knob { transform: translateX(16px); }
+#ui-root.is-compact .seg__btn { min-width: 56px; min-height: 22px; }
+
+/* ---- the edge-anchored panels give the world its width back */
+#ui-root.is-compact #panel-inventory { max-width: 206px; }
+#ui-root.is-compact #panel-skills { max-width: 282px; }
+#ui-root.is-compact #panel-equipment { max-width: 262px; }
+#ui-root.is-compact #panel-quests { max-width: 316px; }
+#ui-root.is-compact #panel-controls { max-width: 298px; }
+#ui-root.is-compact #panel-settings { max-width: 336px; }
+
+/* ---- and the menu itself, since it is inside #ui-root too */
+#ui-root.is-compact .title__card { width: min(460px, 100%); }
+#ui-root.is-compact .title__mark { font-size: 32px; }
+#ui-root.is-compact .title__action { min-height: 34px; }
+
+/* ================================================================== smaller screens */
+
+/* 1280x720 is the floor: the card must not need to scroll to reach its last button. */
+@media (max-height: 800px) {
+  .title__card { gap: var(--space-2); padding: var(--space-4) var(--space-4) var(--space-3); }
+  .title__mark { font-size: 32px; }
+  .title__actions { margin-top: var(--space-1); }
+  .title__action { min-height: 34px; }
+  .settings__row { padding: 5px 0; }
+  .settings { gap: var(--space-3); }
+}

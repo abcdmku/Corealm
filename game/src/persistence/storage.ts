@@ -114,6 +114,16 @@ function recompute(state: GameState): GameState {
   state.equipment = { ...fresh.equipment, ...(state.equipment ?? {}) };
   state.combat = state.combat ?? fresh.combat;
   state.settings = { ...fresh.settings, ...(state.settings ?? {}) };
+
+  // A conversation does not survive a reload.
+  //
+  // `state.dialogue` is serialised with everything else, and the window that draws it is raised by
+  // the `dialogue.opened` event — which a load does not emit. So saving mid-conversation and
+  // reloading left the game silently inside an open dialogue: nothing on screen, and the next
+  // `talk` behaving oddly because one was already running. The node is re-derivable by talking to
+  // the NPC again, so dropping it costs nothing and closes the gap between the state and the
+  // events that are supposed to describe it.
+  state.dialogue = null;
   state.currency = typeof state.currency === "number" ? state.currency : 0;
 
   // The inventory must be exactly 28 slots, or every index-based operation is off by however

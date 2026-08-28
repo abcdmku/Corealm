@@ -232,7 +232,9 @@ export class EntityStore {
 
       if (entity) {
         if (!this.matchesArchetypeAndInteraction(entity, filter)) continue;
-        const observed = this.toObserved(entity, distance);
+        // The row is the ENTITY, so it carries the entity's id; `locationId` is what names the
+        // place it stands at, and it is the only one of the two `moveTo({ locationId })` accepts.
+        const observed = { ...this.toObserved(entity, distance), locationId: location.id };
         if (filter.requirementsMet !== undefined && observed.requirementsMet !== filter.requirementsMet) continue;
         rows.push({ observed, distance });
         continue;

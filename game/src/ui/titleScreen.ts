@@ -9,8 +9,25 @@
  * "Continue" is therefore just a dismiss. "New Game" is the only button that does anything to the
  * world: it clears the save and rebuilds, through the same `resetWorld` the debug surface uses.
  *
- * SCAFFOLD. The interface below is frozen; the body is a placeholder for the title worker.
+ * Three behaviours in here are load-bearing rather than decorative:
+ *
+ *  - The screen covers everything and opts into pointer events, so it MUST go back to
+ *    `display: none` when closed. `.title[hidden]` in styles/title.css does that; without it a
+ *    transparent sheet stays over the world and every click in the game stops working.
+ *  - Escape is pushed onto the registry's escape stack while open, which is what makes the second
+ *    Escape close the menu. `input.cancel` (priority 900) runs that stack before `ui.menu` (950)
+ *    gets the key, so an open menu is closed rather than reopened.
+ *  - Keydowns that land inside the card stop there. Focus is inside the dialog while it is open, so
+ *    without this "W" would walk the player around behind the menu and "I" would open the pack
+ *    under it. Keyups are deliberately let through: swallowing the release of a key held before the
+ *    menu opened would leave it held forever.
+ *
+ * "New game" always asks first. It is the one button that can throw away a character, and a player
+ * who loses Mining 10 to a stray click does not come back — so the destructive answer is behind an
+ * acknowledgement it takes a second, separate act to give.
  */
+import { keybindings } from "../input/keyboard.js";
+import type { Unregister } from "../input/keyboard.js";
 
 export interface TitleScreenOptions {
   /** True when a save was found at boot, so "Continue" is meaningful. */
@@ -23,16 +40,41 @@ export interface TitleScreenOptions {
   onClose(): void;
 }
 
+type View = "menu" | "confirm";
+
 export class TitleScreen {
   private readonly root: HTMLElement;
+  private readonly card: HTMLElement;
+  private view: View = "menu";
+  private popEscape: Unregister | null = null;
+  private restoreFocus: HTMLElement | null = null;
 
   constructor(private readonly options: TitleScreenOptions) {
     const root = document.createElement("section");
     root.className = "title";
     root.hidden = true;
+    root.tabIndex = -1;
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Corealm");
+
+    const card = document.createElement("div");
+    card.className = "title__card";
+    root.appendChild(card);
+
     this.root = root;
+    this.card = card;
+
+    root.addEventListener("keydown", this.onKeyDown);
+    // A click on the backdrop must not blur the dialog: focus outside it would put the movement
+    // keys back on the world while the menu is still covering it.
+    root.addEventListener("mousedown", (event) => {
+      if (event.target === root && document.activeElement !== root) {
+        event.preventDefault();
+        root.focus({ preventScroll: true });
+      }
+    });
+
     this.render();
   }
 
@@ -45,48 +87,230 @@ export class TitleScreen {
   }
 
   open(): void {
+    if (this.isOpen()) return;
+    this.restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.view = "menu";
     this.render();
     this.root.hidden = false;
+
+    // Escape backs out one step: out of the confirmation first, out of the menu second.
+    this.popEscape = keybindings.pushEscapeHandler(() => {
+      if (!this.isOpen()) return false;
+      if (this.view === "confirm") {
+        this.setView("menu");
+        return true;
+      }
+      this.options.onClose();
+      return true;
+    });
+
+    this.focusFirst();
   }
 
   close(): void {
+    if (!this.isOpen()) return;
     this.root.hidden = true;
+    this.popEscape?.();
+    this.popEscape = null;
+    // Next time it opens it opens on the menu, never mid-confirmation.
+    this.view = "menu";
+
+    const restore = this.restoreFocus;
+    this.restoreFocus = null;
+    if (restore && restore.isConnected && !this.root.contains(restore)) {
+      restore.focus({ preventScroll: true });
+    } else if (document.activeElement instanceof HTMLElement && this.root.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+  }
+
+  dispose(): void {
+    this.popEscape?.();
+    this.popEscape = null;
+    this.root.remove();
+  }
+
+  // ------------------------------------------------------------------ keys
+
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    // Escape belongs to the registry, which owns the "close the top thing" order.
+    if (event.key === "Escape") return;
+
+    if (event.key === "Tab") {
+      this.wrapFocus(event);
+      return;
+    }
+
+    // Everything else dies here rather than reaching the window listener behind the menu.
+    // stopPropagation, not preventDefault: Enter and Space must still press the focused button.
+    event.stopPropagation();
+  };
+
+  /** Tab stays inside the card. A menu you can tab out of is a menu you can lose. */
+  private wrapFocus(event: KeyboardEvent): void {
+    event.stopPropagation();
+    const stops = [...this.card.querySelectorAll<HTMLElement>(
+      "button:not([disabled]), input:not([disabled]), [tabindex='0']",
+    )];
+    if (stops.length === 0) return;
+    const first = stops[0];
+    const last = stops[stops.length - 1];
+    if (!first || !last) return;
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === this.root)) {
+      event.preventDefault();
+      last.focus({ preventScroll: true });
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
+  }
+
+  private focusFirst(): void {
+    const target = this.card.querySelector<HTMLElement>("[data-autofocus]")
+      ?? this.card.querySelector<HTMLElement>("button:not([disabled])");
+    (target ?? this.root).focus({ preventScroll: true });
+  }
+
+  // --------------------------------------------------------------- drawing
+
+  private setView(view: View): void {
+    if (this.view === view) return;
+    this.view = view;
+    this.render();
+    this.focusFirst();
   }
 
   private render(): void {
-    this.root.replaceChildren();
+    this.card.replaceChildren();
+    this.card.dataset["view"] = this.view;
+    if (this.view === "confirm") this.renderConfirm();
+    else this.renderMenu();
+  }
+
+  /**
+   * The menu. The mark and its letter-spacing are the boot screen's, deliberately: the player has
+   * been looking at exactly that word for the last second and a half.
+   */
+  private renderMenu(): void {
+    const hasSave = this.options.hasSave();
+
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "title__eyebrow u-caps";
+    eyebrow.textContent = "Paused";
 
     const mark = document.createElement("h1");
     mark.className = "title__mark";
     mark.textContent = "COREALM";
 
+    const tagline = document.createElement("p");
+    tagline.className = "title__tagline";
+    tagline.textContent = hasSave
+      ? "Your frontier is still running behind this."
+      : "A fresh frontier is already running behind this.";
+
     const actions = document.createElement("div");
     actions.className = "title__actions";
 
-    const resume = document.createElement("button");
-    resume.type = "button";
-    resume.className = "btn btn--primary";
-    resume.textContent = this.options.hasSave() ? "Continue" : "Begin";
+    const resume = this.button(hasSave ? "Continue" : "Begin", "btn btn--primary title__action", () => {
+      this.options.onClose();
+    });
     resume.dataset["autofocus"] = "true";
-    resume.addEventListener("click", () => this.options.onClose());
 
-    const fresh = document.createElement("button");
-    fresh.type = "button";
-    fresh.className = "btn";
-    fresh.textContent = "New game";
-    fresh.addEventListener("click", () => this.options.onNewGame());
-
-    const settings = document.createElement("button");
-    settings.type = "button";
-    settings.className = "btn";
-    settings.textContent = "Settings";
-    settings.addEventListener("click", () => this.options.onSettings());
+    const fresh = this.button("New game", "btn title__action", () => this.setView("confirm"));
+    const settings = this.button("Settings", "btn title__action", () => this.options.onSettings());
 
     actions.append(resume, fresh, settings);
-    this.root.append(mark, actions);
+
+    const hint = document.createElement("p");
+    hint.className = "title__hint";
+    hint.append(cap("Esc"), text(" returns to the world. "), cap("H"), text(" lists every key."));
+
+    this.card.append(eyebrow, mark, tagline, actions, hint);
   }
 
-  dispose(): void {
-    this.root.remove();
+  /**
+   * The confirmation. Two rules: the safe answer is the one under the cursor and under the focus
+   * ring, and the destructive one cannot be pressed until the player has said, separately, that
+   * they know what it does.
+   */
+  private renderConfirm(): void {
+    const hasSave = this.options.hasSave();
+
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "title__eyebrow u-caps";
+    eyebrow.textContent = "New game";
+
+    const heading = document.createElement("h2");
+    heading.className = "title__warning";
+    heading.textContent = hasSave ? "This deletes your save." : "This throws away this run.";
+
+    const body = document.createElement("p");
+    body.className = "title__tagline";
+    body.textContent = hasSave
+      ? "Every level, every item and every quest on this character goes, the world is rebuilt from"
+        + " scratch, and there is no undo. Your settings are kept."
+      : "The world is rebuilt from scratch and anything you have done in this session goes with it."
+        + " Your settings are kept.";
+
+    const acknowledge = document.createElement("label");
+    acknowledge.className = "title__ack";
+
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "title__ack-box";
+
+    const ackText = document.createElement("span");
+    ackText.textContent = hasSave
+      ? "I understand my saved character will be deleted."
+      : "I understand this run will be thrown away.";
+
+    acknowledge.append(box, ackText);
+
+    const actions = document.createElement("div");
+    actions.className = "title__actions title__actions--confirm";
+
+    const keep = this.button("Keep playing", "btn btn--primary title__action", () => this.setView("menu"));
+    // The safe answer holds the focus ring: Enter on this screen must never be the one that deletes.
+    keep.dataset["autofocus"] = "true";
+
+    const destroy = this.button(
+      hasSave ? "Delete save and start over" : "Start over",
+      "btn btn--danger title__action",
+      () => {
+        if (!box.checked) return;
+        this.options.onNewGame();
+      },
+    );
+    destroy.disabled = true;
+
+    box.addEventListener("change", () => {
+      destroy.disabled = !box.checked;
+    });
+
+    actions.append(keep, destroy);
+
+    this.card.append(eyebrow, heading, body, acknowledge, actions);
   }
+
+  private button(label: string, className: string, onClick: () => void): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = label;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+}
+
+/** A key drawn as a key, following `.dock__key` — the game's existing "this is a thing you press". */
+function cap(key: string): HTMLElement {
+  const node = document.createElement("kbd");
+  node.className = "title__cap";
+  node.textContent = key;
+  return node;
+}
+
+function text(value: string): Text {
+  return document.createTextNode(value);
 }

@@ -23,6 +23,10 @@ import { chromium, type Browser, type Page } from "playwright";
 import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun } from "./lib/paths.js";
 import type {} from "./lib/debug-api.js";
+// The reward numbers F3 asserts are read out of the content table and handed to the page, so
+// the check compares the game against its own definition instead of against a number a test
+// author typed once and nobody re-read when the quest was rebalanced.
+import { QUESTS } from "../game/src/content/quests.js";
 
 export interface GateCheck {
   id: string;
@@ -76,27 +80,200 @@ function playthroughSource(): string {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /**
-   * Walks an open conversation by taking the first enabled option each turn.
+   * Walks somewhere and waits for the walk to finish.
    *
-   * Deliberately not clever. A quest stage that ends on a dialogue node is only genuinely
-   * playable if a caller who cannot see the tree can still get there, and "take the first thing
-   * offered" is the weakest possible reader. Stops when the conversation closes, when nothing is
-   * enabled, or after \`limit\` turns.
+   * Reports "arrived", "failed", "timeout" or "refused: <code>" rather than a boolean, because the
+   * difference between "the world would not path there" and "the walk ran out of clock" is the
+   * difference between a content bug and a slow harness, and a check that swallows it proves
+   * neither.
    */
-  const talkThrough = async (limit) => {
-    const visited = [];
-    for (let step = 0; step < limit; step += 1) {
-      const state = await agent.call("corealm_dialogue", { op: "state" });
-      if (!state || state.error || !state.options || state.options.length === 0) break;
-      visited.push(state.text ? state.text.slice(0, 24) : "");
-      const next = state.options.find((o) => o.enabled !== false);
-      if (!next) break;
-      const chosen = await agent.call("corealm_dialogue", { op: "choose", optionId: next.id });
-      if (!chosen || chosen.error) break;
-      await sleep(150);
+  const travel = async (target, ms) => {
+    const moved = await agent.call("corealm_move_to", target);
+    if (moved.error) return "refused: " + moved.error;
+    const seen = await waitFor(["navigation.completed", "navigation.failed"], ms || 120000);
+    if (seen.some((e) => e.type === "navigation.completed")) return "arrived";
+    return seen.length ? "failed" : "timeout";
+  };
+
+  /** Opens a conversation, walking to the NPC first if they are out of range. */
+  const openDialogue = async (npcId) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const started = await agent.call("corealm_interact", { entityId: npcId, interaction: "talk" });
+      if (started.error) return { error: started.error + " " + (started.message || "") };
+      if (String(started.started || "").startsWith("walking")) {
+        await waitFor(["navigation.completed", "navigation.failed"], 150000);
+        await sleep(250);
+        continue;
+      }
+      await sleep(250);
+      const view = await agent.call("corealm_dialogue", { op: "state" });
+      if (view && !view.error && (view.options || []).length > 0) return view;
+      await sleep(400);
     }
+    return { error: "NO_DIALOGUE" };
+  };
+
+  /** A chooser: the first ENABLED option whose id or text matches, plus why it was unavailable. */
+  const optionLike = (pattern) => {
+    const re = new RegExp(pattern, "i");
+    const chooser = (view) => (view.options || []).find(
+      (o) => o.enabled !== false && (re.test(o.id) || re.test(o.text || "")));
+    chooser.label = "/" + pattern + "/";
+    chooser.blocked = (view) => (view.options || []).find((o) => re.test(o.id) || re.test(o.text || ""));
+    return chooser;
+  };
+
+  /**
+   * Drives a conversation through a named sequence of choices.
+   *
+   * The earlier walker took the first enabled option every turn, which is enough to accept a quest
+   * offer and nothing else: every one of Cairnkeeper Ode's stage options sits underneath "What is
+   * a cairn for?", so the dumb reader talked about masonry until it ran out of turns and the stage
+   * never moved. This one names what it is looking for, and when a turn offers no match it stops
+   * and says whether the option was missing or merely disabled - which is the difference between
+   * content that cannot be reached and a walker that got bored.
+   */
+  const converse = async (npcId, choosers) => {
+    const opened = await openDialogue(npcId);
+    if (opened.error) return { ok: false, at: "open", detail: opened.error, taken: [] };
+    let view = opened;
+    const taken = [];
+    for (const chooser of choosers) {
+      const option = chooser(view);
+      if (!option) {
+        const blocked = chooser.blocked ? chooser.blocked(view) : null;
+        await agent.call("corealm_dialogue", { op: "end" });
+        return {
+          ok: false, taken, view,
+          at: chooser.label || "?",
+          detail: blocked
+            ? blocked.id + " is disabled: " + (blocked.reason || "no reason given")
+            : "nothing matched among [" + (view.options || []).map((o) => o.id).join(", ") + "]",
+        };
+      }
+      const next = await agent.call("corealm_dialogue", { op: "choose", optionId: option.id });
+      if (!next || next.error) {
+        await agent.call("corealm_dialogue", { op: "end" });
+        return { ok: false, taken, at: option.id, detail: "choose refused: " + (next && next.error) };
+      }
+      taken.push(option.id);
+      view = next;
+      await sleep(200);
+    }
+    await sleep(300);
     await agent.call("corealm_dialogue", { op: "end" });
-    return visited;
+    return { ok: true, taken, view };
+  };
+
+  /**
+   * Solves Ode's three-lever door out of her own words, rather than by trying all six.
+   *
+   * Two wrong answers unlock a "just tell me" option, so a walker that guessed would still finish
+   * the chain and the check would prove nothing about the puzzle. This reads the three marks off
+   * the options themselves, the meaning of each mark out of the sentence that defines it ("A
+   * WEDGE, which is the mason's mark for stone"), and the order out of the one sentence that names
+   * all three meanings ("THE MOOR GIVES STONE, THEN WATER, THEN DARK"). Compose the two and
+   * exactly one option lists the marks in that order. The check below then asserts that
+   * \`lever_attempts\` is still zero, which is what makes this a solve rather than a search.
+   */
+  const solveLevers = (view) => {
+    const text = String(view.text || "").toLowerCase();
+    const orderings = [];
+    const marks = [];
+    for (const option of (view.options || [])) {
+      const parts = String(option.text || "").toLowerCase().replace(/[.]+$/, "").split(/,?\\s*then\\s+/);
+      if (parts.length !== 3) continue;
+      const trimmed = parts.map((part) => part.trim());
+      orderings.push({ option, marks: trimmed });
+      for (const mark of trimmed) if (!marks.includes(mark)) marks.push(mark);
+    }
+    if (marks.length !== 3) return undefined;
+
+    // "A WEDGE, which is the mason's mark for stone." -> wedge means stone.
+    const meaningOf = {};
+    for (const mark of marks) {
+      const found = new RegExp(mark + "[^.]*?mark for (?:the )?([a-z]+)").exec(text);
+      if (found) meaningOf[mark] = found[1];
+    }
+    const meanings = marks.map((mark) => meaningOf[mark]);
+    if (meanings.some((meaning) => !meaning) || new Set(meanings).size !== 3) return undefined;
+
+    // The rule is the only sentence that names all three meanings at once.
+    const rule = text.split(/[.\\n]+/).find(
+      (sentence) => /then/.test(sentence) && meanings.every((meaning) => sentence.includes(meaning)));
+    if (!rule) return undefined;
+    const order = marks.slice().sort((a, b) => rule.indexOf(meaningOf[a]) - rule.indexOf(meaningOf[b]));
+
+    const answer = orderings.find((candidate) => candidate.marks.join("|") === order.join("|"));
+    return answer && answer.option.enabled !== false ? answer.option : undefined;
+  };
+  solveLevers.label = "the lever order derived from Ode's own text";
+
+  /**
+   * Kills living enemies whose id or name matches, keeping the player upright.
+   *
+   * The health top-ups are setup: dying drops the pack, and The Long Cairn's last stage checks
+   * that a specific item is still in it. Staying alive is not the thing being proved. The kills
+   * are, and every one of them goes through \`corealm_attack\`.
+   */
+  const slay = async (pattern, count, radius, approach) => {
+    const re = new RegExp(pattern, "i");
+    const felled = [];
+    for (let hunt = 0; hunt < count * 4 && felled.length < count; hunt += 1) {
+      const seen = await agent.call("corealm_observe",
+        { archetypes: ["enemy"], interaction: "attack", radius: radius || 140, limit: 30 });
+      const target = (seen || []).find(
+        (e) => e.state !== "dead" && !felled.includes(e.id) && re.test(e.id + " " + (e.name || "")));
+      if (!target) {
+        if (approach && hunt < 2) await travel(approach, 120000);
+        else await sleep(800);
+        continue;
+      }
+      await travel({ entityId: target.id }, 90000);
+      const opened = await agent.call("corealm_attack", { entityId: target.id });
+      if (opened.error) { await sleep(500); continue; }
+      for (let swing = 0; swing < 80; swing += 1) {
+        await sleep(400);
+        if (dbg.getState().health < 60) dbg.setHealth(999);
+        const live = dbg.getEntity(target.id);
+        if (!live || live.state === "dead" || (live.combat && live.combat.health <= 0)) {
+          felled.push(target.id);
+          break;
+        }
+        if (!dbg.getState().combatTargetId) await agent.call("corealm_attack", { entityId: target.id });
+      }
+    }
+    return { killed: felled.length, names: felled };
+  };
+
+  /** One quest's summary, off the agent surface. */
+  const questOf = async (id) => {
+    const all = await agent.call("corealm_quests");
+    return (all || []).find((q) => q.id === id) || { id, status: "unknown", stage: -1, stageCount: 0 };
+  };
+
+  /**
+   * The raw counters and flags behind a quest record. Read only, and only ever used to explain a
+   * stage that would not move: a check that can say no more than "stage 4 did not advance" costs
+   * whoever reads it an hour.
+   */
+  const questRecord = (id) => {
+    try {
+      return JSON.parse(dbg.getSaveBlob()).quests[id] || { counters: {}, flags: {} };
+    } catch (cause) {
+      return { counters: {}, flags: {} };
+    }
+  };
+
+  /** Waits for a quest to leave a stage. Quest evaluation is event-driven with a 500 ms heartbeat. */
+  const waitStage = async (id, fromStage, ms) => {
+    const deadline = Date.now() + (ms || 10000);
+    let seen = await questOf(id);
+    while (Date.now() < deadline && seen.status === "active" && seen.stage === fromStage) {
+      await sleep(400);
+      seen = await questOf(id);
+    }
+    return seen;
   };
 
   /** Walks to an entity and performs an interaction, handling the walk-then-act round trip. */
@@ -139,6 +316,8 @@ function playthroughSource(): string {
   const findNear = async (archetypes, interaction, hint) => {
     const trail = [];
     lastSearchTrail = trail;
+    // Walking somewhere twice discovers nothing and burns an attempt.
+    const visited = new Set();
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const found = await agent.call("corealm_observe", {
         archetypes, interaction, requirementsMet: true, radius: 140, limit: 12,
@@ -149,15 +328,29 @@ function playthroughSource(): string {
       const usable = (found || []).filter((e) => e.state !== "depleted" && e.state !== "dead");
       trail.push("saw " + (found || []).length + "/" + usable.length + " usable");
       if (usable.length) return usable[0];
-      const places = await agent.call("corealm_observe", { scope: "known", limit: 40 });
-      const ranked = (places || []).sort((a, b) => {
-        const score = (x) => (hint && new RegExp(hint, "i").test(x.id + " " + x.name) ? 0 : 1);
-        return score(a) - score(b) || a.distance - b.distance;
-      });
-      // Walk the ranked list in order rather than modulo, so a hinted match is tried first and a
-      // failure moves on instead of retrying the same place twelve times.
-      const target = ranked[attempt];
+      // WHERE to walk is setup; the check is the state delta that follows. That distinction is
+      // why this reads the route graph off the debug surface rather than off
+      // \`observe({ scope: "known" })\`: discovery is now genuinely gated — a fresh character knows
+      // four places out of forty-four — and a harness that can only walk to what it has already
+      // walked to cannot reach the Bracken Pit at all. It bounced between three Coldbrace nodes and
+      // reported the world as having no ore in it.
+      //
+      // The walk itself still goes through \`corealm_move_to\`, and everything being checked still
+      // happens by playing. Whether an agent can FIND the pit unaided is a real question, and it is
+      // \`agent-proof\`'s: its mining agent prospects twenty-five locations with no debug at all.
+      const known = new Set(((await agent.call("corealm_observe", { scope: "known", limit: 100 })) || [])
+        .map((place) => place.locationId || place.id));
+      const ranked = (dbg.listRouteNodes() || [])
+        .filter((node) => !visited.has(node.id))
+        .sort((a, b) => {
+          const hinted = (x) => (hint && new RegExp(hint, "i").test(x.id + " " + (x.name || "")) ? 0 : 1);
+          // Hinted first, then somewhere already known (a short hop that widens the frontier),
+          // then anything else.
+          return hinted(a) - hinted(b) || (known.has(b.id) ? 1 : 0) - (known.has(a.id) ? 1 : 0);
+        });
+      const target = ranked[0];
       if (!target) break;
+      visited.add(target.id);
       const moved = await agent.call("corealm_move_to", { locationId: target.id });
       // Waiting on an event that will never arrive costs REAL seconds, not sim seconds: a move that
       // was refused used to burn the full timeout, twelve times over, before the check gave up and
@@ -209,6 +402,12 @@ function playthroughSource(): string {
   {
     const node = await findNear(["ore"], "mine", "pit|seam");
     let depleted = false;
+    // Measured the instant the seam empties, not after the loop. A tier 1 node respawns in 21
+    // SIM seconds, which at the gate's time scale is about one second of wall clock: reading the
+    // silhouette a few awaits later measured a seam that had already grown its vein back, and the
+    // check then reported "spent looks identical to live" about a node that was no longer spent.
+    let spentBounds = null;
+    let liveBounds = null;
     if (node) {
       // A sibling seam, left full, so "spent-node" below has a live silhouette to measure the
       // depleted one against rather than a number somebody typed into the check.
@@ -220,6 +419,14 @@ function playthroughSource(): string {
         await doInteract(node.id, "mine", ["resource.depleted", "activity.stopped", "inventory.full"], 45000);
         const now = dbg.getEntity(node.id);
         depleted = now && now.state === "depleted";
+        if (depleted) {
+          // One view sync, no more: \`EntityViews.sync\` runs every 250 ms of sim time, which is a
+          // few milliseconds of wall clock here, and every extra one spends the respawn budget.
+          await sleep(150);
+          spentBounds = dbg.getDrawnBounds(node.id);
+          liveBounds = liveNeighbourId ? dbg.getDrawnBounds(liveNeighbourId) : null;
+          break;
+        }
         if (dbg.getState().inventoryUsed >= 27) {
           const banks = await agent.call("corealm_observe", { scope: "known", archetypes: ["bank"], limit: 2 });
           if (banks && banks[0]) {
@@ -239,8 +446,8 @@ function playthroughSource(): string {
     let spentEvidence = "no node";
     let spentOk = false;
     if (node) {
-      const spent = dbg.getDrawnBounds(node.id);
-      const live = liveNeighbourId ? dbg.getDrawnBounds(liveNeighbourId) : null;
+      const spent = spentBounds;
+      const live = liveBounds;
       // Two halves, and both matter. It has to still be THERE — same rock, same silhouette, so a
       // player walking back does not think the seam moved — and it has to be VISIBLY worked out.
       // The ore vein is its own part on the live side only, so the spent node draws one mesh
@@ -364,20 +571,37 @@ function playthroughSource(): string {
 
   // -------------------------------------------------------------- agility
   {
-    const before = (await skills()).agility.xp;
+    // The baseline is read AFTER the level grant, not before it.
+    //
+    // \`setSkillLevel\` writes the level's XP threshold, so a baseline taken before it made
+    // \`xp > before\` true the moment setup ran — and the check reported PASS with the evidence
+    // "no obstacle found" printed next to it. It was passing on its own setup, which is the exact
+    // thing rule 2 in this file's header exists to forbid. Traversal now has to actually move the
+    // player, too: an obstacle that awards XP without displacing anybody is not a shortcut.
     dbg.setSkillLevel("agility", 20);
-    const obstacle = await findNear(["obstacle"], "climb", "ledge|vault|wall|plank|tunnel|sunder");
+    const before = (await skills()).agility.xp;
+    // Either traversal verb, nearest first.
+    //
+    // The two obstacles beside the spawn town are authored \`vault\` (the Brookvault Planks and the
+    // Coldbrace north wall); \`climb\` does not appear until Vellenwood's Canopy Walk, most of a
+    // region away. Asking only for \`climb\` used to work by accident, because discovery was not
+    // gated and the search could walk straight across the map to it. With the gate on, the check
+    // has to ask for what is actually next to it.
+    const obstacle = await findNear(["obstacle"], "vault", "brookvault|plank|wall|vault")
+      ?? await findNear(["obstacle"], "climb", "ledge|canopy|sunder|tunnel");
     let evidence = "no obstacle found";
+    let displaced = 0;
     if (obstacle) {
       const posBefore = dbg.getPlayerPosition();
-      await doInteract(obstacle.id, "climb", ["activity.stopped"], 40000);
+      const verb = (obstacle.interactions || []).includes("vault") ? "vault" : "climb";
+      await doInteract(obstacle.id, verb, ["activity.stopped"], 40000);
       await sleep(1200);
       const posAfter = dbg.getPlayerPosition();
-      const moved = Math.hypot(posAfter.x - posBefore.x, posAfter.z - posBefore.z);
+      displaced = Math.hypot(posAfter.x - posBefore.x, posAfter.z - posBefore.z);
       evidence = "agility xp " + before + " -> " + (await skills()).agility.xp
-        + ", displaced " + moved.toFixed(1) + " m via " + obstacle.id;
+        + ", displaced " + displaced.toFixed(1) + " m via " + obstacle.id;
     }
-    note("agility", (await skills()).agility.xp > before, evidence);
+    note("agility", !!obstacle && displaced > 3 && (await skills()).agility.xp > before, evidence);
   }
 
   // ------------------------------------------------------- death and recovery
@@ -526,6 +750,9 @@ function playthroughSource(): string {
       await agent.call("corealm_move_to", { entityId: enemy.id });
       await waitFor(["navigation.completed", "navigation.failed"], 30000);
       await agent.call("corealm_attack", { entityId: enemy.id });
+      // Mid-fight, before anything can have died: this is the half of the claim that says
+      // \`inCombat\` means something at all.
+      const during = await agent.call("corealm_player");
       let killed = false;
       for (let i = 0; i < 40 && !killed; i += 1) {
         await sleep(500);
@@ -534,11 +761,16 @@ function playthroughSource(): string {
         if (dbg.getState().health < 20) dbg.setHealth(999);
         if (!dbg.getState().combatTargetId && !killed) await agent.call("corealm_attack", { entityId: enemy.id });
       }
-      // Read immediately. Waiting would let the eight-second window expire and hide the bug.
       const after = await agent.call("corealm_player");
-      cleared = killed && after.inCombat === false && after.regenBlocked === true;
-      evidence = "killed=" + killed + ", inCombat=" + after.inCombat
-        + ", regenBlocked=" + after.regenBlocked + ", targetId=" + after.targetId;
+
+      // \`regenBlocked\` is deliberately NOT asserted. It is an eight-second SIM window, and the
+      // harness runs at --scale 20, so those eight seconds pass in 0.4 s of wall clock — the
+      // assertion was a race that happened to win twice. What the fix actually changed is that
+      // \`inCombat\` tracks the fight rather than the window, so that is what is checked: true while
+      // swinging, false the moment the target dies. The window is printed as evidence.
+      cleared = killed && during.inCombat === true && after.inCombat === false && after.targetId === null;
+      evidence = "killed=" + killed + ", inCombat " + during.inCombat + " -> " + after.inCombat
+        + ", targetId=" + after.targetId + ", regenBlocked=" + after.regenBlocked;
     }
     note("combat-clears", cleared, evidence);
   }
@@ -574,7 +806,7 @@ function playthroughSource(): string {
     const failed = [];
     for (const binding of bindings) {
       const key = binding.keys[0];
-      const id = binding.id.replace(/^panel\./, "");
+      const id = binding.id.replace(/^panel\\./, "");
       window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
       await sleep(120);
       const state = (dbg.getPanels() || []).find((p) => p.id === id);
@@ -615,43 +847,274 @@ function playthroughSource(): string {
       + (active[0] ? " :: " + active[0].currentObjective : ""));
   }
 
-  // ------------------------------------------------ a quest chain past its first stage
+  // --------------------------------------------- Cold Iron, every stage, then the numbers
+  // PRD F3. Not "the quest completed" but "the quest completed and paid exactly what the content
+  // table says it pays". \`cold_iron\` deliberately carries no per-stage grants, so the whole delta
+  // across the final dialogue choice IS \`rewards\`, and drift in any one number shows up as
+  // arithmetic rather than as a vague green.
+  //
+  // Every stage is completed by the predicate it declares. Debug appears four times and each time
+  // it is setup: a skill level so a gather is not glacial, the flux and the shaft that the two
+  // recipes consume (exactly as the production checks set up theirs), health so a fight does not
+  // end the run, and an emptied pack so "the exact item stacks" can be read off the bag directly
+  // instead of inferred from a difference. \`giveItem\` is never used for Grithe ore, because stage
+  // 1 counts \`item.received\` and a debug grant emits that event too - it would satisfy the stage
+  // without a single swing.
   {
-    // The Long Cairn is the seven-stage chain. Phase 1 proved stage 0 and nothing after it, so
-    // every later stage was authored content nobody had played. This walks it as far as the
-    // agent surface can take it: reach the cairn, then talk Ode through her dialogue.
-    dbg.setSkillLevel("melee", 12);
+    const expected = (window.__gateExpect || {}).coldIron;
+    const trail = [];
+    const reached = [];
+    dbg.setSkillLevel("mining", 10);
+    dbg.setHealth(999);
+
+    let quest = await questOf("cold_iron");
+    if (quest.status === "unstarted") {
+      const start = await converse("npc_smith_harrow", [optionLike("#offer"), optionLike("accept")]);
+      if (!start.ok) trail.push("offer: " + start.at + " -> " + start.detail);
+      quest = await questOf("cold_iron");
+    }
+    reached.push(quest.stage);
+
+    // Stage 1: mine 6 Grithe ore. \`gather\` counts receipts since the stage began.
+    if (quest.status === "active" && quest.stage === 0) {
+      dbg.clearInventory();
+      trail.push("bracken_pit " + await travel({ locationId: "bracken_pit" }, 150000));
+      for (let round = 0; round < 12; round += 1) {
+        const seams = await agent.call("corealm_observe",
+          { archetypes: ["ore"], interaction: "mine", requirementsMet: true, radius: 90, limit: 12 });
+        const seam = (seams || []).find((e) => e.state !== "depleted");
+        if (!seam) { await sleep(800); continue; }
+        await doInteract(seam.id, "mine", ["resource.depleted", "activity.stopped", "inventory.full"], 60000);
+        await sleep(300);
+        if ((await questOf("cold_iron")).stage > 0) break;
+      }
+      quest = await waitStage("cold_iron", 0, 6000);
+      reached.push(quest.stage);
+    }
+
+    // Stage 2: two bars at the furnace. The flux is setup; the smelt is the check.
+    if (quest.status === "active" && quest.stage === 1) {
+      dbg.giveItem("march_stone", 6);
+      trail.push("furnace " + await travel({ entityId: "coldbrace_furnace" }, 90000));
+      const smelted = await agent.call("corealm_produce", { recipeId: "smelt_grithe_bar", quantity: 3 });
+      if (smelted.error) trail.push("smelt refused: " + smelted.error + " " + smelted.message);
+      else await waitFor(["production.completed", "activity.stopped"], 90000);
+      quest = await waitStage("cold_iron", 1, 12000);
+      reached.push(quest.stage);
+    }
+
+    // Stage 3: the dagger at the anvil.
+    if (quest.status === "active" && quest.stage === 2) {
+      dbg.giveItem("palewood_shaft", 2);
+      trail.push("anvil " + await travel({ entityId: "coldbrace_anvil" }, 90000));
+      const forged = await agent.call("corealm_produce", { recipeId: "smith_grithe_dagger", quantity: 1 });
+      if (forged.error) trail.push("smith refused: " + forged.error + " " + forged.message);
+      else await waitFor(["production.completed", "activity.stopped"], 90000);
+      quest = await waitStage("cold_iron", 2, 12000);
+      reached.push(quest.stage);
+    }
+
+    // Stage 4: wear it and use it. The stage checks the slot as well as the kills.
+    if (quest.status === "active" && quest.stage === 3) {
+      const worn = await agent.call("corealm_equip", { itemId: "grithe_dagger" });
+      if (worn.error) trail.push("equip refused: " + worn.error + " " + worn.message);
+      const hunt = await slay("skitter", 3, 140, { position: [-88, 0, -70] });
+      trail.push("skitterlings killed " + hunt.killed + " [" + hunt.names.join(", ") + "]");
+      quest = await waitStage("cold_iron", 3, 10000);
+      reached.push(quest.stage);
+      if (quest.stage === 3) {
+        const counters = questRecord("cold_iron").counters || {};
+        trail.push("kill:skitterling counter reads "
+          + (counters["kill:skitterling"] === undefined ? "ABSENT" : counters["kill:skitterling"])
+          + " after " + hunt.killed + " confirmed kills");
+      }
+    }
+
+    // Stage 5: tell Harrow, and then count what he pays.
+    let evidence = "cold_iron " + quest.status + " stage " + quest.stage + "/" + quest.stageCount;
+    let paidRight = false;
+    if (quest.status === "active" && quest.stage === 4) {
+      await agent.call("corealm_stop");
+      // Walk to him BEFORE the snapshot: nothing may happen between reading the numbers and the
+      // choice that pays them, or the delta stops being the reward and starts being the journey.
+      trail.push("harrow " + await travel({ entityId: "npc_smith_harrow" }, 120000));
+      dbg.clearInventory();
+      await sleep(500);
+      const xpBefore = await skills();
+      const marksBefore = (await agent.call("corealm_inventory")).currency;
+
+      const told = await converse("npc_smith_harrow", [optionLike("#done|dagger held")]);
+      if (!told.ok) trail.push("harrow: " + told.at + " -> " + told.detail);
+      quest = await waitStage("cold_iron", 4, 12000);
+      await sleep(800);
+      reached.push(quest.stage);
+
+      const xpAfter = await skills();
+      const pack = await agent.call("corealm_inventory");
+      const xpGained = {};
+      for (const skill of Object.keys(xpAfter)) {
+        const delta = xpAfter[skill].xp - xpBefore[skill].xp;
+        if (delta !== 0) xpGained[skill] = delta;
+      }
+      const held = {};
+      for (const slot of (pack.slots || [])) {
+        if (slot) held[slot.itemId] = (held[slot.itemId] || 0) + slot.quantity;
+      }
+      const owed = {};
+      for (const stack of (expected ? expected.items : [])) {
+        owed[stack.itemId] = (owed[stack.itemId] || 0) + stack.quantity;
+      }
+      const marks = pack.currency - marksBefore;
+      const same = (got, want) => Object.keys(got).length === Object.keys(want).length
+        && Object.keys(want).every((key) => got[key] === want[key]);
+      const show = (map) => Object.keys(map).sort().map((key) => key + " " + map[key]).join(", ") || "nothing";
+
+      const xpOk = !!expected && same(xpGained, expected.xp);
+      const itemsOk = !!expected && same(held, owed);
+      const marksOk = !!expected && marks === expected.currency;
+      paidRight = quest.status === "complete" && xpOk && itemsOk && marksOk;
+      evidence = "cold_iron " + quest.status + " stage " + quest.stage + "/" + quest.stageCount
+        + " via stages [" + reached.join(">") + "]"
+        + "; xp {" + show(xpGained) + "} want {" + show(expected ? expected.xp : {}) + "}"
+        + (xpOk ? "" : " MISMATCH")
+        + "; pack {" + show(held) + "} want {" + show(owed) + "}"
+        + (itemsOk ? "" : " MISMATCH")
+        + "; marks +" + marks + " want +" + (expected ? expected.currency : "?")
+        + (marksOk ? "" : " MISMATCH");
+    } else {
+      evidence += " -- never reached the hand-in";
+    }
+    note("cold-iron-complete", paidRight, evidence + (paidRight ? "" : " :: " + trail.join(" | ")));
+  }
+
+  // ------------------------------------------- The Long Cairn, all seven stages, by playing
+  // PRD F18. The chain an external agent is graded on end to end: unstarted to "complete" using
+  // nothing but the tools an outside caller gets. Two lines come out of this one walk, because the
+  // Phase 1 gate line ("a chain can be driven past its first stage") is now proved by the walk
+  // that finishes it rather than by a separate half-attempt that stopped at stage 2.
+  //
+  // Debug is setup only: the two skill levels are the quest's own entry requirements, the sword
+  // and the health top-ups exist because tier 10 kills a Melee 12 character and dying drops the
+  // pack that the last stage checks. No stage is advanced by hand.
+  {
+    dbg.setSkillLevel("melee", 30);
     dbg.setSkillLevel("mining", 12);
-    const stageOf = async () => {
-      const all = await agent.call("corealm_quests");
-      return (all || []).find((q) => q.id === "long_cairn") || { status: "unknown", stage: -1 };
-    };
+    dbg.setHealth(999);
+    dbg.giveItem("kaldite_sword", 1);
+    await agent.call("corealm_equip", { itemId: "kaldite_sword" });
 
-    let started = await stageOf();
-    if (started.status === "unstarted") {
-      await doInteract("npc_cairnkeeper_ode", "talk", ["dialogue.opened"], 30000);
-      await talkThrough(24);
-      started = await stageOf();
+    const trail = [];
+    const reached = [];
+    let leverAttempts = -1;
+    let solvedFirstTry = false;
+
+    let quest = await questOf("long_cairn");
+    if (quest.status === "unstarted") {
+      const start = await converse("npc_cairnkeeper_ode", [optionLike("#offer"), optionLike("accept")]);
+      if (!start.ok) trail.push("offer: " + start.at + " -> " + start.detail);
+      quest = await questOf("long_cairn");
+    }
+    reached.push(quest.stage);
+
+    // Stage 1: reach the Great Cairn. Pure movement, no dialogue, no combat.
+    if (quest.status === "active" && quest.stage === 0) {
+      trail.push("great_cairn " + await travel({ locationId: "great_cairn" }, 180000));
+      quest = await waitStage("long_cairn", 0, 8000);
+      reached.push(quest.stage);
     }
 
-    // Stage 0 is a \`reach\` predicate: pure movement, no dialogue, no combat.
-    if (started.status === "active" && started.stage === 0) {
-      await agent.call("corealm_move_to", { locationId: "great_cairn" });
-      await waitFor(["navigation.completed", "navigation.failed"], 60000);
+    // Stage 2: report it to Ode.
+    if (quest.status === "active" && quest.stage === 1) {
+      const said = await converse("npc_cairnkeeper_ode", [optionLike("#reported|re-stacked")]);
+      if (!said.ok) trail.push("report: " + said.at + " -> " + said.detail);
+      quest = await waitStage("long_cairn", 1, 8000);
+      reached.push(quest.stage);
+    }
+
+    // Stage 3: ask Watcher Hale what his rota has seen.
+    if (quest.status === "active" && quest.stage === 2) {
+      const asked = await converse("npc_watcher_hale", [optionLike("#gravelmaw|plainly")]);
+      if (!asked.ok) trail.push("hale: " + asked.at + " -> " + asked.detail);
+      quest = await waitStage("long_cairn", 2, 8000);
+      reached.push(quest.stage);
+    }
+    const pastFirstStage = quest.status === "complete" || quest.stage >= 2;
+
+    // Stage 4: into the mouth, four Cairnwights in the Lit Gallery, then The Collapse.
+    if (quest.status === "active" && quest.stage === 3) {
+      trail.push("mouth " + await travel({ entityId: "gravelmaw_mouth_portal" }, 180000));
+      const entered = await agent.call("corealm_interact",
+        { entityId: "gravelmaw_mouth_portal", interaction: "enter" });
+      if (entered.error) trail.push("enter refused: " + entered.error + " " + entered.message);
       await sleep(600);
+      const hunt = await slay("cairnwight", 4, 100);
+      trail.push("cairnwights killed " + hunt.killed);
+      trail.push("collapse " + await travel({ locationId: "gravelmaw_chamber2" }, 90000));
+      quest = await waitStage("long_cairn", 3, 10000);
+      reached.push(quest.stage);
     }
 
-    // Stage 1 ends on a specific dialogue node with Ode. Walk her options until the stage moves.
-    let reached = await stageOf();
-    if (reached.status === "active" && reached.stage === 1) {
-      await doInteract("npc_cairnkeeper_ode", "talk", ["dialogue.opened"], 30000);
-      await talkThrough(24);
-      reached = await stageOf();
+    // Stage 5: work out the lever order from what Ode says, then open the door in the dark.
+    if (quest.status === "active" && quest.stage === 4) {
+      const solved = await converse("npc_cairnkeeper_ode", [optionLike("#levers|three levers"), solveLevers]);
+      if (!solved.ok) trail.push("levers: " + solved.at + " -> " + solved.detail);
+      const record = questRecord("long_cairn");
+      leverAttempts = record.counters["lever_attempts"] || 0;
+      solvedFirstTry = solved.ok && leverAttempts === 0 && record.flags["lever_order_known"] === true;
+      trail.push("lever answer " + (solved.taken[solved.taken.length - 1] || "none")
+        + " on attempt " + (leverAttempts + 1));
+
+      trail.push("mouth " + await travel({ entityId: "gravelmaw_mouth_portal" }, 180000));
+      await agent.call("corealm_interact", { entityId: "gravelmaw_mouth_portal", interaction: "enter" });
+      await sleep(600);
+      trail.push("collapse " + await travel({ locationId: "gravelmaw_chamber2" }, 90000));
+      let opened = await agent.call("corealm_interact",
+        { entityId: "gravelmaw_stone_door", interaction: "open" });
+      if (String(opened.started || "").startsWith("walking")) {
+        await waitFor(["navigation.completed", "navigation.failed"], 60000);
+        opened = await agent.call("corealm_interact",
+          { entityId: "gravelmaw_stone_door", interaction: "open" });
+      }
+      if (opened.error) trail.push("door refused: " + opened.error + " " + opened.message);
+      quest = await waitStage("long_cairn", 4, 10000);
+      reached.push(quest.stage);
     }
 
-    note("long-cairn", reached.status === "complete" || reached.stage >= 2,
-      "long_cairn " + reached.status + " stage " + reached.stage + "/" + (reached.stageCount || "?")
-      + " :: " + (reached.currentObjective || "-"));
+    // Stage 6: back up to Ode for the keeping-stone.
+    if (quest.status === "active" && quest.stage === 5) {
+      const given = await converse("npc_cairnkeeper_ode", [optionLike("#stone|keeping-stone")]);
+      if (!given.ok) trail.push("stone: " + given.at + " -> " + given.detail);
+      quest = await waitStage("long_cairn", 5, 10000);
+      reached.push(quest.stage);
+    }
+
+    // Stage 7: carry the garnet into the hall, over the two Elders. All three at once.
+    if (quest.status === "active" && quest.stage === 6) {
+      trail.push("mouth " + await travel({ entityId: "gravelmaw_mouth_portal" }, 180000));
+      await agent.call("corealm_interact", { entityId: "gravelmaw_mouth_portal", interaction: "enter" });
+      await sleep(600);
+      trail.push("hall " + await travel({ locationId: "gravelmaw_chamber3" }, 120000));
+      const elders = await slay("thornbound|elder", 2, 100);
+      trail.push("elders killed " + elders.killed);
+      // Back onto the cairn: the stage wants both Elders down AND the player in the hall AND the
+      // garnet still in the pack, all true in the same evaluation.
+      trail.push("hall " + await travel({ locationId: "gravelmaw_chamber3" }, 120000));
+      quest = await waitStage("long_cairn", 6, 12000);
+      reached.push(quest.stage);
+    }
+
+    if (quest.status !== "complete") {
+      const record = questRecord("long_cairn");
+      trail.push("counters " + JSON.stringify(record.counters));
+    }
+
+    const summary = "long_cairn " + quest.status + " stage " + quest.stage + "/"
+      + (quest.stageCount || 7) + " via stages [" + reached.join(">") + "]";
+    note("long-cairn", pastFirstStage, summary);
+    note("long-cairn-complete", quest.status === "complete" && solvedFirstTry,
+      summary + ", levers " + (leverAttempts < 0 ? "never reached"
+        : "solved from the text on attempt " + (leverAttempts + 1))
+      + " :: " + trail.join(" | "));
   }
 
   // ------------------------------------------------------------ persistence
@@ -699,6 +1162,12 @@ const GATE_LINES: Record<string, string> = {
   "building-footing": "Assembled buildings stand on level ground",
   "objective-prose": "Quest objectives read as prose; their ids live in a structured field",
   "long-cairn": "A quest chain can be driven past its first stage by playing",
+  "cold-iron-complete":
+    "Completing every stage of Cold Iron moves status to complete and pays the exact reward "
+    + "XP per skill, the exact item stacks and the exact mark amount from the quest definition",
+  "long-cairn-complete":
+    "Agent quest proof: a scripted agent using only WebMCP tools takes The Long Cairn from "
+    + "unstarted to complete across all 7 stages",
 };
 
 export async function runGateCheck(runCandidate: string, timeScale: number): Promise<GateReport> {
@@ -717,6 +1186,11 @@ export async function runGateCheck(runCandidate: string, timeScale: number): Pro
   try {
     browser = await chromium.launch({ headless: true, args: GPU_ARGS });
     const page: Page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    // The gate runs against the Vite dev server, and a dev server full-reloads the page the moment
+    // anything under `game/` is saved. A ten-minute playthrough that dies with "execution context
+    // was destroyed" because another worker saved a stylesheet is not a gate failure, it is noise,
+    // so the HMR socket is mocked: the client connects, and nothing ever arrives on it.
+    await page.routeWebSocket("**", () => undefined);
     page.on("pageerror", (error) => report.consoleErrors.push(String(error).slice(0, 300)));
     page.on("console", (message) => {
       if (message.type() === "error") report.consoleErrors.push(message.text().slice(0, 300));
@@ -728,6 +1202,15 @@ export async function runGateCheck(runCandidate: string, timeScale: number): Pro
       const api = window.__gameDebug as unknown as { setTimeScale?: (value: number) => void };
       api.setTimeScale?.(scale);
     }, timeScale);
+
+    // F3 asserts exact numbers, so it reads them from `content/quests.ts` rather than carrying its
+    // own copy: a rebalance that changes a reward makes the check disagree with the game, which is
+    // the point, and never makes the check silently obsolete.
+    const coldIron = QUESTS.find((quest) => quest.id === "cold_iron");
+    if (!coldIron) throw new Error("content/quests.ts no longer defines cold_iron");
+    await page.evaluate((rewards) => {
+      (window as unknown as { __gateExpect: unknown }).__gateExpect = { coldIron: rewards };
+    }, coldIron.rewards);
 
     const result = (await page.evaluate(playthroughSource())) as {
       checks: { id: string; passed: boolean; evidence: string }[];

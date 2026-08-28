@@ -93,6 +93,11 @@ with the id of the piece that went back into the pack.
   - `regenBlocked` — the eight-second no-regen window after any blow in either direction. It
     outlives the fight on purpose. Wait on this only if you are waiting to heal.
   - `targetId` and `engagedBy` name who, so you never have to infer it.
+  - `facingRad` — which way the player is pointing, radians, 0 = +Z (north).
+  - `time` — the sim clock: `{ simMs, tick, timeScale, paused }`. **Every deadline the game gives
+    you is stamped in `simMs`, never in wall time** — a recovery cache's `expiresAtMs`, a crop's
+    growth. Comparing one against `Date.now()` is wrong, and quietly wrong whenever the clock is
+    paused or rescaled.
 - `corealm_skills` — all 11 skills with level, xp, xpToNext
 - `corealm_inventory` — 28 slots, equipment with summed bonuses, mark balance
 - `corealm_quests` — every known quest with status, stage, and objective. `currentObjective` is
@@ -109,7 +114,22 @@ with the id of the piece that went back into the pack.
   ```
 
 ### Finding things
-- `corealm_observe` — entities you can see now, or locations you have discovered
+- `corealm_observe` — entities you can see now (`scope: "visible"`, 140 m ceiling), or the places
+  you have discovered (`scope: "known"`)
+
+  **Discovery is real, and it starts almost empty.** A fresh character knows four places out of
+  forty-four. Walking within 40 m of somewhere discovers it permanently and fires
+  `entity.discovered`. So `scope: "known"` is what you have earned, not a map you were handed —
+  which means an agent that only ever looks at what it knows will walk in circles.
+
+  The way out is `corealm_search_docs`. The generated pages name every place with its id —
+  `**Bracken Pit** (\`bracken_pit\`)` — and `corealm_move_to({ locationId })` accepts an id whether
+  or not you have been there. Look up where the ore is, walk there, discover it on arrival. That is
+  the intended loop and it is how the mining proof in this document bootstraps.
+
+  Rows for a place backed by an entity carry BOTH ids: `id` is the entity (`coldbrace_bank`) and
+  `locationId` is the place it stands at (`bank_interior`). Only the second one is accepted by
+  `move_to({ locationId })`.
 - `corealm_inspect` — full detail on one entity
 - `corealm_search_docs` — the public game documentation
 

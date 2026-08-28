@@ -1,1 +1,300 @@
 /* map — owned by the map worker. Nothing else writes to this file. */
+
+/*
+ * The world map. One inline SVG whose user unit IS one world metre, so everything here is sized in
+ * metres: a stroke-width of 2 is a two-metre-wide road, and the whole drawing scales with the panel
+ * because `viewBox` does the fitting.
+ *
+ * No colour is invented. Region tints arrive as `--region-tint`, set from `REGION_PALETTES` by
+ * mapPanel.ts so the map and the 3D world cannot drift apart; everything else is a :root token.
+ * The one rule that governs the palette below: brass means you can act on it. The player marker,
+ * the leader line and the destination ring are brass because they are the live parts; a place pip
+ * is coloured by what the place is FOR — the four resource kinds carry their own skill colour, so
+ * "where do I mine" is answered by the map's colours rather than by reading forty labels.
+ */
+
+/* The panel is placed at left: 50% and pulled back by half its width, so it stays centred from
+ * 1280 up. `.panel--float` sets no transform, so nothing is being overridden here. */
+#panel-map { transform: translateX(-50%); }
+
+.map {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* A sunken well for the map itself: the same treatment as any other inset surface in the UI. */
+.map__figure {
+  background: var(--panel-sunken);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--inset-well);
+  padding: 2px;
+}
+
+.map__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+  overflow: visible;
+}
+
+/* ------------------------------------------------------------------ ground */
+
+.map__ground {
+  fill: #14120f;
+  stroke: var(--panel-edge);
+  stroke-width: 1.2;
+}
+
+.map__region-fill {
+  fill: var(--region-tint, #4a4238);
+  fill-opacity: 0.44;
+  stroke: var(--region-edge, var(--panel-edge-bright));
+  stroke-opacity: 0.65;
+  stroke-width: 1.4;
+}
+
+.map__region-name {
+  fill: var(--region-tint, var(--ink-dim));
+  fill-opacity: 0.85;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  paint-order: stroke fill;
+  stroke: rgba(0, 0, 0, 0.65);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.map__grid line {
+  stroke: var(--ink);
+  stroke-opacity: 0.09;
+  stroke-width: 0.8;
+}
+
+/* ------------------------------------------------------------------- roads */
+
+/* Roads are the trodden-earth tone the render layer uses for a track, not a UI accent: they are
+ * terrain, and they must sit behind the pips rather than compete with them. */
+.map__road {
+  stroke: #c2ab84;
+  stroke-opacity: 0.5;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+/* A gate crossing is a road between two regions. Dashed, because it is a door, not a stretch. */
+.map__road--crossing {
+  stroke: var(--accent);
+  stroke-opacity: 0.5;
+  stroke-dasharray: 5 4;
+}
+
+/* ------------------------------------------------------------------- pips */
+
+.map__place { cursor: pointer; }
+
+.map__hit {
+  fill: #000;
+  fill-opacity: 0;
+}
+
+.map__pip {
+  fill: var(--ink-dim);
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 1.1;
+}
+
+.map__pip--hollow {
+  fill: #14120f;
+  stroke: var(--danger);
+  stroke-width: 2.6;
+}
+
+.map__pip--stroke {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.map__place--settlement .map__pip { fill: var(--accent); }
+.map__place--bank .map__pip { fill: var(--accent); }
+.map__place--gate .map__pip { fill: var(--info); }
+.map__place--seam .map__pip { fill: var(--skill-mining); }
+.map__place--grove .map__pip { fill: var(--skill-woodcutting); }
+.map__place--water .map__pip { fill: var(--skill-fishing); }
+.map__place--farm .map__pip { fill: var(--skill-farming); }
+.map__place--camp .map__pip { fill: var(--danger-dim); }
+.map__place--landmark .map__pip { fill: var(--ink-dim); }
+
+/* Hover and keyboard focus are the same state: the pip grows a brass collar and its name is read
+ * out under the map. The outline is suppressed because the collar IS the focus ring. */
+.map__place.is-focused .map__pip,
+.map__place:focus-visible .map__pip {
+  stroke: var(--accent);
+  stroke-width: 2.6;
+}
+
+.map__place:focus-visible { outline: none; }
+
+.map__place.is-focused .map__pip--stroke,
+.map__place:focus-visible .map__pip--stroke {
+  stroke: var(--accent);
+}
+
+/* ------------------------------------------------------------------ labels */
+
+/* Names are struck through by roads and region fills otherwise. `paint-order` puts a dark casing
+ * under each glyph so a label stays legible wherever it lands. */
+.map__label {
+  fill: var(--ink);
+  font-weight: 600;
+  paint-order: stroke fill;
+  stroke: rgba(12, 11, 9, 0.9);
+  stroke-width: 3.2;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------- the live overlay */
+
+.map__leader {
+  stroke: var(--accent);
+  stroke-opacity: 0.75;
+  stroke-width: 1.6;
+  stroke-dasharray: 6 5;
+  pointer-events: none;
+}
+
+.map__dest {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 2.5 5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.map__player-halo {
+  fill: var(--accent);
+  fill-opacity: 0.14;
+  stroke: var(--accent);
+  stroke-opacity: 0.95;
+  stroke-width: 1.8;
+}
+
+/* A pale core inside a brass ring. Every place pip is a solid shape in one colour, so the player
+ * is the only two-tone mark on the map and does not read as another place. */
+.map__player-dot {
+  fill: #fdf6e6;
+  stroke: var(--accent-ink);
+  stroke-width: 0.8;
+}
+
+.map__player-arrow {
+  fill: var(--accent);
+  stroke: var(--accent-ink);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.map__empty {
+  fill: var(--ink-dim);
+  font-size: 13px;
+  paint-order: stroke fill;
+  stroke: rgba(12, 11, 9, 0.9);
+  stroke-width: 3.2;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.map__scale-bar {
+  stroke: var(--ink-faint);
+  stroke-width: 1.4;
+}
+
+.map__scale-text,
+.map__north {
+  fill: var(--ink-faint);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.map__north {
+  fill: var(--ink-dim);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ----------------------------------------------------------- readout strip */
+
+/* One line under the map that answers "what is that, and how far". It is a `role="status"`, so the
+ * same sentence a sighted player reads on hover is announced on keyboard focus. */
+.map__readout {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: 20px;
+  padding: 0 2px;
+}
+
+.map__readout-name {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.map__readout-meta {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map__readout-range {
+  color: var(--accent);
+  font-size: var(--size-sm);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ legend */
+
+.map__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: var(--size-xs);
+  letter-spacing: 0.04em;
+}
+
+.map__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  background: var(--region-tint, var(--panel-edge));
+}
+
+.map__hint {
+  margin-left: auto;
+  font-style: italic;
+}
+
+/* 1280x720 is the floor. The panel keeps its width there — 684 px of 1280 is comfortable — and
+ * only gives up the vertical breathing room. */
+@media (max-height: 800px) {
+  #panel-map { top: 64px !important; }
+  .map { gap: var(--space-1); }
+}

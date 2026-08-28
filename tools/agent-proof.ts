@@ -99,29 +99,73 @@ const MINING_AGENT = `(async (targetLevel) => {
   // Where the agent has looked, so it does not pace between two places forever.
   const visited = new Set();
 
-  /**
-   * Travel toward somewhere that plausibly has ore.
+/**
+   * Where the ore is, read out of the game's own documentation.
    *
-   * Observation has a 140 m ceiling and the player spawns further than that from any seam, so an
-   * agent that only ever looks around sees nothing and waits forever. Exploration is the missing
-   * half of the loop: observe with scope "known" returns the locations this character knows, and
-   * their names are the only clue available -- exactly what a player reads off the map.
+   * This is the half of the loop that used to be missing, and it only became visible once
+   * discovery was actually gated. Before that, \`observe({ scope: "known" })\` answered with all
+   * forty-four places in the world to a character who had never left the spawn square, so
+   * "exploration" was picking a name off a list the agent had done nothing to earn. With the gate
+   * on, a fresh character knows four places, none of them a seam, and that strategy walks in
+   * circles: 973 tool calls, Mining still 1.
+   *
+   * What an agent actually has is \`corealm_search_docs\`, over the same generated pages a player
+   * can read. \`docs/game/regions.md\` lists every place with its id — "**Bracken Pit**
+   * (\`bracken_pit\`)" — and \`moveTo({ locationId })\` accepts an id whether or not the character
+   * has been there. So the agent looks up where Grithe comes from, walks there, and discovers it
+   * on arrival. That is the intended loop, and proving it is worth more than proving the agent can
+   * read a list it was handed.
    */
-  const travelToProspect = async () => {
-    const places = await agent.call("corealm_observe", { scope: "known", limit: 40 });
-    const ranked = (places || [])
-      .filter((place) => !visited.has(place.id))
-      .sort((a, b) => {
-        const mining = (place) => /pit|seam|mine|quarry|face|scree|karrow/i.test(place.id + " " + place.name) ? 0 : 1;
-        return (mining(a) - mining(b)) || (a.distance - b.distance);
-      });
-    if (!ranked.length) { visited.clear(); return false; }
+  const idsFromDocs = async (query) => {
+    const hits = await agent.call("corealm_search_docs", { query, limit: 12 });
+    const ids = [];
+    for (const hit of hits || []) {
+      const text = String(hit.snippet || "") + " " + String(hit.title || "");
+      // A Places entry reads: moveTo({ locationId: "bracken_pit" }). That id is the one thing in
+      // the documentation an agent cannot guess, which is the whole reason this lookup exists.
+      //
+      // NO BACKSLASHES IN THIS REGEX. The agent is a template literal, and a template literal
+      // collapses an unrecognised escape, so a "\s" reached the page as a bare "s" and
+      // /locationId:\s*"/ became /locationId:s*"/ — which matched nothing, while reporting
+      // "docs named 0 place ids" as though the documentation were at fault. It was not.
+      for (const match of text.matchAll(/locationId: "([a-z0-9_]+)"/g)) ids.push(match[1]);
+    }
+    return ids;
+  };
 
-    const destination = ranked[0];
-    visited.add(destination.id);
-    log.push("prospecting at " + destination.id);
-    const moved = await agent.call("corealm_move_to", { locationId: destination.id });
-    if (moved.error) return false;
+  /** Places named in the docs as having ore, best-first, resolved once and then walked in order. */
+  let docLeads = null;
+
+  const travelToProspect = async () => {
+    if (docLeads === null) {
+      const found = [];
+      // Terms a mining agent can derive: the ore is Grithe (it is in the skill guide and in every
+      // recipe) and a mining site is a "seam" or a "face". Those rank the Places entries that name
+      // a location id, which is the one thing here that cannot be guessed. "grithe" alone returns
+      // recipes, so the query genuinely matters.
+      for (const query of ["grithe seam", "seam", "kaldite face", "quarry"]) {
+        for (const id of await idsFromDocs(query)) if (!found.includes(id)) found.push(id);
+      }
+      docLeads = found;
+      log.push("docs named " + docLeads.length + " place ids");
+    }
+
+    // Known places first when one of them looks like a seam — a short walk beats a long one — then
+    // fall through to whatever the documentation named.
+    const places = await agent.call("corealm_observe", { scope: "known", limit: 40 });
+    const looksMineable = (text) => /pit|seam|mine|quarry|face|scree|karrow/i.test(text);
+    const nearby = (places || [])
+      .map((place) => place.locationId || place.id)
+      .filter((id, index) => !visited.has(id) && looksMineable(id + " " + ((places[index] || {}).name || "")));
+
+    const candidates = [...nearby, ...docLeads.filter((id) => !visited.has(id))];
+    if (!candidates.length) { visited.clear(); docLeads = null; return false; }
+
+    const destination = candidates[0];
+    visited.add(destination);
+    log.push("prospecting at " + destination);
+    const moved = await agent.call("corealm_move_to", { locationId: destination });
+    if (moved.error) { log.push("  refused: " + moved.error); return false; }
     await waitFor(["navigation.completed", "navigation.failed"], 120000);
     return true;
   };

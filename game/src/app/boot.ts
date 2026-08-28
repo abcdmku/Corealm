@@ -46,6 +46,7 @@ import { HealthSystem } from "../systems/health.js";
 import { DeathSystem } from "../systems/death.js";
 import { ProductionSystem } from "../systems/production.js";
 import { QuestSystem } from "../systems/quests.js";
+import { DiscoverySystem } from "../systems/discovery.js";
 import { DialogueSystem } from "../systems/dialogue.js";
 import { TravelSystem } from "../systems/travel.js";
 import { INTERACT_RANGE } from "./config.js";
@@ -182,7 +183,16 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     return levels;
   };
 
-  const entityStore = new EntityStore({ skillLevels });
+  // PRD F12's discovery gate, finally connected. `EntityStore` has always accepted this port and
+  // boot has always constructed the store without one, which made it return null — and null means
+  // "discovery is not gating anything", so `observe({ scope: "known" })` handed a character who had
+  // never left the spawn square all forty named places in the world. The system that answers it is
+  // built below, once there are locations to sweep; the closure defers to it.
+  let discoverySystem: DiscoverySystem | null = null;
+  const entityStore = new EntityStore({
+    skillLevels,
+    discoveredLocationIds: () => discoverySystem?.discovered() ?? null,
+  });
   entityStore.load(built.entities);
   entityStore.registerLocations(built.knownLocations);
 
@@ -469,6 +479,15 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     },
   };
 
+  discoverySystem = new DiscoverySystem({
+    store,
+    events,
+    locations: () => built.knownLocations,
+  });
+  // Once, before the first frame: a loaded save or a fresh spawn knows where it is standing rather
+  // than finding out 700 ms in.
+  discoverySystem.sweep(clock.elapsedMs);
+
   const questSystem = new QuestSystem({
     store, events, clock,
     entities: questEntityPort,
@@ -691,10 +710,12 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.addSystem(deathSystem);
   loop.addSystem(productionSystem);
   loop.addSystem(questSystem);
+  loop.addSystem(discoverySystem);
 
   if (dungeon) loop.addInterior(dungeon.group, () => store.get().player.regionId === "gravelmaw");
   loop.setOverlays(overlays);
   loop.setVfx(vfx);
+  loop.setCombatHits(() => combatSystem.consumeHits());
   loop.setUi(ui);
   if (rigged) loop.setPlayerRig(playerRig);
   loop.setEntityViews(entityViews, () => {
@@ -784,10 +805,15 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       rotationY: building.rotationY,
     }))),
 
+    // Silent on purpose. `addItem` emits `item.received`, which the quest system counts into
+    // `gather:<itemId>` — so an unsilenced debug grant could complete a gather stage on its own,
+    // which is exactly the hole the gate check's "debug may set a check up, never satisfy one" rule
+    // exists to close. Cold Iron stage 1 and the whole of Dorn's Tally were satisfiable by
+    // `giveItem` alone.
     giveItem: (itemId: string, quantity: number, to: string) => (
       to === "bank"
         ? bankSystem.op("deposit", { itemId, quantity })
-        : inventorySystem.addItem(itemId, quantity)
+        : inventorySystem.addItem(itemId, quantity, { silent: true })
     ),
     focusCamera: (shotId: string) => {
       const shot = findShot(shotId);

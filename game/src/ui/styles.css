@@ -658,7 +658,12 @@ html, body {
 
 .tooltip[hidden] { display: none; }
 
-.panel--float { min-width: 200px; }
+/*
+ * The default height ceiling for a floating panel. It lives here rather than being written
+ * inline by PanelFrame so the short-screen media query below can actually reach it; a panel that
+ * needs a different ceiling still passes one through `placement.maxHeight`.
+ */
+.panel--float { min-width: 200px; max-height: calc(100vh - 96px); }
 .panel__titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .panel__body { display: flex; flex-direction: column; gap: var(--space-3); }
 

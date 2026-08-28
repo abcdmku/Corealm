@@ -240,6 +240,41 @@ export function buildDocs(): DocEntry[] {
     });
   }
 
+  // ------------------------------------------------------------------ places
+  //
+  // One entry per named place, and the ONE reason it exists is that the id is in the body.
+  //
+  // Discovery is gated: a fresh character knows four places out of forty-four, and
+  // `observe({ scope: "known" })` only ever answers with what has already been walked to. So an
+  // agent that has never left the spawn square has no way to name anywhere else — it cannot ask to
+  // go to the Bracken Pit, because nothing has told it that "bracken_pit" is a string. Without this
+  // section the only route to the rest of the world is wandering, and the mining proof demonstrated
+  // exactly that: 1,606 tool calls, Mining still 1.
+  //
+  // Geography is public knowledge — the generated `docs/game/regions.md` has always published this
+  // same list, so the in-game index was simply missing a section its file-based twin already had.
+  // What must NOT leak is an unstarted quest's later stages (PRD F13), and none of that is here.
+  for (const region of REGIONS) {
+    for (const location of region.locations) {
+      const clusters = region.clusters
+        .filter((cluster) => cluster.locationId === location.id)
+        .map((cluster) => `${cluster.name} (tier ${cluster.tier} ${cluster.skill}, needs level ${cluster.reqLevel})`);
+      entries.push({
+        id: `place-${location.id}`,
+        title: location.name,
+        section: "Places",
+        body:
+          `${location.name} is a ${location.kind} in ${region.name}, tier ${region.tier}. `
+          + `Travel there with moveTo({ locationId: "${location.id}" }). `
+          + `${clusters.length ? `You can gather here: ${clusters.join(", ")}.` : ""}`,
+        keywords: [
+          location.id, location.kind, region.id, "place", "location", "where", "travel",
+          ...clusters.map((text) => text.toLowerCase()),
+        ],
+      });
+    }
+  }
+
   return entries;
 }
 

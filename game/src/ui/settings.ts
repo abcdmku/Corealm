@@ -12,8 +12,10 @@
  * character, so "New Game" must not reset them and a save transferred between browsers must not
  * carry them.
  *
- * SCAFFOLD. The shape below is frozen; the settings worker owns the body and may add fields, so
- * long as each new one is applied by something.
+ * The four here are the four that are applied. `boot.ts` subscribes once and wires each of them:
+ * shadows flip the sun's cast, inversion lands on the camera, damage numbers are never created
+ * rather than created-and-hidden, and compact density puts `.is-compact` on `#ui-root`, which
+ * `ui/styles/title.css` answers with smaller type, tighter padding and narrower side panels.
  */
 
 export interface UiSettings {
@@ -76,16 +78,33 @@ export class SettingsStore {
   }
 }
 
+/**
+ * Reads what is in storage, field by field.
+ *
+ * The stored blob is JSON, so it is `unknown` no matter what the type says: an older build, a
+ * hand-edited value or a half-written string all end up here. Anything that is not the right shape
+ * is dropped and the default stands, because a `uiScale` of `"huge"` would otherwise be spread
+ * straight into the store and every reader would trust it.
+ */
 function readStored(): Partial<UiSettings> {
+  let parsed: unknown;
   try {
     const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
     if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed as Partial<UiSettings> : {};
+    parsed = JSON.parse(raw);
   } catch {
     // A corrupt or unavailable store falls back to defaults. Preferences are never worth a crash.
     return {};
   }
+  if (typeof parsed !== "object" || parsed === null) return {};
+
+  const source = parsed as Record<string, unknown>;
+  const out: Partial<UiSettings> = {};
+  if (typeof source["damageNumbers"] === "boolean") out.damageNumbers = source["damageNumbers"];
+  if (typeof source["shadows"] === "boolean") out.shadows = source["shadows"];
+  if (typeof source["invertCameraY"] === "boolean") out.invertCameraY = source["invertCameraY"];
+  if (source["uiScale"] === "compact" || source["uiScale"] === "normal") out.uiScale = source["uiScale"];
+  return out;
 }
 
 function writeStored(settings: UiSettings): void {

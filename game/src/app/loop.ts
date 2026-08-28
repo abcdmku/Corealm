@@ -15,6 +15,7 @@ import type { WorldScene } from "../render/scene.js";
 import type { Physics } from "../systems/physics.js";
 import type { Navigation } from "../systems/navigation.js";
 import type { Movement } from "../systems/movement.js";
+import type { CombatHit } from "../systems/combat.js";
 import type { CorealmGameApi } from "../api/gameApi.js";
 import type { SaveService } from "../persistence/storage.js";
 import type { InputController } from "../input/mouse.js";
@@ -63,6 +64,7 @@ export class GameLoop {
   private overlays: Overlays | null = null;
   private playerRig: CharacterRig | null = null;
   private vfx: Vfx | null = null;
+  private drainHits: (() => readonly CombatHit[]) | null = null;
   private ui: Ui | null = null;
   private interiors: { group: { visible: boolean }; visible: () => boolean }[] = [];
   private lastPlayerPos: [number, number, number] | null = null;
@@ -94,6 +96,21 @@ export class GameLoop {
   /** Floating combat and XP feedback. Ticked on real time so it reads the same at any time scale. */
   setVfx(vfx: Vfx): void {
     this.vfx = vfx;
+  }
+
+  /**
+   * Where damage numbers come from.
+   *
+   * `systems/combat.ts` has kept a hit log since round 3, with a comment on `consumeHits()` saying
+   * "render/vfx.ts polls this for damage numbers", and nothing ever polled it — `Vfx.damage()` had
+   * no callers anywhere in the project. So every fight in the game, including the two-phase boss,
+   * happened in complete silence: health bars moved and nothing else did. It went unnoticed because
+   * the gate check reads combat out of XP and entity state, which are both correct.
+   *
+   * The log is drained rather than read, so a frame that drops cannot replay yesterday's swings.
+   */
+  setCombatHits(drain: () => readonly CombatHit[]): void {
+    this.drainHits = drain;
   }
 
   /** The human UI. `update()` is internally throttled, so calling it every frame is correct. */
@@ -180,6 +197,7 @@ export class GameLoop {
     // time-scaled test run should not play idles at 100x.
     this.entityViews?.update(realDeltaMs / 1000, renderer.camera.position);
     this.overlays?.update(this.deps.clock.elapsedMs);
+    this.paintCombatHits(nowMs);
     this.vfx?.update(nowMs);
     this.ui?.update();
     this.syncPlayerRig(state.player.position, state.player.facingRad, realDeltaMs);
@@ -219,6 +237,24 @@ export class GameLoop {
       activityKind: player.activityKind,
     }));
     rig.update(realDeltaMs / 1000);
+  }
+
+  /**
+   * Turns this frame's swings into floating numbers.
+   *
+   * A hit the player took floats over the player and reads as "incoming"; one they landed floats
+   * over whatever they hit. A miss is worth showing too — a run of zeroes against a high-armour
+   * target is the game explaining why Magic exists — so `hit: false` still paints, as a nought.
+   */
+  private paintCombatHits(nowMs: number): void {
+    if (!this.vfx || !this.drainHits) return;
+    const playerId = this.deps.store.get().player.id;
+    for (const swing of this.drainHits()) {
+      const incoming = swing.attacker === "enemy";
+      const kind = incoming ? "incoming" : swing.kind === "magic" ? "magic" : "melee";
+      const over = incoming ? playerId : swing.targetId;
+      this.vfx.damage(over === playerId ? null : over, swing.damage, kind, nowMs);
+    }
   }
 
   /** Diffs semantic entities into the render layer a few times a second, not every frame. */

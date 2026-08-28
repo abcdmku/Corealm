@@ -13,7 +13,7 @@
  *
  *  1. **The event stream.** The system subscribes to `EventBus` and turns events into counters on
  *     the quest record: `item.received` feeds `gather:<itemId>`, `combat.ended` with
- *     `outcome: "killed"` feeds `kill:<family>` (the family comes off the dead entity's
+ *     `reason: "killed"` feeds `kill:<family>` (the family comes off the dead entity's
  *     `meta.family`), `production.completed` feeds `produce:<recipeId>`, and `resource.depleted`
  *     feeds `deplete:<itemId>` plus the `last_seam_yield` figure Dorn's Tally is built around.
  *     Any event at all also marks the system dirty.
@@ -393,8 +393,18 @@ export class QuestSystem implements TickSystem {
         break;
       }
       case "combat.ended": {
-        if (data.outcome !== "killed") break;
-        const targetId = typeof data.targetId === "string" ? data.targetId : entityId;
+        // `reason`, not `outcome`, and `enemyId`, not `targetId`. Both of those names were invented
+        // here and never existed on the event: `systems/combat.ts` emits
+        // `{ reason: "killed", enemyId, name, xp }`. So the guard never passed, no `kill:<family>`
+        // counter was ever incremented, and EVERY kill predicate in the game was unsatisfiable —
+        // Cold Iron stage 4, the Long Cairn stages 4 and 7, Eleven Empty Days stage 1. Four of the
+        // ten quests could not be finished by anybody, human or agent.
+        //
+        // It survived three rounds because nothing had played a quest past its opening stages: the
+        // gate proved Cold Iron to stage 0 and the Long Cairn to stage 2, and both of those sit
+        // before the first kill. A predicate nobody has ever satisfied is not a tested predicate.
+        if (data.reason !== "killed") break;
+        const targetId = typeof data.enemyId === "string" ? data.enemyId : entityId;
         const family = this.familyOf(targetId, data);
         if (family) bump(`kill:${family}`, 1);
         break;
