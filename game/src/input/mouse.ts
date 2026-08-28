@@ -1,78 +1,216 @@
 /**
- * Human input: click-to-move, WASD direct movement, camera orbit and zoom, hover picking.
+ * Human pointer input: hover feedback, click-to-move, click-to-interact, camera orbit and zoom.
  *
- * Both movement styles the brief asks for, side by side. Everything routes through GameApi, so a
- * human click and an agent tool call reach the identical function.
+ * Everything the player does here goes through `GameApi`. That is the whole point of the layering:
+ * a human click and a WebMCP call reach the identical function, so agent parity is a property of
+ * the architecture rather than a claim. This file never touches the store and never reaches into a
+ * system directly.
+ *
+ * The render and movement dependencies are taken structurally rather than by class import. The
+ * concrete `Renderer`, `OrbitCamera` and `Movement` satisfy these shapes, but the input layer does
+ * not need to know their internals — and staying structural keeps `input/` from breaking every time
+ * the render layer reorganises.
  */
-import * as THREE from "three";
-import type { CorealmGameApi } from "../api/gameApi.js";
-import type { OrbitCamera } from "../render/camera.js";
-import type { Renderer } from "../render/renderer.js";
-import type { Movement } from "../systems/movement.js";
-import type { Vec3 } from "../contracts.js";
+import type * as THREE from "three";
+import type { EntityId, GameApi, InteractionId, Vec3 } from "../contracts.js";
 import { CAMERA } from "../app/config.js";
+import { Picker, type Pick, type PickSource, type PickerSources } from "./picking.js";
+import { KeyboardController, type KeyBindingRegistry } from "./keyboard.js";
+import {
+  ContextMenu, INTERACTION_LABELS, notify, primaryInteraction, reportResult,
+} from "../ui/contextMenu.js";
 
+/** Below this the pointer was shaky, not dragging. Above it, the click is cancelled. */
 const DRAG_THRESHOLD_PX = 4;
 
+/** Radians per pixel of orbit drag. Slow enough that the camera reads as a camera, not a cursor. */
+const ORBIT_YAW_PER_PX = 0.006;
+const ORBIT_PITCH_PER_PX = 0.004;
+
+/** Fraction of the zoom range per wheel notch. */
+const ZOOM_STEP_FRACTION = 0.06;
+
+export interface RendererLike {
+  camera: THREE.Camera;
+  scene: THREE.Object3D;
+}
+
+export interface OrbitCameraLike {
+  readonly yaw: number;
+  rotate(deltaYaw: number, deltaPitch: number): void;
+  zoom(delta: number): void;
+}
+
+export interface MovementLike {
+  setDirectInput(input: { forward: number; strafe: number; cameraYaw: number }): void;
+}
+
+export interface InputOptions {
+  /** Root wires this to the render layer's entity pick at integration. */
+  entityPickSource?: PickSource | null;
+  /** Alternative wiring shape; see `PickerSources`. */
+  pickSources?: PickerSources;
+  /** Share the registry with the panels. Defaults to the module-level `keybindings`. */
+  keybindings?: KeyBindingRegistry;
+  /** Notified when the hovered entity changes, so the render layer can highlight it. */
+  onHoverChange?: (entityId: EntityId | null) => void;
+  /** Notified when the selected (last left-clicked) entity changes. */
+  onSelectionChange?: (entityId: EntityId | null) => void;
+  /** Defaults to #ui-root. */
+  uiRoot?: HTMLElement | null;
+  hoverThrottleMs?: number;
+}
+
 export class InputController {
-  private keys = new Set<string>();
+  readonly picker: Picker;
+  readonly contextMenu: ContextMenu;
+  readonly keyboard: KeyboardController;
+
+  /** The entity under the cursor, or null. Read by the render layer for the highlight ring. */
+  hoveredEntityId: EntityId | null = null;
+  /** Last left-clicked entity. Space falls back to this when nothing is hovered. */
+  selectedEntityId: EntityId | null = null;
+
   private pointerDown = false;
   private dragging = false;
   private dragButton = 0;
+  private activePointerId: number | null = null;
   private downX = 0;
   private downY = 0;
   private lastX = 0;
   private lastY = 0;
 
-  private readonly raycaster = new THREE.Raycaster();
-  private readonly pointer = new THREE.Vector2();
+  /** Latest cursor position, in client coordinates. Hover is resolved from the frame loop. */
+  private cursorX = 0;
+  private cursorY = 0;
+  private cursorOverCanvas = false;
+  /** A press that began on a panel must not fall through to the world on release. */
+  private pressStartedOnCanvas = false;
+  /** The click that dismisses an open context menu does nothing else. */
+  private suppressNextClick = false;
 
-  hoveredEntityId: string | null = null;
+  private hoverLabel: HTMLElement | null = null;
+  private labelAtX = Number.NaN;
+  private labelAtY = Number.NaN;
+  private readonly hoverThrottleMs: number;
+  private readonly options: InputOptions;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly renderer: Renderer,
-    private readonly camera: OrbitCamera,
-    private readonly api: CorealmGameApi,
-    private readonly movement: Movement,
+    renderer: RendererLike,
+    private readonly camera: OrbitCameraLike,
+    private readonly api: GameApi,
+    private readonly movement: MovementLike,
+    options: InputOptions = {},
   ) {
+    this.options = options;
+    this.hoverThrottleMs = options.hoverThrottleMs ?? 70;
+
+    this.picker = new Picker(
+      { camera: renderer.camera, scene: renderer.scene, element: canvas },
+      {
+        ...(options.pickSources ?? {}),
+        ...(options.entityPickSource !== undefined ? { pickEntity: options.entityPickSource } : {}),
+      },
+    );
+
+    const menuDeps = options.uiRoot !== undefined
+      ? { api, root: options.uiRoot }
+      : { api };
+    this.contextMenu = new ContextMenu(menuDeps);
+
+    const keyboardOptions = {
+      api,
+      getActionTargetId: (): EntityId | null => this.actionTargetId(),
+      activateTarget: (): void => this.activateTarget(),
+      ...(options.keybindings ? { registry: options.keybindings } : {}),
+    };
+    this.keyboard = new KeyboardController(keyboardOptions);
+
     this.attach();
   }
 
-  private attach(): void {
-    this.canvas.addEventListener("pointerdown", this.onPointerDown);
-    window.addEventListener("pointermove", this.onPointerMove);
-    window.addEventListener("pointerup", this.onPointerUp);
-    this.canvas.addEventListener("wheel", this.onWheel, { passive: false });
-    this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
-    window.addEventListener("blur", () => this.keys.clear());
+  // ------------------------------------------------------------ root wiring
+
+  /**
+   * Integration hook. The root calls this once the render layer can answer "what is under this
+   * ray", which is the only thing the input layer cannot work out for itself.
+   */
+  setEntityPickSource(source: PickSource | null): void {
+    this.picker.setEntitySource(source);
   }
 
+  configurePicking(sources: PickerSources): void {
+    this.picker.configure(sources);
+  }
+
+  // ------------------------------------------------------------------ events
+
+  private attach(): void {
+    this.canvas.addEventListener("pointerdown", this.onPointerDown);
+    // Move/up live on the window so a drag that leaves the viewport keeps orbiting and still ends
+    // cleanly when the button is released over a panel or off-screen.
+    window.addEventListener("pointermove", this.onPointerMove);
+    window.addEventListener("pointerup", this.onPointerUp);
+    window.addEventListener("pointercancel", this.onPointerCancel);
+    this.canvas.addEventListener("pointerleave", this.onPointerLeave);
+    this.canvas.addEventListener("wheel", this.onWheel, { passive: false });
+    this.canvas.addEventListener("contextmenu", this.onContextMenuEvent);
+    window.addEventListener("blur", this.onWindowBlur);
+  }
+
+  private onContextMenuEvent = (event: MouseEvent): void => {
+    // The browser menu would cover the game menu, and right-drag orbit needs the button.
+    event.preventDefault();
+  };
+
   private onPointerDown = (event: PointerEvent): void => {
+    this.pressStartedOnCanvas = event.target === this.canvas;
+    if (!this.pressStartedOnCanvas) return;
+
+    // A click anywhere outside an open menu just dismisses it. The menu closes itself; we only
+    // have to make sure the same click does not also walk the player somewhere.
+    this.suppressNextClick = this.contextMenu.isOpen();
+
     this.pointerDown = true;
     this.dragging = false;
     this.dragButton = event.button;
-    this.downX = this.lastX = event.clientX;
-    this.downY = this.lastY = event.clientY;
+    this.activePointerId = event.pointerId;
+    this.downX = this.lastX = this.cursorX = event.clientX;
+    this.downY = this.lastY = this.cursorY = event.clientY;
+
+    // Capture keeps orbit alive at the edge of the screen instead of dropping the drag there.
+    if (event.button === 1 || event.button === 2) {
+      try {
+        this.canvas.setPointerCapture(event.pointerId);
+      } catch {
+        // Capture is a nicety. Losing it only costs edge-of-screen comfort.
+      }
+    }
+    // Middle click otherwise scrolls the page.
+    if (event.button === 1) event.preventDefault();
   };
 
   private onPointerMove = (event: PointerEvent): void => {
-    this.pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-    this.pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    this.cursorX = event.clientX;
+    this.cursorY = event.clientY;
+    this.cursorOverCanvas = event.target === this.canvas;
 
     if (!this.pointerDown) return;
     if (!this.dragging && Math.hypot(event.clientX - this.downX, event.clientY - this.downY) > DRAG_THRESHOLD_PX) {
       this.dragging = true;
+      this.setHovered(null);
     }
     if (!this.dragging) return;
 
-    // Right-drag or middle-drag orbits. Left-drag is reserved for future selection boxes.
+    // Right-drag or middle-drag orbits. Left-drag is reserved for a future selection box, and in
+    // particular must never nudge the camera — that is what "does not fight the camera" means.
     if (this.dragButton === 2 || this.dragButton === 1) {
       const deltaX = event.clientX - this.lastX;
       const deltaY = event.clientY - this.lastY;
-      this.camera.rotate(-deltaX * 0.006, -deltaY * 0.004);
+      this.camera.rotate(-deltaX * ORBIT_YAW_PER_PX, -deltaY * ORBIT_PITCH_PER_PX);
+      // The world moved under a stationary cursor; the cached hover pick is stale.
+      this.picker.invalidate();
     }
     this.lastX = event.clientX;
     this.lastY = event.clientY;
@@ -80,65 +218,267 @@ export class InputController {
 
   private onPointerUp = (event: PointerEvent): void => {
     if (!this.pointerDown) return;
+    this.releaseCapture(event.pointerId);
     this.pointerDown = false;
-    if (this.dragging) {
-      this.dragging = false;
-      return;
-    }
-    if (event.button === 0) this.handleClick(event.clientX, event.clientY);
+
+    const wasDragging = this.dragging;
+    this.dragging = false;
+    this.activePointerId = null;
+
+    const suppressed = this.suppressNextClick;
+    this.suppressNextClick = false;
+
+    if (wasDragging || suppressed) return;
+    // A press that started on a panel, or a release that landed off the viewport, is not a world
+    // click. Both would otherwise teleport the destination marker somewhere the player never aimed.
+    if (!this.pressStartedOnCanvas) return;
+    if (!this.picker.containsPoint(event.clientX, event.clientY)) return;
+
+    if (event.button === 0) this.handleLeftClick(event.clientX, event.clientY);
+    else if (event.button === 2) this.handleRightClick(event.clientX, event.clientY);
+  };
+
+  private onPointerCancel = (event: PointerEvent): void => {
+    this.releaseCapture(event.pointerId);
+    this.pointerDown = false;
+    this.dragging = false;
+    this.activePointerId = null;
+    this.suppressNextClick = false;
+  };
+
+  private onPointerLeave = (): void => {
+    this.cursorOverCanvas = false;
+    if (!this.dragging) this.setHovered(null);
+  };
+
+  private onWindowBlur = (): void => {
+    this.pointerDown = false;
+    this.dragging = false;
+    this.cursorOverCanvas = false;
+    this.setHovered(null);
   };
 
   private onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    this.camera.zoom(Math.sign(event.deltaY) * (CAMERA.maxDistance - CAMERA.minDistance) * 0.06);
+    this.camera.zoom(Math.sign(event.deltaY) * (CAMERA.maxDistance - CAMERA.minDistance) * ZOOM_STEP_FRACTION);
+    this.picker.invalidate();
   };
 
-  private onKeyDown = (event: KeyboardEvent): void => {
-    this.keys.add(event.key.toLowerCase());
-  };
+  private releaseCapture(pointerId: number): void {
+    if (this.activePointerId !== pointerId) return;
+    try {
+      if (this.canvas.hasPointerCapture(pointerId)) this.canvas.releasePointerCapture(pointerId);
+    } catch {
+      // Already released, or never captured.
+    }
+  }
 
-  private onKeyUp = (event: KeyboardEvent): void => {
-    this.keys.delete(event.key.toLowerCase());
-  };
+  // ----------------------------------------------------------------- actions
 
-  /** Click-to-move: raycast the terrain, path there through GameApi. */
-  private handleClick(clientX: number, clientY: number): void {
-    const ndc = new THREE.Vector2(
-      (clientX / window.innerWidth) * 2 - 1,
-      -(clientY / window.innerHeight) * 2 + 1,
-    );
-    this.raycaster.setFromCamera(ndc, this.renderer.camera);
+  /**
+   * Left click. On an entity: its primary interaction. On ground: walk there.
+   * `GameApi.interact` already walks into range first, so one click is always one intent.
+   */
+  private handleLeftClick(clientX: number, clientY: number): void {
+    const pick = this.picker.pickAt(clientX, clientY);
+    if (!pick) return;
 
-    const terrain = this.renderer.scene.getObjectByName("terrain");
-    if (!terrain) return;
-    const hits = this.raycaster.intersectObject(terrain, true);
-    const hit = hits[0];
-    if (!hit) return;
+    if (pick.entityId) {
+      this.setSelected(pick.entityId);
+      this.interactPrimary(pick.entityId);
+      return;
+    }
 
-    const target: Vec3 = [hit.point.x, hit.point.y, hit.point.z];
-    this.api.moveTo({ position: target });
+    this.setSelected(null);
+    this.moveTo(pick.point);
+  }
+
+  private handleRightClick(clientX: number, clientY: number): void {
+    const pick = this.picker.pickAt(clientX, clientY);
+    if (!pick) return;
+    if (pick.entityId) this.contextMenu.openForEntity(pick.entityId, clientX, clientY);
+    else this.contextMenu.openForGround(pick.point, clientX, clientY);
+  }
+
+  private moveTo(point: Vec3): void {
+    reportResult(this.api.moveTo({ position: point }));
+  }
+
+  /** Shared by the left click and by Space, so both routes cannot drift apart. */
+  private interactPrimary(entityId: EntityId): void {
+    const interaction = this.primaryInteractionFor(entityId);
+    if (!interaction) {
+      // No interactions known yet (the entity hook may not be registered). Walking there is still
+      // the honest interpretation of the click.
+      reportResult(this.api.moveTo({ entityId }));
+      return;
+    }
+    // Examine is a read, so it takes the read path — same as the context menu's Examine entry.
+    if (interaction === "inspect") {
+      const inspected = this.api.inspect(entityId);
+      if (!reportResult(inspected)) return;
+      notify(`${inspected.value.name} — tier ${inspected.value.tier}, ${inspected.value.state}.`, "info");
+      return;
+    }
+    reportResult(this.api.interact(entityId, interaction));
+  }
+
+  private primaryInteractionFor(entityId: EntityId): InteractionId | null {
+    const inspected = this.api.inspect(entityId);
+    if (!inspected.ok) return null;
+    return primaryInteraction(inspected.value.interactions);
+  }
+
+  /** Space acts on the hovered entity, or on the last selected one. PRD section 5. */
+  private actionTargetId(): EntityId | null {
+    return this.hoveredEntityId ?? this.selectedEntityId;
+  }
+
+  private activateTarget(): void {
+    const target = this.actionTargetId();
+    if (!target) return;
+    this.interactPrimary(target);
+  }
+
+  // ------------------------------------------------------------------- hover
+
+  /**
+   * Folds held keys into movement and refreshes hover. Called once per rendered frame.
+   *
+   * Hover picking lives here rather than in the pointermove handler on purpose: mousemove fires far
+   * faster than the frame rate, and a raycast per event is wasted work. The throttle inside
+   * `Picker` bounds it further, so a fast sweep across a canopy costs a handful of rays.
+   */
+  update(): void {
+    const { forward, strafe } = this.keyboard.axes();
+    this.movement.setDirectInput({ forward, strafe, cameraYaw: this.camera.yaw });
+    this.updateHover();
+  }
+
+  private updateHover(): void {
+    if (!this.cursorOverCanvas || this.dragging || this.contextMenu.isOpen()) {
+      this.setHovered(null);
+      return;
+    }
+    const pick = this.picker.pickThrottled(this.cursorX, this.cursorY, performance.now(), this.hoverThrottleMs);
+    this.setHovered(pick?.entityId ?? null);
+    this.positionHoverLabel();
+  }
+
+  private setHovered(entityId: EntityId | null): void {
+    if (entityId === this.hoveredEntityId) return;
+    this.hoveredEntityId = entityId;
+    this.canvas.classList.toggle("is-hovering-entity", entityId !== null);
+    this.renderHoverLabel(entityId);
+    this.options.onHoverChange?.(entityId);
+  }
+
+  private setSelected(entityId: EntityId | null): void {
+    if (entityId === this.selectedEntityId) return;
+    this.selectedEntityId = entityId;
+    this.options.onSelectionChange?.(entityId);
   }
 
   /**
-   * Folds held keys into the movement controller. Called once per rendered frame.
-   * Movement is screen-relative, so W always means "away from the camera".
+   * The cursor label. Names the thing and the verb a click would run, which is the cheapest way to
+   * make a 3D scene legible — the player never has to click to find out what something is.
    */
-  update(): void {
-    const forward = (this.keys.has("w") || this.keys.has("arrowup") ? 1 : 0)
-      - (this.keys.has("s") || this.keys.has("arrowdown") ? 1 : 0);
-    const strafe = (this.keys.has("d") || this.keys.has("arrowright") ? 1 : 0)
-      - (this.keys.has("a") || this.keys.has("arrowleft") ? 1 : 0);
-    this.movement.setDirectInput({ forward, strafe, cameraYaw: this.camera.yaw });
+  private renderHoverLabel(entityId: EntityId | null): void {
+    if (!entityId) {
+      this.hoverLabel?.remove();
+      this.hoverLabel = null;
+      return;
+    }
+
+    const inspected = this.api.inspect(entityId);
+    if (!inspected.ok) {
+      this.hoverLabel?.remove();
+      this.hoverLabel = null;
+      return;
+    }
+
+    const entity = inspected.value;
+    const interaction = primaryInteraction(entity.interactions);
+    const label = this.hoverLabel ?? this.createHoverLabel();
+    if (!label) return;
+
+    label.textContent = interaction
+      ? `${INTERACTION_LABELS[interaction]} ${entity.name}`
+      : entity.name;
+
+    const tier = document.createElement("span");
+    tier.className = "hover-label__tier";
+    tier.textContent = `T${entity.tier}`;
+    label.appendChild(tier);
+
+    // New text means a new width, so force the next position pass even if the cursor is still.
+    this.labelAtX = Number.NaN;
+    this.labelAtY = Number.NaN;
+    this.positionHoverLabel();
   }
 
+  private createHoverLabel(): HTMLElement | null {
+    const root = this.options.uiRoot ?? document.getElementById("ui-root");
+    if (!root) return null;
+    const label = document.createElement("div");
+    label.className = "hover-label";
+    root.appendChild(label);
+    this.hoverLabel = label;
+    return label;
+  }
+
+  private positionHoverLabel(): void {
+    const label = this.hoverLabel;
+    if (!label) return;
+    // Reading offsetWidth forces layout, so only do it when the cursor actually moved.
+    if (this.labelAtX === this.cursorX && this.labelAtY === this.cursorY) return;
+    this.labelAtX = this.cursorX;
+    this.labelAtY = this.cursorY;
+    // Offset below-right of the cursor, flipped near the edges so it never leaves the window.
+    const width = label.offsetWidth;
+    const height = label.offsetHeight;
+    const x = this.cursorX + 18 + width > window.innerWidth ? this.cursorX - width - 12 : this.cursorX + 18;
+    const y = this.cursorY + 20 + height > window.innerHeight ? this.cursorY - height - 12 : this.cursorY + 20;
+    label.style.left = `${Math.round(Math.max(4, x))}px`;
+    label.style.top = `${Math.round(Math.max(4, y))}px`;
+  }
+
+  // ---------------------------------------------------------------- lifecycle
+
+  /** Resets transient input state. The debug `reset()` path calls this. */
   clear(): void {
-    this.keys.clear();
+    this.keyboard.clear();
     this.pointerDown = false;
     this.dragging = false;
+    this.suppressNextClick = false;
+    this.contextMenu.close();
+    this.setHovered(null);
+    this.setSelected(null);
+    this.picker.invalidate();
     this.movement.setDirectInput({ forward: 0, strafe: 0, cameraYaw: this.camera.yaw });
   }
 
   isHeld(key: string): boolean {
-    return this.keys.has(key.toLowerCase());
+    return this.keyboard.isHeld(key);
+  }
+
+  /** Full pick under the cursor, entity or ground. Useful for a destination marker overlay. */
+  pickUnderCursor(): Pick | null {
+    return this.picker.pickAt(this.cursorX, this.cursorY);
+  }
+
+  dispose(): void {
+    this.canvas.removeEventListener("pointerdown", this.onPointerDown);
+    window.removeEventListener("pointermove", this.onPointerMove);
+    window.removeEventListener("pointerup", this.onPointerUp);
+    window.removeEventListener("pointercancel", this.onPointerCancel);
+    this.canvas.removeEventListener("pointerleave", this.onPointerLeave);
+    this.canvas.removeEventListener("wheel", this.onWheel);
+    this.canvas.removeEventListener("contextmenu", this.onContextMenuEvent);
+    window.removeEventListener("blur", this.onWindowBlur);
+    this.keyboard.dispose();
+    this.contextMenu.dispose();
+    this.hoverLabel?.remove();
+    this.hoverLabel = null;
   }
 }

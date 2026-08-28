@@ -18,6 +18,8 @@ import type { Movement } from "../systems/movement.js";
 import type { CorealmGameApi } from "../api/gameApi.js";
 import type { SaveService } from "../persistence/storage.js";
 import type { InputController } from "../input/mouse.js";
+import type { EntityViews } from "../render/entityViews.js";
+import type { SemanticEntity } from "../contracts.js";
 import { SIM_TICK_MS } from "../core/time.js";
 import { AUTOSAVE_INTERVAL_MS } from "./config.js";
 
@@ -51,8 +53,23 @@ export class GameLoop {
   private lastFrameAt = 0;
   private lastAutosaveAt = 0;
   private systems: TickSystem[] = [];
+  private entityViews: EntityViews | null = null;
+  private entitySource: (() => SemanticEntity[]) | null = null;
+  private viewSyncAccumulatorMs = 0;
 
   constructor(private readonly deps: LoopDeps) {}
+
+  /**
+   * Attaches the render mirror of the semantic world.
+   *
+   * Kept out of `LoopDeps` because the views are built after the world is, and the loop must be
+   * constructible before them. Views resync on a slow cadence rather than every frame: entity state
+   * changes at gameplay speed, not at 240 Hz, and a full diff every frame is pure waste.
+   */
+  setEntityViews(views: EntityViews, entities: () => SemanticEntity[]): void {
+    this.entityViews = views;
+    this.entitySource = entities;
+  }
 
   /** Later rounds register their systems here. Kept sorted by declared order. */
   addSystem(system: TickSystem): void {
@@ -116,11 +133,21 @@ export class GameLoop {
     const state = store.get();
 
     input.update();
+    this.syncEntityViews();
     scene.syncPlayer(state.player.position, state.player.facingRad);
     camera.update(state.player.position[0], state.player.position[1], state.player.position[2]);
     renderer.followShadow(renderer.camera.position.clone().setY(state.player.position[1]));
     renderer.camera.updateMatrixWorld();
     renderer.render(nowMs);
+  }
+
+  /** Diffs semantic entities into the render layer a few times a second, not every frame. */
+  private syncEntityViews(): void {
+    if (!this.entityViews || !this.entitySource) return;
+    this.viewSyncAccumulatorMs += SIM_TICK_MS;
+    if (this.viewSyncAccumulatorMs < 250) return;
+    this.viewSyncAccumulatorMs = 0;
+    this.entityViews.sync(this.entitySource());
   }
 
   private maybeAutosave(nowMs: number): void {

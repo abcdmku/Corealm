@@ -1,0 +1,116 @@
+{
+  "name": "movement-and-camera",
+  "actions": [
+    {
+      "inspect": "getPlayerPosition",
+      "label": "Spawn position"
+    },
+    {
+      "inspect": "getNavigationState",
+      "label": "Navmesh ready before any input"
+    },
+    {
+      "key": "w",
+      "holdMs": 900,
+      "label": "Walk forward with WASD"
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "Direct movement moved the player"
+    },
+    {
+      "key": "a",
+      "holdMs": 600,
+      "label": "Strafe left"
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "Strafe moved the player"
+    },
+    {
+      "click": [
+        720,
+        300
+      ],
+      "label": "Click distant ground to path there"
+    },
+    {
+      "waitMs": 500
+    },
+    {
+      "inspect": "getNavigationState",
+      "label": "A path is active"
+    },
+    {
+      "waitMs": 3000
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "Player walked the path"
+    },
+    {
+      "drag": [
+        700,
+        400,
+        980,
+        430
+      ],
+      "button": "right",
+      "label": "Orbit the camera"
+    },
+    {
+      "inspect": "getCamera",
+      "label": "Camera yaw changed"
+    },
+    {
+      "screenshot": "r1-after-movement"
+    },
+    {
+      "debug": "getNavPath",
+      "args": [
+        [
+          -160,
+          2,
+          -118
+        ],
+        [
+          -156,
+          3,
+          79
+        ]
+      ],
+      "label": "Spawn to the Bracken Pit over the navmesh"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "bank_interior"
+        }
+      ],
+      "label": "Teleport to the Coldbrace bank"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "Teleport landed on the navmesh"
+    },
+    {
+      "screenshot": "r1-bank"
+    },
+    {
+      "reset": true,
+      "label": "Reset restores spawn"
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "Back at spawn"
+    },
+    {
+      "inspect": "getState",
+      "label": "Reset rebuilt the world deterministically"
+    }
+  ]
+}

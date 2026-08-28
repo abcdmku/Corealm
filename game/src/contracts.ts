@@ -111,6 +111,23 @@ export interface SemanticEntity {
   station?: { skill: SkillId; recipeIds: RecipeId[] };
   /** Agility shortcut. Traversal is a route-graph edge, not a navmesh off-mesh link. */
   obstacle?: { reqLevel: number; exitPosition: Vec3; durationMs: number; savesMeters: number };
+  /**
+   * How this entity is drawn. The seam between the world layer (which owns semantics) and the
+   * render layer (which owns meshes). `assetId` refers to an id in assets/manifest.json.
+   * The render layer never invents an appearance; the world layer never touches Three.js.
+   */
+  view?: {
+    assetId: string;
+    /** Uniform scale. Assets are authored in metres, so this is usually near 1. */
+    scale?: number;
+    rotationY?: number;
+    /** Swapped in when `state` is "depleted" or "dead". Falls back to a desaturated material. */
+    depletedAssetId?: string;
+    /** Tier palette override. Defaults to the entity's own tier. */
+    materialTier?: number;
+    /** Metres above `position` for the interaction label and highlight ring. */
+    labelHeight?: number;
+  };
   meta?: Record<string, string | number | boolean>;
 }
 

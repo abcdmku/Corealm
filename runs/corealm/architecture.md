@@ -201,3 +201,28 @@ path to a Grithe node over the real navmesh, gather four ore one at a time, hit 
 deplete the node, walk back, bank it — and get an identical result through
 `callTool("corealm_interact", ...)`. Rounds 1–7 follow PRD §9 with its file ownership table, which I
 accept unchanged.
+
+---
+
+## Round 1 integration notes (root, recorded during the round)
+
+**Region layout must be reconciled at integration.** A2 (terrain) chose three vertical bands running
+west to east in ascending tier order, chunk-aligned, in `render/scene.ts` as `COREALM_WORLD`:
+
+```
+Fallowmarch  x -360 .. -120   centre (-240, 0)   floor  0 m, amplitude  7
+Vellenwood   x -120 .. +110   centre   (-5, 0)   floor +4 m, amplitude 12
+Karrowmoor   x +110 .. +340   centre (+225, 0)   floor +6 m, amplitude 36
+world bounds  x -360..340, z -200..200, seams at x = -120 and x = +110
+```
+
+A1 (world semantics) was briefed with a looser arrangement (Fallowmarch middle-west, Vellenwood
+north-east, Karrowmoor east/south-east). **`COREALM_WORLD` wins** — it is chunk-aligned, drives the
+navmesh, and owns the blend bands that keep the walkable surface continuous. At integration the root
+reconciles A1's `RegionDef` bounds and every authored position against these rects, and asserts that
+every entity lands inside its own region's rect and on the sampled terrain height.
+
+This is the predictable cost of splitting semantics from rendering across two concurrent workers. The
+seam held (both sides only exchange `SemanticEntity` and `heightAt`), but the coordinate frame should
+have been frozen by the root *before* the round rather than left to whichever worker decided first.
+Worth fixing for round 2: freeze shared constants in `app/config.ts` up front.

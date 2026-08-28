@@ -1,0 +1,185 @@
+{
+  "name": "world-and-entities",
+  "actions": [
+    {
+      "inspect": "getState",
+      "label": "Boot state, entity count, asset stats"
+    },
+    {
+      "debug": "listRouteNodes",
+      "label": "44 named locations"
+    },
+    {
+      "debug": "planRoute",
+      "args": [
+        "highcairn_bank",
+        "upper_karrow_seam",
+        1
+      ],
+      "label": "Route at Agility 1 (road only)"
+    },
+    {
+      "debug": "planRoute",
+      "args": [
+        "highcairn_bank",
+        "upper_karrow_seam",
+        10
+      ],
+      "label": "Route at Agility 10 (Sunder Ledge unlocks)"
+    },
+    {
+      "debug": "planRoute",
+      "args": [
+        "rootfall_bank",
+        "hollowcut_seam",
+        1
+      ],
+      "label": "The tier 5 comparison leg"
+    },
+    {
+      "debug": "listEntities",
+      "args": [
+        {
+          "archetype": "ore"
+        }
+      ],
+      "label": "All ore nodes"
+    },
+    {
+      "debug": "listEntities",
+      "args": [
+        {
+          "regionId": "vellenwood"
+        }
+      ],
+      "label": "Vellenwood contents"
+    },
+    {
+      "debug": "listEntities",
+      "args": [
+        {
+          "regionId": "karrowmoor"
+        }
+      ],
+      "label": "Karrowmoor contents"
+    },
+    {
+      "debug": "listEntities",
+      "args": [
+        {
+          "regionId": "gravelmaw"
+        }
+      ],
+      "label": "Gravelmaw dungeon contents"
+    },
+    {
+      "debug": "getMetrics",
+      "label": "Draw calls and triangles at spawn"
+    },
+    {
+      "screenshot": "r1-spawn"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "town_center"
+        }
+      ],
+      "label": "Coldbrace town centre"
+    },
+    {
+      "waitMs": 700
+    },
+    {
+      "screenshot": "r1-town-center"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "bracken_pit"
+        }
+      ],
+      "label": "The tier 1 mine"
+    },
+    {
+      "waitMs": 700
+    },
+    {
+      "screenshot": "r1-bracken-pit"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "vellenwood_canopy"
+        }
+      ],
+      "label": "Vellenwood canopy, the density worst case"
+    },
+    {
+      "waitMs": 900
+    },
+    {
+      "debug": "getMetrics",
+      "label": "Vellenwood draw calls"
+    },
+    {
+      "screenshot": "r1-vellenwood"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "karrowmoor_terraces"
+        }
+      ],
+      "label": "Karrowmoor terraces"
+    },
+    {
+      "waitMs": 900
+    },
+    {
+      "debug": "getMetrics",
+      "label": "Karrowmoor draw calls"
+    },
+    {
+      "screenshot": "r1-karrowmoor"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "highcairn_outpost"
+        }
+      ],
+      "label": "Highcairn"
+    },
+    {
+      "waitMs": 700
+    },
+    {
+      "screenshot": "r1-highcairn"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "gravelmaw_entrance"
+        }
+      ],
+      "label": "Dungeon mouth"
+    },
+    {
+      "waitMs": 700
+    },
+    {
+      "screenshot": "r1-gravelmaw-entrance"
+    },
+    {
+      "debug": "getErrors",
+      "label": "Console must be clean"
+    }
+  ]
+}
