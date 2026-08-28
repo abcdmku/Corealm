@@ -31,6 +31,7 @@ import type { OrbitCamera } from "../render/camera.js";
 import type { AssetRegistry } from "../render/assets.js";
 import { addSkillXp, setSkillLevel as applySkillLevel } from "../state/store.js";
 import { roundVec3 } from "../core/math.js";
+import { keybindings } from "../input/keyboard.js";
 
 export interface RecordedError {
   atMs: number;
@@ -68,10 +69,22 @@ export interface DebugDeps {
   depleteNode(entityId: EntityId): boolean;
   /** Brings a node or enemy back immediately, skipping its respawn timer. */
   forceRespawn(entityId: EntityId): boolean;
+  /** World-space box the renderer draws for one entity, or null when it draws nothing. */
+  drawnBounds(entityId: EntityId): { min: Vec3; max: Vec3; meshes: number; path: string } | null;
+  /** Instancing, rig and draw-call budget state for the entity layer. */
+  entityViewStats(): unknown;
+  /** Terrain height at a world XZ. The same function the world layer places entities with. */
+  groundHeight(x: number, z: number): number;
+  /** Every assembled building, with the footprint the terrain has to be flat across. */
+  listBuildings(): { id: string; prefab: string; x: number; z: number; width: number; depth: number; rotationY: number }[];
 }
 
 function xyz(value: Vec3): { x: number; y: number; z: number } {
   return { x: value[0], y: value[1], z: value[2] };
+}
+
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
 }
 
 export function installGameDebug(deps: DebugDeps): void {
@@ -161,6 +174,33 @@ export function installGameDebug(deps: DebugDeps): void {
         stage: quest.stage,
         stageCount: quest.stageCount,
         currentObjective: quest.currentObjective,
+        // The ids the objective points at. The prose itself carries none, so a test that wants to
+        // act on a quest reads these rather than parsing a sentence.
+        refs: quest.currentObjectiveRefs,
+      }));
+    },
+
+    /**
+     * Every key the game answers to, from the live registry.
+     *
+     * Exists because "the panels are bound to i/k/e and nothing says so" was a real Phase 1 bug,
+     * and the only honest way to test that a key still works is to ask what is bound and then
+     * press it. A hard-coded list in a scenario would keep passing after the binding was lost.
+     */
+    getKeyBindings(): unknown[] {
+      return keybindings.list().map((binding) => ({
+        id: binding.id,
+        keys: [...binding.keys],
+        label: binding.label,
+        group: binding.group ?? "General",
+      }));
+    },
+
+    /** Which panels exist and which are open right now. Screenshots cannot answer the second half. */
+    getPanels(): unknown[] {
+      return [...document.querySelectorAll<HTMLElement>(".panel")].map((panel) => ({
+        id: panel.id.replace(/^panel-/, ""),
+        open: !panel.hidden,
       }));
     },
 
@@ -335,6 +375,68 @@ export function installGameDebug(deps: DebugDeps): void {
         if (!visible) hidden[key] = (hidden[key] ?? 0) + 1;
       });
       return { totalObjects: total, counts, hidden };
+    },
+
+    /**
+      * The world-space box the renderer actually draws for one entity, or null when it draws
+      * nothing.
+      *
+      * "It vanished" and "it is drawn somewhere I am not looking" are different bugs with the same
+      * screenshot, and `getSceneStats` cannot tell them apart: it counts meshes, and an instanced
+      * mesh exists whether or not any of its slots are visible. This reads the instance matrix for
+      * the entity's own slot.
+      */
+    getDrawnBounds(entityId: EntityId): Record<string, unknown> | null {
+      const bounds = deps.drawnBounds(entityId);
+      if (!bounds) return null;
+      return {
+        min: xyz(bounds.min),
+        max: xyz(bounds.max),
+        height: round3(bounds.max[1] - bounds.min[1]),
+        width: round3(Math.max(bounds.max[0] - bounds.min[0], bounds.max[2] - bounds.min[2])),
+        meshes: bounds.meshes,
+        // "instanced" is the baked-idle fallback, "animated:<clip>" is a live rig. A screenshot
+        // cannot tell them apart and the difference is the whole reason a boss looks like a statue.
+        path: bounds.path,
+      };
+    },
+
+    /**
+     * How level the ground is under each building, in metres.
+     *
+     * A building is assembled level — every part shares the origin's ground height, because
+     * following the terrain per part would shear a twelve-metre hall — so any tilt in the ground
+     * beneath it turns into a floating corner or a buried one. That was the "wall panels float at
+     * an angle, roof sections rest on grass" finding, and it is not a rendering bug at all: it is
+     * a building standing off the edge of its settlement's flattened pad.
+     *
+     * `worst` is the largest gap between the height at the building's origin and the height under
+     * any corner of its footprint. Anything above a few centimetres is visible.
+     */
+    checkBuildingFooting(): { id: string; worst: number }[] {
+      return deps.listBuildings()
+        .map((building) => {
+          const cos = Math.cos(building.rotationY);
+          const sin = Math.sin(building.rotationY);
+          const base = deps.groundHeight(building.x, building.z);
+          let worst = 0;
+          for (const sx of [-0.5, 0.5]) {
+            for (const sz of [-0.5, 0.5]) {
+              const lx = sx * building.width;
+              const lz = sz * building.depth;
+              const x = building.x + lx * cos + lz * sin;
+              const z = building.z - lx * sin + lz * cos;
+              worst = Math.max(worst, Math.abs(deps.groundHeight(x, z) - base));
+            }
+          }
+          return { id: building.id, worst: round3(worst) };
+        })
+        .sort((a, b) => b.worst - a.worst);
+    },
+
+    /** Instancing, rig and draw-call budget state for the entity layer. */
+    getEntityViewStats(): Record<string, unknown> {
+      return deps.entityViewStats() as unknown as Record<string, unknown>;
     },
 
     listClips(): string[] {

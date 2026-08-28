@@ -204,7 +204,8 @@ export class Hud {
     const api = this.ctx.api;
     const player = api.getPlayer();
 
-    this.updateHealth(player.health, player.maxHealth, player.inCombat, player.dead);
+    // The bar stays hot for the whole no-regen window, not just while a target is alive.
+    this.updateHealth(player.health, player.maxHealth, player.inCombat || player.regenBlocked, player.dead);
     this.updateActivity();
     this.updateCurrency(api.getCurrency());
     this.updateXpFeed();

@@ -26,7 +26,7 @@
 import * as THREE from "three";
 import { clone as cloneRigged } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import type { Archetype, EntityId, SemanticEntity } from "../contracts.js";
+import type { Archetype, EntityId, SemanticEntity, Vec3 } from "../contracts.js";
 import type { AssetRegistry } from "./assets.js";
 import type { WorldScene } from "./scene.js";
 import type { PaletteSwatch } from "./materials.js";
@@ -81,6 +81,21 @@ const NEUTRAL: Appearance = { swatch: "metal", strength: 0 };
 const LEAF_MATERIAL = /leaf|leaves|foliage|canopy/i;
 
 /**
+ * The pantile material every roof in the kit shares.
+ *
+ * Building parts are `landmark` archetype, which carries no tint at all, so every roof in the
+ * world drew at the texture's authored orange: Highcairn's slate quarry town had the same fired
+ * pantiles as the farming village three regions away. Roofs take the tier BODY swatch at a low
+ * strength — enough to weather Karrowmoor's roofs toward its blue-grey and Vellenwood's toward its
+ * bark brown, and not enough to lose the tile.
+ *
+ * The standing rule still applies: a tint multiplies against the texture, so this DARKENS an
+ * orange toward slate. It cannot turn one into a blue. That is why the walls carry the region's
+ * identity — brick against plaster against exposed frame — and the roof only shades it.
+ */
+const ROOF_MATERIAL = /roundtiles|rooftile/i;
+
+/**
  * Materials a tier tint must never touch. Eyes, teeth and the pure black/white trims on the
  * monster packs are art direction, not tier: pulling them toward a palette colour flattens a face
  * into a smear and buys no legibility.
@@ -103,6 +118,20 @@ const OWN_IDLE_PATTERN = /idle/i;
 
 /** Shards in an ore seam. Five reads as a vein from any bearing and costs 40 triangles. */
 const SEAM_SHARDS = 5;
+
+/**
+ * How much of a felled tree is left standing, as a fraction of its height.
+ *
+ * The nature kit ships one mesh per tree with the trunk and the canopy fused, and no stump asset at
+ * all. Round 3 worked around that by swapping in `anvil_log` — which is an anvil that happens to
+ * sit on a log — so every worked-out tree in the world turned into a blacksmith's anvil. Clipping
+ * the tree's own geometry to its lowest sixth gives a real stump: same trunk, same material, same
+ * place, obviously cut.
+ */
+const TREE_STUMP_FRACTION = 0.22;
+
+/** Same trick for a harvested plot: the crop is cut back to stubble rather than swapped for a crate. */
+const CROP_STUBBLE_FRACTION = 0.3;
 
 /** Fraction of the idle clip to freeze at for the instanced fallback. Mid-clip, i.e. settled. */
 const BAKE_PHASE = 0.35;
@@ -425,13 +454,27 @@ export class EntityViews {
     if (this.missing.has(view.assetId) || !this.assets.isLoaded(view.assetId)) return;
 
     const tier = view.materialTier ?? entity.tier;
-    const groupKey = `${view.assetId}|${view.depletedAssetId ?? "-"}|${tier}|${entity.archetype}`;
+    const clip = view.clipFraction ?? 0;
+    const groupKey = `${view.assetId}|${view.depletedAssetId ?? "-"}|${tier}|${entity.archetype}|${clip}`;
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
     const signature = `${groupKey}|${spent ? 1 : 0}|${round(entity.position[0])},${round(entity.position[1])},${round(entity.position[2])}|${round(view.rotationY ?? 0)}|${round(scale)}`;
 
-    const existing = this.records.get(entity.id);
+    let existing = this.records.get(entity.id);
+
+    // A rigged entity built before its skeleton arrived is holding a baked idle frame. Upgrade it
+    // the moment the source is available, per entity, rather than waiting for the global
+    // `sourcesChanged` sweep in `sync`: that sweep only fires when some OTHER asset finishes
+    // loading, and anything that was not in the entity list on that exact pass never got a second
+    // look. Ordrun is in the dungeon, the dungeon is not in the list until the player is inside
+    // it, and so the boss of the game stood through a two-phase fight in bind-adjacent pose.
+    if (existing?.awaitingRig && this.sourceOf(view.assetId)) {
+      this.release(existing);
+      this.records.delete(entity.id);
+      existing = undefined;
+    }
+
     if (existing && existing.signature === signature) return;
 
     if (existing && existing.groupKey !== groupKey) {
@@ -439,7 +482,7 @@ export class EntityViews {
       this.records.delete(entity.id);
     }
 
-    const record = this.records.get(entity.id) ?? this.acquire(entity, groupKey, tier);
+    const record = this.records.get(entity.id) ?? this.acquire(entity, groupKey, tier, clip);
     if (!record) return;
 
     record.signature = signature;
@@ -467,9 +510,11 @@ export class EntityViews {
     if (highlight) this.placeHighlight(highlight, record);
   }
 
-  private acquire(entity: SemanticEntity, groupKey: string, tier: number): ViewRecord | null {
+  private acquire(entity: SemanticEntity, groupKey: string, tier: number, clip: number): ViewRecord | null {
     const view = entity.view!;
-    const group = this.ensureGroup(groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier);
+    const group = this.ensureGroup(
+      groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier, clip,
+    );
     if (!group) return null;
 
     // Rigged characters cannot be instanced with a live pose (their pose lives in the skeleton), so
@@ -596,15 +641,22 @@ export class EntityViews {
     depletedAssetId: string | null,
     archetype: Archetype,
     tier: number,
+    clipFraction = 0,
   ): InstanceGroup | null {
     const existing = this.groups.get(key);
     if (existing) return existing;
 
     const rigged = this.isRigged(assetId);
     const source = rigged ? this.sourceOf(assetId) : null;
-    const liveParts = rigged && source
+    let liveParts = rigged && source
       ? this.bakedParts(source, assetId, archetype, tier, false)
       : this.collectParts(assetId, archetype, tier, false);
+
+    // `view.clipFraction` keeps only the bottom of the mesh. One geometry per group, built once.
+    if (clipFraction > 0 && clipFraction < 1) {
+      const clipped = clipPartsBelow(liveParts, clipFraction);
+      if (clipped.length > 0) liveParts = clipped;
+    }
 
     // The ore seam. It is a separate part on the LIVE side only: losing the vein is half of what
     // makes a depleted node read as depleted.
@@ -644,18 +696,74 @@ export class EntityViews {
    */
   private ensureSpent(group: InstanceGroup): void {
     if (group.spent.length > 0) return;
-    if (!group.spentParts) {
-      const spentSource = group.depletedAssetId && this.assets.isLoaded(group.depletedAssetId)
-        ? group.depletedAssetId
-        : group.assetId;
-      const rigged = this.isRigged(spentSource);
-      const source = rigged ? this.sourceOf(spentSource) : null;
-      group.spentParts = rigged && source
-        ? this.bakedParts(source, spentSource, group.archetype, group.tier, true)
-        : this.collectParts(spentSource, group.archetype, group.tier, true);
-    }
+    if (!group.spentParts) group.spentParts = this.buildSpentParts(group);
+    // A group with no spent geometry at all keeps its LIVE instance drawn under the spent
+    // material rather than being hidden. `writeSlot` hides the live meshes when it has something
+    // to put in their place; a node that vanishes on depletion is worse than one that only
+    // changes colour, and that vanishing is exactly what Phase 1 shipped.
     if (group.spentParts.length === 0) return;
     group.spent = this.buildMeshes(group, group.spentParts, "spent");
+  }
+
+  /**
+   * What a worked-out node looks like.
+   *
+   * The rule is that a spent node keeps the silhouette the player walked up to. Swapping in a
+   * different, smaller asset reads as the node disappearing, because from ten metres up a
+   * `rock_small_1` standing where a `rock_medium_1` stood is indistinguishable from nothing at all.
+   * So the spent variant is derived from the LIVE geometry wherever the archetype gives us a
+   * meaning for "spent":
+   *
+   *   ore        the rock, minus its vein. The vein is already a separate part (see `seamPart`),
+   *              so dropping it is exactly the change the player made by mining it.
+   *   tree       the trunk, clipped to `TREE_STUMP_FRACTION` of its height: a stump.
+   *   farm_plot  the crop cut back to `CROP_STUBBLE_FRACTION`: stubble.
+   *
+   * Everything else falls back to `depletedAssetId` when content authored one, and to the live
+   * geometry under the spent material when it did not.
+   */
+  private buildSpentParts(group: InstanceGroup): SourcePart[] {
+    const live = this.spentMaterialParts(group);
+
+    if (group.archetype === "ore") {
+      // `ensureGroup` appends the seam as the LAST live part, so everything before it is the rock.
+      const seamIndex = group.liveParts.length - 1;
+      const rock = live.filter((_part, index) => index !== seamIndex || live.length === 1);
+      if (rock.length > 0) return rock;
+    }
+
+    if (group.archetype === "tree" || group.archetype === "farm_plot") {
+      const fraction = group.archetype === "tree" ? TREE_STUMP_FRACTION : CROP_STUBBLE_FRACTION;
+      const clipped = clipPartsBelow(live, fraction);
+      if (clipped.length > 0) return clipped;
+    }
+
+    if (group.depletedAssetId && this.assets.isLoaded(group.depletedAssetId)) {
+      const rigged = this.isRigged(group.depletedAssetId);
+      const source = rigged ? this.sourceOf(group.depletedAssetId) : null;
+      const parts = rigged && source
+        ? this.bakedParts(source, group.depletedAssetId, group.archetype, group.tier, true)
+        : this.collectParts(group.depletedAssetId, group.archetype, group.tier, true);
+      if (parts.length > 0) return parts;
+    }
+
+    return live;
+  }
+
+  /** The live parts again, re-materialised with the spent variant. Geometry is shared, not copied. */
+  private spentMaterialParts(group: InstanceGroup): SourcePart[] {
+    const rigged = this.isRigged(group.assetId);
+    const source = rigged ? this.sourceOf(group.assetId) : null;
+    const parts = rigged && source
+      ? this.bakedParts(source, group.assetId, group.archetype, group.tier, true)
+      : this.collectParts(group.assetId, group.archetype, group.tier, true);
+    if (group.archetype !== "ore" || parts.length === 0) return parts;
+
+    // The ore seam is generated, not authored, so `collectParts` never returns it. Re-append it in
+    // the same position the live side has it, or the index arithmetic above lines up with nothing.
+    const seam = this.seamPart(group.assetId, group.tier, parts);
+    if (seam) parts.push({ ...seam, material: this.materials.oreRock(group.tier, true) });
+    return parts;
   }
 
   /**
@@ -774,6 +882,7 @@ export class EntityViews {
 
   private appearanceFor(archetype: Archetype, material: THREE.Material): Appearance {
     if (PROTECTED_MATERIAL.test(material.name)) return NEUTRAL;
+    if (ROOF_MATERIAL.test(material.name)) return { swatch: "body", strength: 0.42 };
     if (archetype === "tree" && LEAF_MATERIAL.test(material.name)) {
       // Canopy stays close to its authored colour: species and scale carry a tree's region look,
       // and a heavy tint here fights the world layer rather than helping it.
@@ -910,10 +1019,17 @@ export class EntityViews {
    * the kind of cost that only shows up as "the loading screen got slower" with nothing to blame.
    */
   private canAffordUnique(archetype: Archetype, assetId: string, source: THREE.Object3D): boolean {
-    if (this.countUnique() >= this.maxUniqueViews) return false;
     const cost = this.meshesIn(assetId, source) * 2;
     if (cost === 0) return false;
-    const named = archetype === "npc" || archetype === "boss";
+
+    // A boss is never instanced. There is one of them, the fight is the climax of its region, and
+    // the instanced fallback freezes a rig on a single baked idle frame — which is why Ordrun
+    // stood through a two-phase fight in a pose that read as a bug. Twenty draw calls against a
+    // budget with eighty to spare at the worst dungeon pose is the right trade.
+    if (archetype === "boss") return true;
+    if (this.countUnique() >= this.maxUniqueViews) return false;
+
+    const named = archetype === "npc";
     const ceiling = named ? this.maxUniqueDrawCalls : this.maxUniqueDrawCalls - NAMED_CHARACTER_RESERVE;
     return this.uniqueDrawCalls + cost <= ceiling;
   }
@@ -1017,9 +1133,13 @@ export class EntityViews {
     );
     const transform = new THREE.Matrix4();
 
-    const active = spent ? group.spent : group.live;
-    const activeParts = spent ? group.spentParts ?? [] : group.liveParts;
-    const hidden = spent ? group.live : group.spent;
+    // A spent group with no geometry of its own falls back to the live meshes rather than to
+    // nothing. Hiding the live instance without drawing a replacement is how a worked-out node
+    // used to disappear from the world entirely.
+    const spentReady = spent && group.spent.length > 0;
+    const active = spentReady ? group.spent : group.live;
+    const activeParts = spentReady ? group.spentParts ?? [] : group.liveParts;
+    const hidden = spentReady ? group.live : group.spent;
 
     for (const [index, mesh] of active.entries()) {
       const part = activeParts[index];
@@ -1213,6 +1333,50 @@ export class EntityViews {
     return count;
   }
 
+  /**
+   * The world-space box this layer actually draws for one entity, or null when it draws nothing.
+   *
+   * Written for the depleted-node bug: a screenshot showing an empty patch of grass cannot
+   * distinguish "the spent mesh was never built" from "the spent mesh is a pebble" from "the live
+   * mesh is hidden and nothing replaced it". Mesh counts cannot either — an `InstancedMesh` exists
+   * whether or not any of its slots hold a visible matrix. This reads the matrix in the entity's
+   * own slot, which is the only thing that answers the question.
+   */
+  drawnBounds(entityId: EntityId): { min: Vec3; max: Vec3; meshes: number; path: string } | null {
+    const record = this.records.get(entityId);
+    if (!record) return null;
+
+    const box = new THREE.Box3();
+    let meshes = 0;
+
+    if (record.unique) {
+      record.unique.updateMatrixWorld(true);
+      box.setFromObject(record.unique);
+      record.unique.traverse((child) => { if ((child as THREE.Mesh).isMesh) meshes += 1; });
+      const path = record.rig ? `animated:${record.rig.clipName}` : "unique";
+      return box.isEmpty() ? null : boxToBounds(box, meshes, path);
+    }
+
+    const group = this.groups.get(record.groupKey);
+    if (!group || record.slot < 0) return null;
+    const active = record.spent && group.spent.length > 0 ? group.spent : group.live;
+    const matrix = new THREE.Matrix4();
+    const scale = new THREE.Vector3();
+    for (const mesh of active) {
+      if (record.slot >= mesh.count) continue;
+      mesh.getMatrixAt(record.slot, matrix);
+      // A hidden slot is written as a zero-scale matrix, which is not the same as absent.
+      matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+      if (scale.lengthSq() < 1e-9) continue;
+      mesh.geometry.computeBoundingBox();
+      const bounds = mesh.geometry.boundingBox;
+      if (!bounds) continue;
+      box.union(bounds.clone().applyMatrix4(matrix));
+      meshes += 1;
+    }
+    return box.isEmpty() ? null : boxToBounds(box, meshes, record.spent ? "instanced-spent" : "instanced");
+  }
+
   stats(): EntityViewStats {
     let instancedMeshes = 0;
     let triangles = 0;
@@ -1281,6 +1445,113 @@ export class EntityViews {
 
 function round(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * Cuts a set of parts off at a fraction of their COMBINED height.
+ *
+ * The fraction has to be measured across the whole asset, not per mesh. A tree ships as a trunk
+ * mesh and a canopy mesh; cutting each at its own lowest quarter leaves a stub of trunk AND a ring
+ * of leaves hanging in the air where the bottom of the canopy used to be. Measuring once across
+ * both and cutting every part at that one world height is what actually produces a stump: the
+ * trunk keeps its lower quarter and the canopy, which lives entirely above the cut, keeps nothing.
+ *
+ * Parts are returned identity-placed with their source transform baked in, so a rotated or offset
+ * part still cuts along world Y. Runs once per group.
+ */
+function clipPartsBelow(parts: readonly SourcePart[], fraction: number): SourcePart[] {
+  const boxes = parts.map((part) => {
+    part.geometry.computeBoundingBox();
+    const bounds = part.geometry.boundingBox;
+    return bounds ? bounds.clone().applyMatrix4(part.matrix) : null;
+  });
+
+  const box = new THREE.Box3();
+  for (const bounds of boxes) if (bounds) box.union(bounds);
+  if (box.isEmpty()) return [];
+
+  const height = box.max.y - box.min.y;
+  const cut = box.min.y + height * fraction;
+  // A part that does not reach the ground is foliage, not structure. Cutting it at the same height
+  // leaves the underside of the canopy floating where the tree was — which is what the first
+  // version of this did, and it read as a bush rather than a stump. Only parts that start at the
+  // base survive the cut at all.
+  const groundReach = box.min.y + height * 0.1;
+
+  const out: SourcePart[] = [];
+  for (const [index, part] of parts.entries()) {
+    const bounds = boxes[index];
+    if (bounds && bounds.min.y > groundReach) continue;
+    const geometry = clipGeometryBelow(part.geometry, part.matrix, cut);
+    if (!geometry) continue;
+    out.push({
+      geometry,
+      material: part.material,
+      matrix: new THREE.Matrix4(),
+      triangles: triangleCount(geometry),
+    });
+  }
+  return out;
+}
+
+/**
+ * Keeps only the triangles below world height `cut`, with `matrix` baked in.
+ *
+ * A triangle is kept when its CENTROID is below the cut, which leaves a flat-ish top rather than
+ * the ragged fringe an all-vertices test produces on low-poly geometry.
+ *
+ * Returns null when the cut keeps nothing — for a tree canopy that is the correct answer, and the
+ * caller drops the part entirely.
+ */
+function clipGeometryBelow(
+  geometry: THREE.BufferGeometry,
+  matrix: THREE.Matrix4,
+  cut: number,
+): THREE.BufferGeometry | null {
+  const baked = geometry.clone().applyMatrix4(matrix);
+  const source = baked.getIndex() ? baked.toNonIndexed() : baked;
+  const position = source.getAttribute("position");
+  if (!position || position.count < 3) return null;
+
+  const keep: number[] = [];
+  for (let triangle = 0; triangle < position.count; triangle += 3) {
+    const centroid = (position.getY(triangle) + position.getY(triangle + 1) + position.getY(triangle + 2)) / 3;
+    if (centroid <= cut) keep.push(triangle);
+  }
+  if (keep.length === 0) return null;
+
+  const out = new THREE.BufferGeometry();
+  for (const name of ["position", "normal", "uv", "color"] as const) {
+    const attribute = source.getAttribute(name);
+    if (!attribute) continue;
+    const size = attribute.itemSize;
+    const values = new Float32Array(keep.length * 3 * size);
+    let write = 0;
+    for (const triangle of keep) {
+      for (let vertex = 0; vertex < 3; vertex += 1) {
+        for (let component = 0; component < size; component += 1) {
+          values[write] = attribute.getComponent(triangle + vertex, component);
+          write += 1;
+        }
+      }
+    }
+    out.setAttribute(name, new THREE.BufferAttribute(values, size));
+  }
+  out.computeBoundingSphere();
+  return out;
+}
+
+function boxToBounds(
+  box: THREE.Box3,
+  meshes: number,
+  path: string,
+): { min: Vec3; max: Vec3; meshes: number; path: string } {
+  return {
+    min: [box.min.x, box.min.y, box.min.z] as unknown as Vec3,
+    max: [box.max.x, box.max.y, box.max.z] as unknown as Vec3,
+    meshes,
+    path,
+  };
 }
 
 function triangleCount(geometry: THREE.BufferGeometry): number {

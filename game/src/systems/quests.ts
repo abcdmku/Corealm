@@ -698,6 +698,8 @@ export class QuestSystem implements TickSystem {
       // An unstarted quest reports no objective: the stage text is content the player has not been
       // told yet, and PRD F13 forbids leaking it through the docs index.
       currentObjective: status === "active" && stageDef ? stageDef.objective : null,
+      // The ids the objective talks about, for an agent. The sentence itself carries none.
+      currentObjectiveRefs: status === "active" && stageDef ? [...(stageDef.refs ?? [])] : [],
       requirements: def.requirements,
     };
   }
@@ -712,6 +714,7 @@ export class QuestSystem implements TickSystem {
         stage: record.stage,
         stageCount: def.stages.length,
         objective: record.status === "active" && stageDef ? stageDef.objective : null,
+        objectiveRefs: record.status === "active" && stageDef ? [...(stageDef.refs ?? [])] : [],
       },
       undefined,
       this.deps.clock.elapsedMs,

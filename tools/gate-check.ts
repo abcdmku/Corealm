@@ -71,7 +71,33 @@ function playthroughSource(): string {
   const skills = async () => agent.call("corealm_skills");
   /** What the last findNear actually tried, so a failure explains itself. */
   let lastSearchTrail = [];
+  /** A still-full node of the same kind the depletion check empties. See "spent-node". */
+  let liveNeighbourId = null;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /**
+   * Walks an open conversation by taking the first enabled option each turn.
+   *
+   * Deliberately not clever. A quest stage that ends on a dialogue node is only genuinely
+   * playable if a caller who cannot see the tree can still get there, and "take the first thing
+   * offered" is the weakest possible reader. Stops when the conversation closes, when nothing is
+   * enabled, or after \`limit\` turns.
+   */
+  const talkThrough = async (limit) => {
+    const visited = [];
+    for (let step = 0; step < limit; step += 1) {
+      const state = await agent.call("corealm_dialogue", { op: "state" });
+      if (!state || state.error || !state.options || state.options.length === 0) break;
+      visited.push(state.text ? state.text.slice(0, 24) : "");
+      const next = state.options.find((o) => o.enabled !== false);
+      if (!next) break;
+      const chosen = await agent.call("corealm_dialogue", { op: "choose", optionId: next.id });
+      if (!chosen || chosen.error) break;
+      await sleep(150);
+    }
+    await agent.call("corealm_dialogue", { op: "end" });
+    return visited;
+  };
 
   /** Walks to an entity and performs an interaction, handling the walk-then-act round trip. */
   const doInteract = async (entityId, interaction, waitTypes, waitMs) => {
@@ -184,6 +210,12 @@ function playthroughSource(): string {
     const node = await findNear(["ore"], "mine", "pit|seam");
     let depleted = false;
     if (node) {
+      // A sibling seam, left full, so "spent-node" below has a live silhouette to measure the
+      // depleted one against rather than a number somebody typed into the check.
+      const siblings = await agent.call("corealm_observe", { archetypes: ["ore"], radius: 60, limit: 8 });
+      const sibling = (siblings || []).find((e) => e.id !== node.id && e.state !== "depleted");
+      if (sibling) liveNeighbourId = sibling.id;
+
       for (let round = 0; round < 12 && !depleted; round += 1) {
         await doInteract(node.id, "mine", ["resource.depleted", "activity.stopped", "inventory.full"], 45000);
         const now = dbg.getEntity(node.id);
@@ -199,6 +231,32 @@ function playthroughSource(): string {
       }
     }
     note("depletion", depleted, node ? node.id + " depleted by mining it out" : "no node");
+
+    // A worked-out node has to still BE somewhere. Phase 1 hid the live instance and drew no
+    // replacement, so a seam the player had just mined out vanished from the world: correct
+    // state, correct respawn, nothing on screen. Draw calls and mesh counts cannot see this —
+    // an InstancedMesh exists whether or not any of its slots hold a visible matrix.
+    let spentEvidence = "no node";
+    let spentOk = false;
+    if (node) {
+      const spent = dbg.getDrawnBounds(node.id);
+      const live = liveNeighbourId ? dbg.getDrawnBounds(liveNeighbourId) : null;
+      // Two halves, and both matter. It has to still be THERE — same rock, same silhouette, so a
+      // player walking back does not think the seam moved — and it has to be VISIBLY worked out.
+      // The ore vein is its own part on the live side only, so the spent node draws one mesh
+      // fewer. Size alone would pass on a node that never changed at all.
+      const present = !!spent && spent.height > 0.2 && spent.width > 0.2;
+      const changed = !!spent && !!live && spent.meshes < live.meshes;
+      spentOk = present && changed;
+      spentEvidence = spent
+        ? node.id + " draws " + spent.width.toFixed(1) + " x " + spent.height.toFixed(1) + " m in "
+          + spent.meshes + " meshes"
+          + (live ? ", live sibling " + live.width.toFixed(1) + " x " + live.height.toFixed(1)
+            + " m in " + live.meshes : "")
+          + (changed ? " (vein gone)" : " -- spent looks identical to live")
+        : node.id + " draws NOTHING once depleted";
+    }
+    note("spent-node", spentOk, spentEvidence);
   }
 
   // ------------------------------------------------------------- farming
@@ -453,6 +511,149 @@ function playthroughSource(): string {
       + " :: " + bossNote + ", player deaths " + deaths);
   }
 
+  // -------------------------------------------------- combat clears after a kill
+  {
+    // \`inCombat\` used to mean "the eight-second no-regen window is open", so it stayed true for
+    // eight seconds after the last enemy died and an agent waiting for \`inCombat === false\` hung.
+    // It now means a fight is happening: a target, or an enemy that has engaged. The regen window
+    // is \`regenBlocked\`, and after a kill the two must disagree.
+    dbg.setSkillLevel("melee", 30);
+    dbg.setHealth(999);
+    const enemy = await findNear(["enemy"], "attack", "march|camp|pit|skitter|moor");
+    let evidence = "no enemy found";
+    let cleared = false;
+    if (enemy) {
+      await agent.call("corealm_move_to", { entityId: enemy.id });
+      await waitFor(["navigation.completed", "navigation.failed"], 30000);
+      await agent.call("corealm_attack", { entityId: enemy.id });
+      let killed = false;
+      for (let i = 0; i < 40 && !killed; i += 1) {
+        await sleep(500);
+        const e = dbg.getEntity(enemy.id);
+        if (!e || e.state === "dead" || (e.combat && e.combat.health <= 0)) killed = true;
+        if (dbg.getState().health < 20) dbg.setHealth(999);
+        if (!dbg.getState().combatTargetId && !killed) await agent.call("corealm_attack", { entityId: enemy.id });
+      }
+      // Read immediately. Waiting would let the eight-second window expire and hide the bug.
+      const after = await agent.call("corealm_player");
+      cleared = killed && after.inCombat === false && after.regenBlocked === true;
+      evidence = "killed=" + killed + ", inCombat=" + after.inCombat
+        + ", regenBlocked=" + after.regenBlocked + ", targetId=" + after.targetId;
+    }
+    note("combat-clears", cleared, evidence);
+  }
+
+  // ------------------------------------------------------- equipping is not losing
+  {
+    // An agent rebuilding its pack from item events used to read an equip as a loss: the piece
+    // left the inventory through the ordinary remove path and emitted \`item.lost\`.
+    dbg.giveItem("grithe_dagger", 1);
+    await agent.call("corealm_equip", { itemId: null, slot: "mainHand" });
+    await sleep(200);
+    const before = await agent.call("corealm_events", { sinceSeq: cursor, timeoutMs: 1 });
+    cursor = before.nextSeq;
+    const result = await agent.call("corealm_equip", { itemId: "grithe_dagger" });
+    await sleep(400);
+    const seen = await agent.call("corealm_events", { sinceSeq: cursor, timeoutMs: 1200 });
+    cursor = seen.nextSeq;
+    const types = (seen.events || []).map((e) => e.type);
+    const equipped = types.includes("item.equipped");
+    const lost = types.includes("item.lost");
+    note("equip-events", !result.error && equipped && !lost,
+      "equip emitted [" + types.join(", ") + "]"
+      + (lost ? " -- item.lost must not fire for gear going onto the body" : ""));
+  }
+
+  // ------------------------------------------------------- the UI is reachable
+  {
+    // Every panel was bound to a key and nothing on screen said so, and the keys did not work
+    // either: two KeyboardControllers were listening on \`window\`, so one press toggled a panel
+    // open and closed again. A player who cannot find their inventory cannot progress.
+    const bindings = (dbg.getKeyBindings() || []).filter((b) => b.group === "Panels");
+    const opened = [];
+    const failed = [];
+    for (const binding of bindings) {
+      const key = binding.keys[0];
+      const id = binding.id.replace(/^panel\./, "");
+      window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      await sleep(120);
+      const state = (dbg.getPanels() || []).find((p) => p.id === id);
+      if (state && state.open) opened.push(id); else failed.push(id);
+      window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      await sleep(120);
+    }
+    const dock = document.querySelectorAll(".dock__btn").length;
+    note("ui-panels", bindings.length >= 4 && failed.length === 0 && dock >= 4,
+      opened.length + "/" + bindings.length + " panel keys open their panel"
+      + (failed.length ? " (failed: " + failed.join(", ") + ")" : "")
+      + ", " + dock + " dock buttons on screen");
+  }
+
+  // --------------------------------------------------- buildings stand on level ground
+  {
+    // A building is assembled level, so any tilt in the ground under it comes out as a corner in
+    // the air and a wall through the grass. This measures the ground, not the assembly.
+    const footing = dbg.checkBuildingFooting() || [];
+    const bad = footing.filter((b) => b.worst > 0.05);
+    note("building-footing", footing.length >= 30 && bad.length === 0,
+      footing.length + " buildings, worst ground tilt across a footprint "
+      + (footing[0] ? footing[0].worst.toFixed(3) : "?") + " m"
+      + (bad.length ? " -- " + bad.length + " over 0.05 m: " + bad.slice(0, 4).map((b) => b.id).join(", ") : ""));
+  }
+
+  // ------------------------------------------------- objectives read as prose
+  {
+    // Quest objectives used to print backticked developer ids into the player's journal. The ids
+    // now live in \`refs\`, which is what an agent reads; the sentence is what a player reads.
+    const quests = await agent.call("corealm_quests");
+    const active = (quests || []).filter((q) => q.status === "active");
+    const leaking = active.filter((q) => (q.currentObjective || "").includes(String.fromCharCode(96)));
+    const withRefs = active.filter((q) => (q.currentObjectiveRefs || []).length > 0);
+    note("objective-prose", active.length > 0 && leaking.length === 0 && withRefs.length > 0,
+      active.length + " active, " + leaking.length + " printing ids, "
+      + withRefs.length + " carrying refs"
+      + (active[0] ? " :: " + active[0].currentObjective : ""));
+  }
+
+  // ------------------------------------------------ a quest chain past its first stage
+  {
+    // The Long Cairn is the seven-stage chain. Phase 1 proved stage 0 and nothing after it, so
+    // every later stage was authored content nobody had played. This walks it as far as the
+    // agent surface can take it: reach the cairn, then talk Ode through her dialogue.
+    dbg.setSkillLevel("melee", 12);
+    dbg.setSkillLevel("mining", 12);
+    const stageOf = async () => {
+      const all = await agent.call("corealm_quests");
+      return (all || []).find((q) => q.id === "long_cairn") || { status: "unknown", stage: -1 };
+    };
+
+    let started = await stageOf();
+    if (started.status === "unstarted") {
+      await doInteract("npc_cairnkeeper_ode", "talk", ["dialogue.opened"], 30000);
+      await talkThrough(24);
+      started = await stageOf();
+    }
+
+    // Stage 0 is a \`reach\` predicate: pure movement, no dialogue, no combat.
+    if (started.status === "active" && started.stage === 0) {
+      await agent.call("corealm_move_to", { locationId: "great_cairn" });
+      await waitFor(["navigation.completed", "navigation.failed"], 60000);
+      await sleep(600);
+    }
+
+    // Stage 1 ends on a specific dialogue node with Ode. Walk her options until the stage moves.
+    let reached = await stageOf();
+    if (reached.status === "active" && reached.stage === 1) {
+      await doInteract("npc_cairnkeeper_ode", "talk", ["dialogue.opened"], 30000);
+      await talkThrough(24);
+      reached = await stageOf();
+    }
+
+    note("long-cairn", reached.status === "complete" || reached.stage >= 2,
+      "long_cairn " + reached.status + " stage " + reached.stage + "/" + (reached.stageCount || "?")
+      + " :: " + (reached.currentObjective || "-"));
+  }
+
   // ------------------------------------------------------------ persistence
   {
     dbg.saveNow();
@@ -491,6 +692,13 @@ const GATE_LINES: Record<string, string> = {
   dungeon: "The dungeon is enterable",
   boss: "The tier 10 boss provides meaningful combat",
   persistence: "A browser reload retains character progression",
+  "spent-node": "A depleted node shows a spent state instead of disappearing",
+  "combat-clears": "Combat state clears the moment the last enemy dies",
+  "equip-events": "Equipping gear reports itself as equipping, not as losing an item",
+  "ui-panels": "Every panel is reachable, and the screen says how",
+  "building-footing": "Assembled buildings stand on level ground",
+  "objective-prose": "Quest objectives read as prose; their ids live in a structured field",
+  "long-cairn": "A quest chain can be driven past its first stage by playing",
 };
 
 export async function runGateCheck(runCandidate: string, timeScale: number): Promise<GateReport> {

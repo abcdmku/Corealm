@@ -14,10 +14,10 @@ import { argValue, repoRoot } from "./lib/paths.js";
 
 import { content } from "../game/src/content/index.js";
 import { ALL_ITEMS } from "../game/src/content/items.js";
-import { RESOURCES } from "../game/src/content/resources.js";
+import { RESOURCES, RESOURCE_ARCHETYPES } from "../game/src/content/resources.js";
 import { RECIPES } from "../game/src/content/recipes.js";
 import { SPELLS } from "../game/src/content/spells.js";
-import { ENEMIES } from "../game/src/content/enemies.js";
+import { ENEMIES, ENEMY_BLOCKS } from "../game/src/content/enemies.js";
 import { SHOPS } from "../game/src/content/shops.js";
 import { QUESTS } from "../game/src/content/quests.js";
 import { REGIONS } from "../game/src/content/regions.js";
@@ -149,12 +149,10 @@ function recipesDoc(): string {
 }
 
 function enemiesDoc(): string {
-  // The enemy table publishes alias rows so a lookup by group id, by family or by block id all
-  // resolve. Documentation wants one row per creature, so dedupe on the name.
-  const unique = new Map<string, typeof ENEMIES[number]>();
-  for (const enemy of ENEMIES) if (!unique.has(enemy.name)) unique.set(enemy.name, enemy);
-
-  const rows = [...unique.values()]
+  // `ENEMY_BLOCKS` is the canonical set: one stat block per creature. `ENEMIES` adds an alias row
+  // per world group so a lookup by group id resolves, and those aliases are lookup keys, not
+  // creatures. The index counts the same thing this table shows — see `main`.
+  const rows = [...ENEMY_BLOCKS]
     .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name))
     .map((enemy) => [
       enemy.name, enemy.tier, enemy.maxHealth, enemy.maxHit,
@@ -173,13 +171,9 @@ function enemiesDoc(): string {
 }
 
 function resourcesDoc(): string {
-  // Same alias situation as enemies: dedupe on the produced item plus tier.
-  const unique = new Map<string, typeof RESOURCES[number]>();
-  for (const resource of RESOURCES) {
-    const key = `${resource.itemId}:${resource.tier}`;
-    if (!unique.has(key)) unique.set(key, resource);
-  }
-  const rows = [...unique.values()]
+  // Same alias situation as enemies: `RESOURCE_ARCHETYPES` is the canonical set and `RESOURCES`
+  // adds one alias per world cluster. The index counts archetypes, matching this table.
+  const rows = [...RESOURCE_ARCHETYPES]
     .sort((a, b) => a.tier - b.tier || a.skill.localeCompare(b.skill))
     .map((resource) => {
       const [low, high] = yieldRange(resource.tier);
@@ -304,10 +298,19 @@ async function main(): Promise<void> {
     "",
     "## Counts",
     "",
+    "One row per thing that exists, matching the page it links to. Enemies and resources also",
+    "publish alias ids so a lookup by world group resolves to the same block; those aliases are",
+    `lookup keys rather than content, and are counted separately below.`,
+    "",
     table(["Table", "Rows"], [
-      ["Items", ALL_ITEMS.length], ["Resources", RESOURCES.length], ["Recipes", RECIPES.length],
-      ["Spells", SPELLS.length], ["Enemies", ENEMIES.length], ["Shops", SHOPS.length],
+      ["Items", ALL_ITEMS.length], ["Resources", RESOURCE_ARCHETYPES.length], ["Recipes", RECIPES.length],
+      ["Spells", SPELLS.length], ["Enemies", ENEMY_BLOCKS.length], ["Shops", SHOPS.length],
       ["Quests", QUESTS.length], ["Regions", REGIONS.length], ["Skills", Object.keys(SKILLS).length],
+    ]),
+    "",
+    table(["Lookup table", "Ids that resolve"], [
+      ["Enemy ids (blocks + group aliases)", ENEMIES.length],
+      ["Resource ids (archetypes + cluster aliases)", RESOURCES.length],
     ]),
     "",
   ].join("\n");

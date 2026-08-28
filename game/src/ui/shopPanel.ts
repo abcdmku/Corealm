@@ -11,8 +11,9 @@ import { notify } from "./contextMenu.js";
 import type { ManagedPanel, UiContext } from "./panels.js";
 import {
   PanelFrame, QuantitySelector, emptyState, formatExact, formatQuantity, itemDef, itemGlyphColour,
-  itemGlyphText, itemName, itemSellPrice, report,
+  itemName, itemSellPrice, report,
 } from "./panels.js";
+import { itemIconSvg } from "./itemIcons.js";
 
 interface ShopRow {
   root: HTMLElement;
@@ -260,7 +261,7 @@ export class ShopPanel implements ManagedPanel {
     const glyph = document.createElement("span");
     glyph.className = "slot__glyph shop-row__glyph";
     glyph.style.setProperty("--glyph-colour", itemGlyphColour(itemId));
-    glyph.textContent = itemGlyphText(itemId);
+    glyph.innerHTML = itemIconSvg(itemDef(itemId));
 
     const text = document.createElement("div");
     text.className = "shop-row__text";

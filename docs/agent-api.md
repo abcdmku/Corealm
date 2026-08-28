@@ -72,18 +72,41 @@ The event types are:
 ```
 navigation.started  navigation.completed  navigation.failed
 activity.started    activity.stopped      resource.depleted   inventory.full
-item.received       item.lost             combat.started      combat.ended
-health.low          player.died           level.gained        production.completed
-quest.updated       dialogue.opened       dialogue.closed     entity.discovered
+item.received       item.lost             item.equipped       item.unequipped
+combat.started      combat.ended          health.low          player.died
+level.gained        production.completed  quest.updated       dialogue.opened
+dialogue.closed     entity.discovered
 ```
+
+You can reconstruct your inventory from `item.received` and `item.lost` alone. Gear moving onto or
+off the body is **not** a loss or a gain: it emits `item.equipped` or `item.unequipped` instead, and
+neither of the two item events fires for it. A swap emits one `item.equipped` carrying `replaced`
+with the id of the piece that went back into the pack.
 
 ## The 19 tools
 
 ### Reading state
-- `corealm_player` — position, region, health, inCombat, dead, moving, activityKind
+- `corealm_player` — position, region, health, dead, moving, activityKind, and two separate
+  combat facts:
+  - `inCombat` — a fight is happening: you have a target, or something has engaged you. It clears
+    on the frame the last enemy dies, so `waitFor(() => !inCombat)` is safe after a kill.
+  - `regenBlocked` — the eight-second no-regen window after any blow in either direction. It
+    outlives the fight on purpose. Wait on this only if you are waiting to heal.
+  - `targetId` and `engagedBy` name who, so you never have to infer it.
 - `corealm_skills` — all 11 skills with level, xp, xpToNext
 - `corealm_inventory` — 28 slots, equipment with summed bonuses, mark balance
-- `corealm_quests` — every known quest with status, stage, current objective
+- `corealm_quests` — every known quest with status, stage, and objective. `currentObjective` is
+  prose written for a player and contains no ids; `currentObjectiveRefs` is the same objective as
+  data — `{ kind: "item" | "entity" | "location" | "enemyFamily" | "recipe" | "spell", id }` — in
+  the order the sentence names them. Read the refs, not the sentence:
+
+  ```js
+  const quest = (await agent.call("corealm_quests")).find((q) => q.status === "active");
+  for (const ref of quest.currentObjectiveRefs) {
+    if (ref.kind === "location") await agent.call("corealm_move_to", { locationId: ref.id });
+    if (ref.kind === "entity") await agent.call("corealm_move_to", { entityId: ref.id });
+  }
+  ```
 
 ### Finding things
 - `corealm_observe` — entities you can see now, or locations you have discovered

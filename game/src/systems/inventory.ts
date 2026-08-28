@@ -24,6 +24,21 @@ export const EAT_DURATION_MS = 1_800;
 /** PRD 2.10: a bank slot stacks to int32 max. The inventory uses the same ceiling for stackables. */
 export const MAX_STACK = 2_147_483_647;
 
+/**
+ * Options for a slot move.
+ *
+ * `silent` exists for one caller: `systems/equipment.ts`. Wearing a sword is not losing it, and an
+ * agent rebuilding its pack from `item.received`/`item.lost` reads the pair of events an equip
+ * used to generate as a loss followed by nothing. Equipment suppresses both and emits
+ * `item.equipped`/`item.unequipped` instead, so the two event families never disagree.
+ *
+ * `inventory.full` is never suppressed: running out of room is real information no matter who
+ * asked for the move.
+ */
+export interface ItemMoveOptions {
+  silent?: boolean;
+}
+
 export interface InventoryDeps {
   store: Store;
   events: EventBus;
@@ -99,7 +114,7 @@ export class InventorySystem {
    * merge into their single existing stack and only clip at MAX_STACK. When nothing at all fits the
    * call fails with INVENTORY_FULL, so "no room" is never mistaken for "success, zero items".
    */
-  addItem(itemId: ItemId, quantity: number): Result<number> {
+  addItem(itemId: ItemId, quantity: number, options: ItemMoveOptions = {}): Result<number> {
     const def = content.item(itemId);
     if (!def) return err("NOT_FOUND", `No item with id ${itemId}`);
     if (!Number.isFinite(quantity) || quantity < 1) {
@@ -140,7 +155,7 @@ export class InventorySystem {
     }
 
     this.deps.store.markDirty();
-    this.emit("item.received", { itemId, name: def.name, quantity: added });
+    if (!options.silent) this.emit("item.received", { itemId, name: def.name, quantity: added });
     if (added < wanted) {
       this.emit("inventory.full", { itemId, name: def.name, attempted: wanted, added });
     }
@@ -151,7 +166,7 @@ export class InventorySystem {
    * Removes exactly `quantity`, or nothing at all. All-or-nothing keeps callers from having to
    * unwind a half-consumed recipe input.
    */
-  removeItem(itemId: ItemId, quantity: number): Result<number> {
+  removeItem(itemId: ItemId, quantity: number, options: ItemMoveOptions = {}): Result<number> {
     const def = content.item(itemId);
     if (!def) return err("NOT_FOUND", `No item with id ${itemId}`);
     if (!Number.isFinite(quantity) || quantity < 1) {
@@ -178,7 +193,7 @@ export class InventorySystem {
     }
 
     this.deps.store.markDirty();
-    this.emit("item.lost", { itemId, name: def.name, quantity: wanted });
+    if (!options.silent) this.emit("item.lost", { itemId, name: def.name, quantity: wanted });
     return ok(wanted);
   }
 

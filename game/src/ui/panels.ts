@@ -28,12 +28,15 @@ import type { KeyBindingRegistry, Unregister } from "../input/keyboard.js";
 import { ContextMenu, notify, reportResult, setNoticeSink } from "./contextMenu.js";
 import type { NoticeTone } from "./contextMenu.js";
 import { Tooltip } from "./tooltips.js";
+import { itemIconSvg } from "./itemIcons.js";
 import { Hud } from "./hud.js";
 import { InventoryPanel } from "./inventoryPanel.js";
 import { SkillsPanel } from "./skillsPanel.js";
 import { EquipmentPanel } from "./equipmentPanel.js";
 import { BankPanel } from "./bankPanel.js";
 import { ShopPanel } from "./shopPanel.js";
+import { QuestPanel } from "./questPanel.js";
+import { PanelDock } from "./dock.js";
 
 /** The inventory is 28 slots, per PRD section 5. Panels that mirror it use this, never a literal. */
 export const INVENTORY_SLOTS = 28;
@@ -85,9 +88,15 @@ export function itemSellPrice(def: ItemDef | undefined): number {
 // ------------------------------------------------------------- item glyphs
 
 /**
- * No item icon art ships yet, so a slot draws a coloured glyph instead: category hue, tier-derived
- * shade, and up to two letters of the name. It has to be legible at 40 px, which rules out a grey
- * box with a truncated name in it.
+ * A slot's tile: a tier-shaded plate in the category's hue with a drawn icon on it.
+ *
+ * The colour rules are unchanged from round 2 — category hue, tier-derived shade — but the two
+ * letters that used to sit on the plate are gone. `ui/itemIcons.ts` picks a vector shape from what
+ * the item does: the sword, shield, helm and boot for the slot a piece of gear goes in, and an ore
+ * chunk, ingot, fish, seed, scroll or coin for everything else. At 40 px a bank of 28 tiles of
+ * two-letter text told a player nothing; a bank of 28 silhouettes tells them where the food is.
+ *
+ * `itemGlyphText` is kept for the tooltip and for anywhere text is genuinely wanted.
  */
 const CATEGORY_HUE: Record<ItemCategory, number> = {
   resource: 28, bar: 20, equipment: 210, food: 96, tool: 42,
@@ -154,7 +163,7 @@ export function paintSlot(cell: HTMLElement, stack: ItemStack | null, emptyLabel
   const glyph = document.createElement("span");
   glyph.className = "slot__glyph";
   glyph.style.setProperty("--glyph-colour", itemGlyphColour(stack.itemId));
-  glyph.textContent = itemGlyphText(stack.itemId);
+  glyph.innerHTML = itemIconSvg(itemDef(stack.itemId));
   cell.appendChild(glyph);
 
   if (stack.quantity > 1) {
@@ -565,9 +574,32 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   const inventory = new InventoryPanel(context);
   const skills = new SkillsPanel(context);
   const equipment = new EquipmentPanel(context);
+  const quests = new QuestPanel(context);
   bank = new BankPanel(context);
   shop = new ShopPanel(context);
-  const panels: ManagedPanel[] = [inventory, skills, equipment, bank, shop];
+  const panels: ManagedPanel[] = [inventory, skills, equipment, quests, bank, shop];
+
+  // Every panel gets a permanent on-screen button that prints its own key. The bank and the shop
+  // are deliberately not on it: both are opened by standing at one, and a button that answers
+  // "you are not at a bank" is worse than no button.
+  const dock = new PanelDock([
+    { id: "inventory", label: "Pack", key: "i", glyph: "▦",
+      toggle: () => inventory.frame.toggle(), isOpen: () => inventory.frame.isOpen(),
+      badge: () => {
+        const used = api.getInventory().slots.filter((slot) => slot !== null).length;
+        return used >= INVENTORY_SLOTS ? "FULL" : "";
+      } },
+    { id: "skills", label: "Skills", key: "k", glyph: "◈",
+      toggle: () => skills.frame.toggle(), isOpen: () => skills.frame.isOpen() },
+    { id: "equipment", label: "Worn", key: "e", glyph: "⛨",
+      toggle: () => equipment.frame.toggle(), isOpen: () => equipment.frame.isOpen() },
+    { id: "quests", label: "Journal", key: "j", glyph: "❋",
+      toggle: () => quests.frame.toggle(), isOpen: () => quests.frame.isOpen(),
+      badge: () => {
+        const active = api.getQuests().filter((quest) => quest.status === "active").length;
+        return active > 0 ? String(active) : "";
+      } },
+  ]);
 
   let mounted = false;
   let lastHudMs = 0;
@@ -584,6 +616,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       if (mounted) return;
       mounted = true;
       hud.mount(root);
+      dock.mount(root);
       for (const panel of panels) panel.frame.mount(root);
       tooltip.mount(root);
       // The HUD owns the toast channel from here; the context menu's fallback strip stands down.
@@ -596,6 +629,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       if (now - lastHudMs >= HUD_INTERVAL_MS) {
         lastHudMs = now;
         hud.update(now);
+        dock.update();
         // The world may open a bank or a shop through an interaction rather than through us.
         const wants = hud.takeAutoOpen();
         if (wants === "bank") bank?.openFor(undefined);
@@ -609,6 +643,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
 
     dispose(): void {
       setNoticeSink(null);
+      dock.dispose();
       for (const panel of panels) panel.dispose();
       hud.dispose();
       tooltip.dispose();

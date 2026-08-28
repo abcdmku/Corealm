@@ -27,7 +27,6 @@ import { SaveService } from "../persistence/storage.js";
 import { installBootPlaceholder, installGameDebug, type RecordedError } from "../debug/gameDebug.js";
 import { GameLoop } from "./loop.js";
 import { InputController } from "../input/mouse.js";
-import { KeyboardController } from "../input/keyboard.js";
 import { WATER_BASIN_DEPTH, buildWorldTerrainSpec, startingSpawn } from "./worldSpec.js";
 import { CAMERA } from "./config.js";
 import { buildWorld, type BuildingBox } from "../world/regionBuilder.js";
@@ -59,6 +58,7 @@ import { RECIPES } from "../content/recipes.js";
 import { SPELLS } from "../content/spells.js";
 import { ENEMIES } from "../content/enemies.js";
 import { SHOPS } from "../content/shops.js";
+import { QUESTS } from "../content/quests.js";
 import { scatterWorld, worldExclusions } from "../world/scatter.js";
 import { findShot, shotIds } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
@@ -184,6 +184,13 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   const entityStore = new EntityStore({ skillLevels });
   entityStore.load(built.entities);
   entityStore.registerLocations(built.knownLocations);
+
+  // The other half of the quest-ref check in `validateQuestObjectives`: entity and location refs
+  // can only be resolved once the world exists. An objective that points an agent at an id nothing
+  // built is a dead end no screenshot would ever show.
+  for (const problem of validateQuestRefTargets(entityStore, built.routeNodes.map((node) => node.id))) {
+    errors.push({ atMs: atMs(), source: "content.quests", message: problem });
+  }
 
   // 8a. Dungeon interiors. The Gravelmaw was authored as chamber centres with floor offsets and
   //     nothing underneath, so everything in it hung in mid-air over the moor: entering snapped the
@@ -580,7 +587,11 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       distance: position.distanceTo(renderer.camera.position),
     };
   });
-  const keyboard = new KeyboardController({ api });
+  // There is exactly ONE KeyboardController, and `InputController` owns it. A second one used to
+  // stand here: both listened on `window`, both dispatched the same keydown through the same
+  // shared registry, and every panel key therefore fired twice — open, then closed, in one press.
+  // Movement still worked (held keys are a set, so adding twice is adding once), which is why the
+  // panels looked unbound rather than double-bound and no screenshot in Phase 1 ever showed one.
 
   // The agent surface. Always installed at window.corealm.agent, and mirrored onto whichever
   // model-context container the browser provides. One implementation, three ways in.
@@ -702,6 +713,18 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     },
 
     forceRespawn: (entityId: string) => gatheringSystem.forceRespawn(entityId, clock.elapsedMs),
+    drawnBounds: (entityId: string) => entityViews.drawnBounds(entityId),
+    entityViewStats: () => entityViews.stats(),
+    groundHeight: (x: number, z: number) => scene.heightAtXZ(x, z),
+    listBuildings: () => REGIONS.flatMap((region) => (region.settlement?.buildings ?? []).map((building) => ({
+      id: building.id,
+      prefab: building.prefab,
+      x: building.position[0],
+      z: building.position[1],
+      width: building.footprint[0],
+      depth: building.footprint[1],
+      rotationY: building.rotationY,
+    }))),
 
     giveItem: (itemId: string, quantity: number, to: string) => (
       to === "bank"
@@ -726,7 +749,6 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     callTool: (name: string, args: unknown) => agent.call(name, (args ?? {}) as Record<string, unknown>),
   });
 
-  void keyboard;
   document.getElementById("boot-screen")?.remove();
   loop.start();
   return { loop, api };
@@ -768,6 +790,64 @@ function validateContentTables(): string[] {
   for (const item of content.allItems()) {
     if (seen.has(item.id)) problems.push(`duplicate item id "${item.id}"`);
     seen.add(item.id);
+  }
+
+  problems.push(...validateQuestObjectives(itemIds));
+  return problems;
+}
+
+/**
+ * Objective prose is what a player reads; `refs` is what an agent acts on. Two ways that pair goes
+ * wrong, both caught here rather than in a screenshot:
+ *
+ *  1. A developer id leaks back into the sentence. Any backtick in an objective is one.
+ *  2. A ref names something that does not exist, which is worse than an inline id because nothing
+ *     renders it and nobody notices until an agent calls `moveTo` on it.
+ *
+ * Entity and location ids are checked at world-build time instead — the entity table does not exist
+ * yet when content validates — so only the content-resolvable kinds are checked here.
+ */
+function validateQuestRefTargets(entityStore: EntityStore, locationIds: readonly string[]): string[] {
+  const problems: string[] = [];
+  const known = new Set(locationIds);
+  for (const quest of QUESTS) {
+    for (const stage of quest.stages) {
+      for (const ref of stage.refs ?? []) {
+        if (ref.kind === "entity" && !entityStore.get(ref.id)) {
+          problems.push(`quest ${quest.id} stage ${stage.index} ref names unknown entity "${ref.id}"`);
+        }
+        if (ref.kind === "location" && !known.has(ref.id)) {
+          problems.push(`quest ${quest.id} stage ${stage.index} ref names unknown location "${ref.id}"`);
+        }
+      }
+    }
+  }
+  return problems;
+}
+
+function validateQuestObjectives(itemIds: ReadonlySet<string>): string[] {
+  const problems: string[] = [];
+  const recipeIds = new Set(content.allRecipes().map((recipe) => recipe.id));
+  const spellIds = new Set(content.allSpells().map((spell) => spell.id));
+
+  for (const quest of QUESTS) {
+    for (const stage of quest.stages) {
+      const where = `quest ${quest.id} stage ${stage.index}`;
+      if (stage.objective.includes("`")) {
+        problems.push(`${where} objective still prints a developer id: ${stage.objective}`);
+      }
+      for (const ref of stage.refs ?? []) {
+        if (ref.kind === "item" && !itemIds.has(ref.id)) {
+          problems.push(`${where} ref names unknown item "${ref.id}"`);
+        }
+        if (ref.kind === "recipe" && !recipeIds.has(ref.id)) {
+          problems.push(`${where} ref names unknown recipe "${ref.id}"`);
+        }
+        if (ref.kind === "spell" && !spellIds.has(ref.id)) {
+          problems.push(`${where} ref names unknown spell "${ref.id}"`);
+        }
+      }
+    }
   }
   return problems;
 }

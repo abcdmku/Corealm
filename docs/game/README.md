@@ -16,14 +16,23 @@ from drifting away from what the game actually does.
 
 ## Counts
 
+One row per thing that exists, matching the page it links to. Enemies and resources also
+publish alias ids so a lookup by world group resolves to the same block; those aliases are
+lookup keys rather than content, and are counted separately below.
+
 | Table | Rows |
 | --- | --- |
 | Items | 102 |
-| Resources | 26 |
+| Resources | 12 |
 | Recipes | 78 |
 | Spells | 3 |
-| Enemies | 21 |
+| Enemies | 9 |
 | Shops | 5 |
 | Quests | 10 |
 | Regions | 3 |
 | Skills | 11 |
+
+| Lookup table | Ids that resolve |
+| --- | --- |
+| Enemy ids (blocks + group aliases) | 21 |
+| Resource ids (archetypes + cluster aliases) | 26 |

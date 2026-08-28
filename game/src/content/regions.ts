@@ -80,8 +80,8 @@
  */
 import type { ItemId, QuestId, RecipeId, RegionId, SkillId } from "../contracts.js";
 import {
-  COMPOSITION_IDS, PREFAB_IDS, compositionPartAssetIds, isCompositionId, isPrefabId,
-  prefabPartAssetIds, type CompositionId,
+  COMPOSITION_IDS, KIT_IDS, PREFAB_IDS, compositionPartAssetIds, isCompositionId, isKitId,
+  isPrefabId, prefabPartAssetIds, type CompositionId, type KitId,
 } from "../render/buildings.js";
 
 // ------------------------------------------------------------------ primitives
@@ -142,7 +142,12 @@ export interface ResourceClusterDef {
   centre: Spot;
   radius: number;
   assetId: string;
-  depletedAssetId: string;
+  /**
+   * A different mesh for the worked-out state. Optional, and usually absent: the render layer
+   * derives "spent" from the live mesh so a node never changes silhouette when it runs dry.
+   * Author one only when the spent state is genuinely a different object.
+   */
+  depletedAssetId?: string;
   scale?: number;
   /** The route-graph node a player banks against when working this cluster. */
   locationId: string;
@@ -212,6 +217,12 @@ export interface NpcStandDef {
 export interface SettlementDef {
   id: string;
   name: string;
+  /**
+   * Which building vernacular this settlement is made of. See `BUILDING_KITS` in
+   * render/buildings.ts: wall family, corner post, roof pitch and roofline. Phase 1 shipped every
+   * settlement on one kit, so tier 1 and tier 10 were the same eight cottages in different grass.
+   */
+  kit: KitId;
   centre: Spot;
   respawnPointId: string;
   buildings: BuildingDef[];
@@ -278,6 +289,8 @@ export interface LandmarkDef {
   assetId: string;
   scale?: number;
   rotationY?: number;
+  /** Draw only the lowest fraction of the mesh. See `SemanticEntity.view.clipFraction`. */
+  clipFraction?: number;
   blurb: string;
   /**
    * Set dressing built around the hero mesh by `render/buildings.ts`. Round-1 critique finding 8:
@@ -511,22 +524,27 @@ const FALLOWMARCH: RegionDef = {
       count: 6, centre: [-160, 80], radius: 11,
       // No pack ships a mineable vein (asset-report gap 2). The rock meshes tagged `ore-node` are
       // single-material, so the render layer tints them per `view.materialTier`.
-      assetId: "rock_medium_1", depletedAssetId: "rock_small_1",
+      // No `depletedAssetId`. A worked-out node keeps the silhouette the player walked up to:
+      // the render layer derives the spent look from this same mesh (`buildSpentParts` in
+      // render/entityViews.ts) by dropping the ore vein, cutting a tree back to its stump, or
+      // cutting a crop back to stubble. Swapping in a smaller rock read as the seam vanishing, and
+      // swapping a tree for `anvil_log` — which is an anvil sitting on a log — put a blacksmith's
+      // anvil where every felled tree had been.
+      assetId: "rock_medium_1",
       locationId: "bracken_pit",
     },
     {
       id: "bracken_pit_stone", name: "Marchstone Face", archetype: "ore",
       skill: "mining", tier: 1, reqLevel: 1, itemId: "march_stone",
       count: 2, centre: [-146, 88], radius: 5,
-      assetId: "rock_medium_3", depletedAssetId: "rock_small_2",
+      assetId: "rock_medium_3",
       locationId: "bracken_pit",
     },
     {
       id: "palewood_copse_trees", name: "Palewood", archetype: "tree",
       skill: "woodcutting", tier: 1, reqLevel: 1, itemId: "palewood_log",
       count: 8, centre: [-334, -64], radius: 15,
-      // `anvil_log` is the only stump in the library, so it doubles as every felled-tree variant.
-      assetId: "tree_common_1", depletedAssetId: "anvil_log", scale: 0.9,
+      assetId: "tree_common_1", scale: 0.9,
       locationId: "palewood_copse",
     },
     {
@@ -544,7 +562,7 @@ const FALLOWMARCH: RegionDef = {
       count: 6, centre: [-96, -22], radius: 7,
       // No soil-plot or scarecrow mesh (asset-report gap 5). The crop is the clickable thing; the
       // dirt quad and its fence border are render-layer geometry.
-      assetId: "crop_carrot", depletedAssetId: "farm_crate_empty",
+      assetId: "crop_carrot",
       locationId: "marchfield_farm",
     },
   ],
@@ -552,6 +570,8 @@ const FALLOWMARCH: RegionDef = {
   settlement: {
     id: "coldbrace",
     name: "Coldbrace",
+    // Lime-washed plaster, fired pantiles, a steep pitch. A river-plain farming village.
+    kit: "plaster",
     centre: [-160, -80],
     respawnPointId: "coldbrace",
     buildings: [
@@ -755,7 +775,7 @@ const VELLENWOOD: RegionDef = {
       id: "hollowcut_corven", name: "Corven Seam", archetype: "ore",
       skill: "mining", tier: 5, reqLevel: 5, itemId: "corven_ore",
       count: 5, centre: [94, 145], radius: 9,
-      assetId: "rock_medium_2", depletedAssetId: "rock_small_1",
+      assetId: "rock_medium_2",
       locationId: "hollowcut_seam",
     },
     {
@@ -769,7 +789,7 @@ const VELLENWOOD: RegionDef = {
       // tree_common_2 carries the green `Leaves_NormalTree` texture, and staying off the scatter
       // canopy's 3 and 5 keeps the choppable tree distinguishable from the dressing. Scale 1.15
       // holds the old-growth read that 0.55 on a larger source mesh was buying.
-      assetId: "tree_common_2", depletedAssetId: "anvil_log", scale: 1.15,
+      assetId: "tree_common_2", scale: 1.15,
       locationId: "vellenwood_canopy",
     },
     {
@@ -784,6 +804,8 @@ const VELLENWOOD: RegionDef = {
   settlement: {
     id: "rootfall",
     name: "Rootfall",
+    // Exposed frame, a felled log along every ridge, dormers in the roof. A logging town.
+    kit: "timber",
     centre: [60, 120],
     respawnPointId: "rootfall",
     buildings: [
@@ -877,8 +899,11 @@ const VELLENWOOD: RegionDef = {
   landmarks: [
     {
       id: "rootfall_stump", name: "The Rootfall Stump", position: [60, 120],
-      // `anvil_log` is a stump; at 5x it is the eight-metre Duskoak stump the town is built on.
-      assetId: "anvil_log", scale: 5,
+      // A real Duskoak, cut off just above the flare of its roots. The library ships no stump, and
+      // the round-3 stand-in was `anvil_log` — an anvil that happens to sit on a log — drawn at
+      // five times scale, so Rootfall's town square was a giant anvil. `clipFraction` keeps the
+      // lowest quarter of the same twisted oak that stands split on the ridge above the town.
+      assetId: "tree_twisted_2", scale: 2.0, clipFraction: 0.24,
       composition: "rootfall_stump",
       blurb: "The stump is the square. Somebody has cut steps into the north face of it.",
     },
@@ -998,7 +1023,7 @@ const KARROWMOOR: RegionDef = {
       id: "lower_quarry_kaldite", name: "Kaldite Face", archetype: "ore",
       skill: "mining", tier: 10, reqLevel: 10, itemId: "kaldite_ore",
       count: 5, centre: [60, -16], radius: 10,
-      assetId: "rock_medium_3", depletedAssetId: "rock_small_2",
+      assetId: "rock_medium_3",
       locationId: "karrowmoor_terraces",
     },
     {
@@ -1007,14 +1032,14 @@ const KARROWMOOR: RegionDef = {
       id: "upper_karrow_kaldite", name: "Upper Kaldite Face", archetype: "ore",
       skill: "mining", tier: 10, reqLevel: 10, itemId: "kaldite_ore",
       count: 3, centre: [194, -132], radius: 7,
-      assetId: "rock_medium_1", depletedAssetId: "rock_small_2",
+      assetId: "rock_medium_1",
       locationId: "upper_karrow_seam",
     },
     {
       id: "ridge_pines_trees", name: "Cairnpine", archetype: "tree",
       skill: "woodcutting", tier: 10, reqLevel: 10, itemId: "cairnpine_log",
       count: 8, centre: [250, -96], radius: 18,
-      assetId: "tree_pine_2", depletedAssetId: "anvil_log", scale: 0.95,
+      assetId: "tree_pine_2", scale: 0.95,
       locationId: "ridge_pines",
     },
     {
@@ -1035,7 +1060,7 @@ const KARROWMOOR: RegionDef = {
       id: "highcairn_plot_beds", name: "Highcairn Plot", archetype: "farm_plot",
       skill: "farming", tier: 10, reqLevel: 10, itemId: "cairnleaf",
       count: 4, centre: [128, -58], radius: 6,
-      assetId: "crop_carrot", depletedAssetId: "farm_crate_empty",
+      assetId: "crop_carrot",
       locationId: "highcairn_plots",
     },
   ],
@@ -1043,6 +1068,9 @@ const KARROWMOOR: RegionDef = {
   settlement: {
     id: "highcairn",
     name: "Highcairn",
+    // Brick and cut stone to the eaves, brick piers, gable ends closed in stone, and the shallower
+    // six-wide roof. A town built out of the quarry it works.
+    kit: "stone",
     centre: [144, -66],
     respawnPointId: "highcairn",
     buildings: [
@@ -1399,6 +1427,12 @@ export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
     // Buildings. An unknown prefab, a zero footprint, or a building outside its own region all
     // produce a settlement that is invisible or in the wrong place, and all three are silent.
     const settlement = region.settlement;
+    if (!isKitId(settlement.kit)) {
+      problems.push(
+        `${region.id}: settlement ${settlement.id} names unknown building kit ` +
+        `"${String(settlement.kit)}" (known: ${KIT_IDS.join(", ")})`,
+      );
+    }
     for (const building of settlement.buildings) {
       if (seenIds.has(building.id)) problems.push(`duplicate building id ${building.id}`);
       seenIds.add(building.id);
@@ -1423,7 +1457,7 @@ export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
 
     for (const cluster of region.clusters) {
       checkAsset(`${region.id}: cluster ${cluster.id}`, cluster.assetId);
-      checkAsset(`${region.id}: cluster ${cluster.id}`, cluster.depletedAssetId);
+      if (cluster.depletedAssetId) checkAsset(`${region.id}: cluster ${cluster.id}`, cluster.depletedAssetId);
     }
     for (const group of region.enemyGroups) checkAsset(`${region.id}: enemies ${group.id}`, group.assetId);
     for (const obstacle of region.obstacles) checkAsset(`${region.id}: obstacle ${obstacle.id}`, obstacle.assetId);

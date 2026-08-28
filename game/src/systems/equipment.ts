@@ -90,14 +90,17 @@ export class EquipmentSystem {
 
     // Take the new piece out first: for a one-slot-per-item wearable that frees the slot the
     // displaced piece needs, so the common swap always has room.
-    const removed = this.deps.inventory.removeItem(itemId, 1);
+    //
+    // Both moves are silent. An equip is one event — `item.equipped` below — not a loss and a
+    // gain that an agent has to recognise as a pair.
+    const removed = this.deps.inventory.removeItem(itemId, 1, { silent: true });
     if (!removed.ok) return { ok: false, error: removed.error };
 
     if (previous) {
-      const returned = this.deps.inventory.addItem(previous.itemId, previous.quantity);
+      const returned = this.deps.inventory.addItem(previous.itemId, previous.quantity, { silent: true });
       if (!returned.ok) {
         // Roll back rather than destroy the worn piece. The re-add cannot fail: we just freed it.
-        this.deps.inventory.addItem(itemId, 1);
+        this.deps.inventory.addItem(itemId, 1, { silent: true });
         const previousName = content.item(previous.itemId)?.name ?? previous.itemId;
         return err("INVENTORY_FULL", `No room to take off your ${previousName} first`);
       }
@@ -106,6 +109,18 @@ export class EquipmentSystem {
     this.state.equipment[slot] = { itemId, quantity: 1 };
     this.refreshMaxHealth();
     this.deps.store.markDirty();
+    this.deps.events.emit(
+      "item.equipped",
+      {
+        itemId,
+        name: def.name,
+        slot,
+        replaced: previous ? previous.itemId : null,
+        replacedName: previous ? content.item(previous.itemId)?.name ?? previous.itemId : null,
+      },
+      undefined,
+      this.deps.now(),
+    );
     return ok({ slot, replaced: previous ? previous.itemId : null });
   }
 
@@ -118,12 +133,18 @@ export class EquipmentSystem {
     if (!this.deps.inventory.hasSpaceFor(worn.itemId, worn.quantity)) {
       return err("INVENTORY_FULL", `No free inventory slot for your ${name}`);
     }
-    const returned = this.deps.inventory.addItem(worn.itemId, worn.quantity);
+    const returned = this.deps.inventory.addItem(worn.itemId, worn.quantity, { silent: true });
     if (!returned.ok) return { ok: false, error: returned.error };
 
     this.state.equipment[slot] = null;
     this.refreshMaxHealth();
     this.deps.store.markDirty();
+    this.deps.events.emit(
+      "item.unequipped",
+      { itemId: worn.itemId, name, slot, quantity: worn.quantity },
+      undefined,
+      this.deps.now(),
+    );
     return ok({ itemId: worn.itemId });
   }
 

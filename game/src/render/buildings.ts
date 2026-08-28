@@ -230,27 +230,147 @@ function roofFit(
   return { scale, rotationY: width >= depth ? Math.PI / 2 : 0 };
 }
 
+// -------------------------------------------------------------- building kits
+
+/**
+ * The vernacular of one region: which wall family, which corner post, which roof, what a house is
+ * made of.
+ *
+ * Phase 1 built every settlement out of one kit. Highcairn is a tier-10 quarry town forty metres
+ * up a slate terrace and Coldbrace is a tier-1 farming village on a river plain, and they were the
+ * same eight cottages with the same plaster panels under the same orange pantiles; only the ground
+ * colour told them apart. Nine more regions on top of that would have multiplied the problem by
+ * nine, which is why the Phase 1 report put this before Phase 2 rather than in it.
+ *
+ * What the free kit actually gives us, measured rather than hoped for: two complete wall families
+ * (plaster and brick), two corner posts, and three tiled roofs at two different pitches
+ * (`roof_tiles_4x6` is 4.234 / 5.513 = 0.77; the 6-wide roofs are 5.672 / 8.250 = 0.69). It does
+ * NOT ship a second roof covering — `roof_wood_plank` is a single 2.3 m board and
+ * `roof_gable_brick` is a gable END, not a roof. So a kit differs in wall family, corner, roof
+ * pitch, roof trim, and eaves; the tile texture itself is shared and re-coloured by the material
+ * layer, which is the only thing the tint rule permits.
+ */
+export interface BuildingKit {
+  id: KitId;
+  wall: string;
+  wallWindow: string;
+  wallDoor: string;
+  /** The richer wall used on halls and civic buildings. */
+  wallFeature: string;
+  corner: string;
+  door: string;
+  /** The 4x6-class roof, for cottages, sheds and huts. */
+  roofSmall: string;
+  /** Metres the small roof covers, short side then long. */
+  roofSmallCovers: readonly [number, number];
+  /**
+   * Metres from the small roof's placement height to its ridge, at scale 1.
+   *
+   * Measured, not derived: these roofs pivot above their own eaves, so the bbox height is not the
+   * distance from where the part is placed to where its ridge is. `roof_tiles_4x6` is 4.234 tall
+   * and pivots 0.52 above its base, giving 3.71; `roof_tiles_6x8` is 5.672 and pivots 0.70,
+   * giving 4.97. Anything that has to sit ON the ridge — a log, a finial — needs this number.
+   */
+  roofSmallApex: number;
+  /** The long roof, for halls. */
+  roofLarge: string;
+  roofLargeCovers: readonly [number, number];
+  /** Trim laid along the ridge line. Empty when the kit has none. */
+  ridge: string | null;
+  /** A dormer or gable end that changes the roofline. Empty when the kit has none. */
+  roofFeature: string | null;
+}
+
+export type KitId = "plaster" | "timber" | "stone";
+
+export const BUILDING_KITS: Record<KitId, BuildingKit> = {
+  // Coldbrace. Lime-washed plaster over a timber frame, fired pantiles, a steep pitch to shed rain
+  // off the river plain. The oldest and plainest of the three.
+  plaster: {
+    id: "plaster",
+    wall: "wall_plaster_straight",
+    wallWindow: "wall_plaster_window",
+    wallDoor: "wall_plaster_door",
+    wallFeature: "wall_plaster_timber",
+    corner: "corner_wood",
+    door: "door_round_1",
+    roofSmall: "roof_tiles_4x6",
+    roofSmallCovers: [4, 6],
+    roofSmallApex: 3.71,
+    roofLarge: "roof_tiles_6x12",
+    roofLargeCovers: [6, 12],
+    ridge: null,
+    roofFeature: null,
+  },
+  // Rootfall. A logging town: every wall is exposed frame, every corner is a post, and the roofs
+  // carry a felled log along the ridge because that is what the town has to spare. Dormers break
+  // the roofline, which is what makes Rootfall read as a different place from the ridge above it.
+  timber: {
+    id: "timber",
+    wall: "wall_plaster_timber",
+    wallWindow: "wall_plaster_window",
+    wallDoor: "wall_plaster_door",
+    wallFeature: "wall_plaster_timber",
+    corner: "corner_wood",
+    door: "door_round_2",
+    roofSmall: "roof_tiles_4x6",
+    roofSmallCovers: [4, 6],
+    roofSmallApex: 3.71,
+    roofLarge: "roof_tiles_6x12",
+    roofLargeCovers: [6, 12],
+    ridge: "roof_log",
+    roofFeature: "roof_dormer",
+  },
+  // Highcairn. Built out of the quarry it works: brick and cut stone to the eaves, brick corner
+  // piers, and the shallower 6-wide roof, which reads as a lower, heavier building even at the
+  // distance the whole terrace is seen from.
+  stone: {
+    id: "stone",
+    wall: "wall_brick_straight",
+    wallWindow: "wall_brick_window",
+    wallDoor: "wall_brick_door",
+    wallFeature: "wall_brick_window",
+    corner: "corner_brick",
+    door: "door_flat_1",
+    roofSmall: "roof_tiles_6x8",
+    roofSmallCovers: [6, 8],
+    roofSmallApex: 4.97,
+    roofLarge: "roof_tiles_6x12",
+    roofLargeCovers: [6, 12],
+    ridge: null,
+    roofFeature: "roof_gable_brick",
+  },
+};
+
+export const KIT_IDS: readonly KitId[] = ["plaster", "timber", "stone"] as const;
+
+export function isKitId(value: string): value is KitId {
+  return (KIT_IDS as readonly string[]).includes(value);
+}
+
 // ------------------------------------------------------------------ prefabs
 
 /**
- * Assemble a prefab. Deterministic: the same `(prefab, footprint, seed)` always returns the same
- * ordered list, so a rebuild at the same world seed is byte-identical.
+ * Assemble a prefab. Deterministic: the same `(prefab, footprint, seed, kit)` always returns the
+ * same ordered list, so a rebuild at the same world seed is byte-identical.
  */
 export function buildPrefab(
   prefab: PrefabId,
   footprint: readonly [number, number],
   seed: number,
+  kitId: KitId = "plaster",
 ): PartPlacement[] {
   const width = Math.max(MODULE_METRES, footprint[0]);
   const depth = Math.max(MODULE_METRES, footprint[1]);
   const rng = new Rng(seed);
+  const kit = BUILDING_KITS[kitId];
 
   switch (prefab) {
-    case "cottage": return cottage(width, depth, rng);
-    case "hall": return hall(width, depth, rng);
+    case "cottage": return cottage(width, depth, rng, kit);
+    case "hall": return hall(width, depth, rng, kit);
     case "tower": return tower(width, depth, rng);
-    case "shed": return shed(width, depth, rng);
-    case "quarry_hut": return quarryHut(width, depth, rng);
+    case "shed": return shed(width, depth, rng, kit);
+    case "quarry_hut": return quarryHut(width, depth, rng, kit);
     case "gatehouse": return gatehouse(width, depth);
     case "wall_segment": return wallSegment(width);
     case "stall": return stall(rng);
@@ -277,7 +397,7 @@ export function prefabHeight(prefab: PrefabId): number {
  * Six by four, one storey, tiled roof, chimney on the eave slope. Windows and the door module move
  * with the seed so eight cottages on one street are not eight copies of the same elevation.
  */
-function cottage(width: number, depth: number, rng: Rng): PartPlacement[] {
+function cottage(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPlacement[] {
   const out: PartPlacement[] = [];
   const sides = ringSides(width, depth);
   const entry = sides[2]!;
@@ -288,17 +408,18 @@ function cottage(width: number, depth: number, rng: Rng): PartPlacement[] {
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
       const isDoor = s === 2 && index === doorIndex;
-      let assetId = "wall_plaster_straight";
-      if (isDoor) assetId = "wall_plaster_door";
-      else if (rng.chance(0.45)) assetId = "wall_plaster_window";
+      let assetId = kit.wall;
+      if (isDoor) assetId = kit.wallDoor;
+      else if (rng.chance(0.45)) assetId = kit.wallWindow;
       out.push(part(`w${s}_${index}`, assetId, onSide(side, count, index, 0, 0), side.yaw));
     }
   }
 
-  corners(out, width, depth, "corner_wood", 0, 1, "c");
+  corners(out, width, depth, kit.corner, 0, 1, "c");
 
-  const roof = roofFit(width, depth, 4, 6);
-  out.push(loose("roof", "roof_tiles_4x6", 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
+  const roof = roofFit(width, depth, kit.roofSmallCovers[0], kit.roofSmallCovers[1]);
+  out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
+  addRoofline(out, width, depth, roof, kit);
 
   // On the eave slope, a quarter of the way in from the gable, so it clears the tiles and still
   // reads against the sky rather than hiding behind the ridge.
@@ -311,7 +432,7 @@ function cottage(width: number, depth: number, rng: Rng): PartPlacement[] {
   ));
 
   out.push(part(
-    "door", "door_round_1",
+    "door", kit.door,
     onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET),
     entry.yaw,
   ));
@@ -319,8 +440,74 @@ function cottage(width: number, depth: number, rng: Rng): PartPlacement[] {
   return out;
 }
 
+/**
+ * The thing that makes a roof belong to a region rather than to a kit-bash.
+ *
+ * The library ships one tiled covering at two pitches and nothing else — `roof_wood_plank` is a
+ * single 2.3 m board and `roof_gable_brick` is a gable END — so the ROOFLINE is where a settlement
+ * gets its silhouette. Rootfall lays a felled log along the ridge and breaks the slope with a
+ * dormer; Highcairn closes the gable ends in brick; Coldbrace does neither. Seen from the hillside
+ * above, that is the difference between "a village" and "this village".
+ */
+function addRoofline(
+  out: PartPlacement[],
+  width: number,
+  depth: number,
+  roof: { scale: number; rotationY: number },
+  kit: BuildingKit,
+): void {
+  // `roofFit` rotates the roof by PI/2 when the building is wider than it is deep, so the ridge
+  // runs along local Z exactly when it did not rotate.
+  const alongZ = roof.rotationY === 0;
+  const ridgeLength = alongZ ? depth : width;
+  const ridgeY = STOREY_METRES + kit.roofSmallApex * roof.scale;
+
+  if (kit.ridge === "roof_log") {
+    // roof_log's pivot is 3.85 m below the beam, and the beam runs along local Z for +-5.35 m, so
+    // the log is scaled to the ridge it lies on and then dropped by its own pivot. Getting the
+    // apex wrong buries it in the tiles and pushes its ends out through the eaves, which is
+    // exactly how it looked before `roofSmallApex` was measured rather than guessed at.
+    const logScale = Math.min(1, ridgeLength / 10.7);
+    out.push(loose(
+      "ridge", kit.ridge,
+      // Bedded 0.2 m INTO the tiles: a ridge log is laid on the roof, not balanced on top of it.
+      0, ridgeY - 3.85 * logScale - 0.2, 0,
+      alongZ ? 0 : Math.PI / 2, logScale,
+    ));
+  }
+
+  if (kit.roofFeature === "roof_dormer") {
+    // Halfway up the eave slope, opposite the chimney: a window looking out of the roof.
+    const outward = (alongZ ? width : depth) / 2 - 0.5;
+    out.push(loose(
+      "dormer", "roof_dormer",
+      alongZ ? -outward : 0,
+      STOREY_METRES + 0.55,
+      alongZ ? 0 : -outward,
+      alongZ ? -Math.PI / 2 : Math.PI,
+      1,
+    ));
+  }
+
+  if (kit.roofFeature === "roof_gable_brick") {
+    // 6.694 x 4.516 x 1.129: a gable end. One at each end of the ridge closes the roof in stone,
+    // which is what a town that owns a quarry would actually build.
+    const gableScale = ((alongZ ? width : depth) / 6.694) * 1.08;
+    for (const [index, sign] of [-1, 1].entries()) {
+      out.push(loose(
+        `gable${index}`, "roof_gable_brick",
+        alongZ ? 0 : (ridgeLength / 2) * sign,
+        STOREY_METRES - 0.1,
+        alongZ ? (ridgeLength / 2) * sign : 0,
+        alongZ ? 0 : Math.PI / 2,
+        gableScale,
+      ));
+    }
+  }
+}
+
 /** Twelve by six timber-framed hall: the biggest thing in Coldbrace after the vault tower. */
-function hall(width: number, depth: number, rng: Rng): PartPlacement[] {
+function hall(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPlacement[] {
   const out: PartPlacement[] = [];
   const sides = ringSides(width, depth);
   const entry = sides[2]!;
@@ -331,9 +518,9 @@ function hall(width: number, depth: number, rng: Rng): PartPlacement[] {
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
       const isDoor = s === 2 && index === doorIndex;
-      let assetId = "wall_plaster_timber";
-      if (isDoor) assetId = "wall_plaster_door";
-      else if (index % 2 === (rng.chance(0.5) ? 0 : 1)) assetId = "wall_plaster_window";
+      let assetId = kit.wallFeature;
+      if (isDoor) assetId = kit.wallDoor;
+      else if (index % 2 === (rng.chance(0.5) ? 0 : 1)) assetId = kit.wallWindow;
       out.push(part(`w${s}_${index}`, assetId, onSide(side, count, index, 0, 0), side.yaw));
       // Trim only on the long faces: it hides the wall/ground seam where the player actually
       // walks, and paying for it on all four sides is 6 more instances for nothing.
@@ -343,14 +530,14 @@ function hall(width: number, depth: number, rng: Rng): PartPlacement[] {
     }
   }
 
-  corners(out, width, depth, "corner_wood", 0, 1, "c");
+  corners(out, width, depth, kit.corner, 0, 1, "c");
 
-  const roof = roofFit(width, depth, 6, 12);
-  out.push(loose("roof", "roof_tiles_6x12", 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
+  const roof = roofFit(width, depth, kit.roofLargeCovers[0], kit.roofLargeCovers[1]);
+  out.push(loose("roof", kit.roofLarge, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
   out.push(loose("chimney", "chimney", width * 0.3, STOREY_METRES - 0.3, depth / 2 - 0.55, 0, 1.1));
 
   out.push(part(
-    "door", "door_round_2",
+    "door", kit.door,
     onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET),
     entry.yaw,
   ));
@@ -405,7 +592,7 @@ function tower(width: number, depth: number, rng: Rng): PartPlacement[] {
 }
 
 /** Four by four store shed. Plain walls, plank roof, a crate against the back wall. */
-function shed(width: number, depth: number, rng: Rng): PartPlacement[] {
+function shed(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPlacement[] {
   const out: PartPlacement[] = [];
   const sides = ringSides(width, depth);
   const entry = sides[2]!;
@@ -418,24 +605,27 @@ function shed(width: number, depth: number, rng: Rng): PartPlacement[] {
       const isDoor = s === 2 && index === doorIndex;
       out.push(part(
         `w${s}_${index}`,
-        isDoor ? "wall_plaster_door" : "wall_plaster_straight",
+        isDoor ? kit.wallDoor : kit.wall,
         onSide(side, count, index, 0, 0),
         side.yaw,
       ));
     }
   }
 
-  corners(out, width, depth, "corner_wood", 0, 1, "c");
-  // A 4x6 roof at 0.8 gives a 6.06 x 4.41 bbox: eaves all round on a 4 x 4 shed, no gaps.
-  out.push(loose("roof", "roof_tiles_4x6", 0, STOREY_METRES, 0, width >= depth ? Math.PI / 2 : 0, 0.8));
-  out.push(part("door", "door_round_1", onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
+  corners(out, width, depth, kit.corner, 0, 1, "c");
+  // The small roof at 0.8 of the footprint it covers leaves eaves all round a 4 x 4 shed with no
+  // gaps. The ratio is against the kit's own coverage, so the stone kit's wider roof does not
+  // swallow the shed it sits on.
+  const shedScale = 0.8 * (4 / kit.roofSmallCovers[0]);
+  out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, width >= depth ? Math.PI / 2 : 0, shedScale));
+  out.push(part("door", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
   out.push(loose("crate", "crate_village", width * 0.3, 0, -depth / 2 - 0.65, rng.float(0, Math.PI), 1));
 
   return out;
 }
 
 /** Five by four quarry crew hut: timber walls, a plank roof, props and a tool crate. */
-function quarryHut(width: number, depth: number, rng: Rng): PartPlacement[] {
+function quarryHut(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPlacement[] {
   const out: PartPlacement[] = [];
   const sides = ringSides(width, depth);
   const entry = sides[2]!;
@@ -446,16 +636,18 @@ function quarryHut(width: number, depth: number, rng: Rng): PartPlacement[] {
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
       const isDoor = s === 2 && index === doorIndex;
-      let assetId = "wall_plaster_timber";
-      if (isDoor) assetId = "wall_plaster_door";
-      else if (rng.chance(0.35)) assetId = "wall_plaster_window";
+      let assetId = kit.wallFeature;
+      if (isDoor) assetId = kit.wallDoor;
+      else if (rng.chance(0.35)) assetId = kit.wallWindow;
       out.push(part(`w${s}_${index}`, assetId, onSide(side, count, index, 0, 0), side.yaw));
     }
   }
 
-  corners(out, width, depth, "corner_wood", 0, 1, "c");
-  out.push(loose("roof", "roof_tiles_4x6", 0, STOREY_METRES, 0, width >= depth ? Math.PI / 2 : 0, 0.9));
-  out.push(part("door", "door_round_1", onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
+  corners(out, width, depth, kit.corner, 0, 1, "c");
+  const hutRoof = roofFit(width, depth, kit.roofSmallCovers[0], kit.roofSmallCovers[1]);
+  out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, hutRoof.rotationY, hutRoof.scale * 0.98));
+  addRoofline(out, width, depth, hutRoof, kit);
+  out.push(part("door", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
 
   // support_beam's pivot is 1.211 m under the post, so it has to be dropped to stand on the ground.
   out.push(loose("prop_l", "support_beam", -width / 2 - 0.35, -1.211 * 1.3, depth * 0.2, Math.PI / 2, 1.3));
@@ -650,14 +842,28 @@ function standingStones(rng: Rng): PartPlacement[] {
 }
 
 /** Somebody has cut steps into the north face of it. */
+/**
+ * The Rootfall Stump: steps cut into the north face, brackets on the flanks, one vine.
+ *
+ * Sized against the hero mesh it actually stands on, which is `tree_twisted_2` clipped to its
+ * lowest quarter at 2x: roughly 3.7 m across and 3.7 m tall. The round-3 numbers were authored
+ * against a five-times-scale `anvil_log` and left every part of this composition hanging in space
+ * once the hero mesh changed — steps climbing to 4 m up a 3.7 m stump, brackets 2.3 m clear of a
+ * face that is only 1.85 m from the centre.
+ *
+ * `stairs_exterior` is 2.0 x 1.204 x 2.078 with its pivot on the floor, so each flight rises
+ * 1.204 m and reaches 2.078 m back: three of them climb 3.6 m, which is the top.
+ */
 function rootfallStump(): PartPlacement[] {
   return [
-    loose("step_1", "stairs_exterior", 0, 0, 4.0, 0, 1.3),
-    loose("step_2", "stairs_exterior", 0, 1.3, 2.9, 0, 1.3),
-    loose("step_3", "stairs_exterior", 0, 2.6, 1.9, 0, 1.3),
-    loose("shelf_1", "mushroom_bracket", -2.3, 2.0, 0.9, 0.8, 2.4),
-    loose("shelf_2", "mushroom_bracket", 2.1, 2.9, -1.1, 2.4, 1.9),
-    loose("vine", "vine_1", 1.7, 4.6, 1.5, 1.9, 1.5),
+    loose("step_1", "stairs_exterior", 0, 0, 3.6, 0, 1.0),
+    loose("step_2", "stairs_exterior", 0, 1.2, 1.9, 0, 1.0),
+    loose("step_3", "stairs_exterior", 0, 2.4, 0.2, 0, 1.0),
+    // Brackets grow ON the trunk: 1.7 m out from the axis puts their inner edge against the bark.
+    loose("shelf_1", "mushroom_bracket", -1.7, 1.5, 0.5, 0.8, 1.6),
+    loose("shelf_2", "mushroom_bracket", 1.6, 2.4, -0.7, 2.4, 1.3),
+    // The vine hangs from the cut face, so its top is at the top and it falls 2.6 m down the side.
+    loose("vine", "vine_1", 1.5, 1.1, 1.0, 1.9, 1.0),
   ];
 }
 
@@ -733,7 +939,11 @@ export function prefabPartAssetIds(): string[] {
     for (const footprint of probes) {
       // Several seeds, because window and door choices are seeded.
       for (const seed of [1, 7, 13, 29, 101, 977]) {
-        for (const placement of buildPrefab(prefab, footprint, seed)) ids.add(placement.assetId);
+        // Every kit, or a wall family that only Highcairn uses is never checked against the
+        // manifest and ships as a missing mesh in one region.
+        for (const kit of KIT_IDS) {
+          for (const placement of buildPrefab(prefab, footprint, seed, kit)) ids.add(placement.assetId);
+        }
       }
     }
   }

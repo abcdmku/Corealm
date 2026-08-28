@@ -123,6 +123,14 @@ export interface SemanticEntity {
     rotationY?: number;
     /** Swapped in when `state` is "depleted" or "dead". Falls back to a desaturated material. */
     depletedAssetId?: string;
+    /**
+     * Draw only the lowest fraction of the mesh, 0..1. Used to cut a tree down to a stump.
+     *
+     * The asset library ships no stump, and Phase 1 substituted `anvil_log` — an anvil that
+     * happens to stand on a log — which put a blacksmith's anvil wherever a stump belonged.
+     * Clipping a real tree's own trunk is the honest version and costs one geometry per group.
+     */
+    clipFraction?: number;
     /** Tier palette override. Defaults to the entity's own tier. */
     materialTier?: number;
     /** Metres above `position` for the interaction label and highlight ring. */
@@ -189,6 +197,14 @@ export type GameEventType =
   | "activity.started" | "activity.stopped"
   | "resource.depleted" | "inventory.full"
   | "item.received" | "item.lost"
+  /**
+   * Gear moving between the pack and a worn slot. These exist so an agent that reconstructs its
+   * inventory from `item.received`/`item.lost` does not read an equip as "I lost my weapon":
+   * neither of those two fires for the piece being worn or taken off. A swap emits one
+   * `item.equipped` carrying `replaced`, and the displaced piece's return to the pack is part of
+   * that event rather than a separate `item.received`.
+   */
+  | "item.equipped" | "item.unequipped"
   | "combat.started" | "combat.ended"
   | "health.low" | "player.died"
   | "level.gained" | "production.completed"
@@ -212,7 +228,19 @@ export interface PlayerView {
   regionId: RegionId;
   health: number;
   maxHealth: number;
+  /**
+   * A fight is happening right now: the player has a target, or an enemy has engaged them.
+   * It clears on the frame the last enemy dies or disengages, so `waitFor(() => !inCombat)` is a
+   * safe way for an agent to wait out a kill. The eight-second no-regen window is a different
+   * question — read `regenBlocked` for that.
+   */
   inCombat: boolean;
+  /** The PRD 2.3 no-regen window: true for eight seconds after the last blow in either direction. */
+  regenBlocked: boolean;
+  /** Live target, or null. Non-null implies `inCombat`. */
+  targetId: EntityId | null;
+  /** Enemies that have engaged the player and are still alive. */
+  engagedBy: EntityId[];
   dead: boolean;
   moving: boolean;
   activityKind: string | null;
@@ -232,6 +260,21 @@ export interface ActivitySummary {
   remaining: number;
 }
 
+/**
+ * One id a quest objective points at.
+ *
+ * Objective prose is prose: it names the Bracken Pit, not `bracken_pit`. Everything actionable in
+ * a sentence appears here instead, because `moveTo`, `interact` and `getInventory` all take ids and
+ * a player's journal should never print one.
+ */
+export type QuestObjectiveRef =
+  | { kind: "item"; id: ItemId }
+  | { kind: "entity"; id: EntityId }
+  | { kind: "location"; id: string }
+  | { kind: "enemyFamily"; id: string }
+  | { kind: "recipe"; id: RecipeId }
+  | { kind: "spell"; id: SpellId };
+
 export interface QuestSummary {
   id: QuestId;
   name: string;
@@ -239,7 +282,13 @@ export interface QuestSummary {
   status: "unstarted" | "active" | "complete";
   stage: number;
   stageCount: number;
+  /** Player-facing prose. Never contains an id. */
   currentObjective: string | null;
+  /**
+   * Every id the current objective refers to, in the order the sentence names them. Empty when the
+   * quest is not active. An agent reads this instead of parsing `currentObjective`.
+   */
+  currentObjectiveRefs: QuestObjectiveRef[];
   requirements: Partial<Record<SkillId, number>>;
 }
 

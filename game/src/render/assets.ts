@@ -19,6 +19,17 @@ export interface AssetEntry {
   file: string;
   pack: string;
   category: AssetCategory;
+  /**
+   * What this mesh IS. One word, the subject of the model.
+   *
+   * Separate from `tags`, and the separation is the point. `anvil_log` is tagged
+   * ["anvil", "log", "stump", "smithing", "forge", "crafting"] because it is an anvil standing on a
+   * cut log — and Phase 1 read "stump" off that list and used it as every felled tree in the world
+   * and as the landmark Rootfall is built around. Tags say what a mesh contains, sits on, or is
+   * used for. `is` says what it is, and it is the only field a "find me a stump" lookup may read.
+   */
+  is: string;
+  /** What it contains, relates to, or is used for. Never what it is; see `is`. */
   tags: string[];
   bytes: number;
   size: { x: number; y: number; z: number };
@@ -87,7 +98,24 @@ export class AssetRegistry {
     return (this.manifest?.assets ?? []).filter((asset) => asset.category === category);
   }
 
-  /** Assets carrying every one of the given tags. The main lookup for world composition. */
+  /**
+   * Assets that ARE the given subject.
+   *
+   * Use this, not `byTags`, whenever the question is "what mesh is a stump / a barrel / a door".
+   * `byTags("stump")` answers with anything that has a stump somewhere in it, which is how a
+   * blacksmith's anvil ended up standing where every felled tree in Phase 1 used to be.
+   */
+  byIs(subject: string): AssetEntry[] {
+    const wanted = subject.toLowerCase();
+    return (this.manifest?.assets ?? []).filter((asset) => (asset.is ?? "").toLowerCase() === wanted);
+  }
+
+  /**
+   * Assets carrying every one of the given tags.
+   *
+   * Correct for "anything to do with farming" and wrong for "a stump". Tags are associations, not
+   * identity: see `is`.
+   */
   byTags(...tags: string[]): AssetEntry[] {
     const wanted = tags.map((tag) => tag.toLowerCase());
     return (this.manifest?.assets ?? []).filter((asset) => {

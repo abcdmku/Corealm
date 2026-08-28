@@ -12,7 +12,7 @@
  * FROZEN. Only the root edits this file.
  */
 import type { RegionId } from "../contracts.js";
-import { REGIONS, type RegionDef } from "../content/regions.js";
+import { REGIONS, type RegionDef, type SettlementDef } from "../content/regions.js";
 import type { FlatSpot, RegionTerrainSpec, WorldTerrainSpec, Rect } from "../render/scene.js";
 
 function rectOf(region: RegionDef): Rect {
@@ -44,6 +44,16 @@ function characterOf(regionId: RegionId): RegionTerrainSpec["character"] {
 export const WATER_BASIN_DEPTH = 0.9;
 
 /**
+ * Metres of flat ground beyond the outermost thing a settlement places.
+ *
+ * Roofs overhang their footprint by up to 1.5 m in this kit, and the player has to be able to
+ * stand at a door without the ground already sloping away, so this is deliberately generous. Cost
+ * is a wider blend on the terrain, which is invisible; the alternative is a house with one corner
+ * in the air, which is not.
+ */
+const SETTLEMENT_PAD_MARGIN = 8;
+
+/**
  * Settlements, banks, and stations need buildable ground. Noise does not provide it, so every
  * settlement centre and every named location gets a flattened pad.
  *
@@ -56,7 +66,19 @@ function flatSpotsFor(region: RegionDef): FlatSpot[] {
 
   const settlement = region.settlement;
   if (settlement) {
-    flats.push({ x: settlement.centre[0], z: settlement.centre[1], radius: 34, blend: 26 });
+    // The pad is sized from what actually stands on it, not from a round number.
+    //
+    // A fixed 34 m radius left the outer ring of Coldbrace and Highcairn straddling the blend:
+    // every part of one building shares the origin's ground height (a building has to be level),
+    // so a house whose far corner sat 40 cm up the falloff had that corner buried and the opposite
+    // one hanging in the air. That is the "wall panels float at an angle, roof sections rest on
+    // grass" finding — the assembly was right and the ground under it was not.
+    flats.push({
+      x: settlement.centre[0],
+      z: settlement.centre[1],
+      radius: settlementRadius(settlement),
+      blend: 26,
+    });
   }
 
   // Named locations are where the player stands still: banks, seams, camps, gates. A 7 m pad keeps
@@ -79,6 +101,38 @@ function flatSpotsFor(region: RegionDef): FlatSpot[] {
   }
 
   return flats;
+}
+
+/**
+ * How far the flat ground has to reach: the furthest corner of anything the settlement places,
+ * plus a margin for the eaves and the doorstep.
+ *
+ * A building's footprint is its wall grid; the roof overhangs it and the player has to be able to
+ * stand at the door, so the margin is generous rather than tight. Walls and gatehouses count too —
+ * a wall segment leaning out of a hillside reads exactly as broken as a house does.
+ */
+function settlementRadius(settlement: SettlementDef): number {
+  let furthest = 0;
+  const reach = (x: number, z: number): void => {
+    furthest = Math.max(furthest, Math.hypot(x - settlement.centre[0], z - settlement.centre[1]));
+  };
+
+  for (const building of settlement.buildings) {
+    // The footprint is authored in the building's own frame, so its half-diagonal covers any yaw.
+    const half = Math.hypot(building.footprint[0], building.footprint[1]) / 2;
+    reach(building.position[0] + half, building.position[1] + half);
+    reach(building.position[0] - half, building.position[1] - half);
+    reach(building.position[0] + half, building.position[1] - half);
+    reach(building.position[0] - half, building.position[1] + half);
+  }
+  for (const station of settlement.stations) reach(station.position[0], station.position[1]);
+  for (const shop of settlement.shops) reach(shop.position[0], shop.position[1]);
+  for (const npc of settlement.npcs) reach(npc.position[0], npc.position[1]);
+  reach(settlement.bank.position[0], settlement.bank.position[1]);
+
+  // SETTLEMENT_PAD_MARGIN covers the roof overhang and a walkable step off the doorstep; the floor
+  // keeps a small settlement from getting a pad tighter than its own square.
+  return Math.max(24, Math.ceil(furthest + SETTLEMENT_PAD_MARGIN));
 }
 
 export function buildWorldTerrainSpec(): WorldTerrainSpec {

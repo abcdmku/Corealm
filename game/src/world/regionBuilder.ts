@@ -306,7 +306,7 @@ function buildRegionEntities(
     const origin = place(building.position);
     const seed = variantSeed(building.id);
     emitParts(
-      buildPrefab(building.prefab, building.footprint, seed),
+      buildPrefab(building.prefab, building.footprint, seed, settlement.kit),
       origin, building.rotationY, region.id, region.tier,
       building.id, building.name,
       { buildingId: building.id, prefab: building.prefab, settlementId: settlement.id, scenery: true },
@@ -431,6 +431,7 @@ function buildRegionEntities(
         assetId: landmark.assetId,
         scale: trueScale(landmark.scale, region.tier),
         rotationY: landmark.rotationY,
+        clipFraction: landmark.clipFraction,
         labelHeight: 4,
       },
       meta: { blurb: landmark.blurb },

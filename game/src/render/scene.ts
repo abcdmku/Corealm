@@ -17,7 +17,7 @@
  */
 import * as THREE from "three";
 import type { RegionId, Vec3 } from "../contracts.js";
-import { MaterialLibrary, REGION_PALETTES } from "./materials.js";
+import { MaterialLibrary, REGION_PALETTES, roadColour } from "./materials.js";
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from "../app/config.js";
 import { Rng } from "../core/rng.js";
 import { clamp } from "../core/math.js";
@@ -310,6 +310,7 @@ export class WorldScene {
       palette: REGION_PALETTES[region.regionId],
     }));
 
+    this.resolveFlatTargets();
     this.normaliseFlats();
 
     const { bounds, chunkSize } = spec;
@@ -444,6 +445,28 @@ export class WorldScene {
    * unwalkable ground came from. So each pad's falloff is expanded to whatever the local height
    * difference actually needs, capped at 4x so a pad on a cliff edge does not flatten a region.
    */
+  /**
+   * Pins each pad's target height, in order, against the pads already applied under it.
+   *
+   * Pads nest: a settlement gets a wide one and every named location inside it — the bank counter,
+   * the gate, the square — gets a 7 m one of its own. Left unresolved, each pad targets the
+   * NATURAL height at its own centre, so a location pad sitting inside a flattened settlement
+   * pulled the raw hillside back up through the middle of the town. Highcairn's huts stood on
+   * ground that moved 1.3 m across a six-metre footprint because of it, and a building is
+   * assembled level: that 1.3 m came out as a corner in the air and a wall through the grass.
+   *
+   * Resolving in order makes an inner pad adopt the height of the pad it stands on, so its own
+   * blend runs between two equal values and changes nothing. Pads that carry an explicit height —
+   * the fishing basins — are left alone; theirs is the point.
+   */
+  private resolveFlatTargets(): void {
+    for (let index = 0; index < this.flats.length; index += 1) {
+      const flat = this.flats[index];
+      if (!flat || flat.height !== undefined) continue;
+      flat.height = this.applyFlats(flat.x, flat.z, this.naturalHeight(flat.x, flat.z), index);
+    }
+  }
+
   private normaliseFlats(): void {
     const maxGradient = 0.6; // about 31 degrees, comfortably inside the 48-degree walkable limit
     for (const flat of this.flats) {
@@ -512,16 +535,38 @@ export class WorldScene {
     return total / weightSum;
   }
 
-  private applyFlats(x: number, z: number, height: number): number {
+  /**
+   * Flattens `height` through every pad that reaches this point, in pad order.
+   *
+   * Two rules, and the second one is the load-bearing one:
+   *
+   *  1. Inside a pad's radius the ground IS that pad's height. Later pads may still override — a
+   *     location pad inside a settlement resolves to the settlement's own height, so that override
+   *     is a no-op by construction (see `resolveFlatTargets`).
+   *  2. A pad's FALLOFF never disturbs ground another pad has already made flat. Without this, the
+   *     fishing basins reached into the settlements: `normaliseFlats` widens a basin's blend to
+   *     whatever the local drop needs, which on Karrowmoor's terraces is most of a hundred metres,
+   *     and the Cairn Tarn was quietly pulling Highcairn's east side 1.3 m down toward the
+   *     waterline. Buildings are assembled level, so that came out as huts with a corner in the
+   *     air. Flat has to mean flat, or nothing that stands on it can be trusted.
+   */
+  private applyFlats(x: number, z: number, height: number, limit = this.flats.length): number {
     if (this.flats.length === 0) return height;
     let result = height;
-    for (const flat of this.flats) {
+    let cored = false;
+    for (let index = 0; index < limit; index += 1) {
+      const flat = this.flats[index];
+      if (!flat) continue;
       const distance = Math.hypot(x - flat.x, z - flat.z);
       if (distance > flat.radius + flat.blend) continue;
-      const weight = distance <= flat.radius
-        ? 1
-        : 1 - smoothstep01((distance - flat.radius) / Math.max(0.001, flat.blend));
       const target = flat.height ?? this.naturalHeight(flat.x, flat.z);
+      if (distance <= flat.radius) {
+        result = target;
+        cored = true;
+        continue;
+      }
+      if (cored) continue;
+      const weight = 1 - smoothstep01((distance - flat.radius) / Math.max(0.001, flat.blend));
       result = result + (target - result) * weight;
     }
     return result;
@@ -692,14 +737,27 @@ export class WorldScene {
    * they sit on the terrain that already is one, and adding them to the navmesh input would only
    * add duplicate coplanar geometry for recast to argue with.
    */
+  /**
+   * A trodden track draped over the terrain, from a polyline.
+   *
+   * Four vertices per sample, not two: the outer pair is a skirt at zero alpha, so the track fades
+   * into the grass instead of ending at a drawn line. Round 3 built it as a two-vertex ribbon
+   * lifted 0.3 m, which gave every road in the world a hard edge and a visible lip. The last
+   * sample at each end fades out entirely, so a route stops looking like a plank someone dropped.
+   */
   buildRoad(points: readonly Vec3[], width = 4.5, regionId: RegionId = "fallowmarch"): THREE.Mesh | null {
     if (points.length < 2) return null;
     const samples = resamplePolyline(points, 3);
-    const vertexCount = samples.length * 2;
+    const lanes = [-1, -1, 1, 1];
+    const laneWidth = [ROAD_SKIRT, 1, 1, ROAD_SKIRT];
+    const laneAlpha = [0, 1, 1, 0];
+    const vertexCount = samples.length * 4;
     const positions = new Float32Array(vertexCount * 3);
-    const colours = new Float32Array(vertexCount * 3);
+    // RGBA, not RGB: three.js reads vertex alpha off a four-component colour attribute, and the
+    // alpha is what feathers the skirt. A separate custom attribute would need a custom shader.
+    const colours = new Float32Array(vertexCount * 4);
     const indices: number[] = [];
-    const edge = new THREE.Color(REGION_PALETTES[regionId].soil);
+    const edge = new THREE.Color(roadColour(regionId));
 
     for (let i = 0; i < samples.length; i += 1) {
       const current = samples[i]!;
@@ -710,28 +768,35 @@ export class WorldScene {
       const length = Math.hypot(dirX, dirZ) || 1;
       const nx = -dirZ / length;
       const nz = dirX / length;
+      // Both ends taper to nothing over one sample, so a route does not end in a cut edge.
+      const endFade = (i === 0 || i === samples.length - 1) ? 0 : 1;
 
-      for (const side of [-1, 1]) {
-        const index = i * 2 + (side < 0 ? 0 : 1);
-        const x = current[0] + nx * (width / 2) * side;
-        const z = current[2] + nz * (width / 2) * side;
+      for (let lane = 0; lane < 4; lane += 1) {
+        const index = i * 4 + lane;
+        const half = (width / 2) * laneWidth[lane]!;
+        const x = current[0] + nx * half * lanes[lane]!;
+        const z = current[2] + nz * half * lanes[lane]!;
         positions[index * 3] = x;
         positions[index * 3 + 1] = this.heightAtXZ(x, z) + ROAD_LIFT;
         positions[index * 3 + 2] = z;
-        colours[index * 3] = edge.r;
-        colours[index * 3 + 1] = edge.g;
-        colours[index * 3 + 2] = edge.b;
+        colours[index * 4] = edge.r;
+        colours[index * 4 + 1] = edge.g;
+        colours[index * 4 + 2] = edge.b;
+        colours[index * 4 + 3] = laneAlpha[lane]! * endFade;
       }
 
       if (i < samples.length - 1) {
-        const base = i * 2;
-        indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+        const base = i * 4;
+        for (let lane = 0; lane < 3; lane += 1) {
+          const a = base + lane;
+          indices.push(a, a + 4, a + 1, a + 1, a + 4, a + 5);
+        }
       }
     }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colours, 4));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
@@ -746,10 +811,35 @@ export class WorldScene {
     return mesh;
   }
 
-  /** A still water surface for a pool, tarn, or brook. Not walkable, not a collider. */
+  /**
+   * A still water surface for a pool, tarn or brook. Not walkable, not a collider.
+   *
+   * A disc with a faded rim, not a rectangle. The basin under it is a circular flat spot (see
+   * `flatSpotsFor`), so a rectangle was always the wrong shape: it cut four straight edges across
+   * the bank and stopped dead where the pond kept going. The rim vertices fade to zero alpha and
+   * sit slightly LOWER than the centre, so the waterline meets the sloping bank instead of ending
+   * in a drawn line, and the shoreline is wherever the terrain rises through the surface.
+   */
   buildWater(rect: Rect, level: number, regionId: RegionId): THREE.Mesh {
-    const geometry = new THREE.PlaneGeometry(rect.maxX - rect.minX, rect.maxZ - rect.minZ, 1, 1);
+    const radius = Math.max(rect.maxX - rect.minX, rect.maxZ - rect.minZ) / 2;
+    const geometry = new THREE.CircleGeometry(radius, WATER_SEGMENTS, 0, Math.PI * 2);
     geometry.rotateX(-Math.PI / 2);
+
+    // CircleGeometry puts the hub at vertex 0 and the rim after it, so the fade is a straight walk
+    // over the vertex list rather than a distance test.
+    const position = geometry.getAttribute("position");
+    const colours = new Float32Array(position.count * 4);
+    for (let index = 0; index < position.count; index += 1) {
+      const rim = index > 0;
+      colours[index * 4] = 1;
+      colours[index * 4 + 1] = 1;
+      colours[index * 4 + 2] = 1;
+      colours[index * 4 + 3] = rim ? 0 : 1;
+      if (rim) position.setY(index, -WATER_RIM_DROP);
+    }
+    geometry.setAttribute("color", new THREE.BufferAttribute(colours, 4));
+    position.needsUpdate = true;
+
     const mesh = new THREE.Mesh(geometry, this.materials.water(regionId));
     mesh.position.set((rect.minX + rect.maxX) / 2, level, (rect.minZ + rect.maxZ) / 2);
     mesh.name = `water-${regionId}`;
@@ -1022,7 +1112,25 @@ function terraceRamp(spec: RegionTerrainSpec, x: number, z: number, width: numbe
  * (measured). A lift smaller than that error hides the road for most of its length. 0.30 clears it
  * almost everywhere while staying far too small to read as floating at the camera's distance.
  */
-const ROAD_LIFT = 0.3;
+/**
+ * How far a road ribbon floats above the ground, in metres.
+ *
+ * Two centimetres, not thirty. The material already carries a polygon offset, which is what keeps
+ * the ribbon out of a z-fight; the lift only has to cover the difference between the terrain MESH
+ * (sampled every 2 m) and the terrain FIELD the ribbon samples. At the round-3 value of 0.3 m a
+ * road was a kerb: it stood a third of a metre proud of the grass, caught the directional light on
+ * its edge, and dropped a hard shadow line down one side of every route in the world.
+ */
+const ROAD_LIFT = 0.02;
+
+/** How far past the worn width the fade-out skirt reaches, as a multiple of the half-width. */
+const ROAD_SKIRT = 1.7;
+
+/** Rim segments on a water disc. 32 is round at the distance a pond is ever seen from. */
+const WATER_SEGMENTS = 32;
+
+/** How far the faded rim of a water disc sits below its centre, in metres. */
+const WATER_RIM_DROP = 0.35;
 
 /** Even-ish resampling of a polyline, so road ribbons do not stretch across long segments. */
 function resamplePolyline(points: readonly Vec3[], spacing: number): Vec3[] {

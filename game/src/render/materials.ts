@@ -147,6 +147,29 @@ export function regionSwatches(regionId: RegionId): string[] {
   ].map((value) => `#${value.toString(16).padStart(6, "0")}`);
 }
 
+/**
+ * The colour of a trodden track in a region: its soil, lifted toward its rock tone.
+ *
+ * Kept next to the palette rather than inside the material so the road ribbon's vertex colours in
+ * `render/scene.ts` and the material's base colour cannot drift apart.
+ */
+export function roadColour(regionId: RegionId): number {
+  const palette = REGION_PALETTES[regionId];
+  return mixHex(palette.soil, palette.rock, 0.45, 1.35);
+}
+
+/** Linear mix of two packed colours, then a brightness multiplier, clamped per channel. */
+function mixHex(a: number, b: number, t: number, gain = 1): number {
+  let out = 0;
+  for (let shift = 16; shift >= 0; shift -= 8) {
+    const channelA = (a >> shift) & 0xff;
+    const channelB = (b >> shift) & 0xff;
+    const mixed = Math.round((channelA + (channelB - channelA) * t) * gain);
+    out |= Math.min(255, Math.max(0, mixed)) << shift;
+  }
+  return out;
+}
+
 export type SurfaceState = "normal" | "depleted" | "dead";
 
 /**
@@ -232,11 +255,22 @@ export class MaterialLibrary {
    * was built, added to the scene, marked visible — and backface-culled from the only angle a
    * player ever sees it from. Forty-two roads rendered as nothing.
    */
+  /**
+   * A worn track. Lighter than the ground it crosses, not darker.
+   *
+   * `soil` is damp valley-floor earth, and using it raw drew Vellenwood's roads at 0x413630 —
+   * near black, and the strongest thing in the frame. A trodden path is dust and exposed grit: it
+   * reads BRIGHTER than the vegetation beside it, which is also what makes it legible as a route
+   * from the top-down camera the game is actually played at.
+   *
+   * The vertex alpha the ribbon writes feathers the edge, so `transparent` is load-bearing here
+   * rather than incidental.
+   */
   road(regionId: RegionId = "fallowmarch"): THREE.MeshStandardMaterial {
     return this.remember(this.key(["road", regionId]), () =>
       new THREE.MeshStandardMaterial({
         side: THREE.DoubleSide,
-        color: REGION_PALETTES[regionId].soil,
+        color: roadColour(regionId),
         roughness: 0.99,
         metalness: 0,
         vertexColors: true,
@@ -259,7 +293,11 @@ export class MaterialLibrary {
         roughness: 0.22,
         metalness: 0.05,
         transparent: true,
-        opacity: 0.78,
+        opacity: 0.82,
+        // The disc writes a faded rim into its vertex alpha, which is what dissolves the shoreline
+        // instead of drawing it. Without this the surface is a hard-edged shape on the grass.
+        vertexColors: true,
+        side: THREE.DoubleSide,
         depthWrite: false,
       }));
   }

@@ -64,6 +64,7 @@
       "file": "models/animation/animation_library_1.glb",
       "pack": "universal-animation-library",
       "category": "animation",
+      "is": "animation",
       "tags": [
         "animation",
         "clips",
@@ -131,6 +132,7 @@
       "file": "models/animation/animation_library_2.glb",
       "pack": "universal-animation-library-2",
       "category": "animation",
+      "is": "animation",
       "tags": [
         "animation",
         "clips",
@@ -198,6 +200,7 @@
       "file": "models/building/balcony_corner.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "balcony",
       "tags": [
         "balcony",
         "railing",
@@ -219,6 +222,7 @@
       "file": "models/building/balcony_straight.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "balcony",
       "tags": [
         "balcony",
         "railing",
@@ -240,6 +244,7 @@
       "file": "models/building/bridge_modular_center.glb",
       "pack": "ultimate-platformer-pack",
       "category": "building",
+      "is": "bridge",
       "tags": [
         "bridge",
         "crossing",
@@ -265,6 +270,7 @@
       "file": "models/building/bridge_modular_end.glb",
       "pack": "ultimate-platformer-pack",
       "category": "building",
+      "is": "bridge",
       "tags": [
         "bridge",
         "crossing",
@@ -290,6 +296,7 @@
       "file": "models/building/bridge_small.glb",
       "pack": "ultimate-platformer-pack",
       "category": "building",
+      "is": "bridge",
       "tags": [
         "bridge",
         "crossing",
@@ -314,6 +321,7 @@
       "file": "models/building/corner_brick.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "corner",
       "tags": [
         "corner",
         "brick",
@@ -337,6 +345,7 @@
       "file": "models/building/corner_interior.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "corner",
       "tags": [
         "corner",
         "interior",
@@ -358,6 +367,7 @@
       "file": "models/building/corner_wood.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "corner",
       "tags": [
         "corner",
         "timber",
@@ -379,6 +389,7 @@
       "file": "models/building/door_flat_1.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "door",
       "tags": [
         "door",
         "entrance",
@@ -401,6 +412,7 @@
       "file": "models/building/door_frame_round.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "door",
       "tags": [
         "door",
         "frame",
@@ -423,6 +435,7 @@
       "file": "models/building/door_round_1.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "door",
       "tags": [
         "door",
         "entrance",
@@ -445,6 +458,7 @@
       "file": "models/building/door_round_2.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "door",
       "tags": [
         "door",
         "entrance",
@@ -468,6 +482,7 @@
       "file": "models/building/floor_brick.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "floor",
       "tags": [
         "floor",
         "brick",
@@ -492,6 +507,7 @@
       "file": "models/building/floor_cobble.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "floor",
       "tags": [
         "floor",
         "cobble",
@@ -516,6 +532,7 @@
       "file": "models/building/floor_wood.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "floor",
       "tags": [
         "floor",
         "wood",
@@ -540,6 +557,7 @@
       "file": "models/building/floor_wood_light.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "floor",
       "tags": [
         "floor",
         "wood",
@@ -564,6 +582,7 @@
       "file": "models/building/kerb_corner.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "kerb",
       "tags": [
         "kerb",
         "border",
@@ -587,6 +606,7 @@
       "file": "models/building/kerb_straight.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "kerb",
       "tags": [
         "kerb",
         "border",
@@ -610,6 +630,7 @@
       "file": "models/building/overhang_brick.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "overhang",
       "tags": [
         "overhang",
         "brick",
@@ -633,6 +654,7 @@
       "file": "models/building/overhang_plaster.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "overhang",
       "tags": [
         "overhang",
         "plaster",
@@ -656,6 +678,7 @@
       "file": "models/building/roof_dormer.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "roof",
       "tags": [
         "roof",
         "dormer",
@@ -680,6 +703,7 @@
       "file": "models/building/roof_gable_brick.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "roof",
       "tags": [
         "roof",
         "gable",
@@ -703,6 +727,7 @@
       "file": "models/building/roof_log.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "log",
       "tags": [
         "log",
         "beam",
@@ -725,6 +750,7 @@
       "file": "models/building/roof_tiles_4x6.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "roof",
       "tags": [
         "roof",
         "tiles",
@@ -748,6 +774,7 @@
       "file": "models/building/roof_tiles_6x12.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "roof",
       "tags": [
         "roof",
         "tiles",
@@ -771,6 +798,7 @@
       "file": "models/building/roof_tiles_6x8.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "roof",
       "tags": [
         "roof",
         "tiles",
@@ -794,6 +822,7 @@
       "file": "models/building/roof_tower.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "roof",
       "tags": [
         "roof",
         "tower",
@@ -819,6 +848,7 @@
       "file": "models/building/roof_wood_plank.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "roof",
       "tags": [
         "roof",
         "wood",
@@ -842,6 +872,7 @@
       "file": "models/building/stairs_exterior.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "stairs",
       "tags": [
         "stairs",
         "steps",
@@ -864,6 +895,7 @@
       "file": "models/building/stairs_stone.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "stairs",
       "tags": [
         "stairs",
         "steps",
@@ -887,6 +919,7 @@
       "file": "models/building/wall_bottom_trim.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "trim",
@@ -908,6 +941,7 @@
       "file": "models/building/wall_brick_door.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "door",
@@ -934,6 +968,7 @@
       "file": "models/building/wall_brick_straight.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "brick",
@@ -960,6 +995,7 @@
       "file": "models/building/wall_brick_window.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "window",
@@ -985,6 +1021,7 @@
       "file": "models/building/wall_plaster_base.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "plaster",
@@ -1010,6 +1047,7 @@
       "file": "models/building/wall_plaster_door.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "door",
@@ -1035,6 +1073,7 @@
       "file": "models/building/wall_plaster_straight.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "plaster",
@@ -1059,6 +1098,7 @@
       "file": "models/building/wall_plaster_timber.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "timber",
@@ -1083,6 +1123,7 @@
       "file": "models/building/wall_plaster_window.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "wall",
       "tags": [
         "wall",
         "window",
@@ -1108,6 +1149,7 @@
       "file": "models/building/window_shutters.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "window",
       "tags": [
         "window",
         "shutters",
@@ -1129,6 +1171,7 @@
       "file": "models/building/window_thin.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "window",
       "tags": [
         "window",
         "house",
@@ -1151,6 +1194,7 @@
       "file": "models/building/window_wide.glb",
       "pack": "medieval-village-megakit",
       "category": "building",
+      "is": "window",
       "tags": [
         "window",
         "house",
@@ -1173,6 +1217,7 @@
       "file": "models/character/base_female.glb",
       "pack": "universal-base-characters",
       "category": "character",
+      "is": "character",
       "tags": [
         "character",
         "base",
@@ -1200,6 +1245,7 @@
       "file": "models/character/base_male.glb",
       "pack": "universal-base-characters",
       "category": "character",
+      "is": "character",
       "tags": [
         "character",
         "base",
@@ -1227,6 +1273,7 @@
       "file": "models/character/enemy_bee.glb",
       "pack": "ultimate-platformer-pack",
       "category": "character",
+      "is": "enemy",
       "tags": [
         "enemy",
         "monster",
@@ -1262,6 +1309,7 @@
       "file": "models/character/enemy_blob.glb",
       "pack": "ultimate-platformer-pack",
       "category": "character",
+      "is": "enemy",
       "tags": [
         "enemy",
         "monster",
@@ -1301,6 +1349,7 @@
       "file": "models/character/enemy_crab.glb",
       "pack": "ultimate-platformer-pack",
       "category": "character",
+      "is": "enemy",
       "tags": [
         "enemy",
         "monster",
@@ -1339,6 +1388,7 @@
       "file": "models/character/enemy_skull.glb",
       "pack": "ultimate-platformer-pack",
       "category": "character",
+      "is": "enemy",
       "tags": [
         "enemy",
         "monster",
@@ -1378,6 +1428,7 @@
       "file": "models/character/eyebrows.glb",
       "pack": "universal-base-characters",
       "category": "character",
+      "is": "eyebrows",
       "tags": [
         "eyebrows",
         "face",
@@ -1399,6 +1450,7 @@
       "file": "models/character/hair_beard.glb",
       "pack": "universal-base-characters",
       "category": "character",
+      "is": "hair",
       "tags": [
         "hair",
         "beard",
@@ -1422,6 +1474,7 @@
       "file": "models/character/hair_buns.glb",
       "pack": "universal-base-characters",
       "category": "character",
+      "is": "hair",
       "tags": [
         "hair",
         "head",
@@ -1444,6 +1497,7 @@
       "file": "models/character/hair_buzzed.glb",
       "pack": "universal-base-characters",
       "category": "character",
+      "is": "hair",
       "tags": [
         "hair",
         "head",
@@ -1466,6 +1520,7 @@
       "file": "models/character/hair_long.glb",
       "pack": "universal-base-characters",
       "category": "character",
+      "is": "hair",
       "tags": [
         "hair",
         "head",
@@ -1488,6 +1543,7 @@
       "file": "models/character/hair_short.glb",
       "pack": "universal-base-characters",
       "category": "character",
+      "is": "hair",
       "tags": [
         "hair",
         "head",
@@ -1510,6 +1566,7 @@
       "file": "models/dungeon/rubble_brick_1.glb",
       "pack": "medieval-village-megakit",
       "category": "dungeon",
+      "is": "rubble",
       "tags": [
         "rubble",
         "brick",
@@ -1533,6 +1590,7 @@
       "file": "models/dungeon/rubble_brick_2.glb",
       "pack": "medieval-village-megakit",
       "category": "dungeon",
+      "is": "rubble",
       "tags": [
         "rubble",
         "brick",
@@ -1556,6 +1614,7 @@
       "file": "models/dungeon/rubble_brick_3.glb",
       "pack": "medieval-village-megakit",
       "category": "dungeon",
+      "is": "rubble",
       "tags": [
         "rubble",
         "brick",
@@ -1579,6 +1638,7 @@
       "file": "models/dungeon/rubble_brick_4.glb",
       "pack": "medieval-village-megakit",
       "category": "dungeon",
+      "is": "rubble",
       "tags": [
         "rubble",
         "brick",
@@ -1602,6 +1662,7 @@
       "file": "models/dungeon/rubble_vase.glb",
       "pack": "fantasy-props-megakit",
       "category": "dungeon",
+      "is": "rubble",
       "tags": [
         "rubble",
         "debris",
@@ -1625,6 +1686,7 @@
       "file": "models/dungeon/wall_arch.glb",
       "pack": "medieval-village-megakit",
       "category": "dungeon",
+      "is": "arch",
       "tags": [
         "arch",
         "stone",
@@ -1650,6 +1712,7 @@
       "file": "models/farm/crop_carrot.glb",
       "pack": "fantasy-props-megakit",
       "category": "farm",
+      "is": "carrot",
       "tags": [
         "carrot",
         "crop",
@@ -1673,6 +1736,7 @@
       "file": "models/farm/farm_crate_apple.glb",
       "pack": "fantasy-props-megakit",
       "category": "farm",
+      "is": "crate",
       "tags": [
         "crate",
         "farm",
@@ -1698,6 +1762,7 @@
       "file": "models/farm/farm_crate_carrot.glb",
       "pack": "fantasy-props-megakit",
       "category": "farm",
+      "is": "crate",
       "tags": [
         "crate",
         "farm",
@@ -1723,6 +1788,7 @@
       "file": "models/farm/farm_crate_empty.glb",
       "pack": "fantasy-props-megakit",
       "category": "farm",
+      "is": "crate",
       "tags": [
         "crate",
         "farm",
@@ -1746,6 +1812,7 @@
       "file": "models/nature/bush_common.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "bush",
       "tags": [
         "bush",
         "shrub",
@@ -1767,6 +1834,7 @@
       "file": "models/nature/bush_flowering.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "bush",
       "tags": [
         "bush",
         "shrub",
@@ -1790,6 +1858,7 @@
       "file": "models/nature/clover_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "clover",
       "tags": [
         "clover",
         "ground-cover",
@@ -1811,6 +1880,7 @@
       "file": "models/nature/clover_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "clover",
       "tags": [
         "clover",
         "ground-cover",
@@ -1832,6 +1902,7 @@
       "file": "models/nature/fern_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "fern",
       "tags": [
         "fern",
         "undergrowth",
@@ -1853,6 +1924,7 @@
       "file": "models/nature/flower_a_group.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "flower",
       "tags": [
         "flower",
         "ground-cover",
@@ -1875,6 +1947,7 @@
       "file": "models/nature/flower_a_single.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "flower",
       "tags": [
         "flower",
         "ground-cover",
@@ -1897,6 +1970,7 @@
       "file": "models/nature/flower_b_group.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "flower",
       "tags": [
         "flower",
         "ground-cover",
@@ -1919,6 +1993,7 @@
       "file": "models/nature/flower_b_single.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "flower",
       "tags": [
         "flower",
         "ground-cover",
@@ -1941,6 +2016,7 @@
       "file": "models/nature/grass_common_short.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "grass",
       "tags": [
         "grass",
         "ground-cover",
@@ -1962,6 +2038,7 @@
       "file": "models/nature/grass_common_tall.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "grass",
       "tags": [
         "grass",
         "ground-cover",
@@ -1983,6 +2060,7 @@
       "file": "models/nature/grass_wispy_short.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "grass",
       "tags": [
         "grass",
         "ground-cover",
@@ -2004,6 +2082,7 @@
       "file": "models/nature/grass_wispy_tall.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "grass",
       "tags": [
         "grass",
         "ground-cover",
@@ -2025,6 +2104,7 @@
       "file": "models/nature/mushroom_bracket.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "mushroom",
       "tags": [
         "mushroom",
         "forage",
@@ -2047,6 +2127,7 @@
       "file": "models/nature/mushroom_common.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "mushroom",
       "tags": [
         "mushroom",
         "forage",
@@ -2069,6 +2150,7 @@
       "file": "models/nature/plant_broad_large.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "plant",
       "tags": [
         "plant",
         "broadleaf",
@@ -2090,6 +2172,7 @@
       "file": "models/nature/plant_broad_small.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "plant",
       "tags": [
         "plant",
         "broadleaf",
@@ -2111,6 +2194,7 @@
       "file": "models/nature/plant_leafy_large.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "plant",
       "tags": [
         "plant",
         "leafy",
@@ -2132,6 +2216,7 @@
       "file": "models/nature/plant_leafy_small.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "plant",
       "tags": [
         "plant",
         "leafy",
@@ -2153,6 +2238,7 @@
       "file": "models/nature/tree_common_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "broadleaf",
@@ -2177,6 +2263,7 @@
       "file": "models/nature/tree_common_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "broadleaf",
@@ -2201,6 +2288,7 @@
       "file": "models/nature/tree_common_3.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "broadleaf",
@@ -2225,6 +2313,7 @@
       "file": "models/nature/tree_common_4.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "broadleaf",
@@ -2249,6 +2338,7 @@
       "file": "models/nature/tree_common_5.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "broadleaf",
@@ -2273,6 +2363,7 @@
       "file": "models/nature/tree_dead_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "dead",
@@ -2296,6 +2387,7 @@
       "file": "models/nature/tree_dead_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "dead",
@@ -2319,6 +2411,7 @@
       "file": "models/nature/tree_dead_3.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "dead",
@@ -2342,6 +2435,7 @@
       "file": "models/nature/tree_dead_4.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "dead",
@@ -2365,6 +2459,7 @@
       "file": "models/nature/tree_dead_5.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "dead",
@@ -2388,6 +2483,7 @@
       "file": "models/nature/tree_pine_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "pine",
@@ -2412,6 +2508,7 @@
       "file": "models/nature/tree_pine_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "pine",
@@ -2436,6 +2533,7 @@
       "file": "models/nature/tree_pine_3.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "pine",
@@ -2460,6 +2558,7 @@
       "file": "models/nature/tree_pine_4.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "pine",
@@ -2484,6 +2583,7 @@
       "file": "models/nature/tree_pine_5.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "pine",
@@ -2508,6 +2608,7 @@
       "file": "models/nature/tree_twisted_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "twisted",
@@ -2532,6 +2633,7 @@
       "file": "models/nature/tree_twisted_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "twisted",
@@ -2556,6 +2658,7 @@
       "file": "models/nature/tree_twisted_3.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "twisted",
@@ -2580,6 +2683,7 @@
       "file": "models/nature/tree_twisted_4.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "twisted",
@@ -2604,6 +2708,7 @@
       "file": "models/nature/tree_twisted_5.glb",
       "pack": "stylized-nature-megakit",
       "category": "nature",
+      "is": "tree",
       "tags": [
         "tree",
         "twisted",
@@ -2628,6 +2733,7 @@
       "file": "models/nature/vine_1.glb",
       "pack": "medieval-village-megakit",
       "category": "nature",
+      "is": "vine",
       "tags": [
         "vine",
         "ivy",
@@ -2651,6 +2757,7 @@
       "file": "models/nature/vine_2.glb",
       "pack": "medieval-village-megakit",
       "category": "nature",
+      "is": "vine",
       "tags": [
         "vine",
         "ivy",
@@ -2674,6 +2781,7 @@
       "file": "models/outfit/outfit_female_peasant.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "full",
@@ -2699,6 +2807,7 @@
       "file": "models/outfit/outfit_female_peasant_boots.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2724,6 +2833,7 @@
       "file": "models/outfit/outfit_female_peasant_chest.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2750,6 +2860,7 @@
       "file": "models/outfit/outfit_female_peasant_gloves.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2775,6 +2886,7 @@
       "file": "models/outfit/outfit_female_peasant_legs.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2799,6 +2911,7 @@
       "file": "models/outfit/outfit_female_ranger.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "full",
@@ -2825,6 +2938,7 @@
       "file": "models/outfit/outfit_female_ranger_boots.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2851,6 +2965,7 @@
       "file": "models/outfit/outfit_female_ranger_chest.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2876,6 +2991,7 @@
       "file": "models/outfit/outfit_female_ranger_gloves.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2903,6 +3019,7 @@
       "file": "models/outfit/outfit_female_ranger_hood.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2929,6 +3046,7 @@
       "file": "models/outfit/outfit_female_ranger_legs.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2954,6 +3072,7 @@
       "file": "models/outfit/outfit_female_ranger_pauldron.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -2980,6 +3099,7 @@
       "file": "models/outfit/outfit_male_peasant.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "full",
@@ -3006,6 +3126,7 @@
       "file": "models/outfit/outfit_male_peasant_boots.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3031,6 +3152,7 @@
       "file": "models/outfit/outfit_male_peasant_chest.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3055,6 +3177,7 @@
       "file": "models/outfit/outfit_male_peasant_gloves.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3081,6 +3204,7 @@
       "file": "models/outfit/outfit_male_peasant_legs.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3105,6 +3229,7 @@
       "file": "models/outfit/outfit_male_ranger.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "full",
@@ -3131,6 +3256,7 @@
       "file": "models/outfit/outfit_male_ranger_boots.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3157,6 +3283,7 @@
       "file": "models/outfit/outfit_male_ranger_chest.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3182,6 +3309,7 @@
       "file": "models/outfit/outfit_male_ranger_gloves.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3209,6 +3337,7 @@
       "file": "models/outfit/outfit_male_ranger_hood.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3235,6 +3364,7 @@
       "file": "models/outfit/outfit_male_ranger_legs.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3260,6 +3390,7 @@
       "file": "models/outfit/outfit_male_ranger_pauldron.glb",
       "pack": "modular-character-outfits-fantasy",
       "category": "outfit",
+      "is": "outfit",
       "tags": [
         "outfit",
         "modular",
@@ -3286,6 +3417,7 @@
       "file": "models/prop/anvil.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "anvil",
       "tags": [
         "anvil",
         "smithing",
@@ -3309,6 +3441,7 @@
       "file": "models/prop/anvil_log.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "anvil",
       "tags": [
         "anvil",
         "log",
@@ -3335,6 +3468,7 @@
       "file": "models/prop/banner_1.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "banner",
       "tags": [
         "banner",
         "flag",
@@ -3360,6 +3494,7 @@
       "file": "models/prop/banner_2.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "banner",
       "tags": [
         "banner",
         "flag",
@@ -3385,6 +3520,7 @@
       "file": "models/prop/barrel.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "barrel",
       "tags": [
         "barrel",
         "storage",
@@ -3410,6 +3546,7 @@
       "file": "models/prop/barrel_apples.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "barrel",
       "tags": [
         "barrel",
         "apples",
@@ -3435,6 +3572,7 @@
       "file": "models/prop/barrel_rack.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "barrel",
       "tags": [
         "barrel",
         "rack",
@@ -3458,6 +3596,7 @@
       "file": "models/prop/bed.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "bed",
       "tags": [
         "bed",
         "inn",
@@ -3482,6 +3621,7 @@
       "file": "models/prop/bench.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "bench",
       "tags": [
         "bench",
         "seat",
@@ -3505,6 +3645,7 @@
       "file": "models/prop/book_stack.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "book",
       "tags": [
         "book",
         "library",
@@ -3527,6 +3668,7 @@
       "file": "models/prop/bookcase.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "bookcase",
       "tags": [
         "bookcase",
         "shelf",
@@ -3550,6 +3692,7 @@
       "file": "models/prop/bottle.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "bottle",
       "tags": [
         "bottle",
         "tavern",
@@ -3571,6 +3714,7 @@
       "file": "models/prop/bucket_metal.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "bucket",
       "tags": [
         "bucket",
         "well",
@@ -3593,6 +3737,7 @@
       "file": "models/prop/bucket_wood.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "bucket",
       "tags": [
         "bucket",
         "well",
@@ -3616,6 +3761,7 @@
       "file": "models/prop/cabinet.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "cabinet",
       "tags": [
         "cabinet",
         "storage",
@@ -3639,6 +3785,7 @@
       "file": "models/prop/cage.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "cage",
       "tags": [
         "cage",
         "prison",
@@ -3660,6 +3807,7 @@
       "file": "models/prop/candle_stand.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "candle",
       "tags": [
         "candle",
         "light",
@@ -3683,6 +3831,7 @@
       "file": "models/prop/cauldron.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "cauldron",
       "tags": [
         "cauldron",
         "cooking",
@@ -3707,6 +3856,7 @@
       "file": "models/prop/chain_coil.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "chain",
       "tags": [
         "chain",
         "dungeon",
@@ -3728,6 +3878,7 @@
       "file": "models/prop/chair.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "chair",
       "tags": [
         "chair",
         "seat",
@@ -3750,6 +3901,7 @@
       "file": "models/prop/chandelier.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "chandelier",
       "tags": [
         "chandelier",
         "light",
@@ -3774,6 +3926,7 @@
       "file": "models/prop/chest_wood.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "chest",
       "tags": [
         "chest",
         "bank",
@@ -3804,6 +3957,7 @@
       "file": "models/prop/chimney.glb",
       "pack": "medieval-village-megakit",
       "category": "prop",
+      "is": "chimney",
       "tags": [
         "chimney",
         "roof",
@@ -3826,6 +3980,7 @@
       "file": "models/prop/coin.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "coin",
       "tags": [
         "coin",
         "gold",
@@ -3848,6 +4003,7 @@
       "file": "models/prop/coin_pile.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "coin",
       "tags": [
         "coin",
         "gold",
@@ -3871,6 +4027,7 @@
       "file": "models/prop/cooking_pot.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "pot",
       "tags": [
         "pot",
         "cooking",
@@ -3893,6 +4050,7 @@
       "file": "models/prop/crate_metal.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "crate",
       "tags": [
         "crate",
         "box",
@@ -3917,6 +4075,7 @@
       "file": "models/prop/crate_village.glb",
       "pack": "medieval-village-megakit",
       "category": "prop",
+      "is": "crate",
       "tags": [
         "crate",
         "box",
@@ -3939,6 +4098,7 @@
       "file": "models/prop/crate_wood.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "crate",
       "tags": [
         "crate",
         "box",
@@ -3963,6 +4123,7 @@
       "file": "models/prop/fence_metal.glb",
       "pack": "medieval-village-megakit",
       "category": "prop",
+      "is": "fence",
       "tags": [
         "fence",
         "metal",
@@ -3985,6 +4146,7 @@
       "file": "models/prop/fence_metal_ornate.glb",
       "pack": "medieval-village-megakit",
       "category": "prop",
+      "is": "fence",
       "tags": [
         "fence",
         "metal",
@@ -4008,6 +4170,7 @@
       "file": "models/prop/fence_wood_extension.glb",
       "pack": "medieval-village-megakit",
       "category": "prop",
+      "is": "fence",
       "tags": [
         "fence",
         "wood",
@@ -4030,6 +4193,7 @@
       "file": "models/prop/fence_wood_single.glb",
       "pack": "medieval-village-megakit",
       "category": "prop",
+      "is": "fence",
       "tags": [
         "fence",
         "wood",
@@ -4052,6 +4216,7 @@
       "file": "models/prop/key.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "key",
       "tags": [
         "key",
         "dungeon",
@@ -4074,6 +4239,7 @@
       "file": "models/prop/lamp_wall.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "lamp",
       "tags": [
         "lamp",
         "lantern",
@@ -4098,6 +4264,7 @@
       "file": "models/prop/market_stall.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "stall",
       "tags": [
         "stall",
         "market",
@@ -4123,6 +4290,7 @@
       "file": "models/prop/market_stall_cart.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "stall",
       "tags": [
         "stall",
         "cart",
@@ -4148,6 +4316,7 @@
       "file": "models/prop/mug.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "mug",
       "tags": [
         "mug",
         "tankard",
@@ -4171,6 +4340,7 @@
       "file": "models/prop/potion_1.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "potion",
       "tags": [
         "potion",
         "flask",
@@ -4194,6 +4364,7 @@
       "file": "models/prop/potion_2.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "potion",
       "tags": [
         "potion",
         "flask",
@@ -4217,6 +4388,7 @@
       "file": "models/prop/rope_coil.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "rope",
       "tags": [
         "rope",
         "dock",
@@ -4239,6 +4411,7 @@
       "file": "models/prop/sack.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "sack",
       "tags": [
         "sack",
         "bag",
@@ -4263,6 +4436,7 @@
       "file": "models/prop/sack_large.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "sack",
       "tags": [
         "sack",
         "pouch",
@@ -4287,6 +4461,7 @@
       "file": "models/prop/scroll.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "scroll",
       "tags": [
         "scroll",
         "quest",
@@ -4310,6 +4485,7 @@
       "file": "models/prop/shelf.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "shelf",
       "tags": [
         "shelf",
         "storage",
@@ -4332,6 +4508,7 @@
       "file": "models/prop/shelf_bottles.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "shelf",
       "tags": [
         "shelf",
         "bottles",
@@ -4357,6 +4534,7 @@
       "file": "models/prop/stool.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "stool",
       "tags": [
         "stool",
         "seat",
@@ -4378,6 +4556,7 @@
       "file": "models/prop/support_beam.glb",
       "pack": "medieval-village-megakit",
       "category": "prop",
+      "is": "beam",
       "tags": [
         "beam",
         "post",
@@ -4403,6 +4582,7 @@
       "file": "models/prop/table_large.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "table",
       "tags": [
         "table",
         "counter",
@@ -4427,6 +4607,7 @@
       "file": "models/prop/torch.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "torch",
       "tags": [
         "torch",
         "brazier",
@@ -4450,6 +4631,7 @@
       "file": "models/prop/training_dummy.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "dummy",
       "tags": [
         "dummy",
         "training",
@@ -4474,6 +4656,7 @@
       "file": "models/prop/wagon.glb",
       "pack": "medieval-village-megakit",
       "category": "prop",
+      "is": "wagon",
       "tags": [
         "wagon",
         "cart",
@@ -4496,6 +4679,7 @@
       "file": "models/prop/weapon_rack.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "weapon",
       "tags": [
         "weapon",
         "rack",
@@ -4520,6 +4704,7 @@
       "file": "models/prop/whetstone.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "whetstone",
       "tags": [
         "whetstone",
         "smithing",
@@ -4544,6 +4729,7 @@
       "file": "models/prop/workbench.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "workbench",
       "tags": [
         "workbench",
         "crafting",
@@ -4567,6 +4753,7 @@
       "file": "models/prop/workbench_drawers.glb",
       "pack": "fantasy-props-megakit",
       "category": "prop",
+      "is": "workbench",
       "tags": [
         "workbench",
         "crafting",
@@ -4590,6 +4777,7 @@
       "file": "models/rock/boulder_large.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "boulder",
       "tags": [
         "boulder",
         "cliff",
@@ -4614,6 +4802,7 @@
       "file": "models/rock/boulder_medium.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "boulder",
       "tags": [
         "boulder",
         "cliff",
@@ -4637,6 +4826,7 @@
       "file": "models/rock/cliff_step_1.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "cliff",
       "tags": [
         "cliff",
         "rock",
@@ -4659,6 +4849,7 @@
       "file": "models/rock/cliff_step_2.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "cliff",
       "tags": [
         "cliff",
         "rock",
@@ -4681,6 +4872,7 @@
       "file": "models/rock/cliff_step_3.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "cliff",
       "tags": [
         "cliff",
         "rock",
@@ -4703,6 +4895,7 @@
       "file": "models/rock/cliff_tall.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "cliff",
       "tags": [
         "cliff",
         "boulder",
@@ -4727,6 +4920,7 @@
       "file": "models/rock/ore_crystal_blue.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "ore",
       "tags": [
         "ore",
         "ore-node",
@@ -4752,6 +4946,7 @@
       "file": "models/rock/ore_crystal_green.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "ore",
       "tags": [
         "ore",
         "ore-node",
@@ -4777,6 +4972,7 @@
       "file": "models/rock/ore_crystal_pink.glb",
       "pack": "ultimate-platformer-pack",
       "category": "rock",
+      "is": "ore",
       "tags": [
         "ore",
         "ore-node",
@@ -4802,6 +4998,7 @@
       "file": "models/rock/path_rock_round_thin.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "path",
       "tags": [
         "path",
         "road",
@@ -4824,6 +5021,7 @@
       "file": "models/rock/path_rock_round_wide.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "path",
       "tags": [
         "path",
         "road",
@@ -4846,6 +5044,7 @@
       "file": "models/rock/path_rock_small_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "path",
       "tags": [
         "path",
         "road",
@@ -4868,6 +5067,7 @@
       "file": "models/rock/path_rock_small_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "path",
       "tags": [
         "path",
         "road",
@@ -4890,6 +5090,7 @@
       "file": "models/rock/path_rock_square_thin.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "path",
       "tags": [
         "path",
         "road",
@@ -4912,6 +5113,7 @@
       "file": "models/rock/path_rock_square_wide.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "path",
       "tags": [
         "path",
         "road",
@@ -4934,6 +5136,7 @@
       "file": "models/rock/pebble_round_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "rock",
       "tags": [
         "rock",
         "stone",
@@ -4956,6 +5159,7 @@
       "file": "models/rock/pebble_round_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "rock",
       "tags": [
         "rock",
         "stone",
@@ -4978,6 +5182,7 @@
       "file": "models/rock/rock_medium_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "rock",
       "tags": [
         "rock",
         "stone",
@@ -5002,6 +5207,7 @@
       "file": "models/rock/rock_medium_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "rock",
       "tags": [
         "rock",
         "stone",
@@ -5026,6 +5232,7 @@
       "file": "models/rock/rock_medium_3.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "rock",
       "tags": [
         "rock",
         "stone",
@@ -5050,6 +5257,7 @@
       "file": "models/rock/rock_small_1.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "rock",
       "tags": [
         "rock",
         "stone",
@@ -5074,6 +5282,7 @@
       "file": "models/rock/rock_small_2.glb",
       "pack": "stylized-nature-megakit",
       "category": "rock",
+      "is": "rock",
       "tags": [
         "rock",
         "stone",
@@ -5098,6 +5307,7 @@
       "file": "models/weapon/axe.glb",
       "pack": "fantasy-props-megakit",
       "category": "weapon",
+      "is": "axe",
       "tags": [
         "axe",
         "melee",
@@ -5122,6 +5332,7 @@
       "file": "models/weapon/pickaxe.glb",
       "pack": "fantasy-props-megakit",
       "category": "weapon",
+      "is": "pickaxe",
       "tags": [
         "pickaxe",
         "mining",
@@ -5145,6 +5356,7 @@
       "file": "models/weapon/shield.glb",
       "pack": "fantasy-props-megakit",
       "category": "weapon",
+      "is": "shield",
       "tags": [
         "shield",
         "offhand",
@@ -5169,6 +5381,7 @@
       "file": "models/weapon/sword.glb",
       "pack": "fantasy-props-megakit",
       "category": "weapon",
+      "is": "sword",
       "tags": [
         "sword",
         "melee",

@@ -194,18 +194,33 @@ scale at instantiation.
 
 `game/public/assets/manifest.json`, 213 assets, 8 packs. Shape matches the frozen contract
 exactly: `generatedAt`, `packs[{id,name,author,source,license}]`,
-`assets[{id,file,pack,category,tags,bytes,size:{x,y,z},animations,materials}]`.
+`assets[{id,file,pack,category,is,tags,bytes,size:{x,y,z},animations,materials}]`.
 
 Categories in use: `nature`, `rock`, `building`, `prop`, `farm`, `dungeon`, `character`,
 `outfit`, `weapon`, `animation`. **`water` is unused — nothing in the free library provides
 water.**
 
-Tags are the lookup surface, so they are deliberately redundant: a "what is it" tag
-(`tree`, `wall`, `barrel`), a use/region tag (`plains`, `dungeon`, `market`, `tier10`), and
-hints like `modular`, `recolour`, `minable`, `animated`, `placeholder-style`. Note
+### `is` versus `tags`
+
+`is` is what the mesh IS: one word, the subject of the model, and always the first tag.
+Everything after the first tag is an ASSOCIATION — what the mesh contains, what it stands
+on, what it is used for, how it should be recoloured.
+
+The distinction is published as its own field because Phase 1 shipped without it and it
+cost a round. `anvil_log` is tagged
+`["anvil", "log", "stump", "smithing", "forge", "crafting"]` because it is an anvil standing
+on a cut log. Somebody read "stump" off that list, and every felled tree in the world plus
+the landmark Rootfall is built around became a blacksmith's anvil at five times scale.
+Nothing in the manifest was wrong; the reading was.
+
+So: `assets.byIs("stump")` for identity, `assets.byTags("farm", "tier10")` for "anything to
+do with". Tags are still deliberately redundant — a use/region tag (`plains`, `dungeon`,
+`market`, `tier10`) and hints like `modular`, `recolour`, `minable`, `animated`,
+`placeholder-style` — and they are still the right query for composition code. They are
+never the right query for "what is this".
+
 `category` is the folder and is single-valued; cross-use is carried by tags. Brick walls
-live in `building` but are tagged `dungeon`, so tag lookup is the right query for
-composition code, not category.
+live in `building` but are tagged `dungeon`.
 
 ## Coverage table
 

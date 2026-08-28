@@ -290,9 +290,21 @@ interface Pick {
 // ---------------------------------------------------------------------------
 // Catalog
 //
-// Every entry below was chosen against the Phase 1 needs list. Tags are the
-// lookup surface for world composition, so they are deliberately repetitive:
-// a broad "what is it" tag, a region/use tag, and any recolour hints.
+// Every entry below was chosen against the Phase 1 needs list.
+//
+// TAG ORDER IS A CONTRACT. The FIRST tag is what the mesh IS, and it is
+// published separately as the manifest's `is` field. Every tag after it is an
+// association: what the mesh contains, what it stands on, what it is used for,
+// how it should be recoloured.
+//
+// This distinction cost a full round to learn. `anvil_log` is
+// ["anvil", "log", "stump", ...] because it is an anvil standing on a cut log.
+// Phase 1 read "stump" off that list, and every felled tree in the world plus
+// the landmark Rootfall is built around became a blacksmith's anvil. Adding a
+// tag that describes a PART of the mesh is fine and useful; putting it first,
+// or reading anything but the first as identity, is the bug.
+//
+// Look things up with `assets.byIs("stump")`, never `assets.byTags("stump")`.
 // ---------------------------------------------------------------------------
 
 const nature = (file: string, id: string, tags: string[], category: Category = "nature"): Pick => ({
@@ -702,6 +714,8 @@ interface ManifestAsset {
   file: string;
   pack: string;
   category: Category;
+  /** What the mesh IS. Always `tags[0]`; see the catalog note above the pick helpers. */
+  is: string;
   tags: string[];
   bytes: number;
   size: { x: number; y: number; z: number };
@@ -1147,6 +1161,10 @@ function describe(
     file: relative.replace(/\\/g, "/"),
     pack: pick.pack,
     category: pick.category,
+    // The first tag is the subject and the rest are associations. Publishing the subject as its
+    // own field is what stops a reader — human or agent — taking "stump" off the tag list of an
+    // anvil that happens to stand on one, which is exactly what Phase 1 did.
+    is: pick.tags[0] ?? pick.category,
     tags: pick.tags,
     bytes,
     size,
