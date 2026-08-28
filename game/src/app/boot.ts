@@ -273,6 +273,13 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
   events.subscribe((event) => vfx.handle(event, clock.elapsedMs));
 
+  // "Click a distant ore" must walk there AND THEN mine it. The API remembers the intent; this is
+  // what fires it on arrival. Both a human click and an agent tool call route through here.
+  events.subscribe((event) => {
+    if (event.type === "navigation.completed") api.resumePending();
+    else if (event.type === "navigation.failed") api.clearPending();
+  });
+
   // Documentation, generated from the same canonical content the runtime uses, so the docs cannot
   // drift from the game. Public knowledge only — hidden quest state never reaches this index.
   const docs = new DocSearch();

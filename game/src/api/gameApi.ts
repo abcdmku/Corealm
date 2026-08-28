@@ -72,6 +72,16 @@ type ShopViewLike = import("../contracts.js").ShopView;
 export class CorealmGameApi implements GameApiContract {
   readonly hooks: SystemHooks = {};
 
+  /**
+   * The interaction to re-fire once the player finishes walking into range.
+   *
+   * Without this, "click a distant ore" walked the player there and then stopped — the single most
+   * important affordance in the game, silently half-implemented. It is held here rather than in the
+   * movement system because it is an API-level affordance: one call means "get there and do it",
+   * for a human click and an agent tool call alike.
+   */
+  private pending: { entityId: EntityId; interaction: InteractionId; expiresAtMs: number } | null = null;
+
   constructor(
     private readonly store: Store,
     private readonly eventBus: EventBus,
@@ -198,6 +208,7 @@ export class CorealmGameApi implements GameApiContract {
   stop(): Result<{ stopped: string[] }> {
     const state = this.store.get();
     const stopped: string[] = [];
+    this.pending = null;
     if (this.movement.stop(state, this.clock.elapsedMs, "cancelled")) stopped.push("navigation");
     if (state.activity) {
       this.eventBus.emit("activity.stopped", { kind: state.activity.kind, reason: "cancelled" }, undefined, this.clock.elapsedMs);
@@ -227,12 +238,21 @@ export class CorealmGameApi implements GameApiContract {
 
     const gap = distanceXZ(state.player.position, entity.position);
     if (gap > INTERACT_RANGE) {
-      // Matching the human affordance: one click walks into range and then acts.
+      // One click walks into range and THEN acts. The interaction is remembered and re-fired by
+      // `resumePending` when navigation completes.
       const moved = this.moveTo({ entityId });
       if (!moved.ok) return moved as Result<{ started: string }>;
+      this.pending = {
+        entityId,
+        interaction,
+        // Generous, but bounded: a stale intent must not fire minutes later after the player has
+        // wandered off and forgotten they ever clicked.
+        expiresAtMs: this.clock.elapsedMs + moved.value.etaMs + 10_000,
+      };
       return ok({ started: `walking to ${entity.name}` });
     }
 
+    this.pending = null;
     const runner = this.hooks.interactions;
     if (!runner) return err("UNAVAILABLE", "Interaction system is not available yet");
     return runner.run(entityId, interaction);
@@ -322,6 +342,36 @@ export class CorealmGameApi implements GameApiContract {
       return Promise.resolve(this.eventBus.since(sinceSeq, filter));
     }
     return this.eventBus.wait(sinceSeq, filter, timeoutMs);
+  }
+
+  /**
+   * Runs the remembered interaction now that the player has arrived.
+   * Called by the loop when navigation completes. Returns what happened, or null if nothing waited.
+   */
+  resumePending(): Result<{ started: string }> | null {
+    const pending = this.pending;
+    if (!pending) return null;
+    this.pending = null;
+    if (this.clock.elapsedMs > pending.expiresAtMs) return null;
+
+    const entity = this.hooks.entities?.get(pending.entityId);
+    if (!entity) return null;
+    // The world moves while the player walks: a node can deplete or an enemy die en route.
+    const gap = distanceXZ(this.store.get().player.position, entity.position);
+    if (gap > INTERACT_RANGE * 1.6) return null;
+
+    const runner = this.hooks.interactions;
+    if (!runner) return null;
+    return runner.run(pending.entityId, pending.interaction);
+  }
+
+  /** Drops any remembered interaction. Called when the player cancels or is interrupted. */
+  clearPending(): void {
+    this.pending = null;
+  }
+
+  hasPending(): boolean {
+    return this.pending !== null;
   }
 
   // ---------------------------------------------------------------- helpers
