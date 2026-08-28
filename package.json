@@ -18,7 +18,8 @@
     "fetch-assets": "tsx tools/fetch-assets.ts",
     "build-assets": "tsx tools/build-assets.ts",
     "agent-proof": "tsx tools/agent-proof.ts",
-    "gen-docs": "tsx tools/gen-docs.ts"
+    "gen-docs": "tsx tools/gen-docs.ts",
+    "gate-check": "tsx tools/gate-check.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.20.0",
