@@ -1,0 +1,9 @@
+node_modules/
+game/dist/
+playwright-report/
+test-results/
+*.log
+
+# Keep run records, but ignore throwaway local runs.
+runs/local-*/
+

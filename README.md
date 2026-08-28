@@ -1,0 +1,95 @@
+# Lean 3D game-building harness
+
+This is an uninitialized template for an agent-built Three.js browser game. It contains the workflow, agent instructions, browser driver, state-backed playtests, screenshot support, and critic handoffs. It does not contain a game, a game brief, or a completed run.
+
+## Start from a brief
+
+Install the harness once:
+
+```bash
+npm install
+npx playwright install chromium
+```
+
+Write a short Markdown brief, then create a run:
+
+```bash
+npm run game-agent -- build briefs/my-game.md --id my-game
+```
+
+That command records the brief under `runs/my-game/`. It does not call a model or invent the game. Give the repository to a root coding agent and ask it to follow [AGENTS.md](./AGENTS.md):
+
+1. Use a fresh-context PRD agent with `skills/prd.md`.
+2. Review and approve `runs/my-game/PRD.md`.
+3. Build the minimal browser foundation and freeze only the shared contracts the PRD needs.
+4. Pass the Chromium smoke test before delegating disjoint specialist files.
+5. Integrate in short rounds, play through Playwright, inspect state and screenshots, and use a fresh read-only critic.
+6. Convert concrete criticism into a fix round and retest.
+
+Durable context belongs in the run directory, not in a long orchestration transcript.
+
+## Repository shape
+
+```text
+game/                 uninitialized until a PRD is approved
+skills/               PRD, builder, and critic role instructions
+tools/                browser driver and small command-line utilities
+runs/<run-id>/        brief, PRD, architecture, evidence, and critique
+docs/                 architecture and source-pattern notes
+```
+
+The game remains a normal Vite application and never imports the harness at runtime.
+
+## Commands after the foundation exists
+
+```bash
+npm run dev
+npm run typecheck
+npm test
+npm run build
+npm run smoke -- --run runs/my-game
+npm run play -- --run runs/my-game --scenario tools/scenarios/my-game.json
+npm run screenshot -- --run runs/my-game --name checkpoint
+npm run game-agent -- critic-pack --run runs/my-game
+```
+
+`dev`, `build`, and browser commands intentionally stop with a clear message while `game/index.html` is absent.
+
+## Runtime testing contract
+
+Development builds expose a synchronous, JSON-safe `window.__gameDebug` with:
+
+```text
+getState()
+getPlayer()
+getPlayerPosition()
+getCamera()
+getEntities()
+getCurrentActivity()
+getObjectives()
+getNavigationState()
+reset()
+```
+
+Games may add development-only helpers such as `teleport()` or `setScenario()` when they make tests deterministic. Gameplay tests record state before and after every action; source inspection alone is not proof that a feature works.
+
+## Scripted play
+
+A scenario is JSON with a name and up to 50 actions. Supported actions include key presses, mouse input, waits, debug calls, semantic inspections, screenshots, reset, and reload.
+
+```json
+{
+  "name": "movement-proof",
+  "actions": [
+    { "key": "w", "holdMs": 1000, "label": "Move forward" },
+    { "inspect": "getPlayerPosition", "label": "Read the result" },
+    { "screenshot": "after-move" }
+  ]
+}
+```
+
+Reports and screenshots are written into the selected run directory.
+
+GLB assets belong under `game/public/assets/` with a small metadata manifest. `npm run inspect-glb -- game/public/assets/model.glb` reports scenes, nodes, meshes, and animations without introducing an asset database.
+
+The harness keeps the useful mechanisms from [WorldBuild Bench](https://github.com/sebnado/worldbuild-bench) and [Sunburst Isle](https://github.com/djtoon/sunburst_isle), summarized in [docs/reference-patterns.md](./docs/reference-patterns.md). It deliberately omits model-provider adapters, workflow databases, queues, plugins, benchmark scoring, and other infrastructure that does not help build and inspect the next game.
