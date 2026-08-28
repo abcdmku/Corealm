@@ -41,6 +41,11 @@ import { ActivitySystem } from "../systems/activity.js";
 import { GatheringSystem } from "../systems/gathering.js";
 import { FarmingSystem } from "../systems/farming.js";
 import { AgilitySystem } from "../systems/agility.js";
+import { CombatSystem } from "../systems/combat.js";
+import { EnemyAiSystem } from "../systems/enemyAI.js";
+import { HealthSystem } from "../systems/health.js";
+import { DeathSystem } from "../systems/death.js";
+import { ProductionSystem } from "../systems/production.js";
 import { INTERACT_RANGE } from "./config.js";
 import { distanceXZ } from "../core/math.js";
 import { REGIONS, getRegion, validateRegions } from "../content/regions.js";
@@ -342,6 +347,56 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     activity: activitySystem, dispatcher: interactions, nav,
   });
 
+  // ---- Combat and production. Combat is NOT an activity: it lives in its own state slice so the
+  // player can eat while auto-attacking, without which the boss is unwinnable.
+  const combatSystem = new CombatSystem({
+    store, events, rng,
+    entities: entityStore,
+    equipment: equipmentSystem,
+    inventory: inventorySystem,
+    dispatcher: interactions,
+    movement,
+    activity: activitySystem,
+  });
+  const enemyAiSystem = new EnemyAiSystem({
+    store, events, entities: entityStore, combat: combatSystem, nav,
+  });
+  const healthSystem = new HealthSystem({ store, events, equipment: equipmentSystem });
+  const deathSystem = new DeathSystem({
+    store, events,
+    entities: entityStore,
+    inventory: inventorySystem,
+    dispatcher: interactions,
+    // Respawn points are authored per region; fall back to the region's own spawn.
+    respawn: {
+      resolve: (respawnPointId: string, regionId: RegionId) => {
+        const node = nav.routeNode(respawnPointId);
+        if (node) return { position: node.position, regionId: node.regionId as RegionId };
+        const region = getRegion(regionId) ?? getRegion("fallowmarch");
+        const fallbackId: RegionId = region?.id ?? "fallowmarch";
+        const spot = region?.spawnPoint ?? [spawnSpec.x, spawnSpec.z];
+        const y = scene.heightAt(fallbackId, spot[0], spot[1]);
+        return { position: [spot[0], y, spot[1]] as Vec3, regionId: fallbackId };
+      },
+    },
+    health: healthSystem,
+    combat: combatSystem,
+    enemyAi: enemyAiSystem,
+    activity: activitySystem,
+    movement,
+    snapToGround: (point) => nav.closestPoint(point),
+  });
+  const productionSystem = new ProductionSystem({
+    store, events, rng,
+    entities: entityStore,
+    inventory: inventorySystem,
+    activity: activitySystem,
+    dispatcher: interactions,
+  });
+  activitySystem.register(productionSystem.driver);
+
+  api.register("combat", combatSystem.hook());
+  api.register("production", productionSystem.hook());
   api.register("inventory", inventorySystem);
   api.register("equipment", equipmentSystem);
   api.register("bank", bankSystem);
@@ -443,6 +498,11 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.addSystem(agilitySystem);
   loop.addSystem(gatheringSystem);
   loop.addSystem(farmingSystem);
+  loop.addSystem(enemyAiSystem);
+  loop.addSystem(combatSystem);
+  loop.addSystem(healthSystem);
+  loop.addSystem(deathSystem);
+  loop.addSystem(productionSystem);
 
   loop.setOverlays(overlays);
   loop.setVfx(vfx);

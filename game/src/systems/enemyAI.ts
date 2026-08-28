@@ -25,7 +25,6 @@ import type { GameState, Store } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
 import type { TickSystem } from "../app/loop.js";
 import { distanceXZ } from "../core/math.js";
-import type { EnemyDef } from "../content/index.js";
 import type { BossPhase } from "../content/enemies.js";
 import { ORDRUN_PHASES } from "../content/enemies.js";
 import type { CombatEntityPort, CombatSystem } from "./combat.js";

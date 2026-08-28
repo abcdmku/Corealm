@@ -23,6 +23,8 @@ import type {
   EntityId, InteractionId, RegionId, SemanticEntity, SkillId, Vec3,
 } from "../contracts.js";
 import { RngStreams, type Rng } from "../core/rng.js";
+import { content } from "../content/index.js";
+import { enemyIdFor } from "../content/enemies.js";
 import {
   REGIONS, WALK_SPEED_MPS,
   type BuildingDef, type DungeonDef, type EnemyGroupDef, type LocationDef, type ObstacleDef,
@@ -707,6 +709,10 @@ function buildEnemyGroup(
   place: (spot: Spot) => Vec3,
   out: SemanticEntity[],
 ): void {
+  // One lookup per group. `content/enemies.ts` publishes alias rows keyed by group id and by
+  // family, so either spelling resolves.
+  const enemyBlock = content.enemy(group.id) ?? content.enemy(enemyIdFor(group.family, group.tier));
+
   for (let index = 0; index < group.count; index += 1) {
     const spot = group.radius <= 0
       ? group.centre
@@ -721,11 +727,15 @@ function buildEnemyGroup(
       position,
       state: "alive",
       interactions: ["inspect", "attack", "cast"],
+      // Stats come from `content/enemies.ts`, which solves them backwards from the PRD's
+      // time-to-kill rows. `regions.ts` carried its own maxHealth as a placement hint from before
+      // that table existed; where the two disagree the derived block wins, or the balance work is
+      // silently discarded. A Rill Skitterling read 18 HP here against the content table's 6.
       combat: {
-        health: group.maxHealth,
-        maxHealth: group.maxHealth,
+        health: enemyBlock?.maxHealth ?? group.maxHealth,
+        maxHealth: enemyBlock?.maxHealth ?? group.maxHealth,
         level: group.level,
-        aggroRadius: group.aggroRadius,
+        aggroRadius: enemyBlock?.aggroRadius ?? group.aggroRadius,
       },
       view: {
         assetId: group.assetId,

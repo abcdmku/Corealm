@@ -78,10 +78,10 @@
       "debug": "teleport",
       "args": [
         {
-          "locationId": "town_center"
+          "entityId": "coldbrace_general"
         }
       ],
-      "label": "Go to the shop"
+      "label": "Stand at the Coldbrace general store"
     },
     {
       "waitMs": 500
@@ -96,6 +96,10 @@
         }
       ],
       "label": "Read the stock"
+    },
+    {
+      "inspect": "getState",
+      "label": "Marks before the sale"
     },
     {
       "debug": "callTool",
