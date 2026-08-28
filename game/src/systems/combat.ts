@@ -224,8 +224,11 @@ export class CombatSystem implements TickSystem {
 
   /** Enemy swing timers. Runtime scratch; the frozen enemy record has no room for them. */
   private readonly enemyNextAttackAtMs = new Map<EntityId, number>();
-  /** Per-enemy cadence multiplier, so a boss phase can speed an enemy up without new state. */
-  private readonly enemySpeedScale = new Map<EntityId, number>();
+  /**
+   * Per-enemy stat overrides. `EnemyDef` is frozen and carries no phase field, so a boss phase
+   * publishes its armour, cadence and max hit through here rather than through new state.
+   */
+  private readonly enemyOverrides = new Map<EntityId, Partial<EnemyDef>>();
   private readonly defCache = new Map<EntityId, EnemyDef>();
   private readonly provokeListeners: ((enemyId: EntityId, atMs: number) => void)[] = [];
   private readonly hitLog: CombatHit[] = [];
@@ -498,8 +501,7 @@ export class CombatSystem implements TickSystem {
       this.markInCombat(state, atMs);
       if (gap > ENEMY_ATTACK_RANGE) continue;
 
-      const scale = this.enemySpeedScale.get(enemyId) ?? 1;
-      const intervalMs = attackIntervalMs(def.attackSpeedMs * scale);
+      const intervalMs = attackIntervalMs(def.attackSpeedMs);
       const due = this.enemyNextAttackAtMs.get(enemyId);
       if (due === undefined) {
         // First swing lands one full cadence after contact, not on the frame the enemy arrives.
@@ -605,7 +607,7 @@ export class CombatSystem implements TickSystem {
     if (skill) this.awardXp(state, skill, Math.round(maxHealth * KILL_XP_MULTIPLIER), atMs);
 
     this.enemyNextAttackAtMs.delete(entity.id);
-    this.enemySpeedScale.delete(entity.id);
+    this.enemyOverrides.delete(entity.id);
     this.disengageEnemy(state, entity.id, atMs, false);
 
     this.rollDrops(state, entity, def, atMs);
@@ -705,10 +707,14 @@ export class CombatSystem implements TickSystem {
     return this.deps.store.get().combat.targetId;
   }
 
-  /** A boss phase can speed an enemy up without adding a field to the frozen enemy record. */
-  setEnemySpeedScale(enemyId: EntityId, scale: number): void {
-    if (scale === 1) this.enemySpeedScale.delete(enemyId);
-    else this.enemySpeedScale.set(enemyId, Math.max(0.2, scale));
+  /**
+   * Overrides part of an enemy's stat block for as long as it lives. `systems/enemyAI.ts` uses it
+   * to apply `ORDRUN_PHASES`, whose phase 2 drops the boss's armour from 62 to 50, its cadence
+   * from 3.0 s to 2.4 s, and raises its max hit from 12 to 14.
+   */
+  setEnemyOverride(enemyId: EntityId, override: Partial<EnemyDef> | null): void {
+    if (!override) this.enemyOverrides.delete(enemyId);
+    else this.enemyOverrides.set(enemyId, override);
   }
 
   /** `systems/enemyAI.ts` subscribes so a territorial enemy retaliates when struck. */
@@ -739,7 +745,7 @@ export class CombatSystem implements TickSystem {
     state.combat.nextAttackAtMs = 0;
     state.combat.inCombatUntilMs = 0;
     this.enemyNextAttackAtMs.clear();
-    this.enemySpeedScale.clear();
+    this.enemyOverrides.clear();
     this.deps.store.markDirty();
   }
 
@@ -804,8 +810,22 @@ export class CombatSystem implements TickSystem {
     };
   }
 
-  /** The content row behind a spawned enemy. Public so enemy AI reads the same resolution. */
+  /**
+   * The content row behind a spawned enemy, with any live override folded in. Public so enemy AI,
+   * the forecast and the bestiary all read one resolution.
+   */
   defFor(entity: SemanticEntity): EnemyDef {
+    let base = this.defCache.get(entity.id);
+    if (!base) {
+      base = resolveEnemyDef(entity);
+      this.defCache.set(entity.id, base);
+    }
+    const override = this.enemyOverrides.get(entity.id);
+    return override ? { ...base, ...override } : base;
+  }
+
+  /** The stat block as content authored it, ignoring boss phases. */
+  baseDefFor(entity: SemanticEntity): EnemyDef {
     const cached = this.defCache.get(entity.id);
     if (cached) return cached;
     const resolved = resolveEnemyDef(entity);

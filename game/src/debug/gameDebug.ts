@@ -64,6 +64,10 @@ export interface DebugDeps {
   callTool(name: string, args: unknown): Promise<unknown>;
   /** Test-only item grant. Goes through the real inventory so slot limits still apply. */
   giveItem(itemId: ItemId, quantity: number, to: "inventory" | "bank"): unknown;
+  /** Empties a resource node through the real depletion path, so events and respawn still fire. */
+  depleteNode(entityId: EntityId): boolean;
+  /** Brings a node or enemy back immediately, skipping its respawn timer. */
+  forceRespawn(entityId: EntityId): boolean;
 }
 
 function xyz(value: Vec3): { x: number; y: number; z: number } {
@@ -365,6 +369,14 @@ export function installGameDebug(deps: DebugDeps): void {
     /** Invokes an agent tool in-page. This is how parity between a click and a tool call is proven. */
     callTool(name: string, args: unknown): Promise<unknown> {
       return deps.callTool(name, args);
+    },
+
+    depleteNode(entityId: EntityId): boolean {
+      return deps.depleteNode(entityId);
+    },
+
+    forceRespawn(entityId: EntityId): boolean {
+      return deps.forceRespawn(entityId);
     },
 
     setQuestStage(questId: QuestId, stage: number): void {

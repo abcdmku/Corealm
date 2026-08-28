@@ -506,6 +506,23 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
      * Moves the camera to a named repeatable pose. Screenshots and the perf budget both use these,
      * so a shot points at the thing it is named after rather than at a fixed compass bearing.
      */
+    /**
+     * Empties a node through the REAL depletion path rather than by writing `remaining = 0`, so a
+     * test sees the same events, the same state transition, and the same respawn timer a player
+     * would. A shortcut that bypasses the system proves nothing about the system.
+     */
+    depleteNode: (entityId: string) => {
+      const entity = entityStore.get(entityId);
+      if (!entity?.resource) return false;
+      const node = store.get().world.nodes[entityId];
+      if (node) node.remaining = 1;
+      entity.resource.remaining = 1;
+      // One more successful gather now empties it, and the system does the rest.
+      return gatheringSystem.forceDeplete(entityId, clock.elapsedMs);
+    },
+
+    forceRespawn: (entityId: string) => gatheringSystem.forceRespawn(entityId, clock.elapsedMs),
+
     giveItem: (itemId: string, quantity: number, to: string) => (
       to === "bank"
         ? bankSystem.op("deposit", { itemId, quantity })

@@ -339,6 +339,37 @@ export class GatheringSystem implements TickSystem {
     if (entity.resource) entity.resource.remaining = node.remaining;
   }
 
+  /**
+   * Test-only: empty a node through the real depletion path.
+   *
+   * Deliberately routed through `deplete` rather than writing `remaining = 0` directly, so a test
+   * observes the same events, the same state transition and the same respawn timer a player would.
+   * A shortcut that bypasses the system proves nothing about the system.
+   */
+  forceDeplete(entityId: EntityId, atMs: number): boolean {
+    const state = this.deps.store.get();
+    const entity = this.deps.entities.get(entityId);
+    if (!entity?.resource) return false;
+    this.deplete(entity, this.nodeRuntime(state, entity), atMs);
+    return true;
+  }
+
+  /**
+   * Test-only: bring a node back now.
+   *
+   * Expires the timer rather than re-rolling the node here, so the next tick runs the identical
+   * respawn path a player would see — including the fresh yield roll from the seeded stream.
+   */
+  forceRespawn(entityId: EntityId, atMs: number): boolean {
+    const state = this.deps.store.get();
+    const entity = this.deps.entities.get(entityId);
+    if (!entity?.resource) return false;
+    const node = this.nodeRuntime(state, entity);
+    if (node.state !== "depleted") return false;
+    node.respawnAtMs = atMs;
+    return true;
+  }
+
   private deplete(entity: SemanticEntity, node: NodeRuntime, atMs: number): void {
     const seconds = entity.resource?.respawnSeconds ?? respawnSeconds(entity.tier);
     node.remaining = 0;

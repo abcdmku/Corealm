@@ -26,6 +26,8 @@ import type { EventBus } from "../core/events.js";
 import type { TickSystem } from "../app/loop.js";
 import { distanceXZ } from "../core/math.js";
 import type { EnemyDef } from "../content/index.js";
+import type { BossPhase } from "../content/enemies.js";
+import { ORDRUN_PHASES } from "../content/enemies.js";
 import type { CombatEntityPort, CombatSystem } from "./combat.js";
 import { cloneVec3, spawnPositionOf } from "./combat.js";
 
@@ -52,22 +54,30 @@ const ENEMY_SCAN_INTERVAL_MS = 2_000;
 
 // ------------------------------------------------------------- boss tuning
 
-/** Ordrun drops to phase 2 at 55% health, which is where the ground slam unlocks. */
-export const BOSS_PHASE2_FRACTION = 0.55;
+/**
+ * Boss phase scripts, keyed by entity id.
+ *
+ * The numbers are content's, not this file's: `ORDRUN_PHASES` in `content/enemies.ts` carries the
+ * health fraction, the phase armour, the phase cadence, the phase max hit and the telegraph shape,
+ * because `EnemyDef` is frozen and has no room for them. Phase 2 dropping Ordrun's armour from 62
+ * to 50 is what keeps the second half winnable at the DPS the first half establishes.
+ */
+const BOSS_PHASES: Readonly<Record<string, readonly BossPhase[]>> = {
+  ordrun: ORDRUN_PHASES,
+};
 
-/** Phase 2 swings 25% faster. */
-export const BOSS_PHASE2_SPEED_SCALE = 0.75;
-
+/** Gap between ground slams once a phase unlocks one. */
 export const SLAM_INTERVAL_MS = 12_000;
-export const SLAM_WINDUP_MS = 1_500;
-/** How long the scorched circle stays visible after it fires. */
-export const SLAM_LINGER_MS = 600;
-export const SLAM_RADIUS_METRES = 5.0;
-/** Slam damage as a multiple of the boss's normal max hit. */
-export const SLAM_DAMAGE_MULTIPLIER = 1.5;
 
-/** The boss ids that get the phase script. Ordrun is the tier 10 Quarrykeeper. */
-const BOSS_IDS: ReadonlySet<string> = new Set(["ordrun"]);
+/** How long the scorched circle stays readable after it fires. */
+export const SLAM_LINGER_MS = 600;
+
+/** Fallbacks for a phase that names a telegraph without giving it a shape. */
+export const SLAM_WINDUP_MS = 1_500;
+export const SLAM_RADIUS_METRES = 5.0;
+
+/** Slam damage as a multiple of the boss's phase max hit. */
+export const SLAM_DAMAGE_MULTIPLIER = 1.5;
 
 // -------------------------------------------------------------------- types
 
@@ -153,9 +163,8 @@ export class EnemyAiSystem implements TickSystem {
       const distanceToPlayer = distanceXZ(playerPos, entity.position);
       const distanceFromSpawn = distanceXZ(spawn, entity.position);
 
-      if (entity.archetype === "boss" || BOSS_IDS.has(entity.id)) {
-        this.updateBoss(state, entity, runtime, record, def, atMs);
-      }
+      const phases = BOSS_PHASES[entity.id];
+      if (phases) this.updateBoss(state, entity, runtime, record, phases, atMs);
 
       // 1. leash. Nothing outruns 28 m from home, including a boss mid-telegraph.
       if (record.mode === "aggro" && distanceFromSpawn > LEASH_METRES) {
@@ -270,7 +279,7 @@ export class EnemyAiSystem implements TickSystem {
       record.provokedUntilMs = 0;
       record.telegraph = null;
       record.nextSlamAtMs = 0;
-      this.deps.combat.setEnemySpeedScale(entityId, 1);
+      this.deps.combat.setEnemyOverride(entityId, null);
       this.deps.store.markDirty();
     }
   }
@@ -278,43 +287,62 @@ export class EnemyAiSystem implements TickSystem {
   // ------------------------------------------------------------------- boss
 
   /**
-   * Ordrun. Phase 1 is a plain slugging match; at 55% health he drops to phase 2, swings 25%
-   * faster, and starts telegraphing a ground slam every 12 s: 1.5 s of wind-up, then damage to
-   * anyone still standing in a 5 m circle.
+   * Ordrun. Phase 1 is a plain slugging match; at 55% health he drops to phase 2 - lighter armour,
+   * a 2.4 s swing instead of 3.0 s, a higher max hit - and starts telegraphing a ground slam every
+   * 12 s: 1.8 s of wind-up, then damage to anyone still standing in a 6 m circle.
    *
-   * The whole fight is visible in state: `bossPhase` on the enemy record, `telegraphs()` here.
+   * Every number here comes from `ORDRUN_PHASES`. This file owns *when* a phase applies and how the
+   * telegraph is published; content owns *what* the phase is.
+   *
+   * The whole fight is readable from state: `bossPhase` on the enemy record, `telegraphs()` here.
    */
   private updateBoss(
     state: GameState,
     entity: SemanticEntity,
     runtime: NonNullable<GameState["world"]["enemies"][string]>,
     record: AiRecord,
-    def: EnemyDef,
+    phases: readonly BossPhase[],
     atMs: number,
   ): void {
-    const maxHealth = entity.combat?.maxHealth ?? def.maxHealth;
-    const phase = runtime.health <= maxHealth * BOSS_PHASE2_FRACTION ? 2 : 1;
+    const base = this.deps.combat.baseDefFor(entity);
+    const maxHealth = entity.combat?.maxHealth ?? base.maxHealth;
+    const fraction = maxHealth > 0 ? runtime.health / maxHealth : 1;
 
-    if (runtime.bossPhase !== phase) {
-      runtime.bossPhase = phase;
-      this.deps.combat.setEnemySpeedScale(entity.id, phase === 2 ? BOSS_PHASE2_SPEED_SCALE : 1);
+    let index = 0;
+    for (let i = 0; i < phases.length; i += 1) {
+      const candidate = phases[i];
+      if (candidate && fraction <= candidate.atHealthFraction) index = i;
+    }
+    const phase = phases[index];
+    if (!phase) return;
+    const phaseNumber = index + 1;
+
+    if (runtime.bossPhase !== phaseNumber) {
+      runtime.bossPhase = phaseNumber;
+      this.deps.combat.setEnemyOverride(entity.id, {
+        armour: phase.armour,
+        attackSpeedMs: phase.attackSpeedMs,
+        maxHit: phase.maxHit,
+      });
       this.deps.store.markDirty();
-      // The frozen `GameEventType` has no boss verb, so the phase change rides on `combat.started`
-      // with a discriminated payload. See the report: this is a contract gap, not a preference.
+      // The frozen `GameEventType` has no boss verb, so a phase change rides on `combat.started`
+      // with a discriminated `event` payload. See the report: a contract gap, not a preference.
       this.deps.events.emit(
         "combat.started",
-        { event: "boss.phase", enemyId: entity.id, name: entity.name, phase },
+        { event: "boss.phase", enemyId: entity.id, name: entity.name, phase: phaseNumber },
         entity.id,
         atMs,
       );
-      if (phase === 2) record.nextSlamAtMs = atMs + SLAM_WINDUP_MS;
+      record.nextSlamAtMs = phase.telegraphId
+        ? atMs + (phase.telegraphWindupMs ?? SLAM_WINDUP_MS)
+        : 0;
     }
 
     const telegraph = record.telegraph;
     if (telegraph) {
       if (telegraph.stage === "windup" && atMs >= telegraph.firesAtMs) {
         telegraph.stage = "active";
-        this.fireSlam(state, entity, telegraph, def, atMs);
+        this.fireSlam(state, entity, telegraph, phase, atMs);
         this.publishTelegraph(telegraph);
       } else if (telegraph.stage === "active" && atMs >= telegraph.endsAtMs) {
         record.telegraph = null;
@@ -322,28 +350,29 @@ export class EnemyAiSystem implements TickSystem {
       return;
     }
 
-    if (phase < 2 || record.mode !== "aggro") return;
+    if (!phase.telegraphId || record.mode !== "aggro") return;
     if (record.nextSlamAtMs === 0) record.nextSlamAtMs = atMs + SLAM_INTERVAL_MS;
     if (atMs < record.nextSlamAtMs) return;
 
+    const windupMs = phase.telegraphWindupMs ?? SLAM_WINDUP_MS;
     const next: BossTelegraph = {
       enemyId: entity.id,
       kind: "ground_slam",
       stage: "windup",
       centre: cloneVec3(entity.position),
-      radius: SLAM_RADIUS_METRES,
+      radius: phase.telegraphRadiusM ?? SLAM_RADIUS_METRES,
       startedAtMs: atMs,
-      firesAtMs: atMs + SLAM_WINDUP_MS,
-      endsAtMs: atMs + SLAM_WINDUP_MS + SLAM_LINGER_MS,
-      phase,
+      firesAtMs: atMs + windupMs,
+      endsAtMs: atMs + windupMs + SLAM_LINGER_MS,
+      phase: phaseNumber,
     };
     record.telegraph = next;
     record.nextSlamAtMs = next.endsAtMs + SLAM_INTERVAL_MS;
     this.deps.events.emit(
       "combat.started",
       {
-        event: "boss.telegraph", enemyId: entity.id, name: entity.name, kind: "ground_slam",
-        centre: next.centre, radius: next.radius, firesAtMs: next.firesAtMs, phase,
+        event: "boss.telegraph", enemyId: entity.id, name: entity.name, kind: phase.telegraphId,
+        centre: next.centre, radius: next.radius, firesAtMs: next.firesAtMs, phase: phaseNumber,
       },
       entity.id,
       atMs,
@@ -355,14 +384,13 @@ export class EnemyAiSystem implements TickSystem {
     state: GameState,
     entity: SemanticEntity,
     telegraph: BossTelegraph,
-    def: EnemyDef,
+    phase: BossPhase,
     atMs: number,
   ): void {
     const inside = distanceXZ(state.player.position, telegraph.centre) <= telegraph.radius;
-    const damage = inside ? Math.max(1, Math.round(def.maxHit * SLAM_DAMAGE_MULTIPLIER)) : 0;
-    if (damage > 0) {
-      this.deps.combat.damagePlayer(damage, entity.id, atMs, "special", Math.round(def.maxHit * SLAM_DAMAGE_MULTIPLIER));
-    }
+    const peak = Math.max(1, Math.round(phase.maxHit * SLAM_DAMAGE_MULTIPLIER));
+    const damage = inside ? peak : 0;
+    if (damage > 0) this.deps.combat.damagePlayer(damage, entity.id, atMs, "special", peak);
     this.deps.events.emit(
       "combat.started",
       {
