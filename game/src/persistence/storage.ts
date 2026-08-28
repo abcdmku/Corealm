@@ -4,7 +4,7 @@
  * Content-derived values (maxHealth, skill levels, prices) are recomputed on load rather than
  * trusted, so a content rebalance applies to existing saves.
  */
-import { SAVE_VERSION, type GameState } from "../state/store.js";
+import { SAVE_VERSION, createInitialState, type GameState } from "../state/store.js";
 import { levelForXp } from "../content/xp.js";
 import { SKILL_IDS } from "../contracts.js";
 import { migrate, type MigrationResult } from "./migrate.js";
@@ -79,13 +79,52 @@ export class SaveService {
   }
 }
 
-/** Recomputes everything derivable from content, so rebalances reach old saves. */
+/**
+ * Recomputes everything derivable from content, so a rebalance reaches existing saves.
+ *
+ * Also repairs shape: a save written by an older build can be missing a slice entirely, and a
+ * missing slice must not crash the boot that loads it. Every gap falls back to the fresh-state
+ * default rather than to undefined.
+ */
 function recompute(state: GameState): GameState {
+  const fresh = createInitialState(state.meta?.seed ?? 1337, Date.now());
+
+  state.skills = state.skills ?? fresh.skills;
   for (const skill of SKILL_IDS) {
-    const entry = state.skills?.[skill];
-    if (entry) entry.level = levelForXp(entry.xp);
-    else state.skills = { ...state.skills, [skill]: { xp: 0, level: 1 } };
+    const entry = state.skills[skill];
+    if (entry && typeof entry.xp === "number") entry.level = levelForXp(entry.xp);
+    else state.skills[skill] = { xp: 0, level: 1 };
   }
+
+  // Slices added after a save was written.
+  state.world = state.world ?? fresh.world;
+  state.world.nodes = state.world.nodes ?? {};
+  state.world.enemies = state.world.enemies ?? {};
+  state.world.obstaclesUsed = state.world.obstaclesUsed ?? {};
+  state.world.lootPiles = state.world.lootPiles ?? {};
+  state.world.recoveryCache = state.world.recoveryCache ?? null;
+  state.discovery = state.discovery ?? fresh.discovery;
+  state.discovery.entities = state.discovery.entities ?? {};
+  state.discovery.locations = state.discovery.locations ?? {};
+  state.discovery.regions = state.discovery.regions ?? fresh.discovery.regions;
+  state.farming = state.farming ?? {};
+  state.quests = state.quests ?? {};
+  state.bank = state.bank ?? fresh.bank;
+  state.bank.slots = state.bank.slots ?? [];
+  state.equipment = { ...fresh.equipment, ...(state.equipment ?? {}) };
+  state.combat = state.combat ?? fresh.combat;
+  state.settings = { ...fresh.settings, ...(state.settings ?? {}) };
+  state.currency = typeof state.currency === "number" ? state.currency : 0;
+
+  // The inventory must be exactly 28 slots, or every index-based operation is off by however
+  // many an older build wrote.
+  const slots = Array.isArray(state.inventory?.slots) ? state.inventory.slots : [];
+  slots.length = fresh.inventory.slots.length;
+  for (let index = 0; index < slots.length; index += 1) {
+    if (slots[index] === undefined) slots[index] = null;
+  }
+  state.inventory = { slots };
+
   return state;
 }
 

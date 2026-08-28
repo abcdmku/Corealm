@@ -165,6 +165,9 @@ export class ActivitySystem implements TickSystem {
 
     state.activity = activity;
     this.lastHealth = state.player.health;
+    // `summary()` is answered between ticks too (the API is synchronous), so keep the clock the
+    // summary reads current from the moment the activity exists.
+    if (atMs > this.lastAtMs) this.lastAtMs = atMs;
     this.store.markDirty();
 
     const entityId = entityIdOf(activity);

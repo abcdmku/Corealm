@@ -167,14 +167,9 @@ export class AgilitySystem implements TickSystem {
       const damage = this.rng.int(FAIL_DAMAGE_RANGE[0], FAIL_DAMAGE_RANGE[1]);
       state.player.health = Math.max(0, state.player.health - damage);
       this.deps.store.markDirty();
-      this.deps.events.emit(
-        "activity.stopped",
-        { kind: "traversing", reason: "failed", damage, obstacleId: entity.id, xp: 0 },
-        entity.id,
-        atMs,
-      );
-      // The spine emits its own `activity.stopped` right after this with reason "failed"; the extra
-      // event above is what carries the damage, which is the number a player or an agent reacts to.
+      // Rides out on the spine's single `activity.stopped` rather than a second, near-identical
+      // event of its own. Damage is the number a player or an agent actually reacts to.
+      this.deps.activity.noteStopData({ damage, xp: 0, health: state.player.health });
       return stopWith("failed");
     }
 
@@ -187,9 +182,11 @@ export class AgilitySystem implements TickSystem {
     state.player.movement.destinationEntityId = null;
 
     state.world.obstaclesUsed[entity.id] = (state.world.obstaclesUsed[entity.id] ?? 0) + 1;
-    awardXp(state, this.deps.events, "agility", agilityXp(entity.tier), atMs);
+    const xp = agilityXp(entity.tier);
+    awardXp(state, this.deps.events, "agility", xp, atMs);
     this.deps.store.markDirty();
 
+    this.deps.activity.noteStopData({ xp, damage: 0, exitPosition: state.player.position });
     return stopWith("completed");
   }
 

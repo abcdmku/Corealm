@@ -213,9 +213,16 @@ export function recipeXp(tier: number, craftWeight: number): number {
   return Math.round(gatherXp(tier) * craftWeight);
 }
 
-/** PRD 2.8. */
+/**
+ * PRD 2.8. Agility XP is 1.8x the gather XP for the tier.
+ *
+ * Defined on top of the ALREADY-ROUNDED gather XP, not on the raw curve. Rounding once at the end
+ * gives 18 / 44 / 64 at tiers 1 / 5 / 10; the PRD's acceptance criteria assert 18 / 43 / 63, which
+ * is what composing the rounded values produces. Expressing it in terms of `gatherXp` also makes
+ * the relationship explicit rather than re-deriving the same exponent in two places.
+ */
 export function agilityXp(tier: number): number {
-  return Math.round(10 * Math.pow(tier, 0.55) * 1.8);
+  return Math.round(gatherXp(tier) * 1.8);
 }
 
 /** PRD 2.8. */
