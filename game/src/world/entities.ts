@@ -265,6 +265,14 @@ export class EntityStore {
   }
 
   private matches(entity: SemanticEntity, filter: ObserveFilter): boolean {
+    // Assembled buildings put ~685 scenery rows in the store — 302 of them inside the default 40 m
+    // radius in Coldbrace alone. Unfiltered, `observe()` in a town returns 25 wall pieces and no
+    // shopkeeper, which is useless to an agent and to the UI.
+    //
+    // They stay IN the store on purpose: picking returns whatever mesh the ray hits, so scenery
+    // held outside the store would make every click on a building a NOT_FOUND. `get`, `inspect`
+    // and `moveTo({entityId})` all bypass this filter, so clicking a wall still works.
+    if (entity.meta?.scenery === true) return false;
     if (filter.regionId && entity.regionId !== filter.regionId) return false;
     if (!this.matchesArchetypeAndInteraction(entity, filter)) return false;
     if (filter.requirementsMet !== undefined) {

@@ -46,7 +46,23 @@ export class AssetRegistry {
   private loader = new GLTFLoader();
   private loaded = new Map<string, THREE.Group>();
   private inflight = new Map<string, Promise<THREE.Group>>();
+  /**
+   * Shared humanoid clip library, keyed by bare clip name.
+   *
+   * Safe ONLY because every humanoid pack shares one identical 65-bone skeleton (measured, see
+   * runs/corealm/stack-findings.md section 2), so a clip from any of them plays on any of them.
+   */
   private clips = new Map<string, THREE.AnimationClip>();
+
+  /**
+   * Per-asset clips, keyed `${assetId}:${clipName}`.
+   *
+   * The monster GLBs each export clips called `Idle` / `Walk` / `Death` on three DIFFERENT
+   * skeletons, so a single global name map lets whichever file loaded first win the name and
+   * deform the others. Every clip is recorded here as well, so a caller that knows which asset it
+   * is animating can ask for that asset's own clip instead of a same-named stranger's.
+   */
+  private assetClips = new Map<string, THREE.AnimationClip>();
 
   async loadManifest(): Promise<AssetManifest> {
     const response = await fetch(ASSET_MANIFEST_URL);
@@ -96,7 +112,12 @@ export class AssetRegistry {
         const group = gltf.scene;
         group.name = id;
         for (const clip of gltf.animations) {
-          if (!this.clips.has(clip.name)) this.clips.set(clip.name, clip);
+          this.assetClips.set(`${id}:${clip.name}`, clip);
+          // The shared library is for the humanoid rig only. Letting a crab's "Idle" claim the
+          // global name would hand it to every base character that asks for one.
+          if (entry.category === "animation" && !this.clips.has(clip.name)) {
+            this.clips.set(clip.name, clip);
+          }
         }
         this.loaded.set(id, group);
         this.inflight.delete(id);
@@ -125,8 +146,27 @@ export class AssetRegistry {
     return this.clips.size;
   }
 
+  /** A clip from the shared humanoid library. */
   clip(name: string): THREE.AnimationClip | undefined {
     return this.clips.get(name);
+  }
+
+  /**
+   * A clip belonging to one specific asset. Prefer this whenever the rig is not the shared
+   * humanoid skeleton — the monster packs reuse clip names across incompatible skeletons.
+   */
+  clipOf(assetId: string, name: string): THREE.AnimationClip | undefined {
+    return this.assetClips.get(`${assetId}:${name}`);
+  }
+
+  /** Every clip an asset shipped, in load order. */
+  clipsOf(assetId: string): THREE.AnimationClip[] {
+    const prefix = `${assetId}:`;
+    const found: THREE.AnimationClip[] = [];
+    for (const [key, clip] of this.assetClips) {
+      if (key.startsWith(prefix)) found.push(clip);
+    }
+    return found;
   }
 
   clipNames(): string[] {
@@ -147,11 +187,12 @@ export class AssetRegistry {
     return this.loaded.has(id);
   }
 
-  stats(): { manifestAssets: number; loaded: number; clips: number } {
+  stats(): { manifestAssets: number; loaded: number; clips: number; assetClips: number } {
     return {
       manifestAssets: this.manifest?.assets.length ?? 0,
       loaded: this.loaded.size,
       clips: this.clips.size,
+      assetClips: this.assetClips.size,
     };
   }
 }

@@ -224,9 +224,18 @@ export class MaterialLibrary {
    * Roads and worn paths. Drawn as a thin ribbon laid over the terrain, so it needs a polygon
    * offset rather than a vertical lift — a lift would float over dips and sink into crests.
    */
+  /**
+   * Road ribbon.
+   *
+   * `DoubleSide` is load-bearing, not decoration. The ribbon is a flat horizontal strip whose
+   * triangle winding comes out facing down, so with the default `FrontSide` every road in the game
+   * was built, added to the scene, marked visible — and backface-culled from the only angle a
+   * player ever sees it from. Forty-two roads rendered as nothing.
+   */
   road(regionId: RegionId = "fallowmarch"): THREE.MeshStandardMaterial {
     return this.remember(this.key(["road", regionId]), () =>
       new THREE.MeshStandardMaterial({
+        side: THREE.DoubleSide,
         color: REGION_PALETTES[regionId].soil,
         roughness: 0.99,
         metalness: 0,

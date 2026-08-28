@@ -18,6 +18,7 @@
  *
  * Everything below the nine is a Corealm-specific test helper.
  */
+import type * as THREE from "three";
 import type { EntityId, ItemId, QuestId, SkillId, Vec3 } from "../contracts.js";
 import type { Store } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
@@ -304,11 +305,42 @@ export function installGameDebug(deps: DebugDeps): void {
       return nav.listRouteNodes();
     },
 
+    /**
+     * Counts what is actually in the scene graph, by group and by name prefix.
+     *
+     * Added because three separate "why can I not see X" investigations were each reduced to
+     * guessing from a screenshot. A render bug is either "the object was never created" or "the
+     * object exists and is invisible", and those need completely different fixes.
+     */
+    getSceneStats(): Record<string, unknown> {
+      const counts: Record<string, number> = {};
+      const hidden: Record<string, number> = {};
+      let total = 0;
+      renderer.scene.traverse((object) => {
+        total += 1;
+        const key = object.name ? object.name.replace(/[-_]?\d+$/, "") : object.type;
+        counts[key] = (counts[key] ?? 0) + 1;
+        let node: THREE.Object3D | null = object;
+        let visible = true;
+        while (node) {
+          if (!node.visible) { visible = false; break; }
+          node = node.parent;
+        }
+        if (!visible) hidden[key] = (hidden[key] ?? 0) + 1;
+      });
+      return { totalObjects: total, counts, hidden };
+    },
+
     listClips(): string[] {
       return assets.clipNames();
     },
 
     focusCamera(shotId: string): boolean {
+      return deps.focusCamera(shotId);
+    },
+
+    /** Alias. `tools/screenshot.ts --preset` calls this name. */
+    setCameraPreset(shotId: string): boolean {
       return deps.focusCamera(shotId);
     },
 

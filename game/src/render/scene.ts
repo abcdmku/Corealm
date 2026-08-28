@@ -716,7 +716,7 @@ export class WorldScene {
         const x = current[0] + nx * (width / 2) * side;
         const z = current[2] + nz * (width / 2) * side;
         positions[index * 3] = x;
-        positions[index * 3 + 1] = this.heightAtXZ(x, z) + 0.06;
+        positions[index * 3 + 1] = this.heightAtXZ(x, z) + ROAD_LIFT;
         positions[index * 3 + 2] = z;
         colours[index * 3] = edge.r;
         colours[index * 3 + 1] = edge.g;
@@ -1013,6 +1013,16 @@ function terraceRamp(spec: RegionTerrainSpec, x: number, z: number, width: numbe
     default: return (x - spec.rect.minX) / width;
   }
 }
+
+/**
+ * How far a road ribbon floats above the analytic ground height, in metres.
+ *
+ * 0.06 was buried. The terrain MESH samples the height field on a 2 m grid and interpolates
+ * between, so the drawn surface sits up to 0.35 m above the analytic value on a convex rise
+ * (measured). A lift smaller than that error hides the road for most of its length. 0.30 clears it
+ * almost everywhere while staying far too small to read as floating at the camera's distance.
+ */
+const ROAD_LIFT = 0.3;
 
 /** Even-ish resampling of a polyline, so road ribbons do not stretch across long segments. */
 function resamplePolyline(points: readonly Vec3[], spacing: number): Vec3[] {

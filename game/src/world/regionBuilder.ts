@@ -25,9 +25,14 @@ import type {
 import { RngStreams, type Rng } from "../core/rng.js";
 import {
   REGIONS, WALK_SPEED_MPS,
-  type DungeonDef, type EnemyGroupDef, type LocationDef, type ObstacleDef,
-  type RegionDef, type ResourceClusterDef, type Spot,
+  type BuildingDef, type DungeonDef, type EnemyGroupDef, type LocationDef, type ObstacleDef,
+  type PrefabId, type RegionDef, type ResourceClusterDef, type Spot,
 } from "../content/regions.js";
+import {
+  buildComposition, buildPrefab, prefabCollision, variantSeed,
+  type CompositionId, type PartPlacement,
+} from "../render/buildings.js";
+import { tierSilhouetteScale } from "../render/materials.js";
 import type { KnownLocation } from "./entities.js";
 
 // ------------------------------------------------------------------ formulas
@@ -72,12 +77,37 @@ export interface RouteEdgeOut {
   reqLevel?: number;
 }
 
+/**
+ * A solid mass a building occupies, in world space. Emitted so the root can make settlements solid
+ * without re-deriving where the walls went.
+ *
+ * TODO(integration, root): buildings are drawn but not yet solid. The navmesh is built from
+ * `scene.getWalkableMeshes()` at boot step 9, before any of this exists, so a path currently runs
+ * straight through a wall and `Physics` has only the terrain heightfield. Two things close it:
+ * add a box collider per entry here after `physics.addHeightfield(...)`, and mark the same boxes
+ * unwalkable before `nav.build(...)` (or carve them as Recast convex-volume obstacles afterwards).
+ * `rotationY` is about the box centre; `halfExtents` is [x, y, z] in the building's own frame.
+ */
+export interface BuildingBox {
+  id: string;
+  buildingId: string;
+  name: string;
+  regionId: RegionId;
+  prefab: PrefabId;
+  /** Centre of the box: ground height at the building origin plus half its height. */
+  position: Vec3;
+  halfExtents: readonly [number, number, number];
+  rotationY: number;
+}
+
 export interface BuiltWorld {
   entities: SemanticEntity[];
   routeNodes: RouteNodeOut[];
   routeEdges: RouteEdgeOut[];
   /** Named places for `EntityStore.registerLocations`, so `scope: "known"` has something to say. */
   knownLocations: KnownLocation[];
+  /** Collision volumes for the assembled buildings. See `BuildingBox`. */
+  buildings: BuildingBox[];
 }
 
 export type HeightAt = (regionId: RegionId, x: number, z: number) => number;
@@ -91,6 +121,7 @@ export function buildWorld(seed: number, heightAt: HeightAt): BuiltWorld {
   const routeNodes: RouteNodeOut[] = [];
   const knownLocations: KnownLocation[] = [];
   const edges: RouteEdgeOut[] = [];
+  const buildings: BuildingBox[] = [];
 
   /** locationId -> resolved world position, so edge costs use the same Y the player walks on. */
   const nodePositions = new Map<string, Vec3>();
@@ -123,7 +154,7 @@ export function buildWorld(seed: number, heightAt: HeightAt): BuiltWorld {
 
   // -- pass 2: entities.
   for (const region of REGIONS) {
-    buildRegionEntities(region, rng, heightAt, entities, locationEntity);
+    buildRegionEntities(region, rng, heightAt, entities, locationEntity, buildings);
   }
   for (const region of REGIONS) {
     const dungeon = region.dungeon;
@@ -186,7 +217,7 @@ export function buildWorld(seed: number, heightAt: HeightAt): BuiltWorld {
     if (entityId) location.entityId = entityId;
   }
 
-  return { entities, routeNodes, routeEdges: edges, knownLocations };
+  return { entities, routeNodes, routeEdges: edges, knownLocations, buildings };
 }
 
 /**
@@ -233,6 +264,7 @@ function buildRegionEntities(
   heightAt: HeightAt,
   out: SemanticEntity[],
   locationEntity: Map<string, EntityId>,
+  buildings: BuildingBox[],
 ): void {
   const place = (spot: Spot): Vec3 => spotToVec3(spot, heightAt, region.id);
 
@@ -241,6 +273,40 @@ function buildRegionEntities(
   }
 
   const settlement = region.settlement;
+
+  // Buildings. Round-1 critique finding 1: `settlement.buildings` was authored and never read, so
+  // 37 buildings across three settlements rendered as nothing at all. Each one is now assembled by
+  // `render/buildings.ts` into 2 m modules and emitted as one instanced part per piece: the render
+  // path already batches by (assetId, tier), so a whole street of cottages is a dozen draw calls.
+  for (const building of settlement.buildings) {
+    const origin = place(building.position);
+    const seed = variantSeed(building.id);
+    emitParts(
+      buildPrefab(building.prefab, building.footprint, seed),
+      origin, building.rotationY, region.id, region.tier,
+      building.id, building.name,
+      { buildingId: building.id, prefab: building.prefab, settlementId: settlement.id, scenery: true },
+      out,
+    );
+    for (const box of prefabCollision(building.prefab, building.footprint)) {
+      const cos = Math.cos(building.rotationY);
+      const sin = Math.sin(building.rotationY);
+      buildings.push({
+        id: `${building.id}#${box.tag}`,
+        buildingId: building.id,
+        name: building.name,
+        regionId: region.id,
+        prefab: building.prefab,
+        position: [
+          round2(origin[0] + box.dx * cos + box.dz * sin),
+          round2(origin[1] + box.height / 2),
+          round2(origin[2] - box.dx * sin + box.dz * cos),
+        ],
+        halfExtents: [round2(box.sizeX / 2), round2(box.height / 2), round2(box.sizeZ / 2)],
+        rotationY: building.rotationY,
+      });
+    }
+  }
 
   out.push({
     id: settlement.bank.id,
@@ -321,41 +387,132 @@ function buildRegionEntities(
   }
 
   for (const landmark of region.landmarks) {
+    const origin = place(landmark.position);
     out.push({
       id: landmark.id,
       archetype: "landmark",
       name: landmark.name,
       tier: region.tier,
       regionId: region.id,
-      position: place(landmark.position),
+      position: origin,
       state: "present",
       interactions: ["inspect"],
       view: {
         assetId: landmark.assetId,
-        scale: landmark.scale,
+        scale: trueScale(landmark.scale, region.tier),
         rotationY: landmark.rotationY,
         labelHeight: 4,
       },
       meta: { blurb: landmark.blurb },
     });
     locationEntity.set(landmark.id, landmark.id);
+    // Finding 8: a landmark drawn as one stand-in prop is not a silhouette. The hero mesh above is
+    // still the clickable, inspectable entity; these parts are what the player navigates by.
+    emitComposition(
+      landmark.composition, origin, landmark.rotationY ?? 0, region.id, region.tier,
+      landmark.id, landmark.name, { blurb: landmark.blurb, scenery: true }, out,
+    );
   }
 
   for (const gate of region.gates) {
+    const origin = place(gate.position);
     out.push({
       id: gate.id,
       archetype: "portal",
       name: gate.name,
       tier: region.tier,
       regionId: region.id,
-      position: place(gate.position),
+      position: origin,
       state: "open",
       interactions: ["inspect", "enter"],
-      view: { assetId: gate.assetId, rotationY: gate.rotationY, scale: 1.4, labelHeight: 3.4 },
+      view: {
+        assetId: gate.assetId,
+        rotationY: gate.rotationY,
+        scale: trueScale(1.4, region.tier),
+        labelHeight: 3.4,
+      },
       meta: { toRegionId: gate.toRegionId, toLocationId: gate.toLocationId },
     });
     locationEntity.set(gate.id, gate.id);
+    emitComposition(
+      gate.composition, origin, gate.rotationY ?? 0, region.id, region.tier,
+      gate.id, gate.name, { toRegionId: gate.toRegionId, scenery: true }, out,
+    );
   }
+}
+
+/**
+ * Turns a prefab or composition part list into semantic entities.
+ *
+ * Two details are load-bearing:
+ *
+ *  - Every part of one building shares the origin's ground height. Buildings are level; following
+ *    the terrain per part would shear a 12 m hall. Settlement pads are flattened for exactly this
+ *    (`app/worldSpec.ts` puts a 34 m flat spot under each settlement centre).
+ *  - `render/entityViews.ts` multiplies `view.scale` by `tierSilhouetteScale(materialTier)`, which
+ *    is 0.92 at tier 1. Left alone, every 2 m wall module would draw 1.84 m wide and the kit would
+ *    not meet on its own grid, so the scale written here cancels it exactly. Importing the real
+ *    function rather than mirroring the constant means it cannot drift.
+ */
+function emitParts(
+  parts: readonly PartPlacement[],
+  origin: Vec3,
+  rotationY: number,
+  regionId: RegionId,
+  tier: number,
+  ownerId: string,
+  name: string,
+  meta: Record<string, string | number | boolean>,
+  out: SemanticEntity[],
+): void {
+  const cos = Math.cos(rotationY);
+  const sin = Math.sin(rotationY);
+  const compensation = 1 / tierSilhouetteScale(tier);
+
+  for (const part of parts) {
+    out.push({
+      id: `${ownerId}#${part.tag}`,
+      archetype: "landmark",
+      name,
+      tier,
+      regionId,
+      position: [
+        round2(origin[0] + part.dx * cos + part.dz * sin),
+        round2(origin[1] + part.dy),
+        round2(origin[2] - part.dx * sin + part.dz * cos),
+      ],
+      state: "present",
+      // Deliberately empty. Scenery is drawn, hovered and walked to, never interacted with, and an
+      // empty list keeps `observe({ interaction: ... })` clean.
+      interactions: [],
+      view: {
+        assetId: part.assetId,
+        scale: round4(part.scale * compensation),
+        rotationY: round4(rotationY + part.rotationY),
+        materialTier: tier,
+        labelHeight: 2,
+      },
+      meta,
+    });
+  }
+}
+
+function emitComposition(
+  composition: CompositionId | undefined,
+  origin: Vec3,
+  rotationY: number,
+  regionId: RegionId,
+  tier: number,
+  ownerId: string,
+  name: string,
+  meta: Record<string, string | number | boolean>,
+  out: SemanticEntity[],
+): void {
+  if (!composition) return;
+  emitParts(
+    buildComposition(composition, variantSeed(ownerId)),
+    origin, rotationY, regionId, tier, ownerId, name, meta, out,
+  );
 }
 
 function buildDungeonEntities(
@@ -372,19 +529,36 @@ function buildDungeonEntities(
   const placeAt = (spot: Spot, offset: number): Vec3 => [spot[0], floorBase + offset, spot[1]];
 
   // The mouth itself lives in Karrowmoor: the player walks up to it on the surface and enters.
+  const mouth: Vec3 = [dungeon.entrance[0], floorBase, dungeon.entrance[1]];
+  const mouthRotation = dungeon.entranceRotationY ?? 0;
   out.push({
     id: "gravelmaw_mouth_portal",
     archetype: "portal",
     name: dungeon.name,
     tier: dungeon.tier,
     regionId: region.id,
-    position: [dungeon.entrance[0], floorBase, dungeon.entrance[1]],
+    position: mouth,
     state: "open",
     interactions: ["inspect", "enter"],
-    view: { assetId: dungeon.entranceAssetId, scale: 4, labelHeight: 6 },
+    view: {
+      assetId: dungeon.entranceAssetId,
+      // 8 m x 12 m exactly, because the PRD's "twelve-metre wound" is a number the composition
+      // around it is measured against.
+      scale: trueScale(dungeon.entranceScale ?? 4, region.tier),
+      rotationY: mouthRotation,
+      labelHeight: 6,
+    },
     meta: { toRegionId: dungeon.id, toLocationId: "gravelmaw_chamber1" },
   });
   locationEntity.set("gravelmaw_entrance", "gravelmaw_mouth_portal");
+
+  // Finding 8: the twelve-metre wound was a lone wooden door frame on open ground. The cliffs, the
+  // brow of rock above it and the two braziers are what make it read as a hole in a quarry face.
+  // Region tier, not dungeon tier, because these parts stand on Karrowmoor's surface.
+  emitComposition(
+    dungeon.entranceComposition, mouth, mouthRotation, region.id, region.tier,
+    "gravelmaw_mouth_portal", dungeon.name, { scenery: true, dungeonId: dungeon.id }, out,
+  );
 
   for (const chamber of dungeon.chambers) {
     // The marker is a brazier, so it sits against the chamber's north wall rather than dead
@@ -663,6 +837,25 @@ function distanceXZSpot(a: Spot, b: Spot): number {
 /** Two decimals everywhere, so the built world serialises identically across runs. */
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/** Four decimals for scales and rotations, where two would visibly shift a 2 m module. */
+function round4(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
+/**
+ * `render/entityViews.ts` multiplies every `view.scale` by `tierSilhouetteScale(materialTier)`.
+ * That rule exists to make an ore tier readable at 12 m; it has no business resizing architecture,
+ * and it breaks the modular kit outright - the same 2 m wall would be 1.8 m in Fallowmarch and
+ * 2.3 m in Karrowmoor, so nothing would meet and no composition would line up with the mesh it is
+ * built around.
+ *
+ * Landmarks, gates, the dungeon mouth and every assembled building therefore cancel it, and their
+ * authored `scale` means true metres. Resource nodes and enemies keep the tier rule.
+ */
+function trueScale(authored: number | undefined, tier: number): number {
+  return round4((authored ?? 1) / tierSilhouetteScale(tier));
 }
 
 /** The bank's route node id differs per settlement; this keeps the mapping in one place. */

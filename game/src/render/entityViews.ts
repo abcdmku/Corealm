@@ -107,6 +107,15 @@ const SEAM_SHARDS = 5;
 /** Fraction of the idle clip to freeze at for the instanced fallback. Mid-clip, i.e. settled. */
 const BAKE_PHASE = 0.35;
 
+/**
+ * Draw calls held in reserve for named characters, out of `maxUniqueDrawCalls`.
+ *
+ * Without this the budget is first-come, and entity order is region order: forty wilderness
+ * enemies would spend the whole allowance before the first shopkeeper in Coldbrace is reached, so
+ * the characters the player actually stands in front of would be the ones rendered as statues.
+ */
+const NAMED_CHARACTER_RESERVE = 64;
+
 interface SourcePart {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
@@ -152,8 +161,10 @@ interface ViewRecord {
   unique: THREE.Object3D | null;
   /** Mixer driving `unique`, when this entity earned one. */
   rig: RigState | null;
-  /** Draw calls `unique` costs, counted once at build rather than guessed. */
+  /** Meshes in `unique`, counted once at build rather than guessed. */
   uniqueMeshes: number;
+  /** Draw calls `unique` costs, shadow pass included. Returned to the pool on release. */
+  uniqueCost: number;
   /** Set when a rigged entity was built before its skeleton source was available. */
   awaitingRig: boolean;
   /** Cheap change detection so a steady frame writes nothing. */
@@ -178,19 +189,36 @@ export interface EntityViewStats {
   /** Rigged assets whose instanced fallback runs from a baked idle pose, not bind pose. */
   bakedPoses: number;
   highlights: number;
-  /** Instanced meshes + unique meshes + highlight meshes. Excludes the shadow pass. */
+  /**
+   * Draw calls this layer is responsible for, INCLUDING the shadow pass.
+   *
+   * Round 1 excluded the shadow pass and assumed 10 meshes per character. Both were wrong in the
+   * expensive direction: every instanced entity mesh casts, so it draws twice, and the base NPCs
+   * Phase 1 uses are 3-4 meshes, not 10. A budget you cannot compare against
+   * `renderer.info.render.calls` is not a budget.
+   */
   estimatedDrawCalls: number;
+  /** Draw calls currently spent on the non-instanced character path, against its own budget. */
+  uniqueDrawCalls: number;
   triangles: number;
   missingAssets: string[];
 }
 
 export interface EntityViewOptions {
   /**
-   * A fully dressed character is ~27k triangles across 10 skinned meshes (measured,
-   * stack-findings.md section 7); the base NPCs used in Phase 1 are lighter, at 3-4 meshes. Past
-   * this many, rigged entities fall back to the instanced baked-pose path rather than blowing the
-   * draw-call budget.
+   * THE cap that matters, expressed in the unit the budget is written in.
+   *
+   * A rigged character cannot be instanced — its pose lives in its skeleton — so every one of them
+   * is a straight per-mesh cost, doubled because they cast. A fully dressed character is 10 skinned
+   * meshes (stack-findings.md section 7) and the Phase 1 base NPCs are 3-4, so a cap counted in
+   * ENTITIES is off by a factor of three depending on which asset happens to be nearby. Counting
+   * draw calls instead makes the ceiling mean the same thing whatever the art is.
+   *
+   * Off-screen characters are frustum-culled to nothing, so this is a world-wide allowance rather
+   * than a per-frame one; the per-frame cost is whatever subset is actually in shot.
    */
+  maxUniqueDrawCalls?: number;
+  /** Hard ceiling on unique objects regardless of cost, so a cheap asset cannot flood the scene. */
   maxUniqueViews?: number;
   /**
    * Mixers ticked per frame, nearest first. Separate from `maxUniqueViews` because a mixer costs
@@ -229,8 +257,13 @@ export class EntityViews {
   private readonly bakedGeometries: THREE.BufferGeometry[] = [];
   /** Rigged records with a mixer. Kept as its own set so `update` never walks 600 ore nodes. */
   private readonly animated = new Set<ViewRecord>();
+  private readonly animationOrder: ViewRecord[] = [];
   private animatedLastFrame = 0;
+  /** Meshes per rigged asset, so the budget can be checked BEFORE paying for a skeleton clone. */
+  private readonly meshCounts = new Map<string, number>();
+  private uniqueDrawCalls = 0;
 
+  private readonly maxUniqueDrawCalls: number;
   private readonly maxUniqueViews: number;
   private readonly maxAnimatedViews: number;
   private readonly animationRadiusSq: number;
@@ -244,9 +277,10 @@ export class EntityViews {
     private readonly materials: MaterialLibrary,
     options: EntityViewOptions = {},
   ) {
+    this.maxUniqueDrawCalls = options.maxUniqueDrawCalls ?? 96;
     this.maxUniqueViews = options.maxUniqueViews ?? 24;
-    this.maxAnimatedViews = options.maxAnimatedViews ?? 14;
-    this.animationRadiusSq = (options.animationRadius ?? 55) ** 2;
+    this.maxAnimatedViews = options.maxAnimatedViews ?? 10;
+    this.animationRadiusSq = (options.animationRadius ?? 40) ** 2;
     this.minHighlightRadius = options.minHighlightRadius ?? 0.9;
     this.group.name = "entity-views";
     this.highlightGroup.name = "entity-highlights";
@@ -368,7 +402,11 @@ export class EntityViews {
     // of an idle clip costs real time and looks identical to not doing it.
     const delta = Math.min(Math.max(deltaSeconds, 0), 0.25);
 
-    let ranked = [...this.animated];
+    // Reused rather than rebuilt: this runs every frame, and a fresh array per frame is garbage
+    // the collector has to walk during exactly the frames that are already the most expensive.
+    const ranked = this.animationOrder;
+    ranked.length = 0;
+    for (const record of this.animated) ranked.push(record);
     if (viewer && ranked.length > 1) {
       ranked.sort((a, b) =>
         a.position.distanceToSquared(viewer) - b.position.distanceToSquared(viewer));
@@ -442,18 +480,28 @@ export class EntityViews {
     let unique: THREE.Object3D | null = null;
     let rig: RigState | null = null;
     let uniqueMeshes = 0;
+    let uniqueCost = 0;
 
-    if (rigged && source && this.countUnique() < this.maxUniqueViews) {
+    if (source && this.canAffordUnique(entity.archetype, view.assetId, source)) {
+      uniqueMeshes = this.meshesIn(view.assetId, source);
+      uniqueCost = uniqueMeshes * 2;
       unique = cloneRigged(source);
       unique.userData.entityId = entity.id;
       unique.traverse((child) => {
         child.userData.entityId = entity.id;
-        if ((child as THREE.Mesh).isMesh) uniqueMeshes += 1;
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        // Characters ground themselves with their own shadow. It is the second draw the budget
+        // above is counting, and a floating shadowless NPC reads as unfinished on its own.
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        // Keep the authored material, so a live -> dead -> respawned entity re-derives its look
+        // from the ART rather than from its own previous variant. Compounding variants is how a
+        // node that respawns after being mined comes back permanently grey.
+        mesh.userData.baseMaterial = mesh.material;
       });
-      const look = APPEARANCE[entity.archetype] ?? NEUTRAL;
-      this.materials.retint(unique, tier, look.strength, look.swatch, (material) =>
-        !PROTECTED_MATERIAL.test(material.name));
       this.group.add(unique);
+      this.uniqueDrawCalls += uniqueCost;
       rig = this.attachRig(entity, unique, view.assetId);
     }
 
@@ -468,6 +516,7 @@ export class EntityViews {
       unique,
       rig,
       uniqueMeshes,
+      uniqueCost,
       // A rigged entity built before its skeleton source arrived is re-acquired on the next sync.
       awaitingRig: rigged && !source,
       signature: "",
@@ -494,6 +543,9 @@ export class EntityViews {
     if (record.unique) {
       record.unique.removeFromParent();
       record.unique = null;
+      this.uniqueDrawCalls = Math.max(0, this.uniqueDrawCalls - record.uniqueCost);
+      record.uniqueCost = 0;
+      record.uniqueMeshes = 0;
       return;
     }
     const group = this.groups.get(record.groupKey);
@@ -515,21 +567,24 @@ export class EntityViews {
    * fires before the loop starts.
    */
   private dropUnposed(): void {
-    for (const [key, group] of [...this.groups]) {
-      if (!group.needsPose || !this.sources.has(group.assetId)) continue;
-      for (const [entityId, record] of [...this.records]) {
-        if (record.groupKey !== key) continue;
-        this.release(record);
-        this.records.delete(entityId);
-      }
-      for (const mesh of [...group.live, ...group.spent]) mesh.removeFromParent();
-      this.groups.delete(key);
+    const stale = new Set<string>();
+    for (const [key, group] of this.groups) {
+      if (group.needsPose && this.sources.has(group.assetId)) stale.add(key);
     }
 
     for (const [entityId, record] of [...this.records]) {
-      if (!record.awaitingRig || !this.sources.has(this.groups.get(record.groupKey)?.assetId ?? "")) continue;
+      const group = this.groups.get(record.groupKey);
+      const sourceReady = group ? this.sources.has(group.assetId) : false;
+      if (!stale.has(record.groupKey) && !(record.awaitingRig && sourceReady)) continue;
       this.release(record);
       this.records.delete(entityId);
+    }
+
+    for (const key of stale) {
+      const group = this.groups.get(key);
+      if (!group) continue;
+      for (const mesh of [...group.live, ...group.spent]) mesh.removeFromParent();
+      this.groups.delete(key);
     }
   }
 
@@ -674,16 +729,18 @@ export class EntityViews {
 
         if (skinned.isSkinnedMesh && skinned.skeleton) {
           const frozen = freezeSkin(skinned);
-          this.bakedGeometries.push(frozen);
-          // `applyBoneTransform` returns positions in the mesh's bind space, so the bind matrix is
-          // exactly the transform that puts them back where the bones live.
-          parts.push({
-            geometry: frozen,
-            material,
-            matrix: skinned.bindMatrix.clone(),
-            triangles: triangleCount(frozen),
-          });
-          return;
+          if (frozen) {
+            this.bakedGeometries.push(frozen);
+            // `applyBoneTransform` returns positions in the mesh's bind space, so the bind matrix
+            // is exactly the transform that puts them back where the bones live.
+            parts.push({
+              geometry: frozen,
+              material,
+              matrix: skinned.bindMatrix.clone(),
+              triangles: triangleCount(frozen),
+            });
+            return;
+          }
         }
         parts.push({
           geometry: mesh.geometry,
@@ -846,6 +903,32 @@ export class EntityViews {
     return null;
   }
 
+  /**
+   * Whether this entity may take the non-instanced path, checked BEFORE the skeleton clone.
+   *
+   * Deciding after cloning would mean paying for ~50 rejected character clones at boot, which is
+   * the kind of cost that only shows up as "the loading screen got slower" with nothing to blame.
+   */
+  private canAffordUnique(archetype: Archetype, assetId: string, source: THREE.Object3D): boolean {
+    if (this.countUnique() >= this.maxUniqueViews) return false;
+    const cost = this.meshesIn(assetId, source) * 2;
+    if (cost === 0) return false;
+    const named = archetype === "npc" || archetype === "boss";
+    const ceiling = named ? this.maxUniqueDrawCalls : this.maxUniqueDrawCalls - NAMED_CHARACTER_RESERVE;
+    return this.uniqueDrawCalls + cost <= ceiling;
+  }
+
+  private meshesIn(assetId: string, source: THREE.Object3D): number {
+    const cached = this.meshCounts.get(assetId);
+    if (cached !== undefined) return cached;
+    let count = 0;
+    source.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) count += 1;
+    });
+    this.meshCounts.set(assetId, count);
+    return count;
+  }
+
   private isRigged(assetId: string): boolean {
     const cached = this.riggedAssets.get(assetId);
     if (cached !== undefined) return cached;
@@ -909,6 +992,8 @@ export class EntityViews {
       mesh.frustumCulled = true;
       for (let slot = 0; slot < group.capacity; slot += 1) mesh.setMatrixAt(slot, HIDDEN);
       mesh.instanceMatrix.needsUpdate = true;
+      // Allocated capacity is not the same as occupied capacity. See `flush`.
+      mesh.count = group.slots.length;
       this.instanceOwners.set(mesh, group);
       this.group.add(mesh);
       return mesh;
@@ -946,31 +1031,59 @@ export class EntityViews {
   }
 
   /**
-   * Spent treatment for a non-instanced entity. A dead character keeps its rig but stops being
-   * ticked, so it holds whatever pose it died in rather than popping to bind.
+   * Paints a non-instanced entity for its current state, always from the authored material.
+   *
+   * A dead character keeps its rig but stops being ticked, so it holds whatever pose it stopped in
+   * rather than popping back to bind — which is the one thing that would put the arms-out silhouette
+   * back on screen after all this.
    */
   private applyUniqueState(record: ViewRecord, tier: number): void {
     if (!record.unique) return;
-    if (!record.spent) return;
 
     if (record.rig) {
-      record.rig.action.paused = true;
-      this.animated.delete(record);
+      record.rig.action.paused = record.spent;
+      if (record.spent) this.animated.delete(record);
+      else this.animated.add(record);
+    }
+
+    restoreBaseMaterials(record.unique);
+    const look = APPEARANCE[record.archetype] ?? NEUTRAL;
+    if (!record.spent) {
+      this.materials.retint(record.unique, tier, look.strength, look.swatch, (material) =>
+        !PROTECTED_MATERIAL.test(material.name));
+      return;
     }
     record.unique.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      // Death ignores the protected-material rule on purpose: a corpse with bright living eyes is
+      // the wrong read, and this is the state the player most needs to see from across a clearing.
       const mapped = materials.map((material) =>
-        this.materials.variant(material, { tier, state: "dead", strength: 0.35 }));
+        this.materials.variant(material, { tier, state: "dead", strength: look.strength, swatch: look.swatch }));
       mesh.material = mapped.length === 1 ? mapped[0]! : mapped;
     });
   }
 
+  /**
+   * Uploads changed instance matrices and, just as importantly, trims `InstancedMesh.count` to the
+   * slots actually in use.
+   *
+   * Capacity grows in steps of 1.6x + 8, so a group holding 9 entities allocates 22 slots. Parking
+   * the spare 13 at a zero-scale matrix makes them invisible but NOT free: the draw still submits
+   * `count` instances and `renderer.info.render.triangles` still counts every one of them. On a
+   * rigged fallback group at ~27k triangles per character that is millions of phantom triangles in
+   * the perf report, which is most of the gap between the 12.56M measured at `gravelmaw_entrance`
+   * and what the visible world can account for.
+   *
+   * Slots are dense from zero and freed slots are reused, so `slots.length` is exactly the
+   * high-water mark and the correct count.
+   */
   private flush(): void {
     for (const group of this.groups.values()) {
       if (!group.dirty) continue;
       for (const mesh of [...group.live, ...group.spent]) {
+        mesh.count = group.slots.length;
         mesh.instanceMatrix.needsUpdate = true;
         mesh.computeBoundingSphere();
       }
@@ -1133,9 +1246,11 @@ export class EntityViews {
       animatedLastFrame: this.animatedLastFrame,
       bakedPoses,
       highlights: this.highlights.size,
-      // Counted, not guessed: round 1 assumed 10 meshes per character, which is right for a fully
-      // dressed modular outfit and roughly triple the truth for the base NPCs Phase 1 actually uses.
-      estimatedDrawCalls: instancedMeshes + uniqueMeshes + this.highlights.size * 2,
+      // Counted, not guessed, and with the shadow pass in it. Every instanced entity mesh and every
+      // unique character mesh casts, so each is two submitted draws; highlights are unlit overlays
+      // and are not, so a ring plus a pip is two.
+      estimatedDrawCalls: instancedMeshes * 2 + uniqueMeshes * 2 + this.highlights.size * 2,
+      uniqueDrawCalls: this.uniqueDrawCalls,
       triangles: Math.round(triangles + uniqueTriangles),
       missingAssets: [...this.missing],
     };
@@ -1148,6 +1263,8 @@ export class EntityViews {
     this.groups.clear();
     this.records.clear();
     this.animated.clear();
+    this.meshCounts.clear();
+    this.uniqueDrawCalls = 0;
     for (const geometry of this.seamGeometries.values()) geometry.dispose();
     for (const geometry of this.bakedGeometries) geometry.dispose();
     this.seamGeometries.clear();
@@ -1171,6 +1288,16 @@ function triangleCount(geometry: THREE.BufferGeometry): number {
   if (index) return Math.round(index.count / 3);
   const position = geometry.getAttribute("position");
   return position ? Math.round(position.count / 3) : 0;
+}
+
+/** Puts a unique object back on the materials its GLB shipped with, before a state is re-applied. */
+function restoreBaseMaterials(object: THREE.Object3D): void {
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const base = mesh.userData.baseMaterial as THREE.Material | THREE.Material[] | undefined;
+    if (base) mesh.material = base;
+  });
 }
 
 /** FNV-1a. Deterministic per-entity seeds, so animation phase survives a reload unchanged. */
@@ -1216,12 +1343,16 @@ function clipFits(root: THREE.Object3D, clip: THREE.AnimationClip): boolean {
  * skeleton and called `updateMatrixWorld` first. Skin attributes are dropped from the result: they
  * are dead weight on an instanced draw, and leaving them means Three.js still reports the geometry
  * as skinnable.
+ *
+ * Returns null rather than the source geometry when the mesh cannot be baked. The caller registers
+ * whatever it gets back for disposal, and handing it the shared source geometry would mean
+ * disposing the asset itself out from under every other user of it.
  */
-function freezeSkin(mesh: THREE.SkinnedMesh): THREE.BufferGeometry {
+function freezeSkin(mesh: THREE.SkinnedMesh): THREE.BufferGeometry | null {
   const source = mesh.geometry;
   const position = source.getAttribute("position");
   if (!position || !source.getAttribute("skinIndex") || !source.getAttribute("skinWeight")) {
-    return source;
+    return null;
   }
 
   const baked = source.clone();

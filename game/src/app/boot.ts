@@ -7,6 +7,7 @@
  * This file is where the round-1 workers' output is composed: A1's semantic world, A2's terrain and
  * views, A4's input. Each depends only on frozen contracts, so no worker had to know about another.
  */
+import * as THREE from "three";
 import type { RegionId, SkillId, Vec3 } from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
 import { Store } from "../state/store.js";
@@ -28,10 +29,11 @@ import { GameLoop } from "./loop.js";
 import { InputController } from "../input/mouse.js";
 import { KeyboardController } from "../input/keyboard.js";
 import { buildWorldTerrainSpec, startingSpawn } from "./worldSpec.js";
-import { buildWorld } from "../world/regionBuilder.js";
+import { CAMERA } from "./config.js";
+import { buildWorld, type BuildingBox } from "../world/regionBuilder.js";
 import { EntityStore, straightLineDistance } from "../world/entities.js";
 import { InteractionDispatcher } from "../world/interactions.js";
-import { REGIONS, validateRegions } from "../content/regions.js";
+import { REGIONS, getRegion, validateRegions } from "../content/regions.js";
 import { scatterWorld, worldExclusions } from "../world/scatter.js";
 import { findShot, shotIds } from "../debug/shots.js";
 
@@ -87,15 +89,32 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     errors.push({ atMs: atMs(), source: "assets", message: describeError(cause) });
   }
 
+  // Content references assets by id, so the ids can only be checked once the manifest exists.
+  // This catches a prefab part or landmark composition naming a mesh that was never shipped.
+  const knownAssetIds = new Set((assets.getManifest()?.assets ?? []).map((asset) => asset.id));
+  if (knownAssetIds.size > 0) {
+    for (const problem of validateRegions(knownAssetIds)) {
+      errors.push({ atMs: atMs(), source: "content.assets", message: problem });
+    }
+  }
+
   // 7. Terrain, derived from canonical region data so there is one source of truth for where the
   //    world is. See app/worldSpec.ts for why this is derived rather than authored twice.
   setStatus("raising the ground…");
+  // Flat pads are registered before the terrain mesh is generated, or the ground under a
+  // settlement stays as noisy as the moor around it — Coldbrace square measured a metre of tilt
+  // across 33 m before this. worldSpec derives the pads from the authored settlement data.
   scene.buildWorld(buildWorldTerrainSpec());
   // One heightfield collider rather than 28 terrain trimeshes: same ground answers, 24 ms instead
   // of a per-chunk trimesh build, and a single collider for the ray queries to walk.
   physics.addHeightfield(scene.heightfieldSamples());
 
   const heightAt = (regionId: RegionId, x: number, z: number): number => scene.heightAt(regionId, x, z);
+
+  // 7b. Roads. Authored as location-to-location links, so the ribbon is built from the endpoints
+  //     and draped onto the finished terrain. Without these the ground is one flat colour and
+  //     nothing tells a new player which direction leads to content.
+  buildRoads(scene);
 
   // 8. Semantic world. Data in, entities out, deterministic from the seed.
   setStatus("populating the frontier…");
@@ -112,9 +131,21 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   entityStore.load(built.entities);
   entityStore.registerLocations(built.knownLocations);
 
+  // 8b. Buildings become solid before the navmesh is generated, so paths route around them
+  //     instead of through a wall. Gatehouses emit two pier boxes with the gate gap left open.
+  for (const box of built.buildings) {
+    physics.addStaticBox(box.position, box.halfExtents as unknown as Vec3, box.rotationY);
+  }
+  // Recast reads raw geometry, so the cheapest way to make a building block a path is to hand the
+  // navmesh an invisible box for it. The vertical sides exceed the 48-degree walkable slope, so the
+  // footprint drops out of the mesh. A box top does generate a small isolated roof polygon, which
+  // is harmless: nothing connects to it, so no path can route over a roof.
+  const navObstacles = buildNavObstacles(built.buildings);
+  renderer.scene.add(navObstacles.group);
+
   // 9. Navmesh over the walkable terrain, then the route graph above it.
   setStatus("mapping walkable ground…");
-  if (!nav.build(scene.getWalkableMeshes())) {
+  if (!nav.build([...scene.getWalkableMeshes(), ...navObstacles.meshes])) {
     const failure = nav.snapshot(null, null, 0).error ?? "unknown";
     errors.push({ atMs: atMs(), source: "navigation", message: `Navmesh build failed: ${failure}` });
   }
@@ -145,14 +176,30 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     errors.push({ atMs: atMs(), source: "entityViews", message: `Missing asset "${missing}"` });
   }
 
+  // The camera pulls in when terrain or a building blocks the view of the player. The probe starts
+  // at head height rather than at the feet, so the player's own capsule is never the first hit —
+  // otherwise the camera jams at minimum distance permanently.
+  camera.setOcclusionProbe((from, to) => {
+    const direction: Vec3 = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+    const length = Math.hypot(direction[0], direction[1], direction[2]);
+    if (length < 0.001) return null;
+    const unit: Vec3 = [direction[0] / length, direction[1] / length, direction[2] / length];
+    return physics.raycast(from, unit, length);
+  });
+
   // 12. Player.
   const spawnSpec = startingSpawn();
   const groundY = scene.heightAt(spawnSpec.regionId, spawnSpec.x, spawnSpec.z);
   const spawn: Vec3 = nav.closestPoint([spawnSpec.x, groundY + 0.2, spawnSpec.z]) ?? [spawnSpec.x, groundY, spawnSpec.z];
+  // Facing convention matches NpcStandDef and debug/shots.ts: 0 looks toward +z.
+  // The camera sits behind the player, so its yaw is the player's facing plus pi.
+  const spawnFacing = getRegion(spawnSpec.regionId)?.spawnFacingRad ?? 0;
   store.get().player.position = spawn;
   store.get().player.regionId = spawnSpec.regionId;
+  store.get().player.facingRad = spawnFacing;
   scene.createPlaceholderPlayer();
-  scene.syncPlayer(spawn, 0, true);
+  scene.syncPlayer(spawn, spawnFacing, true);
+  camera.setPose(spawnFacing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
   camera.update(spawn[0], spawn[1], spawn[2], true);
 
   // 13. Save.
@@ -214,7 +261,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     store.reset(seed ?? store.get().meta.seed, Date.now());
     store.get().player.position = spawn;
     store.get().player.regionId = spawnSpec.regionId;
-    store.get().player.facingRad = 0;
+    store.get().player.facingRad = spawnFacing;
     rng.reseed(store.get().meta.seed);
     events.reset();
     clock.reset();
@@ -222,8 +269,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     movement.setDirectInput({ forward: 0, strafe: 0, cameraYaw: 0 });
     input.clear();
     camera.reset();
+    camera.setPose(spawnFacing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
     camera.update(spawn[0], spawn[1], spawn[2], true);
-    scene.syncPlayer(spawn, 0, true);
+    scene.syncPlayer(spawn, spawnFacing, true);
 
     // Node yields and enemy health are seeded world state, so a reset rebuilds them rather than
     // leaving a half-mined world behind a nominally fresh character.
@@ -283,6 +331,62 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   document.getElementById("boot-screen")?.remove();
   loop.start();
   return { loop, api };
+}
+
+/**
+ * Draws every authored road as a draped ribbon.
+ *
+ * Roads existed only as scatter exclusion corridors until now: the data was read, props were kept
+ * off it, and nothing was ever drawn. `scene.buildRoad` had zero callers.
+ */
+function buildRoads(scene: WorldScene): number {
+  let built = 0;
+  for (const region of REGIONS) {
+    const locationById = new Map(region.locations.map((location) => [location.id, location]));
+    for (const road of region.roads) {
+      const from = locationById.get(road.from);
+      const to = locationById.get(road.to);
+      if (!from || !to) continue;
+
+      // Sample along the link so the ribbon follows the ground instead of cutting through a rise.
+      const steps = Math.max(2, Math.ceil(Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1]) / 6));
+      const points: Vec3[] = [];
+      for (let step = 0; step <= steps; step += 1) {
+        const t = step / steps;
+        const x = from.position[0] + (to.position[0] - from.position[0]) * t;
+        const z = from.position[1] + (to.position[1] - from.position[1]) * t;
+        points.push([x, scene.heightAt(region.id, x, z), z]);
+      }
+      if (scene.buildRoad(points, 5, region.id)) built += 1;
+    }
+  }
+  return built;
+}
+
+/**
+ * Invisible collision proxies handed to Recast so paths route around buildings.
+ * Never rendered: `visible = false` keeps them out of every draw call while Recast still reads
+ * their geometry, which it takes from the buffers rather than from the render list.
+ */
+function buildNavObstacles(boxes: readonly BuildingBox[]): { group: THREE.Group; meshes: THREE.Mesh[] } {
+  const group = new THREE.Group();
+  group.name = "nav-obstacles";
+  group.visible = false;
+  const meshes: THREE.Mesh[] = [];
+  const material = new THREE.MeshBasicMaterial();
+
+  for (const box of boxes) {
+    const [halfX, halfY, halfZ] = box.halfExtents;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(halfX * 2, halfY * 2, halfZ * 2), material);
+    mesh.position.set(box.position[0], box.position[1], box.position[2]);
+    mesh.rotation.y = box.rotationY;
+    mesh.name = `nav-obstacle-${box.id}`;
+    mesh.visible = false;
+    group.add(mesh);
+    meshes.push(mesh);
+  }
+  group.updateMatrixWorld(true);
+  return { group, meshes };
 }
 
 /**

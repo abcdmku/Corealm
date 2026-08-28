@@ -561,8 +561,15 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
       {
         // PRD: "ground clutter kept low so pathing stays legible". Count is down from 780 and the
         // clearance is up, so road corridors read as walkable rather than as a gap in the ferns.
-        // Ferns and low leafy plants are 288 and 360 tris; bush_common adds the volume.
-        id: "undergrowth", assetIds: ["fern_1", "plant_leafy_large", "bush_common"], maxVariants: 3,
+        //
+        // `bush_common` is deliberately absent even though it is the cheapest volume in the kit.
+        // It shares the `Leaves_TwistedTree` material with the autumn tree, and sampling its
+        // texture gives a mean of rgb(105,79,84) — red-dominant. At 360 instances on a 5.5 m
+        // spacing that put a crimson mass at eye height across the whole wood, which is what kept
+        // Vellenwood red after the canopy was already fixed to green broadleaf. `plant_broad_large`
+        // uses the shared green `Leaves` texture, mean rgb(94,118,81), for the same silhouette.
+        // It stays in Fallowmarch, where dry red bracken on a frontier plain is the right read.
+        id: "undergrowth", assetIds: ["fern_1", "plant_leafy_large", "plant_broad_large"], maxVariants: 3,
         spacing: 5.5, maxCount: 360, scale: [0.8, 1.5], clearance: 3.2, patchiness: 0.5, patchScale: 40,
       },
       {

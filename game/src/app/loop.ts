@@ -100,7 +100,7 @@ export class GameLoop {
     const ticks = this.deps.clock.advance(realDelta);
     for (let i = 0; i < ticks; i += 1) this.simTick();
 
-    this.renderFrame(nowMs);
+    this.renderFrame(nowMs, realDelta);
     this.maybeAutosave(nowMs);
   };
 
@@ -128,12 +128,15 @@ export class GameLoop {
     events.flush();
   }
 
-  private renderFrame(nowMs: number): void {
+  private renderFrame(nowMs: number, realDeltaMs: number): void {
     const { store, scene, camera, renderer, input } = this.deps;
     const state = store.get();
 
     input.update();
     this.syncEntityViews();
+    // Animation advances on real time, not sim time: a paused sim should still idle, and a
+    // time-scaled test run should not play idles at 100x.
+    this.entityViews?.update(realDeltaMs / 1000, renderer.camera.position);
     scene.syncPlayer(state.player.position, state.player.facingRad);
     camera.update(state.player.position[0], state.player.position[1], state.player.position[2]);
     renderer.followShadow(renderer.camera.position.clone().setY(state.player.position[1]));

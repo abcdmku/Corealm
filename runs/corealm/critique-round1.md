@@ -119,3 +119,64 @@ produces the PRD's "shafted light against canopy shadow" instead of uniform gloo
   fogged out: invisible geometry, fully paid for.
 - **Dungeon entities render only from inside the dungeon.** A one-line filter on the render entity
   source in `boot.ts`, which removes the entire cause of the 803-call pose.
+
+---
+
+## Fix round: final state
+
+All nine findings closed. Measured after integration:
+
+| metric | before | after |
+| --- | --- | --- |
+| worst-pose draw calls | 803 (`gravelmaw_entrance`) | **359** |
+| worst-pose triangles | 12,562,890 | **3,446,944** |
+| worst-pose frame time | 3.0 ms | **1.9 ms** |
+| poses over the 400 budget | 2 of 18 | **0 of 18** |
+| entities | 179 | **864** |
+
+That is with 36 assembled buildings, 614 building parts, 42 roads, and animation added — the budget
+came down while the content went up roughly fivefold.
+
+### Three bugs found by measuring rather than reasoning
+
+**Vellenwood stayed crimson after the species fix.** F3 correctly identified the `twisted` tree
+family as autumn-coloured and replaced the dominant canopy. The region was still red. I guessed at
+the undergrowth, changed it, and it was still red. Disabling the red accent trees entirely: still
+red. The actual cause was the **tier-5 woodcutting node entities** — ten `tree_twisted_1` at the
+heart of the region — and the reason the tier tint could not fix them is structural:
+
+> Tinting multiplies `material.color` against the texture. It can darken a red leaf. It can never
+> re-hue one.
+
+That is worth carrying into Phase 2, where tier variants do much more work. A tier palette can only
+shift a material within the hue its texture already has; a genuinely different hue needs a
+different mesh or a different texture.
+
+**Forty-two roads rendered as nothing.** `buildRoad` and `addFlatSpot` had zero callers, which the
+critic caught. After wiring them the roads were still invisible. `getSceneStats()` (added for this,
+and kept) proved 42 road meshes existed in the scene graph with nothing hidden — so the geometry
+was being drawn and could not be seen. The ribbon is a flat horizontal strip whose triangle winding
+comes out facing down, and `MeshStandardMaterial` defaults to `FrontSide`, so every road was
+backface-culled from the only angle a player ever looks from. One `side: THREE.DoubleSide`.
+
+I chased two wrong theories first — texture contrast, then the 6 cm ground lift against A2's
+measured 0.35 m terrain discretisation error. Both were plausible and both were wrong. Adding a
+scene-graph census turned a fourth round of guessing into one decisive answer, which is why
+`getSceneStats()` stays: a render bug is either "the object was never created" or "the object
+exists and is invisible", and those need completely different fixes.
+
+**Clip names collided across skeletons.** `AssetRegistry` keyed animation clips by bare name
+globally, and `enemy_blob`, `enemy_crab` and `enemy_skull` each ship `Idle` / `Walk` / `Death` on
+three different skeletons — so whichever GLB loaded first won the name and would deform the other
+two. F2 caught it and added a compatibility check; the underlying fix was mine: clips are now keyed
+`${assetId}:${name}`, and the shared library only accepts clips from the animation packs, where the
+identical-skeleton guarantee actually holds.
+
+### The fix that mattered most, and I would not have specified it
+
+I asked F2 for an `AnimationMixer` on rigged entities. It pointed out that would have fixed almost
+nothing, because **`InstancedMesh` ignores skinning** — the instanced majority of characters were
+rendering in bind pose, and a mixer only ever touches the handful of unique views. It CPU-skins one
+idle frame into static geometry and instances from that, so characters past the animation budget
+stand naturally instead of T-posing. Cost is a few milliseconds once per asset and nothing per
+frame.

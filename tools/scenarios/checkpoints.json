@@ -1,0 +1,175 @@
+{
+  "name": "visual-checkpoints",
+  "actions": [
+    {
+      "debug": "focusCamera",
+      "args": [
+        "spawn"
+      ],
+      "label": "pose: spawn"
+    },
+    {
+      "screenshot": "r2-spawn"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "town_entrance"
+      ],
+      "label": "pose: town_entrance"
+    },
+    {
+      "screenshot": "r2-town_entrance"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "town_center"
+      ],
+      "label": "pose: town_center"
+    },
+    {
+      "screenshot": "r2-town_center"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "bank"
+      ],
+      "label": "pose: bank"
+    },
+    {
+      "screenshot": "r2-bank"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "march_road"
+      ],
+      "label": "pose: march_road"
+    },
+    {
+      "screenshot": "r2-march_road"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "bracken_pit"
+      ],
+      "label": "pose: bracken_pit"
+    },
+    {
+      "screenshot": "r2-bracken_pit"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "palewood_copse"
+      ],
+      "label": "pose: palewood_copse"
+    },
+    {
+      "screenshot": "r2-palewood_copse"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "marchfield_farm"
+      ],
+      "label": "pose: marchfield_farm"
+    },
+    {
+      "screenshot": "r2-marchfield_farm"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "rootfall"
+      ],
+      "label": "pose: rootfall"
+    },
+    {
+      "screenshot": "r2-rootfall"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "vellenwood_canopy"
+      ],
+      "label": "pose: vellenwood_canopy"
+    },
+    {
+      "screenshot": "r2-vellenwood_canopy"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "hollowcut_seam"
+      ],
+      "label": "pose: hollowcut_seam"
+    },
+    {
+      "screenshot": "r2-hollowcut_seam"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "karrowmoor_terraces"
+      ],
+      "label": "pose: karrowmoor_terraces"
+    },
+    {
+      "screenshot": "r2-karrowmoor_terraces"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "highcairn"
+      ],
+      "label": "pose: highcairn"
+    },
+    {
+      "screenshot": "r2-highcairn"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "upper_karrow_seam"
+      ],
+      "label": "pose: upper_karrow_seam"
+    },
+    {
+      "screenshot": "r2-upper_karrow_seam"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "sunder_ledge"
+      ],
+      "label": "pose: sunder_ledge"
+    },
+    {
+      "screenshot": "r2-sunder_ledge"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "gravelmaw_entrance"
+      ],
+      "label": "pose: gravelmaw_entrance"
+    },
+    {
+      "screenshot": "r2-gravelmaw_entrance"
+    },
+    {
+      "debug": "focusCamera",
+      "args": [
+        "great_cairn"
+      ],
+      "label": "pose: great_cairn"
+    },
+    {
+      "screenshot": "r2-great_cairn"
+    }
+  ]
+}

@@ -79,6 +79,10 @@
  * value is used and the discrepancy is noted at the obstacle.
  */
 import type { ItemId, QuestId, RecipeId, RegionId, SkillId } from "../contracts.js";
+import {
+  COMPOSITION_IDS, PREFAB_IDS, compositionPartAssetIds, isCompositionId, isPrefabId,
+  prefabPartAssetIds, type CompositionId,
+} from "../render/buildings.js";
 
 // ------------------------------------------------------------------ primitives
 
@@ -151,8 +155,8 @@ export type PrefabId =
 /**
  * Buildings are composed, not loaded: the Medieval Village kit ships no prebuilt house, only a 2 m
  * modular grid (asset-report, "No prebuilt house or cottage"). A placement names a prefab and a
- * pose; `PREFABS` lists the real manifest assets each prefab is assembled from, so the render
- * layer has one place to look and this file never invents an asset id.
+ * pose; `render/buildings.ts` turns that into an ordered list of part placements on the kit's 2 m /
+ * 3.123 m grid, and `world/regionBuilder.ts` emits one instanced entity per part.
  */
 export interface BuildingDef {
   id: string;
@@ -275,6 +279,12 @@ export interface LandmarkDef {
   scale?: number;
   rotationY?: number;
   blurb: string;
+  /**
+   * Set dressing built around the hero mesh by `render/buildings.ts`. Round-1 critique finding 8:
+   * one stand-in prop gives the player nothing to navigate by, so the landmarks that matter carry
+   * a small authored composition instead.
+   */
+  composition?: CompositionId;
 }
 
 /** A region gate. Two of these, one per side, make a crossing. */
@@ -287,6 +297,7 @@ export interface GateDef {
   /** The location id on the far side. */
   toLocationId: string;
   rotationY?: number;
+  composition?: CompositionId;
 }
 
 export interface RegionAdjacencyDef {
@@ -295,19 +306,6 @@ export interface RegionAdjacencyDef {
   toLocationId: string;
   /** Walking metres between the two gate nodes. */
   meters: number;
-}
-
-/** Poisson-disc scatter hints for `world/scatter.ts` (A2). Never places anything interactable. */
-export interface ScatterLayerDef {
-  id: string;
-  assetIds: string[];
-  /** Instances per 100 m^2. */
-  density: number;
-  minScale: number;
-  maxScale: number;
-  /** Clearance kept around every gameplay entity, road node, and building footprint. */
-  clearance: number;
-  area?: { centre: Spot; radius: number };
 }
 
 /** A stepped plateau. Karrowmoor's defining feature; the terrain generator reads these. */
@@ -355,6 +353,11 @@ export interface DungeonDef {
   /** Surface position of the mouth, in the parent region. */
   entrance: Spot;
   entranceAssetId: string;
+  /** Bearing the mouth opens toward, radians, 0 = +z. The composition is laid out around it. */
+  entranceRotationY?: number;
+  entranceScale?: number;
+  /** Cliff, brow and brazier composition built around the mouth by `render/buildings.ts`. */
+  entranceComposition?: CompositionId;
   palette: string[];
   chambers: DungeonChamberDef[];
   doors: DungeonDoorDef[];
@@ -383,6 +386,18 @@ export interface RegionDef {
   /** Fog start in metres. Vellenwood's canopy is why this is per-region. */
   fogStart: number;
   spawnPoint: Spot;
+  /**
+   * Which way the player faces at frame 0, radians, in the same convention as `NpcStandDef.facingRad`
+   * and `debug/shots.ts`: **0 looks toward +z (north), increasing clockwise seen from above**, so
+   * `facing = atan2(targetX - x, targetZ - z)`.
+   *
+   * Round-1 critique finding 2: Fallowmarch spawns at z = -118 and Coldbrace Square is at z = -80,
+   * i.e. *behind* a camera left at its hardcoded initial yaw. The camera sits opposite the facing,
+   * so the root's boot sequence wants `camera.setPose(spawnFacingRad + Math.PI, ...)` alongside
+   * `scene.syncPlayer(spawn, spawnFacingRad, true)` - exactly the relationship
+   * `__gameDebug.focusCamera` already uses for named shots.
+   */
+  spawnFacingRad: number;
   respawnPointId: string;
   locations: LocationDef[];
   roads: RoadDef[];
@@ -393,61 +408,8 @@ export interface RegionDef {
   landmarks: LandmarkDef[];
   gates: GateDef[];
   adjacency: RegionAdjacencyDef[];
-  scatter: ScatterLayerDef[];
   dungeon?: DungeonDef;
 }
-
-// ------------------------------------------------------------------- prefabs
-
-/**
- * Which manifest assets each prefab is built from. Every id here was checked against
- * game/public/assets/manifest.json. The kit is 2 m modular with a 3.125 m storey, so prefab
- * footprints are multiples of 2 wherever they can be.
- */
-export const PREFABS: Record<PrefabId, { assetIds: string[]; footprint: readonly [number, number] }> = {
-  cottage: {
-    assetIds: [
-      "wall_plaster_straight", "wall_plaster_door", "wall_plaster_window",
-      "corner_wood", "roof_tiles_4x6", "chimney", "door_round_1", "wall_bottom_trim",
-    ],
-    footprint: [6, 4],
-  },
-  hall: {
-    assetIds: [
-      "wall_plaster_timber", "wall_plaster_window", "wall_plaster_door",
-      "corner_wood", "roof_tiles_6x12", "door_round_2", "banner_1",
-    ],
-    footprint: [12, 6],
-  },
-  tower: {
-    assetIds: ["wall_brick_straight", "wall_brick_window", "corner_brick", "roof_tower", "wall_brick_door"],
-    footprint: [6, 6],
-  },
-  stall: {
-    assetIds: ["market_stall", "crate_wood", "barrel", "sack"],
-    footprint: [3, 2],
-  },
-  wall_segment: {
-    assetIds: ["wall_brick_straight", "corner_brick", "wall_bottom_trim"],
-    footprint: [8, 1],
-  },
-  gatehouse: {
-    assetIds: ["wall_arch", "wall_brick_straight", "corner_brick", "banner_2", "lamp_wall"],
-    footprint: [6, 3],
-  },
-  shed: {
-    assetIds: ["wall_plaster_base", "roof_wood_plank", "corner_wood", "crate_village"],
-    footprint: [4, 4],
-  },
-  ruin: {
-    assetIds: ["wall_brick_straight", "corner_brick", "rubble_brick_1", "rubble_brick_2", "vine_1"],
-    footprint: [6, 6],
-  },
-  quarry_hut: {
-    assetIds: ["wall_plaster_timber", "roof_wood_plank", "corner_wood", "support_beam", "crate_metal"],
-    footprint: [5, 4],
-  },
-};
 
 /** Movement speed the route graph costs walking edges at. Mirrors `app/config.ts` PLAYER_SPEED. */
 export const WALK_SPEED_MPS = 4.2;
@@ -486,6 +448,10 @@ const FALLOWMARCH: RegionDef = {
   // Just outside the south gate, facing the town. Screen centre lands on the road, which the
   // harness needs: smoke check `inputChangesState` clicks (640,360) then holds W.
   spawnPoint: [-160, -118],
+  // Coldbrace South Gate is (-160,-108), dead north of spawn; the vault tower door is (-168,-94.5),
+  // 0.51 rad west of it. -0.14 rad splits them: the gatehouse sits just right of screen centre and
+  // the tower rises just left of it, both inside a 55-degree horizontal FOV at 10-25 m.
+  spawnFacingRad: -0.14,
   respawnPointId: "coldbrace",
 
   locations: [
@@ -674,15 +640,23 @@ const FALLOWMARCH: RegionDef = {
 
   landmarks: [
     {
-      id: "march_vault_tower", name: "March Company Vault Tower", position: [-168, -90],
-      assetId: "roof_tower", scale: 1.6,
+      // Round-1 critique finding 8: this was a bare `roof_tower` cone standing on the grass - the
+      // "floating red cone" in r1-town-center. The tower's mass now comes from the `coldbrace_vault`
+      // building (prefab `tower`, two brick storeys under the spire) at (-168,-90), and the landmark
+      // moved 3.3 m south onto its doorway - a hero mesh that belongs at ground level, facing the
+      // south gate the player spawns at.
+      id: "march_vault_tower", name: "March Company Vault Tower", position: [-168, -93.3],
+      assetId: "door_frame_round", scale: 1.5, rotationY: Math.PI,
+      composition: "vault_door",
       blurb: "The tallest thing on the plain. Visible from 300 m, which is the entire point of it.",
     },
     {
       id: "broken_milestone", name: "The Broken North Milestone", position: [-108, -8],
       // No sign or milestone mesh exists (asset-report gap 11). A short brick wall reads as a
-      // snapped stone marker at the distance the player ever sees it from.
-      assetId: "wall_brick_straight", scale: 0.55, rotationY: 0.4,
+      // snapped stone marker; the composition puts the broken-off top on the ground beside it and
+      // kerbs the road, so it reads as a marker rather than a random piece of wall.
+      assetId: "wall_brick_straight", scale: 0.7, rotationY: 0.4,
+      composition: "milestone",
       blurb: "Snapped off at the knee. Whatever it counted down to, nobody here has been there.",
     },
     {
@@ -696,21 +670,12 @@ const FALLOWMARCH: RegionDef = {
     {
       id: "fallowmarch_north_gate", name: "North Gate", position: [-26, 118],
       assetId: "wall_arch", toRegionId: "vellenwood", toLocationId: "vellenwood_marchgate",
-      rotationY: Math.PI / 2,
+      rotationY: Math.PI / 2, composition: "region_gate",
     },
   ],
 
   adjacency: [
     { toRegionId: "vellenwood", fromLocationId: "fallowmarch_north_gate", toLocationId: "vellenwood_marchgate", meters: 14.6 },
-  ],
-
-  scatter: [
-    { id: "fm_grass", assetIds: ["grass_common_short", "grass_common_tall", "grass_wispy_short", "grass_wispy_tall"], density: 22, minScale: 0.8, maxScale: 1.3, clearance: 1.6 },
-    { id: "fm_flowers", assetIds: ["flower_a_single", "flower_a_group", "flower_b_single", "flower_b_group", "clover_1", "clover_2"], density: 4, minScale: 0.8, maxScale: 1.1, clearance: 1.6 },
-    // PRD asks for about 1 prop per 40 m^2 on the plain: wide sightlines, low density.
-    { id: "fm_rocks", assetIds: ["pebble_round_1", "pebble_round_2", "rock_small_1", "rock_small_2"], density: 1.4, minScale: 0.7, maxScale: 1.4, clearance: 2.2 },
-    { id: "fm_bushes", assetIds: ["bush_common", "bush_flowering"], density: 0.5, minScale: 0.8, maxScale: 1.2, clearance: 3 },
-    { id: "fm_copse_trees", assetIds: ["tree_common_2", "tree_common_3", "tree_common_5"], density: 3.5, minScale: 0.85, maxScale: 1.1, clearance: 5, area: { centre: [-320, -60], radius: 55 } },
   ],
 };
 
@@ -741,6 +706,8 @@ const VELLENWOOD: RegionDef = {
   groundPalette: ["#3c5340", "#2b3a2e", "#4f6b4a", "#5c4a55", "#3a2f38", "#6f7f52", "#8fa26a", "#1d241f"],
   fogStart: 55,
   spawnPoint: [-12, 122],
+  // Marchgate looks east down the track to Rootfall (60,120): atan2(72, -2) = 1.60 rad.
+  spawnFacingRad: 1.6,
   respawnPointId: "rootfall",
 
   locations: [
@@ -795,9 +762,14 @@ const VELLENWOOD: RegionDef = {
       id: "duskoak_stand_trees", name: "Duskoak", archetype: "tree",
       skill: "woodcutting", tier: 5, reqLevel: 5, itemId: "duskoak_log",
       count: 10, centre: [14, 166], radius: 20,
-      // tree_twisted_* are 10-13 m across at source scale; 0.55 puts them at a believable
-      // old-growth 9 m without losing the gnarled silhouette.
-      assetId: "tree_twisted_1", depletedAssetId: "anvil_log", scale: 0.55,
+      // Was tree_twisted_1. That family carries the `Leaves_TwistedTree` texture, whose sampled
+      // mean is rgb(105,79,84) — an autumn tree. Ten of them at the heart of the region is what
+      // made Vellenwood read crimson, and the tier tint cannot fix it: tinting multiplies
+      // `material.color` against the texture, so it can darken a red leaf but can never re-hue one.
+      // tree_common_2 carries the green `Leaves_NormalTree` texture, and staying off the scatter
+      // canopy's 3 and 5 keeps the choppable tree distinguishable from the dressing. Scale 1.15
+      // holds the old-growth read that 0.55 on a larger source mesh was buying.
+      assetId: "tree_common_2", depletedAssetId: "anvil_log", scale: 1.15,
       locationId: "vellenwood_canopy",
     },
     {
@@ -821,7 +793,9 @@ const VELLENWOOD: RegionDef = {
       { id: "rootfall_house_4", name: "Cook House", prefab: "cottage", position: [60, 106], rotationY: 0, footprint: [6, 4] },
       { id: "rootfall_house_5", name: "Root House", prefab: "cottage", position: [72, 108], rotationY: 0, footprint: [6, 4] },
       { id: "rootfall_house_6", name: "Seamer's House", prefab: "cottage", position: [74, 118], rotationY: Math.PI / 2, footprint: [6, 4] },
-      { id: "rootfall_house_7", name: "Warden's House", prefab: "cottage", position: [74, 132], rotationY: Math.PI / 2, footprint: [6, 4] },
+      // Pulled 5 m south of its round-1 spot: assembled, its 6x4 footprint swallowed the Root
+      // Tunnel entrance at (76,134), whose 155 m saving is measured from that exact coordinate.
+      { id: "rootfall_house_7", name: "Warden's House", prefab: "cottage", position: [74, 127], rotationY: Math.PI / 2, footprint: [6, 4] },
       { id: "rootfall_house_8", name: "North House", prefab: "cottage", position: [62, 140], rotationY: Math.PI, footprint: [6, 4] },
       { id: "rootfall_shed", name: "Drying Shed", prefab: "shed", position: [50, 140], rotationY: Math.PI, footprint: [4, 4] },
     ],
@@ -905,6 +879,7 @@ const VELLENWOOD: RegionDef = {
       id: "rootfall_stump", name: "The Rootfall Stump", position: [60, 120],
       // `anvil_log` is a stump; at 5x it is the eight-metre Duskoak stump the town is built on.
       assetId: "anvil_log", scale: 5,
+      composition: "rootfall_stump",
       blurb: "The stump is the square. Somebody has cut steps into the north face of it.",
     },
     {
@@ -915,28 +890,19 @@ const VELLENWOOD: RegionDef = {
     {
       id: "thornline_stones", name: "The Thornline Stones", position: [206, 168],
       assetId: "boulder_medium", scale: 1.1,
+      composition: "standing_stones",
       blurb: "Standing stones at the clearing edge. The Thornbound will not cross them.",
     },
   ],
 
   gates: [
-    { id: "vellenwood_marchgate", name: "Marchgate", position: [-12, 122], assetId: "wall_arch", toRegionId: "fallowmarch", toLocationId: "fallowmarch_north_gate", rotationY: Math.PI / 2 },
-    { id: "vellenwood_east_gate", name: "Cairn Gate", position: [250, 24], assetId: "wall_arch", toRegionId: "karrowmoor", toLocationId: "karrowmoor_north_gate", rotationY: 0 },
+    { id: "vellenwood_marchgate", name: "Marchgate", position: [-12, 122], assetId: "wall_arch", toRegionId: "fallowmarch", toLocationId: "fallowmarch_north_gate", rotationY: Math.PI / 2, composition: "region_gate" },
+    { id: "vellenwood_east_gate", name: "Cairn Gate", position: [250, 24], assetId: "wall_arch", toRegionId: "karrowmoor", toLocationId: "karrowmoor_north_gate", rotationY: 0, composition: "region_gate" },
   ],
 
   adjacency: [
     { toRegionId: "fallowmarch", fromLocationId: "vellenwood_marchgate", toLocationId: "fallowmarch_north_gate", meters: 14.6 },
     { toRegionId: "karrowmoor", fromLocationId: "vellenwood_east_gate", toLocationId: "karrowmoor_north_gate", meters: 22.8 },
-  ],
-
-  scatter: [
-    // PRD asks for roughly 1 prop per 8 m^2 in the canopy but low ground clutter, so pathing
-    // stays legible. Canopy density is high; the undergrowth layer is deliberately thin.
-    { id: "vw_canopy", assetIds: ["tree_twisted_3", "tree_twisted_4", "tree_twisted_5", "tree_common_3", "tree_common_4"], density: 5.5, minScale: 0.5, maxScale: 0.75, clearance: 6 },
-    { id: "vw_undergrowth", assetIds: ["fern_1", "plant_leafy_large", "plant_leafy_small", "plant_broad_large", "plant_broad_small"], density: 8, minScale: 0.8, maxScale: 1.3, clearance: 1.8 },
-    { id: "vw_mushrooms", assetIds: ["mushroom_common", "mushroom_bracket"], density: 2, minScale: 0.8, maxScale: 1.4, clearance: 1.4 },
-    { id: "vw_vines", assetIds: ["vine_1", "vine_2"], density: 1.5, minScale: 0.9, maxScale: 1.5, clearance: 2 },
-    { id: "vw_bushes", assetIds: ["bush_common", "bush_flowering"], density: 2.5, minScale: 0.9, maxScale: 1.4, clearance: 2.4 },
   ],
 };
 
@@ -972,6 +938,8 @@ const KARROWMOOR: RegionDef = {
   groundPalette: ["#6b7480", "#525a66", "#7d8791", "#8e9a86", "#a8b06a", "#3e444d", "#c8813c", "#d3d8dd"],
   fogStart: 140,
   spawnPoint: [256, 4],
+  // Moorgate looks WSW down the quarry road to the Moor Road Bend (170,-6): atan2(-86,-10) = -1.69.
+  spawnFacingRad: -1.69,
   respawnPointId: "highcairn",
 
   locations: [
@@ -1079,7 +1047,9 @@ const KARROWMOOR: RegionDef = {
     respawnPointId: "highcairn",
     buildings: [
       { id: "highcairn_hut_1", name: "Crew Hut", prefab: "quarry_hut", position: [132, -58], rotationY: 0, footprint: [5, 4] },
-      { id: "highcairn_hut_2", name: "Foreman's Hut", prefab: "quarry_hut", position: [134, -72], rotationY: 0, footprint: [5, 4] },
+      // Moved 4 m west and 2 m south of its round-1 spot: with the hut actually assembled, its 5x4
+      // footprint enclosed the Highcairn furnace at (136,-72).
+      { id: "highcairn_hut_2", name: "Foreman's Hut", prefab: "quarry_hut", position: [130, -74], rotationY: 0, footprint: [5, 4] },
       { id: "highcairn_hut_3", name: "Store Hut", prefab: "quarry_hut", position: [146, -56], rotationY: Math.PI, footprint: [5, 4] },
       { id: "highcairn_hut_4", name: "Watch Hut", prefab: "quarry_hut", position: [156, -68], rotationY: Math.PI / 2, footprint: [5, 4] },
       { id: "highcairn_hut_5", name: "Tool Hut", prefab: "quarry_hut", position: [142, -78], rotationY: 0, footprint: [5, 4] },
@@ -1167,14 +1137,18 @@ const KARROWMOOR: RegionDef = {
   landmarks: [
     {
       id: "highcairn_crane", name: "The Highcairn Crane", position: [156, -64],
-      // No crane mesh. A 3x support beam plus the render layer's rope reads correctly in
-      // silhouette against the sky, which is the only way this is ever seen.
-      assetId: "support_beam", scale: 3, rotationY: 0.3,
+      // No crane mesh. Round 1 used `support_beam` at 3x, which floats: that asset's pivot is
+      // 1.211 m BELOW the post, so a 3x copy started 3.6 m in the air. `corner_wood` is the only
+      // asset in the library that is a plain vertical post standing on its own origin - at 3.2x it
+      // is a 9.6 m mast, and the composition hangs a 9 m jib and the drum off it.
+      assetId: "corner_wood", scale: 3.2, rotationY: 0.3,
+      composition: "highcairn_crane",
       blurb: "It has not turned in six months. The rope is still on the drum.",
     },
     {
       id: "great_cairn_stone", name: "The Great Cairn", position: [140, -176],
       assetId: "boulder_large", scale: 1.3,
+      composition: "great_cairn",
       blurb: "Head height and forty paces round. It was already old when the quarry opened.",
     },
     // The Gravelmaw mouth is a PRD landmark but it is not listed here: it is already the dungeon
@@ -1183,21 +1157,11 @@ const KARROWMOOR: RegionDef = {
   ],
 
   gates: [
-    { id: "karrowmoor_north_gate", name: "Moorgate", position: [256, 4], assetId: "wall_arch", toRegionId: "vellenwood", toLocationId: "vellenwood_east_gate", rotationY: 0 },
+    { id: "karrowmoor_north_gate", name: "Moorgate", position: [256, 4], assetId: "wall_arch", toRegionId: "vellenwood", toLocationId: "vellenwood_east_gate", rotationY: 0, composition: "region_gate" },
   ],
 
   adjacency: [
     { toRegionId: "vellenwood", fromLocationId: "karrowmoor_north_gate", toLocationId: "vellenwood_east_gate", meters: 22.8 },
-  ],
-
-  scatter: [
-    // Sparse but very large props. Sightlines on the moor are vertical, so the eye needs big
-    // silhouettes at the terrace lips rather than clutter underfoot.
-    { id: "km_cairns", assetIds: ["rock_medium_1", "rock_medium_2", "rock_medium_3"], density: 2.2, minScale: 0.7, maxScale: 1.2, clearance: 3.5 },
-    { id: "km_boulders", assetIds: ["boulder_medium", "boulder_large", "cliff_tall"], density: 0.35, minScale: 0.8, maxScale: 1.3, clearance: 9 },
-    { id: "km_scree", assetIds: ["pebble_round_1", "pebble_round_2", "rock_small_1", "rock_small_2"], density: 9, minScale: 0.6, maxScale: 1.3, clearance: 1.2 },
-    { id: "km_lichen", assetIds: ["clover_1", "clover_2", "grass_wispy_short"], density: 6, minScale: 0.6, maxScale: 1, clearance: 1.2 },
-    { id: "km_ridge_pines", assetIds: ["tree_pine_1", "tree_pine_3", "tree_pine_5"], density: 2.5, minScale: 0.7, maxScale: 1, clearance: 6, area: { centre: [255, -100], radius: 50 } },
   ],
 
   dungeon: {
@@ -1205,7 +1169,13 @@ const KARROWMOOR: RegionDef = {
     name: "The Gravelmaw",
     tier: 10,
     entrance: [46, -24],
+    // `wall_arch` is 2 x 3 m, so 4x is the PRD's "twelve-metre black wound": 8 m wide, 12 m tall.
+    // Round 1 drew it unrotated and unaccompanied, which is why it read as a wooden door frame on
+    // open ground. It now faces the approach from the Lower Quarry (60,-16): atan2(14,8) = 1.05.
     entranceAssetId: "wall_arch",
+    entranceRotationY: 1.05,
+    entranceScale: 4,
+    entranceComposition: "gravelmaw_mouth",
     palette: ["#3a3f47", "#2a2e35", "#4a505a", "#5a6250", "#1b1e23", "#7a6a52", "#c86a2a", "#8f97a1"],
     chambers: [
       { id: "gravelmaw_chamber1", name: "The Lit Gallery", centre: [40, -40], radius: 11, floorOffset: -2, lit: true },
@@ -1333,10 +1303,26 @@ export function spotDistance(a: Spot, b: Spot): number {
  * It checks the things that silently produce a broken world: a road pointing at a location that
  * does not exist, an obstacle wired to a missing route node, a cluster outside its region bounds,
  * a palette that is not eight swatches, or a settlement placed outside its own region.
+ *
+ * Pass `knownAssetIds` (`new Set(assetRegistry.ids())` once the manifest has loaded) and it also
+ * checks every asset id the content names, including every part id the prefabs and landmark
+ * compositions in `render/buildings.ts` can emit. Round-1 critique finding 1 was 37 buildings that
+ * rendered as nothing; a prefab that names an asset the manifest does not have would fail the same
+ * way, silently, so it is checked here rather than discovered in a screenshot.
  */
-export function validateRegions(): string[] {
+export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
   const problems: string[] = [];
   const seenIds = new Set<string>();
+
+  const checkAsset = (where: string, assetId: string | undefined): void => {
+    if (!assetId || !knownAssetIds) return;
+    if (!knownAssetIds.has(assetId)) problems.push(`${where}: unknown asset "${assetId}"`);
+  };
+
+  if (knownAssetIds) {
+    for (const assetId of prefabPartAssetIds()) checkAsset("prefabs", assetId);
+    for (const assetId of compositionPartAssetIds()) checkAsset("landmark compositions", assetId);
+  }
 
   const inBounds = (bounds: RegionBounds, spot: Spot): boolean =>
     spot[0] >= bounds.min[0] && spot[0] <= bounds.max[0] &&
@@ -1405,6 +1391,54 @@ export function validateRegions(): string[] {
       problems.push(`${region.id}: settlement ${region.settlement.id} is outside the region bounds`);
     }
 
+    // Buildings. An unknown prefab, a zero footprint, or a building outside its own region all
+    // produce a settlement that is invisible or in the wrong place, and all three are silent.
+    const settlement = region.settlement;
+    for (const building of settlement.buildings) {
+      if (seenIds.has(building.id)) problems.push(`duplicate building id ${building.id}`);
+      seenIds.add(building.id);
+      if (!isPrefabId(building.prefab)) {
+        problems.push(
+          `${region.id}: building ${building.id} names unknown prefab "${String(building.prefab)}" ` +
+          `(known: ${PREFAB_IDS.join(", ")})`,
+        );
+      }
+      if (building.footprint[0] <= 0 || building.footprint[1] <= 0) {
+        problems.push(`${region.id}: building ${building.id} has a zero footprint`);
+      }
+      if (!inBounds(region.bounds, building.position)) {
+        problems.push(`${region.id}: building ${building.id} is outside the region bounds`);
+      }
+    }
+
+    for (const shop of settlement.shops) checkAsset(`${region.id}: shop ${shop.id}`, shop.assetId);
+    for (const station of settlement.stations) checkAsset(`${region.id}: station ${station.id}`, station.assetId);
+    for (const npc of settlement.npcs) checkAsset(`${region.id}: npc ${npc.id}`, npc.assetId);
+    checkAsset(`${region.id}: bank ${settlement.bank.id}`, settlement.bank.assetId);
+
+    for (const cluster of region.clusters) {
+      checkAsset(`${region.id}: cluster ${cluster.id}`, cluster.assetId);
+      checkAsset(`${region.id}: cluster ${cluster.id}`, cluster.depletedAssetId);
+    }
+    for (const group of region.enemyGroups) checkAsset(`${region.id}: enemies ${group.id}`, group.assetId);
+    for (const obstacle of region.obstacles) checkAsset(`${region.id}: obstacle ${obstacle.id}`, obstacle.assetId);
+
+    for (const landmark of region.landmarks) {
+      checkAsset(`${region.id}: landmark ${landmark.id}`, landmark.assetId);
+      if (landmark.composition !== undefined && !isCompositionId(landmark.composition)) {
+        problems.push(
+          `${region.id}: landmark ${landmark.id} names unknown composition ` +
+          `"${String(landmark.composition)}" (known: ${COMPOSITION_IDS.join(", ")})`,
+        );
+      }
+    }
+    for (const gate of region.gates) {
+      checkAsset(`${region.id}: gate ${gate.id}`, gate.assetId);
+      if (gate.composition !== undefined && !isCompositionId(gate.composition)) {
+        problems.push(`${region.id}: gate ${gate.id} names unknown composition "${String(gate.composition)}"`);
+      }
+    }
+
     const dungeon = region.dungeon;
     if (dungeon) {
       const dungeonIds = new Set([
@@ -1419,7 +1453,14 @@ export function validateRegions(): string[] {
         if (!dungeonIds.has(obstacle.fromLocationId) || !dungeonIds.has(obstacle.toLocationId)) {
           problems.push(`${dungeon.id}: obstacle ${obstacle.id} is wired to a location that does not exist`);
         }
+        checkAsset(`${dungeon.id}: obstacle ${obstacle.id}`, obstacle.assetId);
       }
+      checkAsset(`${dungeon.id}: entrance`, dungeon.entranceAssetId);
+      if (dungeon.entranceComposition !== undefined && !isCompositionId(dungeon.entranceComposition)) {
+        problems.push(`${dungeon.id}: entrance names unknown composition "${String(dungeon.entranceComposition)}"`);
+      }
+      for (const door of dungeon.doors) checkAsset(`${dungeon.id}: door ${door.id}`, door.assetId);
+      for (const group of dungeon.enemyGroups) checkAsset(`${dungeon.id}: enemies ${group.id}`, group.assetId);
     }
   }
 
