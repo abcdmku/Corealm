@@ -17,7 +17,7 @@ export class SimClock {
    * Capped so a long stall (tab in the background, a slow asset load) cannot produce a
    * thousand-tick catch-up burst.
    */
-  advance(realDeltaMs: number, maxTicks = 8): number {
+  advance(realDeltaMs: number, maxTicks = this.maxTicksPerFrame()): number {
     if (this.paused) return 0;
     this.accumulator += realDeltaMs * this.timeScale;
     let ticks = 0;
@@ -27,6 +27,18 @@ export class SimClock {
     }
     if (this.accumulator > SIM_TICK_MS * maxTicks) this.accumulator = 0;
     return ticks;
+  }
+
+  /**
+   * How many sim ticks one frame may run.
+   *
+   * Normally 8, which keeps a stall from producing a thousand-tick catch-up burst. But the cap is
+   * also a hard ceiling on how fast the simulation can advance: at time scale 25 a frame needs 250
+   * ticks, and clamping to 8 silently ignores the scale. Tests that fast-forward are the only
+   * caller that needs more, so the budget grows with the scale and stays modest at 1x.
+   */
+  private maxTicksPerFrame(): number {
+    return Math.max(8, Math.ceil(this.timeScale * 12));
   }
 
   /** Called once per tick actually run. */

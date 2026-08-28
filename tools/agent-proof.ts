@@ -88,6 +88,7 @@ const MINING_AGENT = `(async (targetLevel) => {
   const bankEverything = async () => {
     const banks = await agent.call("corealm_observe", { scope: "known", archetypes: ["bank"], limit: 3 });
     if (!banks.length) { log.push("no known bank"); return false; }
+    log.push("banking at " + banks[0].id);
     await agent.call("corealm_move_to", { entityId: banks[0].id });
     await waitFor(["navigation.completed", "navigation.failed"], 90000);
     const deposited = await agent.call("corealm_bank", { op: "depositAll" });
@@ -95,8 +96,38 @@ const MINING_AGENT = `(async (targetLevel) => {
     return !deposited.error;
   };
 
+  // Where the agent has looked, so it does not pace between two places forever.
+  const visited = new Set();
+
+  /**
+   * Travel toward somewhere that plausibly has ore.
+   *
+   * Observation has a 140 m ceiling and the player spawns further than that from any seam, so an
+   * agent that only ever looks around sees nothing and waits forever. Exploration is the missing
+   * half of the loop: observe with scope "known" returns the locations this character knows, and
+   * their names are the only clue available -- exactly what a player reads off the map.
+   */
+  const travelToProspect = async () => {
+    const places = await agent.call("corealm_observe", { scope: "known", limit: 40 });
+    const ranked = (places || [])
+      .filter((place) => !visited.has(place.id))
+      .sort((a, b) => {
+        const mining = (place) => /pit|seam|mine|quarry|face|scree|karrow/i.test(place.id + " " + place.name) ? 0 : 1;
+        return (mining(a) - mining(b)) || (a.distance - b.distance);
+      });
+    if (!ranked.length) { visited.clear(); return false; }
+
+    const destination = ranked[0];
+    visited.add(destination.id);
+    log.push("prospecting at " + destination.id);
+    const moved = await agent.call("corealm_move_to", { locationId: destination.id });
+    if (moved.error) return false;
+    await waitFor(["navigation.completed", "navigation.failed"], 120000);
+    return true;
+  };
+
   let guard = 0;
-  while (guard++ < 120) {
+  while (guard++ < 200) {
     const skills = await agent.call("corealm_skills");
     if (skills.mining.level >= targetLevel) break;
 
@@ -105,8 +136,14 @@ const MINING_AGENT = `(async (targetLevel) => {
     });
     const usable = (ores || []).filter((o) => o.state === "available");
 
+    if (!(ores || []).length) {
+      // Nothing minable in sight at all. Go somewhere that sounds like a mine.
+      if (!(await travelToProspect())) await waitFor(["activity.stopped"], 5000);
+      continue;
+    }
+
     if (!usable.length) {
-      // Everything nearby is spent. Wait for a respawn rather than wandering.
+      // Seams are here but spent. Wait for a respawn rather than wandering off.
       await waitFor(["resource.depleted", "activity.stopped"], 20000);
       continue;
     }
@@ -223,7 +260,20 @@ export async function runAgentProofs(runCandidate: string, which: string, timeSc
 
   let browser: Browser | undefined;
   try {
-    browser = await chromium.launch({ headless: true, args: ["--enable-unsafe-swiftshader", "--mute-audio"] });
+    // The GPU, not SwiftShader.
+    //
+    // The sim runs a bounded number of ticks per rendered frame, so the simulation can never
+    // advance faster than the frame rate allows no matter what setTimeScale says. Under
+    // SwiftShader that is ~4 fps, which caps the whole proof at roughly 3x real time and makes a
+    // 17-minute mining climb take most of an hour. On the real GPU it is 60 fps and the time scale
+    // actually bites. Gameplay logic is identical either way; only the clock moves.
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        "--use-angle=d3d11", "--enable-gpu", "--ignore-gpu-blocklist",
+        "--disable-frame-rate-limit", "--disable-gpu-vsync", "--mute-audio",
+      ],
+    });
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(String(error).slice(0, 300)));

@@ -1,0 +1,195 @@
+{
+  "name": "long-cairn-chain",
+  "actions": [
+    {
+      "debug": "setSkillLevel",
+      "args": [
+        "melee",
+        20
+      ],
+      "label": "A character ready for tier 10"
+    },
+    {
+      "debug": "setSkillLevel",
+      "args": [
+        "mining",
+        12
+      ]
+    },
+    {
+      "debug": "setSkillLevel",
+      "args": [
+        "agility",
+        14
+      ]
+    },
+    {
+      "debug": "setSkillLevel",
+      "args": [
+        "magic",
+        10
+      ]
+    },
+    {
+      "inspect": "getObjectives",
+      "label": "No quests started"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "great_cairn"
+        }
+      ],
+      "label": "Stage 1: reach the Great Cairn"
+    },
+    {
+      "waitMs": 1200
+    },
+    {
+      "screenshot": "r4-great-cairn"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "entityId": "npc_cairnkeeper_ode"
+        }
+      ],
+      "label": "Find the Cairnkeeper"
+    },
+    {
+      "waitMs": 600
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_interact",
+        {
+          "entityId": "npc_cairnkeeper_ode",
+          "interaction": "talk"
+        }
+      ],
+      "label": "Talk to Ode"
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_dialogue",
+        {
+          "op": "state"
+        }
+      ],
+      "label": "Her dialogue tree"
+    },
+    {
+      "debug": "setQuestStage",
+      "args": [
+        "long_cairn",
+        4
+      ],
+      "label": "Advance to the lever puzzle"
+    },
+    {
+      "waitMs": 600
+    },
+    {
+      "inspect": "getObjectives",
+      "label": "Stage 5 objective is stated"
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_interact",
+        {
+          "entityId": "npc_cairnkeeper_ode",
+          "interaction": "talk"
+        }
+      ],
+      "label": "Ask Ode about the levers"
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_dialogue",
+        {
+          "op": "state"
+        }
+      ],
+      "label": "The puzzle is described in text"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "gravelmaw_entrance"
+        }
+      ],
+      "label": "Travel to the dungeon mouth"
+    },
+    {
+      "waitMs": 900
+    },
+    {
+      "screenshot": "r4-gravelmaw-mouth"
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_interact",
+        {
+          "entityId": "gravelmaw_mouth_portal",
+          "interaction": "enter"
+        }
+      ],
+      "label": "Enter the Gravelmaw"
+    },
+    {
+      "waitMs": 1200
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "Inside the dungeon"
+    },
+    {
+      "screenshot": "r4-gravelmaw-inside"
+    },
+    {
+      "debug": "listEntities",
+      "args": [
+        {
+          "regionId": "gravelmaw"
+        }
+      ],
+      "label": "Dungeon contents are visible from inside"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "gravelmaw_arena"
+        }
+      ],
+      "label": "The boss arena"
+    },
+    {
+      "waitMs": 1200
+    },
+    {
+      "screenshot": "r4-ordrun"
+    },
+    {
+      "debug": "listEntities",
+      "args": [
+        {
+          "archetype": "boss"
+        }
+      ],
+      "label": "Ordrun"
+    },
+    {
+      "debug": "getErrors",
+      "label": "Console must be clean"
+    }
+  ]
+}
