@@ -8,9 +8,9 @@
  * views, A4's input. Each depends only on frozen contracts, so no worker had to know about another.
  */
 import * as THREE from "three";
-import type { RegionId, SkillId, Vec3 } from "../contracts.js";
+import type { EntityId, RegionId, SkillId, Vec3 } from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
-import { Store } from "../state/store.js";
+import { Store, addSkillXp } from "../state/store.js";
 import { EventBus } from "../core/events.js";
 import { SimClock } from "../core/time.js";
 import { RngStreams } from "../core/rng.js";
@@ -46,6 +46,9 @@ import { EnemyAiSystem } from "../systems/enemyAI.js";
 import { HealthSystem } from "../systems/health.js";
 import { DeathSystem } from "../systems/death.js";
 import { ProductionSystem } from "../systems/production.js";
+import { QuestSystem } from "../systems/quests.js";
+import { DialogueSystem } from "../systems/dialogue.js";
+import { TravelSystem } from "../systems/travel.js";
 import { INTERACT_RANGE } from "./config.js";
 import { distanceXZ } from "../core/math.js";
 import { REGIONS, getRegion, validateRegions } from "../content/regions.js";
@@ -395,6 +398,77 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
   activitySystem.register(productionSystem.driver);
 
+  // ---- Quests and dialogue.
+  //
+  // Quests are the only system that writes world state (two doors), so the entity port is narrowed
+  // to exactly that: read, and set a state with an optional locked reason.
+  const questEntityPort = {
+    get: (id: EntityId) => entityStore.get(id),
+    setState: (id: EntityId, state: string, lockedReason?: string): boolean => {
+      const entity = entityStore.get(id);
+      if (!entity) return false;
+      entity.state = state;
+      if (lockedReason !== undefined) {
+        entity.meta = { ...(entity.meta ?? {}), lockedReason };
+      }
+      return true;
+    },
+  };
+
+  // XP must travel the real level-up path, or `level.gained` never fires and quests that reward XP
+  // silently skip the level a player just earned.
+  const questXpPort = {
+    award: (skill: SkillId, amount: number): void => {
+      const result = addSkillXp(store.get(), skill, amount);
+      if (result.levelsGained > 0) {
+        events.emit(
+          "level.gained",
+          { skill, level: result.newLevel, levelsGained: result.levelsGained },
+          undefined,
+          clock.elapsedMs,
+        );
+      }
+      store.markDirty();
+    },
+  };
+
+  const questSystem = new QuestSystem({
+    store, events, clock,
+    entities: questEntityPort,
+    inventory: inventorySystem,
+    xp: questXpPort,
+    dispatcher: interactions,
+  });
+  const dialogueSystem = new DialogueSystem({
+    store, events, clock,
+    entities: entityStore,
+    inventory: inventorySystem,
+    xp: questXpPort,
+    quests: questSystem,
+    dispatcher: interactions,
+  });
+
+  // Portals. Registered AFTER agility so this handler wins the `enter` verb; it hands genuine
+  // obstacles back rather than teleporting past a climb the player has not earned.
+  const teleportPlayer = (position: Vec3, regionId: RegionId): void => {
+    const snapped = nav.closestPoint(position) ?? position;
+    store.get().player.position = snapped;
+    store.get().player.regionId = regionId;
+    movement.stop(store.get(), clock.elapsedMs, "portal");
+    scene.syncPlayer(snapped, store.get().player.facingRad, true);
+    camera.update(snapped[0], snapped[1], snapped[2], true);
+  };
+  const travelSystem = new TravelSystem({
+    store, events, clock,
+    entities: entityStore,
+    nav,
+    dispatcher: interactions,
+    place: teleportPlayer,
+  });
+  void travelSystem;
+
+  api.register("quests", questSystem);
+  api.register("dialogue", dialogueSystem);
   api.register("combat", combatSystem.hook());
   api.register("production", productionSystem.hook());
   api.register("inventory", inventorySystem);
@@ -503,6 +577,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.addSystem(healthSystem);
   loop.addSystem(deathSystem);
   loop.addSystem(productionSystem);
+  loop.addSystem(questSystem);
 
   loop.setOverlays(overlays);
   loop.setVfx(vfx);

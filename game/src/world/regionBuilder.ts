@@ -25,6 +25,7 @@ import type {
 import { RngStreams, type Rng } from "../core/rng.js";
 import { content } from "../content/index.js";
 import { enemyIdFor } from "../content/enemies.js";
+import { QUESTS } from "../content/quests.js";
 import {
   REGIONS, WALK_SPEED_MPS,
   type BuildingDef, type DungeonDef, type EnemyGroupDef, type LocationDef, type ObstacleDef,
@@ -43,6 +44,11 @@ import type { KnownLocation } from "./entities.js";
  * PRD 2.6 with the root's correction R3 (tier 1 floor is 8, not 9):
  *   8-15 at tier 1, 8-15 at tier 5, 8-14 at tier 10.
  */
+/** Every quest a given NPC hands out, derived from the quest table rather than duplicated. */
+function questIdsForNpc(npcId: string): string[] {
+  return QUESTS.filter((quest) => quest.giverNpcId === npcId).map((quest) => quest.id);
+}
+
 export function yieldRange(tier: number): readonly [number, number] {
   return [
     Math.max(4, Math.round(8.5 - 0.052 * tier)),
@@ -374,7 +380,13 @@ function buildRegionEntities(
       position: place(npc.position),
       state: "idle",
       interactions: ["inspect", "talk"],
-      npc: { dialogueRootId: npc.dialogueRootId, questIds: npc.questIds },
+      // `regions.ts` authors questIds as [] because the quest table did not exist when the NPC
+      // stands were placed. Backfilling here keeps one source of truth (the quests) and closes a
+      // real discoverability hole: an agent looking for quest givers reads `npc.questIds`.
+      npc: {
+        dialogueRootId: npc.dialogueRootId,
+        questIds: npc.questIds.length > 0 ? npc.questIds : questIdsForNpc(npc.id),
+      },
       view: { assetId: npc.assetId, rotationY: npc.facingRad, labelHeight: 2.2 },
       meta: { settlementId: settlement.id },
     });

@@ -18,7 +18,7 @@
  * Node ids referenced by a quest's `talk` predicate are load-bearing: `content/quests.ts` names
  * them, and reaching the node is what completes the stage.
  */
-import type { EntityId, ItemId, QuestId, SkillId } from "../contracts.js";
+import type { ItemId, QuestId, SkillId } from "../contracts.js";
 
 // ------------------------------------------------------------------- shapes
 
@@ -1854,5 +1854,3 @@ export function validateDialogue(): string[] {
 export function nodeExists(id: string): boolean {
   return NODES_BY_ID.has(id);
 }
-
-export type { EntityId as DialogueNpcId };

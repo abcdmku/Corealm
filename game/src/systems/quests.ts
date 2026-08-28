@@ -239,7 +239,7 @@ export class QuestSystem implements TickSystem {
     const record: QuestRecord = { status: "active", stage: 0, counters: {}, flags: {} };
     state.quests[questId] = record;
 
-    if (def.onStart) this.applyGrant(def, record, def.onStart);
+    if (def.onStart) this.applyGrant(record, def.onStart);
     this.snapshotBaselines(def, record, 0);
 
     this.deps.store.markDirty();
@@ -261,13 +261,13 @@ export class QuestSystem implements TickSystem {
     const target = Math.min(Math.floor(stage), def.stages.length);
     const record: QuestRecord = { status: "active", stage: 0, counters: {}, flags: {} };
     state.quests[questId] = record;
-    if (def.onStart) this.applyGrant(def, record, def.onStart);
+    if (def.onStart) this.applyGrant(record, def.onStart);
 
     for (let index = 0; index < target; index += 1) {
       const stageDef = def.stages[index];
       if (!stageDef) continue;
-      for (const reaction of stageDef.onFlag ?? []) this.applyGrant(def, record, reaction.grant);
-      if (stageDef.grants) this.applyGrant(def, record, stageDef.grants);
+      for (const reaction of stageDef.onFlag ?? []) this.applyGrant(record, reaction.grant);
+      if (stageDef.grants) this.applyGrant(record, stageDef.grants);
     }
     record.stage = target;
 
@@ -458,7 +458,7 @@ export class QuestSystem implements TickSystem {
 
         if (!this.satisfied(state, record, stageDef.completion)) break;
 
-        if (stageDef.grants) this.applyGrant(def, record, stageDef.grants);
+        if (stageDef.grants) this.applyGrant(record, stageDef.grants);
         record.stage += 1;
         this.clearTalkFlags(record);
         changed = true;
@@ -482,7 +482,7 @@ export class QuestSystem implements TickSystem {
       const marker = `@reacted:${stageDef.index}:${reaction.flag}`;
       if (record.flags[marker] === true) continue;
       if (record.flags[reaction.flag] !== true) continue;
-      this.applyGrant(def, record, reaction.grant);
+      this.applyGrant(record, reaction.grant);
       record.flags[marker] = true;
       applied = true;
     }
@@ -492,7 +492,7 @@ export class QuestSystem implements TickSystem {
   private completeQuest(def: QuestDef, record: QuestRecord): void {
     record.status = "complete";
     record.stage = def.stages.length;
-    this.applyGrant(def, record, {
+    this.applyGrant(record, {
       xp: def.rewards.xp,
       items: def.rewards.items,
       currency: def.rewards.currency,
@@ -592,7 +592,7 @@ export class QuestSystem implements TickSystem {
 
   // ------------------------------------------------------------------ grants
 
-  private applyGrant(def: QuestDef, record: QuestRecord, grant: QuestGrant): void {
+  private applyGrant(record: QuestRecord, grant: QuestGrant): void {
     for (const key of Object.keys(grant.xp ?? {}) as SkillId[]) {
       const amount = grant.xp?.[key];
       if (amount !== undefined && amount > 0) this.deps.xp.award(key, amount);
@@ -615,8 +615,6 @@ export class QuestSystem implements TickSystem {
     for (const write of grant.worldState ?? []) {
       this.deps.entities.setState(write.entityId, write.state, write.lockedReason);
     }
-
-    void def;
   }
 
   /** Adds what fits and parks the rest on the quest record, where it survives a reload. */
