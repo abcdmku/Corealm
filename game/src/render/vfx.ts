@@ -42,6 +42,13 @@ const XP_LIFETIME_MS = 1400;
 const MAX_FLOATERS = 40;
 
 export class Vfx {
+  /**
+   * Floating combat numbers, as a player preference.
+   *
+   * Off means the numbers are never created, not created-and-hidden: on a busy fight that is the
+   * difference between a few dozen DOM nodes a second and none.
+   */
+  damageNumbers = true;
   private floaters: FloatingText[] = [];
   private telegraphs = new Map<string, Telegraph>();
   private readonly projected = new THREE.Vector3();
@@ -96,6 +103,7 @@ export class Vfx {
 
   /** A damage number over whoever took the hit. Called directly by the combat system's event data. */
   damage(entityId: string | null, amount: number, kind: "melee" | "magic" | "incoming", nowMs: number): void {
+    if (!this.damageNumbers) return;
     const at = entityId ? this.deps.entityPosition(entityId) : this.deps.playerPosition();
     if (!at) return;
     const label = amount <= 0 ? "miss" : String(amount);

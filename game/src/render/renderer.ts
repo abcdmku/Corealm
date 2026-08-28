@@ -83,6 +83,17 @@ export class Renderer {
   }
 
   /** Keeps the shadow frustum tight around the player so 2048px of shadow map stays sharp. */
+  /**
+   * Turns real-time shadows on or off, as a player preference.
+   *
+   * Flips the light rather than `shadowMap.enabled`: toggling the renderer flag at runtime
+   * invalidates every material in the scene and costs a full shader recompile, which on this world
+   * is a visible stall. Dropping the sun's cast has the same visual result for free.
+   */
+  setShadows(enabled: boolean): void {
+    this.sun.castShadow = enabled;
+  }
+
   followShadow(target: THREE.Vector3): void {
     this.sun.position.set(target.x + 42, target.y + 60, target.z + 26);
     this.sun.target.position.copy(target);

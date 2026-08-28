@@ -63,6 +63,7 @@ import { scatterWorld, worldExclusions } from "../world/scatter.js";
 import { findShot, shotIds } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
 import { createUi } from "../ui/panels.js";
+import { keybindings } from "../input/keyboard.js";
 import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
 import { addChamberLights, buildDungeon, type DungeonSpec } from "../render/dungeon.js";
@@ -599,8 +600,21 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   const ui = createUi(api, {
     // OrbitCamera yaw is measured from +z clockwise; the compass wants a heading in the same frame.
     getHeadingRad: () => camera.yaw,
+    hasSave: () => loaded.status === "loaded",
+    // Declared below. Referenced from inside a closure, so the temporal dead zone never applies:
+    // nothing can press "New game" before boot has finished running.
+    onNewGame: () => resetWorld(undefined, false),
   });
   ui.mount(labelRoot);
+
+  // Client preferences. Each one is applied here, and each one changes something on the next frame
+  // — see the note in ui/settings.ts about why a setting that does nothing is worse than none.
+  ui.settings.subscribe((preferences) => {
+    renderer.setShadows(preferences.shadows);
+    camera.invertPitch = preferences.invertCameraY;
+    vfx.damageNumbers = preferences.damageNumbers;
+    labelRoot.classList.toggle("is-compact", preferences.uiScale === "compact");
+  });
 
   // A bank or shop interaction has no event of its own, so the panel opens off the successful
   // interaction rather than off a signal that does not exist.
@@ -609,6 +623,44 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     const entity = entityStore.get(event.entityId);
     if (entity?.archetype === "bank") ui.openBank(entity.id);
     else if (entity?.archetype === "shop") ui.openShop(entity.id);
+  });
+
+  // Dialogue and death both have real events, so the windows follow the game rather than the click
+  // that caused it: a conversation opened by a mouse click, by the context menu, or by an agent
+  // calling `corealm_interact` all raise the same window.
+  events.subscribe((event) => {
+    if (event.type === "dialogue.opened") ui.openDialogue();
+    else if (event.type === "dialogue.closed") ui.closeDialogue();
+    else if (event.type === "player.died") {
+      const data = event.data as Record<string, unknown>;
+      ui.showDeath({
+        position: (data["position"] ?? [0, 0, 0]) as [number, number, number],
+        regionId: String(data["regionId"] ?? ""),
+        respawnPosition: (data["respawnPosition"] ?? [0, 0, 0]) as [number, number, number],
+        respawnPointId: String(data["respawnPointId"] ?? ""),
+        cacheId: typeof data["cacheId"] === "string" ? data["cacheId"] : null,
+        itemsLost: Number(data["itemsLost"] ?? 0),
+        expiresAtMs: typeof data["expiresAtMs"] === "number" ? data["expiresAtMs"] : null,
+      });
+    }
+  });
+
+  // The pause menu, on the last Escape.
+  //
+  // Priority 950 puts it after `input.cancel` at 900, which is what makes this the pause menu
+  // rather than a nuisance: Escape closes the top panel if one is open, then cancels the current
+  // activity if one is running, and only reaches here when it had nothing else to do. It therefore
+  // never fires at boot and never interrupts anything.
+  keybindings.register({
+    id: "ui.menu",
+    keys: ["escape"],
+    label: "Menu",
+    group: "General",
+    priority: 950,
+    onDown: () => {
+      ui.openTitle();
+      return true;
+    },
   });
 
   const version = { build: "phase1-round2", contracts: "3", content: "1" };

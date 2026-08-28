@@ -68,7 +68,16 @@ export class OrbitCamera {
 
   constructor(private readonly camera: THREE.PerspectiveCamera) {}
 
+  /**
+   * Vertical orbit inversion, as a player preference.
+   *
+   * Applied here rather than at the mouse layer so every route into the camera — drag, keys, a
+   * future gamepad — obeys it without each one remembering to.
+   */
+  invertPitch = false;
+
   rotate(deltaYaw: number, deltaPitch: number): void {
+    if (this.invertPitch) deltaPitch = -deltaPitch;
     this.yaw += deltaYaw;
     this.pitch = clamp(this.pitch + deltaPitch, CAMERA.minPitch, CAMERA.maxPitch);
   }

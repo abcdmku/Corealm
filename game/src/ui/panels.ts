@@ -36,6 +36,13 @@ import { EquipmentPanel } from "./equipmentPanel.js";
 import { BankPanel } from "./bankPanel.js";
 import { ShopPanel } from "./shopPanel.js";
 import { QuestPanel } from "./questPanel.js";
+import { DialoguePanel } from "./dialoguePanel.js";
+import { ControlsPanel } from "./controlsPanel.js";
+import { MapPanel } from "./mapPanel.js";
+import { DeathScreen, type DeathDetail } from "./deathScreen.js";
+import { TitleScreen } from "./titleScreen.js";
+import { SettingsPanel } from "./settingsPanel.js";
+import { SettingsStore } from "./settings.js";
 import { PanelDock } from "./dock.js";
 
 /** The inventory is 28 slots, per PRD section 5. Panels that mirror it use this, never a literal. */
@@ -523,6 +530,13 @@ export interface ManagedPanel {
 
 export interface UiOptions {
   registry?: KeyBindingRegistry;
+  /** True when boot found a save. The title screen offers "Continue" rather than "Begin". */
+  hasSave?(): boolean;
+  /**
+   * Clears the save and rebuilds the world. The root wires `resetWorld`; the UI must not reach
+   * into persistence or the world layer itself.
+   */
+  onNewGame?(): void;
   /**
    * World heading the view is looking along, radians, 0 = +Z (north), increasing toward +X.
    * Only the compass uses it. Omitted, the compass shows absolute bearings with north fixed up,
@@ -540,6 +554,16 @@ export interface Ui {
   openBank(entityId?: EntityId): void;
   /** Opens the shop window for a shop entity. */
   openShop(shopId?: EntityId): void;
+  /** Raises the conversation window. The root calls this on `dialogue.opened`. */
+  openDialogue(): void;
+  /** Dismisses it. The root calls this on `dialogue.closed`. */
+  closeDialogue(): void;
+  /** Shows the death report. The root calls this on `player.died` with the event payload. */
+  showDeath(detail: DeathDetail): void;
+  /** Raises the title and pause screen. */
+  openTitle(): void;
+  /** Live client preferences. The root subscribes to apply them. */
+  readonly settings: SettingsStore;
   /** The notice channel, for anything outside the UI that needs to tell the player something. */
   notify(message: string, tone?: NoticeTone): void;
 }
@@ -552,6 +576,7 @@ const PANEL_INTERVAL_MS = 220;
  */
 export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   const registry = options.registry ?? keybindings;
+  const settings = new SettingsStore();
   const tooltip = new Tooltip(api);
   const menu = new ContextMenu({ api, skillLabel: skillName });
 
@@ -575,9 +600,26 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   const skills = new SkillsPanel(context);
   const equipment = new EquipmentPanel(context);
   const quests = new QuestPanel(context);
+  const dialogue = new DialoguePanel(context);
+  const controls = new ControlsPanel(context);
+  const map = new MapPanel(context);
+  const settingsPanel = new SettingsPanel(context, settings);
   bank = new BankPanel(context);
   shop = new ShopPanel(context);
-  const panels: ManagedPanel[] = [inventory, skills, equipment, quests, bank, shop];
+  const panels: ManagedPanel[] = [
+    inventory, skills, equipment, quests, map, controls, dialogue, settingsPanel, bank, shop,
+  ];
+
+  const death = new DeathScreen(context);
+  const title = new TitleScreen({
+    hasSave: () => options.hasSave?.() ?? false,
+    onNewGame: () => {
+      options.onNewGame?.();
+      title.close();
+    },
+    onSettings: () => settingsPanel.frame.open(),
+    onClose: () => title.close(),
+  });
 
   // Every panel gets a permanent on-screen button that prints its own key. The bank and the shop
   // are deliberately not on it: both are opened by standing at one, and a button that answers
@@ -599,6 +641,10 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
         const active = api.getQuests().filter((quest) => quest.status === "active").length;
         return active > 0 ? String(active) : "";
       } },
+    { id: "map", label: "Map", key: "m", glyph: "◎",
+      toggle: () => map.frame.toggle(), isOpen: () => map.frame.isOpen() },
+    { id: "controls", label: "Keys", key: "h", glyph: "⌨",
+      toggle: () => controls.frame.toggle(), isOpen: () => controls.frame.isOpen() },
   ]);
 
   let mounted = false;
@@ -618,6 +664,9 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       hud.mount(root);
       dock.mount(root);
       for (const panel of panels) panel.frame.mount(root);
+      // Both of these cover the screen, so they mount last and sit above the panels.
+      death.mount(root);
+      title.mount(root);
       tooltip.mount(root);
       // The HUD owns the toast channel from here; the context menu's fallback strip stands down.
       setNoticeSink((message, tone) => hud.pushNotice(message, tone));
@@ -630,6 +679,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
         lastHudMs = now;
         hud.update(now);
         dock.update();
+        death.update();
         // The world may open a bank or a shop through an interaction rather than through us.
         const wants = hud.takeAutoOpen();
         if (wants === "bank") bank?.openFor(undefined);
@@ -644,6 +694,8 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     dispose(): void {
       setNoticeSink(null);
       dock.dispose();
+      death.dispose();
+      title.dispose();
       for (const panel of panels) panel.dispose();
       hud.dispose();
       tooltip.dispose();
@@ -658,6 +710,24 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     openShop(shopId?: EntityId): void {
       shop?.openFor(shopId);
     },
+
+    openDialogue(): void {
+      dialogue.openFor();
+    },
+
+    closeDialogue(): void {
+      dialogue.frame.close();
+    },
+
+    showDeath(detail: DeathDetail): void {
+      death.show(detail);
+    },
+
+    openTitle(): void {
+      title.open();
+    },
+
+    settings,
 
     notify(message: string, tone: NoticeTone = "info"): void {
       notify(message, tone);

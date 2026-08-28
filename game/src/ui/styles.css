@@ -15,7 +15,18 @@
  *
  * Skill colours are copied from game/src/content/skills.ts. Do not invent new ones; if a skill
  * colour changes there, change it here.
+ *
+ * The imports below are one file per component, each owned by exactly one worker so two people
+ * adding a panel in the same round cannot collide in here. They stay at the top: CSS requires
+ * @import before any other rule. Everything shared — tokens, .panel, .btn, .bar, .slot — lives in
+ * this file and is the root's.
  */
+
+@import "./styles/dialogue.css";
+@import "./styles/controls.css";
+@import "./styles/map.css";
+@import "./styles/death.css";
+@import "./styles/title.css";
 
 :root {
   /* ---- ink and surfaces */
