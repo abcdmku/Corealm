@@ -65,6 +65,7 @@ import { installAgentSurface } from "../agent/index.js";
 import { createUi } from "../ui/panels.js";
 import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
+import { addChamberLights, buildDungeon, type DungeonSpec } from "../render/dungeon.js";
 import { Vfx } from "../render/vfx.js";
 import { DocSearch, buildDocs } from "../api/docs.js";
 
@@ -184,6 +185,17 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   entityStore.load(built.entities);
   entityStore.registerLocations(built.knownLocations);
 
+  // 8a. Dungeon interiors. The Gravelmaw was authored as chamber centres with floor offsets and
+  //     nothing underneath, so everything in it hung in mid-air over the moor: entering snapped the
+  //     player back to the surface and the boss chased, leashed, and walked home. Built before the
+  //     navmesh so the chambers are genuinely walkable.
+  const dungeonSpec = buildDungeonSpec(scene);
+  const dungeon = dungeonSpec ? buildDungeon(dungeonSpec, scene.materials) : null;
+  if (dungeon && dungeonSpec) {
+    scene.root.add(dungeon.group);
+    addChamberLights(dungeonSpec, dungeon.group);
+  }
+
   // 8b. Buildings become solid before the navmesh is generated, so paths route around them
   //     instead of through a wall. Gatehouses emit two pier boxes with the gate gap left open.
   for (const box of built.buildings) {
@@ -198,7 +210,12 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   // 9. Navmesh over the walkable terrain, then the route graph above it.
   setStatus("mapping walkable ground…");
-  if (!nav.build([...scene.getWalkableMeshes(), ...navObstacles.meshes])) {
+  if (!nav.build([
+    ...scene.getWalkableMeshes(),
+    ...(dungeon?.walkable ?? []),
+    ...(dungeon?.blockers ?? []),
+    ...navObstacles.meshes,
+  ])) {
     const failure = nav.snapshot(null, null, 0).error ?? "unknown";
     errors.push({ atMs: atMs(), source: "navigation", message: `Navmesh build failed: ${failure}` });
   }
@@ -788,6 +805,45 @@ function buildRoads(scene: WorldScene): number {
     }
   }
   return built;
+}
+
+/**
+ * Turns the authored dungeon data into a geometry spec.
+ *
+ * Chamber floors are absolute heights here: the content stores an offset from the terrain at the
+ * mouth, which is the one point the surface and the interior agree on. Corridors are derived from
+ * the chamber order rather than authored, because the chambers descend in a line and an authored
+ * corridor list would be a second thing to keep in step.
+ */
+function buildDungeonSpec(scene: WorldScene): DungeonSpec | null {
+  for (const region of REGIONS) {
+    const dungeon = region.dungeon;
+    if (!dungeon) continue;
+
+    const base = scene.heightAt(region.id, dungeon.entrance[0], dungeon.entrance[1]);
+    const chambers = dungeon.chambers.map((chamber) => ({
+      id: chamber.id,
+      name: chamber.name,
+      centre: [chamber.centre[0], chamber.centre[1]] as [number, number],
+      radius: chamber.radius,
+      floorY: base + chamber.floorOffset,
+      lit: chamber.lit,
+    }));
+
+    const corridors = chambers.slice(0, -1).map((chamber, index) => {
+      const next = chambers[index + 1]!;
+      return {
+        from: chamber.centre,
+        to: next.centre,
+        fromY: chamber.floorY,
+        toY: next.floorY,
+        width: 6,
+      };
+    });
+
+    return { regionId: dungeon.id, chambers, corridors, wallHeight: 7 };
+  }
+  return null;
 }
 
 /**

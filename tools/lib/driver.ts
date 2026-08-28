@@ -101,13 +101,22 @@ export class GameDriver {
     await this.requirePage().mouse.move(x, y, { steps: 8 });
   }
 
+  /**
+   * Calls a `window.__gameDebug` method and returns its JSON-safe result.
+   *
+   * The result is awaited before serialising. Several debug helpers are genuinely async — most
+   * importantly `callTool`, which drives the agent surface — and `JSON.stringify` of a pending
+   * Promise is `{}`. Without the await every async call silently returned an empty object, which
+   * looks like a passing step because the side effect still happened.
+   */
   async callDebug(method: string, args: unknown[] = []): Promise<unknown> {
     return this.requirePage().evaluate(
-      ({ methodName, methodArgs }) => {
+      async ({ methodName, methodArgs }) => {
         const api = window.__gameDebug as unknown as Record<string, unknown> | undefined;
         const fn = api?.[methodName];
         if (typeof fn !== "function") throw new Error(`window.__gameDebug.${methodName} is not a function`);
-        return JSON.parse(JSON.stringify((fn as (...values: unknown[]) => unknown)(...methodArgs) ?? null));
+        const value = await (fn as (...values: unknown[]) => unknown)(...methodArgs);
+        return JSON.parse(JSON.stringify(value ?? null));
       },
       { methodName: method, methodArgs: args },
     );

@@ -96,21 +96,22 @@ export class TravelSystem {
   /**
    * Where a portal leads.
    *
-   * `meta.linkedLocationId` is the authored answer. Failing that, a portal into a dungeon is
-   * matched to that dungeon's first chamber, which is what the Gravelmaw mouth wants without
-   * needing the content edited.
+   * `meta.toLocationId` is the authored answer — that is the key `content/regions.ts` writes, and
+   * the content's naming wins over anything this file would rather have been called. The dungeon
+   * fallbacks exist for a portal authored without an explicit target.
    */
   private resolveDestination(
     entity: SemanticEntity,
   ): { position: Vec3; regionId: RegionId; locationId: string } | undefined {
-    const linked = typeof entity.meta?.linkedLocationId === "string" ? entity.meta.linkedLocationId : null;
-    const dungeonId = typeof entity.meta?.dungeonId === "string" ? entity.meta.dungeonId : null;
+    const linked = typeof entity.meta?.toLocationId === "string" ? entity.meta.toLocationId : null;
+    const dungeonId = typeof entity.meta?.toRegionId === "string"
+      ? entity.meta.toRegionId
+      : typeof entity.meta?.dungeonId === "string" ? entity.meta.dungeonId : null;
 
-    const candidates = linked
-      ? [linked]
-      : dungeonId
-        ? [`${dungeonId}_chamber1`, `${dungeonId}_entrance`]
-        : [];
+    const candidates = [
+      ...(linked ? [linked] : []),
+      ...(dungeonId ? [`${dungeonId}_chamber1`, `${dungeonId}_entrance`] : []),
+    ];
 
     for (const candidate of candidates) {
       const node = this.deps.nav.routeNode(candidate);
