@@ -784,7 +784,7 @@ function buildRoads(scene: WorldScene): number {
         const z = from.position[1] + (to.position[1] - from.position[1]) * t;
         points.push([x, scene.heightAt(region.id, x, z), z]);
       }
-      if (scene.buildRoad(points, 5, region.id)) built += 1;
+      if (scene.buildRoad(points, 3.2, region.id)) built += 1;
     }
   }
   return built;

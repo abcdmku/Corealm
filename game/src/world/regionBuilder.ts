@@ -45,6 +45,22 @@ import type { KnownLocation } from "./entities.js";
  *   8-15 at tier 1, 8-15 at tier 5, 8-14 at tier 10.
  */
 /** Every quest a given NPC hands out, derived from the quest table rather than duplicated. */
+/**
+ * Dresses an NPC.
+ *
+ * `regions.ts` authors every NPC as `base_male` / `base_female`, which are undressed base bodies —
+ * a town full of nude mannequins. The Modular Outfits pack ships complete full-body variants on the
+ * same 65-bone skeleton, so swapping the asset costs nothing and clothes everyone. Rangers for the
+ * outdoor roles, peasants for the townsfolk, chosen deterministically from the id so the same NPC
+ * is dressed the same way on every load.
+ */
+function dressedAssetFor(npcId: string, baseAssetId: string): string {
+  const female = baseAssetId.includes("female");
+  const outdoors = /ranger|trapper|woodward|watcher|quarrier|forema|pitmaster/.test(npcId);
+  const kind = outdoors ? "ranger" : "peasant";
+  return `outfit_${female ? "female" : "male"}_${kind}`;
+}
+
 function questIdsForNpc(npcId: string): string[] {
   return QUESTS.filter((quest) => quest.giverNpcId === npcId).map((quest) => quest.id);
 }
@@ -387,7 +403,7 @@ function buildRegionEntities(
         dialogueRootId: npc.dialogueRootId,
         questIds: npc.questIds.length > 0 ? npc.questIds : questIdsForNpc(npc.id),
       },
-      view: { assetId: npc.assetId, rotationY: npc.facingRad, labelHeight: 2.2 },
+      view: { assetId: dressedAssetFor(npc.id, npc.assetId), rotationY: npc.facingRad, labelHeight: 2.2 },
       meta: { settlementId: settlement.id },
     });
   }
