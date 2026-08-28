@@ -13,7 +13,10 @@
     "play": "tsx tools/play-game.ts",
     "screenshot": "tsx tools/screenshot.ts",
     "inspect-glb": "tsx tools/inspect-glb.ts",
-    "game-agent": "tsx tools/game-agent.ts"
+    "game-agent": "tsx tools/game-agent.ts",
+    "perf": "tsx tools/perf-test.ts",
+    "fetch-assets": "tsx tools/fetch-assets.ts",
+    "build-assets": "tsx tools/build-assets.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.20.0",
@@ -23,9 +26,13 @@
     "three": "0.185.1"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/extensions": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2",
     "@types/node": "24.3.0",
     "@types/three": "0.185.0",
     "playwright": "1.62.1",
+    "sharp": "^0.35.4",
     "tsx": "4.23.12",
     "typescript": "7.0.2",
     "vite": "8.2.2",

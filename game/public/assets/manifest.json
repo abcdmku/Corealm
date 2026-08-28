@@ -1,0 +1,5191 @@
+{
+  "generatedAt": "2026-08-28T03:25:48.046Z",
+  "packs": [
+    {
+      "id": "stylized-nature-megakit",
+      "name": "Stylized Nature MegaKit",
+      "author": "Quaternius",
+      "source": "https://quaternius.itch.io/stylized-nature-megakit",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "medieval-village-megakit",
+      "name": "Medieval Village MegaKit",
+      "author": "Quaternius",
+      "source": "https://quaternius.itch.io/medieval-village-megakit",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "fantasy-props-megakit",
+      "name": "Fantasy Props MegaKit",
+      "author": "Quaternius",
+      "source": "https://quaternius.itch.io/fantasy-props-megakit",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "universal-base-characters",
+      "name": "Universal Base Characters",
+      "author": "Quaternius",
+      "source": "https://quaternius.itch.io/universal-base-characters",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "modular-character-outfits-fantasy",
+      "name": "Modular Character Outfits - Fantasy",
+      "author": "Quaternius",
+      "source": "https://quaternius.itch.io/modular-character-outfits-fantasy",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "ultimate-platformer-pack",
+      "name": "Ultimate Platformer Pack",
+      "author": "Quaternius",
+      "source": "https://quaternius.itch.io/ultimate-platformer-pack",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "universal-animation-library",
+      "name": "Universal Animation Library",
+      "author": "Quaternius",
+      "source": "https://quaternius.itch.io/universal-animation-library",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "universal-animation-library-2",
+      "name": "Universal Animation Library 2",
+      "author": "Quaternius",
+      "source": "https://quaternius.itch.io/universal-animation-library-2",
+      "license": "CC0-1.0"
+    }
+  ],
+  "assets": [
+    {
+      "id": "animation_library_1",
+      "file": "models/animation/animation_library_1.glb",
+      "pack": "universal-animation-library",
+      "category": "animation",
+      "tags": [
+        "animation",
+        "clips",
+        "humanoid",
+        "locomotion",
+        "combat",
+        "library",
+        "in-place"
+      ],
+      "bytes": 2254296,
+      "size": {
+        "x": 1.944,
+        "y": 1.829,
+        "z": 0.37
+      },
+      "animations": [
+        "A_TPose",
+        "Crouch_Fwd_Loop",
+        "Crouch_Idle_Loop",
+        "Dance_Loop",
+        "Death01",
+        "Driving_Loop",
+        "Fixing_Kneeling",
+        "Hit_Chest",
+        "Hit_Head",
+        "Idle_Loop",
+        "Idle_Talking_Loop",
+        "Idle_Torch_Loop",
+        "Interact",
+        "Jog_Fwd_Loop",
+        "Jump_Land",
+        "Jump_Loop",
+        "Jump_Start",
+        "PickUp_Table",
+        "Pistol_Aim_Down",
+        "Pistol_Aim_Neutral",
+        "Pistol_Aim_Up",
+        "Pistol_Idle_Loop",
+        "Pistol_Reload",
+        "Pistol_Shoot",
+        "Punch_Cross",
+        "Punch_Jab",
+        "Push_Loop",
+        "Roll",
+        "Sitting_Enter",
+        "Sitting_Exit",
+        "Sitting_Idle_Loop",
+        "Sitting_Talking_Loop",
+        "Spell_Simple_Enter",
+        "Spell_Simple_Exit",
+        "Spell_Simple_Idle_Loop",
+        "Spell_Simple_Shoot",
+        "Sprint_Loop",
+        "Swim_Fwd_Loop",
+        "Swim_Idle_Loop",
+        "Sword_Attack",
+        "Sword_Idle",
+        "Walk_Formal_Loop",
+        "Walk_Loop"
+      ],
+      "materials": []
+    },
+    {
+      "id": "animation_library_2",
+      "file": "models/animation/animation_library_2.glb",
+      "pack": "universal-animation-library-2",
+      "category": "animation",
+      "tags": [
+        "animation",
+        "clips",
+        "humanoid",
+        "gathering",
+        "crafting",
+        "library",
+        "in-place"
+      ],
+      "bytes": 2395100,
+      "size": {
+        "x": 1.944,
+        "y": 1.829,
+        "z": 0.37
+      },
+      "animations": [
+        "A_TPose",
+        "Chest_Open",
+        "ClimbUp_1m",
+        "Consume",
+        "Farm_Harvest",
+        "Farm_PlantSeed",
+        "Farm_Watering",
+        "Hit_Knockback",
+        "Idle_FoldArms_Loop",
+        "Idle_Lantern_Loop",
+        "Idle_No_Loop",
+        "Idle_Rail_Call",
+        "Idle_Rail_Loop",
+        "Idle_Shield_Break",
+        "Idle_Shield_Loop",
+        "Idle_TalkingPhone_Loop",
+        "LayToIdle",
+        "Melee_Hook",
+        "Melee_Hook_Rec",
+        "NinjaJump_Idle_Loop",
+        "NinjaJump_Land",
+        "NinjaJump_Start",
+        "OverhandThrow",
+        "Shield_Dash",
+        "Shield_OneShot",
+        "Slide_Exit",
+        "Slide_Loop",
+        "Slide_Start",
+        "Sword_Block",
+        "Sword_Dash",
+        "Sword_Heavy_Combo",
+        "Sword_Regular_A",
+        "Sword_Regular_A_Rec",
+        "Sword_Regular_B",
+        "Sword_Regular_B_Rec",
+        "Sword_Regular_C",
+        "Sword_Regular_Combo",
+        "TreeChopping_Loop",
+        "Walk_Carry_Loop",
+        "Yes",
+        "Zombie_Idle_Loop",
+        "Zombie_Scratch",
+        "Zombie_Walk_Fwd_Loop"
+      ],
+      "materials": []
+    },
+    {
+      "id": "balcony_corner",
+      "file": "models/building/balcony_corner.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "balcony",
+        "railing",
+        "modular"
+      ],
+      "bytes": 135364,
+      "size": {
+        "x": 2.104,
+        "y": 1.23,
+        "z": 2.104
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "balcony_straight",
+      "file": "models/building/balcony_straight.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "balcony",
+        "railing",
+        "modular"
+      ],
+      "bytes": 87104,
+      "size": {
+        "x": 2,
+        "y": 1.23,
+        "z": 0.206
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "bridge_modular_center",
+      "file": "models/building/bridge_modular_center.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "building",
+      "tags": [
+        "bridge",
+        "crossing",
+        "water",
+        "river",
+        "wood",
+        "modular",
+        "placeholder-style"
+      ],
+      "bytes": 18444,
+      "size": {
+        "x": 3,
+        "y": 2.085,
+        "z": 2.306
+      },
+      "animations": [],
+      "materials": [
+        "Wood"
+      ]
+    },
+    {
+      "id": "bridge_modular_end",
+      "file": "models/building/bridge_modular_end.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "building",
+      "tags": [
+        "bridge",
+        "crossing",
+        "water",
+        "river",
+        "wood",
+        "modular",
+        "placeholder-style"
+      ],
+      "bytes": 28832,
+      "size": {
+        "x": 2.948,
+        "y": 2.013,
+        "z": 2.242
+      },
+      "animations": [],
+      "materials": [
+        "Wood"
+      ]
+    },
+    {
+      "id": "bridge_small",
+      "file": "models/building/bridge_small.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "building",
+      "tags": [
+        "bridge",
+        "crossing",
+        "water",
+        "river",
+        "wood",
+        "placeholder-style"
+      ],
+      "bytes": 54408,
+      "size": {
+        "x": 6.938,
+        "y": 2.617,
+        "z": 2.638
+      },
+      "animations": [],
+      "materials": [
+        "Wood"
+      ]
+    },
+    {
+      "id": "corner_brick",
+      "file": "models/building/corner_brick.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "corner",
+        "brick",
+        "stone",
+        "modular",
+        "dungeon"
+      ],
+      "bytes": 99520,
+      "size": {
+        "x": 0.531,
+        "y": 3.016,
+        "z": 0.576
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim"
+      ]
+    },
+    {
+      "id": "corner_interior",
+      "file": "models/building/corner_interior.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "corner",
+        "interior",
+        "modular"
+      ],
+      "bytes": 39524,
+      "size": {
+        "x": 0.21,
+        "y": 3,
+        "z": 0.24
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "corner_wood",
+      "file": "models/building/corner_wood.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "corner",
+        "timber",
+        "modular"
+      ],
+      "bytes": 39528,
+      "size": {
+        "x": 0.21,
+        "y": 3,
+        "z": 0.24
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "door_flat_1",
+      "file": "models/building/door_flat_1.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "door",
+        "entrance",
+        "house"
+      ],
+      "bytes": 120004,
+      "size": {
+        "x": 1.118,
+        "y": 2.099,
+        "z": 0.199
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim_Wear",
+        "MI_MetalOrnaments"
+      ]
+    },
+    {
+      "id": "door_frame_round",
+      "file": "models/building/door_frame_round.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "door",
+        "frame",
+        "entrance",
+        "modular"
+      ],
+      "bytes": 49632,
+      "size": {
+        "x": 1.407,
+        "y": 2.563,
+        "z": 0.539
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "door_round_1",
+      "file": "models/building/door_round_1.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "door",
+        "entrance",
+        "house"
+      ],
+      "bytes": 60584,
+      "size": {
+        "x": 1.12,
+        "y": 2.318,
+        "z": 0.121
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_WindowGlass"
+      ]
+    },
+    {
+      "id": "door_round_2",
+      "file": "models/building/door_round_2.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "door",
+        "entrance",
+        "house",
+        "shop"
+      ],
+      "bytes": 135700,
+      "size": {
+        "x": 1.115,
+        "y": 2.323,
+        "z": 0.209
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim_Wear",
+        "MI_MetalOrnaments"
+      ]
+    },
+    {
+      "id": "floor_brick",
+      "file": "models/building/floor_brick.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "floor",
+        "brick",
+        "road",
+        "path",
+        "modular",
+        "dungeon"
+      ],
+      "bytes": 34200,
+      "size": {
+        "x": 2,
+        "y": 0.02,
+        "z": 2
+      },
+      "animations": [],
+      "materials": [
+        "MI_Brick"
+      ]
+    },
+    {
+      "id": "floor_cobble",
+      "file": "models/building/floor_cobble.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "floor",
+        "cobble",
+        "road",
+        "path",
+        "modular",
+        "dungeon"
+      ],
+      "bytes": 36072,
+      "size": {
+        "x": 2,
+        "y": 0.02,
+        "z": 2
+      },
+      "animations": [],
+      "materials": [
+        "MI_UnevenBrick"
+      ]
+    },
+    {
+      "id": "floor_wood",
+      "file": "models/building/floor_wood.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "floor",
+        "wood",
+        "plank",
+        "dock",
+        "pier",
+        "modular"
+      ],
+      "bytes": 40540,
+      "size": {
+        "x": 2,
+        "y": 0.02,
+        "z": 2
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "floor_wood_light",
+      "file": "models/building/floor_wood_light.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "floor",
+        "wood",
+        "plank",
+        "dock",
+        "pier",
+        "modular"
+      ],
+      "bytes": 40540,
+      "size": {
+        "x": 2,
+        "y": 0.02,
+        "z": 2
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "kerb_corner",
+      "file": "models/building/kerb_corner.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "kerb",
+        "border",
+        "road",
+        "path",
+        "modular"
+      ],
+      "bytes": 33192,
+      "size": {
+        "x": 0.7,
+        "y": 0.134,
+        "z": 0.7
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim"
+      ]
+    },
+    {
+      "id": "kerb_straight",
+      "file": "models/building/kerb_straight.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "kerb",
+        "border",
+        "road",
+        "path",
+        "modular"
+      ],
+      "bytes": 32972,
+      "size": {
+        "x": 2,
+        "y": 0.134,
+        "z": 0.7
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim"
+      ]
+    },
+    {
+      "id": "overhang_brick",
+      "file": "models/building/overhang_brick.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "overhang",
+        "brick",
+        "trim",
+        "modular"
+      ],
+      "bytes": 76324,
+      "size": {
+        "x": 2,
+        "y": 0.266,
+        "z": 2.022
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_UnevenBrick"
+      ]
+    },
+    {
+      "id": "overhang_plaster",
+      "file": "models/building/overhang_plaster.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "overhang",
+        "plaster",
+        "trim",
+        "modular"
+      ],
+      "bytes": 63720,
+      "size": {
+        "x": 2,
+        "y": 3.028,
+        "z": 2.2
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster"
+      ]
+    },
+    {
+      "id": "roof_dormer",
+      "file": "models/building/roof_dormer.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "roof",
+        "dormer",
+        "house"
+      ],
+      "bytes": 120428,
+      "size": {
+        "x": 1.966,
+        "y": 2.673,
+        "z": 2.439
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster",
+        "MI_WindowGlass",
+        "MI_RoundTiles"
+      ]
+    },
+    {
+      "id": "roof_gable_brick",
+      "file": "models/building/roof_gable_brick.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "roof",
+        "gable",
+        "brick",
+        "modular"
+      ],
+      "bytes": 70748,
+      "size": {
+        "x": 6.694,
+        "y": 4.516,
+        "z": 1.129
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster"
+      ]
+    },
+    {
+      "id": "roof_log",
+      "file": "models/building/roof_log.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "log",
+        "beam",
+        "timber",
+        "roof"
+      ],
+      "bytes": 44140,
+      "size": {
+        "x": 1.149,
+        "y": 1.387,
+        "z": 10.696
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "roof_tiles_4x6",
+      "file": "models/building/roof_tiles_4x6.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "roof",
+        "tiles",
+        "cottage",
+        "modular"
+      ],
+      "bytes": 148648,
+      "size": {
+        "x": 5.513,
+        "y": 4.234,
+        "z": 7.572
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_RoundTiles"
+      ]
+    },
+    {
+      "id": "roof_tiles_6x12",
+      "file": "models/building/roof_tiles_6x12.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "roof",
+        "tiles",
+        "house",
+        "modular"
+      ],
+      "bytes": 212616,
+      "size": {
+        "x": 8.25,
+        "y": 5.672,
+        "z": 13.658
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_RoundTiles"
+      ]
+    },
+    {
+      "id": "roof_tiles_6x8",
+      "file": "models/building/roof_tiles_6x8.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "roof",
+        "tiles",
+        "house",
+        "modular"
+      ],
+      "bytes": 186112,
+      "size": {
+        "x": 8.25,
+        "y": 5.672,
+        "z": 9.683
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_RoundTiles"
+      ]
+    },
+    {
+      "id": "roof_tower",
+      "file": "models/building/roof_tower.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "roof",
+        "tower",
+        "spire",
+        "tiles"
+      ],
+      "bytes": 275640,
+      "size": {
+        "x": 5.651,
+        "y": 7.361,
+        "z": 5.427
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_RockTrim",
+        "MI_RoundTiles",
+        "MI_MetalOrnaments"
+      ]
+    },
+    {
+      "id": "roof_wood_plank",
+      "file": "models/building/roof_wood_plank.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "roof",
+        "wood",
+        "shed",
+        "stall",
+        "modular"
+      ],
+      "bytes": 51256,
+      "size": {
+        "x": 2.258,
+        "y": 1.248,
+        "z": 1.56
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "stairs_exterior",
+      "file": "models/building/stairs_exterior.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "stairs",
+        "steps",
+        "modular"
+      ],
+      "bytes": 68932,
+      "size": {
+        "x": 2,
+        "y": 1.204,
+        "z": 2.078
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim",
+        "MI_Brick"
+      ]
+    },
+    {
+      "id": "stairs_stone",
+      "file": "models/building/stairs_stone.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "stairs",
+        "steps",
+        "stone",
+        "dungeon",
+        "modular"
+      ],
+      "bytes": 55336,
+      "size": {
+        "x": 1.769,
+        "y": 3.046,
+        "z": 4.71
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "wall_bottom_trim",
+      "file": "models/building/wall_bottom_trim.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "trim",
+        "modular"
+      ],
+      "bytes": 40088,
+      "size": {
+        "x": 2,
+        "y": 0.238,
+        "z": 0.432
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "wall_brick_door",
+      "file": "models/building/wall_brick_door.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "door",
+        "brick",
+        "stone",
+        "modular",
+        "dungeon"
+      ],
+      "bytes": 95524,
+      "size": {
+        "x": 2,
+        "y": 3.123,
+        "z": 0.406
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster",
+        "MI_UnevenBrick"
+      ]
+    },
+    {
+      "id": "wall_brick_straight",
+      "file": "models/building/wall_brick_straight.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "brick",
+        "stone",
+        "modular",
+        "dungeon",
+        "tower"
+      ],
+      "bytes": 93436,
+      "size": {
+        "x": 2,
+        "y": 3.123,
+        "z": 0.406
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster",
+        "MI_UnevenBrick"
+      ]
+    },
+    {
+      "id": "wall_brick_window",
+      "file": "models/building/wall_brick_window.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "window",
+        "brick",
+        "stone",
+        "modular"
+      ],
+      "bytes": 95112,
+      "size": {
+        "x": 2,
+        "y": 3.123,
+        "z": 0.406
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster",
+        "MI_UnevenBrick"
+      ]
+    },
+    {
+      "id": "wall_plaster_base",
+      "file": "models/building/wall_plaster_base.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "plaster",
+        "house",
+        "modular",
+        "village"
+      ],
+      "bytes": 91940,
+      "size": {
+        "x": 2,
+        "y": 3.123,
+        "z": 0.406
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster",
+        "MI_Brick"
+      ]
+    },
+    {
+      "id": "wall_plaster_door",
+      "file": "models/building/wall_plaster_door.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "door",
+        "plaster",
+        "house",
+        "modular"
+      ],
+      "bytes": 93036,
+      "size": {
+        "x": 2,
+        "y": 3.123,
+        "z": 0.406
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster",
+        "MI_RockTrim"
+      ]
+    },
+    {
+      "id": "wall_plaster_straight",
+      "file": "models/building/wall_plaster_straight.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "plaster",
+        "house",
+        "modular",
+        "village"
+      ],
+      "bytes": 59940,
+      "size": {
+        "x": 2,
+        "y": 3.125,
+        "z": 0.406
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster"
+      ]
+    },
+    {
+      "id": "wall_plaster_timber",
+      "file": "models/building/wall_plaster_timber.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "timber",
+        "plaster",
+        "house",
+        "modular"
+      ],
+      "bytes": 67132,
+      "size": {
+        "x": 2,
+        "y": 3.123,
+        "z": 0.406
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster"
+      ]
+    },
+    {
+      "id": "wall_plaster_window",
+      "file": "models/building/wall_plaster_window.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "wall",
+        "window",
+        "plaster",
+        "house",
+        "modular"
+      ],
+      "bytes": 93640,
+      "size": {
+        "x": 2,
+        "y": 3.123,
+        "z": 0.406
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim",
+        "MI_Plaster",
+        "MI_Brick"
+      ]
+    },
+    {
+      "id": "window_shutters",
+      "file": "models/building/window_shutters.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "window",
+        "shutters",
+        "house"
+      ],
+      "bytes": 46228,
+      "size": {
+        "x": 2.303,
+        "y": 1.647,
+        "z": 0.472
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim_Wear"
+      ]
+    },
+    {
+      "id": "window_thin",
+      "file": "models/building/window_thin.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "window",
+        "house",
+        "modular"
+      ],
+      "bytes": 53936,
+      "size": {
+        "x": 0.888,
+        "y": 1.605,
+        "z": 0.344
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim_Wear",
+        "MI_WindowGlass"
+      ]
+    },
+    {
+      "id": "window_wide",
+      "file": "models/building/window_wide.glb",
+      "pack": "medieval-village-megakit",
+      "category": "building",
+      "tags": [
+        "window",
+        "house",
+        "modular"
+      ],
+      "bytes": 52048,
+      "size": {
+        "x": 1.365,
+        "y": 1.726,
+        "z": 0.53
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim_Wear",
+        "MI_WindowGlass"
+      ]
+    },
+    {
+      "id": "base_female",
+      "file": "models/character/base_female.glb",
+      "pack": "universal-base-characters",
+      "category": "character",
+      "tags": [
+        "character",
+        "base",
+        "humanoid",
+        "female",
+        "player",
+        "npc",
+        "rigged"
+      ],
+      "bytes": 651876,
+      "size": {
+        "x": 1.669,
+        "y": 1.775,
+        "z": 0.303
+      },
+      "animations": [],
+      "materials": [
+        "MI_Hair_2",
+        "MI_Eyes",
+        "MI_Superhero_Female"
+      ]
+    },
+    {
+      "id": "base_male",
+      "file": "models/character/base_male.glb",
+      "pack": "universal-base-characters",
+      "category": "character",
+      "tags": [
+        "character",
+        "base",
+        "humanoid",
+        "male",
+        "player",
+        "npc",
+        "rigged"
+      ],
+      "bytes": 622184,
+      "size": {
+        "x": 1.859,
+        "y": 1.82,
+        "z": 0.291
+      },
+      "animations": [],
+      "materials": [
+        "MI_Hair_1",
+        "MI_Eyes",
+        "MI_Superhero_Male"
+      ]
+    },
+    {
+      "id": "enemy_bee",
+      "file": "models/character/enemy_bee.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "character",
+      "tags": [
+        "enemy",
+        "monster",
+        "animated",
+        "flying",
+        "insect",
+        "tier5",
+        "placeholder-style"
+      ],
+      "bytes": 152904,
+      "size": {
+        "x": 2.867,
+        "y": 1.871,
+        "z": 1.473
+      },
+      "animations": [
+        "Bite_Front",
+        "Death",
+        "Flying",
+        "HitRecieve"
+      ],
+      "materials": [
+        "Main",
+        "Main_2",
+        "Wings",
+        "Teeth",
+        "Tongue",
+        "Eyes"
+      ]
+    },
+    {
+      "id": "enemy_blob",
+      "file": "models/character/enemy_blob.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "character",
+      "tags": [
+        "enemy",
+        "monster",
+        "animated",
+        "tier1",
+        "placeholder-style"
+      ],
+      "bytes": 120752,
+      "size": {
+        "x": 1.981,
+        "y": 1.646,
+        "z": 1.378
+      },
+      "animations": [
+        "Bite_Front",
+        "Bite_InPlace",
+        "Dance",
+        "Death",
+        "HitRecieve",
+        "Idle",
+        "Jump",
+        "No",
+        "Walk",
+        "Yes"
+      ],
+      "materials": [
+        "Main",
+        "Main_Dark",
+        "Eyes",
+        "Horns",
+        "Tongue",
+        "Teeth"
+      ]
+    },
+    {
+      "id": "enemy_crab",
+      "file": "models/character/enemy_crab.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "character",
+      "tags": [
+        "enemy",
+        "monster",
+        "animated",
+        "crab",
+        "tier1",
+        "placeholder-style"
+      ],
+      "bytes": 164552,
+      "size": {
+        "x": 2.543,
+        "y": 1.512,
+        "z": 1.386
+      },
+      "animations": [
+        "Bite_Front",
+        "Bite_InPlace",
+        "Dance",
+        "Death",
+        "HitRecieve",
+        "Idle",
+        "Jump",
+        "No",
+        "Walk",
+        "Yes"
+      ],
+      "materials": [
+        "Main",
+        "Black",
+        "Main_Dark",
+        "White"
+      ]
+    },
+    {
+      "id": "enemy_skull",
+      "file": "models/character/enemy_skull.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "character",
+      "tags": [
+        "enemy",
+        "monster",
+        "animated",
+        "undead",
+        "skull",
+        "dungeon",
+        "tier10",
+        "boss",
+        "placeholder-style"
+      ],
+      "bytes": 99556,
+      "size": {
+        "x": 1.406,
+        "y": 1.493,
+        "z": 1.422
+      },
+      "animations": [
+        "Bite_Front",
+        "Bite_InPlace",
+        "Dance",
+        "Death",
+        "HitRecieve",
+        "Idle",
+        "Jump",
+        "No",
+        "Walk",
+        "Yes"
+      ],
+      "materials": [
+        "Main",
+        "Main_Light"
+      ]
+    },
+    {
+      "id": "eyebrows",
+      "file": "models/character/eyebrows.glb",
+      "pack": "universal-base-characters",
+      "category": "character",
+      "tags": [
+        "eyebrows",
+        "face",
+        "customisation"
+      ],
+      "bytes": 88240,
+      "size": {
+        "x": 0.125,
+        "y": 0.031,
+        "z": 0.038
+      },
+      "animations": [],
+      "materials": [
+        "MI_Hair_1"
+      ]
+    },
+    {
+      "id": "hair_beard",
+      "file": "models/character/hair_beard.glb",
+      "pack": "universal-base-characters",
+      "category": "character",
+      "tags": [
+        "hair",
+        "beard",
+        "face",
+        "customisation",
+        "recolour"
+      ],
+      "bytes": 85936,
+      "size": {
+        "x": 0.162,
+        "y": 0.14,
+        "z": 0.105
+      },
+      "animations": [],
+      "materials": [
+        "MI_Hair_1"
+      ]
+    },
+    {
+      "id": "hair_buns",
+      "file": "models/character/hair_buns.glb",
+      "pack": "universal-base-characters",
+      "category": "character",
+      "tags": [
+        "hair",
+        "head",
+        "customisation",
+        "recolour"
+      ],
+      "bytes": 255932,
+      "size": {
+        "x": 0.302,
+        "y": 0.249,
+        "z": 0.237
+      },
+      "animations": [],
+      "materials": [
+        "MI_Hair_2"
+      ]
+    },
+    {
+      "id": "hair_buzzed",
+      "file": "models/character/hair_buzzed.glb",
+      "pack": "universal-base-characters",
+      "category": "character",
+      "tags": [
+        "hair",
+        "head",
+        "customisation",
+        "recolour"
+      ],
+      "bytes": 77956,
+      "size": {
+        "x": 0.155,
+        "y": 0.169,
+        "z": 0.191
+      },
+      "animations": [],
+      "materials": [
+        "MI_Hair_1"
+      ]
+    },
+    {
+      "id": "hair_long",
+      "file": "models/character/hair_long.glb",
+      "pack": "universal-base-characters",
+      "category": "character",
+      "tags": [
+        "hair",
+        "head",
+        "customisation",
+        "recolour"
+      ],
+      "bytes": 231776,
+      "size": {
+        "x": 0.245,
+        "y": 0.276,
+        "z": 0.27
+      },
+      "animations": [],
+      "materials": [
+        "MI_Hair_2"
+      ]
+    },
+    {
+      "id": "hair_short",
+      "file": "models/character/hair_short.glb",
+      "pack": "universal-base-characters",
+      "category": "character",
+      "tags": [
+        "hair",
+        "head",
+        "customisation",
+        "recolour"
+      ],
+      "bytes": 95916,
+      "size": {
+        "x": 0.175,
+        "y": 0.179,
+        "z": 0.187
+      },
+      "animations": [],
+      "materials": [
+        "MI_Hair_1"
+      ]
+    },
+    {
+      "id": "rubble_brick_1",
+      "file": "models/dungeon/rubble_brick_1.glb",
+      "pack": "medieval-village-megakit",
+      "category": "dungeon",
+      "tags": [
+        "rubble",
+        "brick",
+        "debris",
+        "ruins",
+        "dungeon"
+      ],
+      "bytes": 34704,
+      "size": {
+        "x": 0.346,
+        "y": 0.208,
+        "z": 0.25
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim"
+      ]
+    },
+    {
+      "id": "rubble_brick_2",
+      "file": "models/dungeon/rubble_brick_2.glb",
+      "pack": "medieval-village-megakit",
+      "category": "dungeon",
+      "tags": [
+        "rubble",
+        "brick",
+        "debris",
+        "ruins",
+        "dungeon"
+      ],
+      "bytes": 34516,
+      "size": {
+        "x": 0.395,
+        "y": 0.245,
+        "z": 0.217
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim"
+      ]
+    },
+    {
+      "id": "rubble_brick_3",
+      "file": "models/dungeon/rubble_brick_3.glb",
+      "pack": "medieval-village-megakit",
+      "category": "dungeon",
+      "tags": [
+        "rubble",
+        "brick",
+        "debris",
+        "ruins",
+        "dungeon"
+      ],
+      "bytes": 35128,
+      "size": {
+        "x": 0.381,
+        "y": 0.25,
+        "z": 0.216
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim"
+      ]
+    },
+    {
+      "id": "rubble_brick_4",
+      "file": "models/dungeon/rubble_brick_4.glb",
+      "pack": "medieval-village-megakit",
+      "category": "dungeon",
+      "tags": [
+        "rubble",
+        "brick",
+        "debris",
+        "ruins",
+        "dungeon"
+      ],
+      "bytes": 35136,
+      "size": {
+        "x": 0.257,
+        "y": 0.25,
+        "z": 0.216
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim"
+      ]
+    },
+    {
+      "id": "rubble_vase",
+      "file": "models/dungeon/rubble_vase.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "dungeon",
+      "tags": [
+        "rubble",
+        "debris",
+        "pottery",
+        "ruins",
+        "dungeon"
+      ],
+      "bytes": 103576,
+      "size": {
+        "x": 0.797,
+        "y": 0.175,
+        "z": 0.598
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "wall_arch",
+      "file": "models/dungeon/wall_arch.glb",
+      "pack": "medieval-village-megakit",
+      "category": "dungeon",
+      "tags": [
+        "arch",
+        "stone",
+        "gate",
+        "gateway",
+        "dungeon",
+        "ruins",
+        "modular"
+      ],
+      "bytes": 46352,
+      "size": {
+        "x": 2,
+        "y": 3,
+        "z": 0.064
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "crop_carrot",
+      "file": "models/farm/crop_carrot.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "farm",
+      "tags": [
+        "carrot",
+        "crop",
+        "farm",
+        "plant",
+        "gatherable"
+      ],
+      "bytes": 64180,
+      "size": {
+        "x": 0.18,
+        "y": 0.566,
+        "z": 0.222
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "farm_crate_apple",
+      "file": "models/farm/farm_crate_apple.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "farm",
+      "tags": [
+        "crate",
+        "farm",
+        "harvest",
+        "apple",
+        "crop"
+      ],
+      "bytes": 215308,
+      "size": {
+        "x": 0.714,
+        "y": 0.244,
+        "z": 0.414
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal",
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "farm_crate_carrot",
+      "file": "models/farm/farm_crate_carrot.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "farm",
+      "tags": [
+        "crate",
+        "farm",
+        "harvest",
+        "carrot",
+        "crop"
+      ],
+      "bytes": 260180,
+      "size": {
+        "x": 0.714,
+        "y": 0.411,
+        "z": 0.567
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex",
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "farm_crate_empty",
+      "file": "models/farm/farm_crate_empty.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "farm",
+      "tags": [
+        "crate",
+        "farm",
+        "harvest",
+        "container"
+      ],
+      "bytes": 116652,
+      "size": {
+        "x": 0.714,
+        "y": 0.244,
+        "z": 0.414
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "bush_common",
+      "file": "models/nature/bush_common.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "bush",
+        "shrub",
+        "undergrowth"
+      ],
+      "bytes": 63028,
+      "size": {
+        "x": 1.915,
+        "y": 1.582,
+        "z": 1.965
+      },
+      "animations": [],
+      "materials": [
+        "Leaves_TwistedTree"
+      ]
+    },
+    {
+      "id": "bush_flowering",
+      "file": "models/nature/bush_flowering.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "bush",
+        "shrub",
+        "flower",
+        "undergrowth"
+      ],
+      "bytes": 129640,
+      "size": {
+        "x": 1.915,
+        "y": 1.582,
+        "z": 1.965
+      },
+      "animations": [],
+      "materials": [
+        "Leaves_NormalTree",
+        "Flowers"
+      ]
+    },
+    {
+      "id": "clover_1",
+      "file": "models/nature/clover_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "clover",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 65380,
+      "size": {
+        "x": 0.796,
+        "y": 1.145,
+        "z": 0.764
+      },
+      "animations": [],
+      "materials": [
+        "Leaves"
+      ]
+    },
+    {
+      "id": "clover_2",
+      "file": "models/nature/clover_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "clover",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 70784,
+      "size": {
+        "x": 0.851,
+        "y": 1.264,
+        "z": 0.837
+      },
+      "animations": [],
+      "materials": [
+        "Leaves"
+      ]
+    },
+    {
+      "id": "fern_1",
+      "file": "models/nature/fern_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "fern",
+        "undergrowth",
+        "woodland"
+      ],
+      "bytes": 64252,
+      "size": {
+        "x": 2.827,
+        "y": 0.84,
+        "z": 2.652
+      },
+      "animations": [],
+      "materials": [
+        "Leaves"
+      ]
+    },
+    {
+      "id": "flower_a_group",
+      "file": "models/nature/flower_a_group.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "flower",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 121016,
+      "size": {
+        "x": 1.488,
+        "y": 2.055,
+        "z": 1.591
+      },
+      "animations": [],
+      "materials": [
+        "Leaves",
+        "Flowers"
+      ]
+    },
+    {
+      "id": "flower_a_single",
+      "file": "models/nature/flower_a_single.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "flower",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 109696,
+      "size": {
+        "x": 0.907,
+        "y": 2.068,
+        "z": 0.878
+      },
+      "animations": [],
+      "materials": [
+        "Leaves",
+        "Flowers"
+      ]
+    },
+    {
+      "id": "flower_b_group",
+      "file": "models/nature/flower_b_group.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "flower",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 147924,
+      "size": {
+        "x": 1.781,
+        "y": 2.487,
+        "z": 1.368
+      },
+      "animations": [],
+      "materials": [
+        "Leaves",
+        "Flowers"
+      ]
+    },
+    {
+      "id": "flower_b_single",
+      "file": "models/nature/flower_b_single.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "flower",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 119948,
+      "size": {
+        "x": 1.072,
+        "y": 2.419,
+        "z": 0.773
+      },
+      "animations": [],
+      "materials": [
+        "Leaves",
+        "Flowers"
+      ]
+    },
+    {
+      "id": "grass_common_short",
+      "file": "models/nature/grass_common_short.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "grass",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 10840,
+      "size": {
+        "x": 0.639,
+        "y": 1.334,
+        "z": 0.737
+      },
+      "animations": [],
+      "materials": [
+        "Grass"
+      ]
+    },
+    {
+      "id": "grass_common_tall",
+      "file": "models/nature/grass_common_tall.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "grass",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 15468,
+      "size": {
+        "x": 0.895,
+        "y": 1.873,
+        "z": 0.993
+      },
+      "animations": [],
+      "materials": [
+        "Grass"
+      ]
+    },
+    {
+      "id": "grass_wispy_short",
+      "file": "models/nature/grass_wispy_short.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "grass",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 22616,
+      "size": {
+        "x": 1.322,
+        "y": 1.072,
+        "z": 1.21
+      },
+      "animations": [],
+      "materials": [
+        "Grass"
+      ]
+    },
+    {
+      "id": "grass_wispy_tall",
+      "file": "models/nature/grass_wispy_tall.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "grass",
+        "ground-cover",
+        "plains"
+      ],
+      "bytes": 25428,
+      "size": {
+        "x": 1.54,
+        "y": 1.672,
+        "z": 1.594
+      },
+      "animations": [],
+      "materials": [
+        "Grass"
+      ]
+    },
+    {
+      "id": "mushroom_bracket",
+      "file": "models/nature/mushroom_bracket.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "mushroom",
+        "forage",
+        "woodland",
+        "gatherable"
+      ],
+      "bytes": 103624,
+      "size": {
+        "x": 1.366,
+        "y": 0.767,
+        "z": 1.103
+      },
+      "animations": [],
+      "materials": [
+        "Mushrooms"
+      ]
+    },
+    {
+      "id": "mushroom_common",
+      "file": "models/nature/mushroom_common.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "mushroom",
+        "forage",
+        "woodland",
+        "gatherable"
+      ],
+      "bytes": 64580,
+      "size": {
+        "x": 0.564,
+        "y": 0.463,
+        "z": 0.779
+      },
+      "animations": [],
+      "materials": [
+        "Mushrooms"
+      ]
+    },
+    {
+      "id": "plant_broad_large",
+      "file": "models/nature/plant_broad_large.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "plant",
+        "broadleaf",
+        "undergrowth"
+      ],
+      "bytes": 59780,
+      "size": {
+        "x": 1.311,
+        "y": 0.253,
+        "z": 1.362
+      },
+      "animations": [],
+      "materials": [
+        "Leaves"
+      ]
+    },
+    {
+      "id": "plant_broad_small",
+      "file": "models/nature/plant_broad_small.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "plant",
+        "broadleaf",
+        "undergrowth"
+      ],
+      "bytes": 57948,
+      "size": {
+        "x": 1.048,
+        "y": 0.25,
+        "z": 0.962
+      },
+      "animations": [],
+      "materials": [
+        "Leaves"
+      ]
+    },
+    {
+      "id": "plant_leafy_large",
+      "file": "models/nature/plant_leafy_large.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "plant",
+        "leafy",
+        "undergrowth"
+      ],
+      "bytes": 67504,
+      "size": {
+        "x": 1.807,
+        "y": 2.348,
+        "z": 1.954
+      },
+      "animations": [],
+      "materials": [
+        "Leaves"
+      ]
+    },
+    {
+      "id": "plant_leafy_small",
+      "file": "models/nature/plant_leafy_small.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "plant",
+        "leafy",
+        "undergrowth"
+      ],
+      "bytes": 60296,
+      "size": {
+        "x": 1.273,
+        "y": 1.014,
+        "z": 1.386
+      },
+      "animations": [],
+      "materials": [
+        "Leaves"
+      ]
+    },
+    {
+      "id": "tree_common_1",
+      "file": "models/nature/tree_common_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "broadleaf",
+        "common",
+        "forest",
+        "plains"
+      ],
+      "bytes": 366092,
+      "size": {
+        "x": 4.311,
+        "y": 7.265,
+        "z": 4.578
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_NormalTree"
+      ]
+    },
+    {
+      "id": "tree_common_2",
+      "file": "models/nature/tree_common_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "broadleaf",
+        "common",
+        "forest",
+        "plains"
+      ],
+      "bytes": 329216,
+      "size": {
+        "x": 4.464,
+        "y": 7.643,
+        "z": 4.276
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_NormalTree"
+      ]
+    },
+    {
+      "id": "tree_common_3",
+      "file": "models/nature/tree_common_3.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "broadleaf",
+        "common",
+        "forest",
+        "plains"
+      ],
+      "bytes": 246636,
+      "size": {
+        "x": 4.063,
+        "y": 9.425,
+        "z": 4.241
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_NormalTree"
+      ]
+    },
+    {
+      "id": "tree_common_4",
+      "file": "models/nature/tree_common_4.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "broadleaf",
+        "common",
+        "forest",
+        "plains"
+      ],
+      "bytes": 262336,
+      "size": {
+        "x": 3.826,
+        "y": 9.438,
+        "z": 3.755
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_NormalTree"
+      ]
+    },
+    {
+      "id": "tree_common_5",
+      "file": "models/nature/tree_common_5.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "broadleaf",
+        "common",
+        "forest",
+        "plains"
+      ],
+      "bytes": 234544,
+      "size": {
+        "x": 3.671,
+        "y": 7.006,
+        "z": 4.22
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_NormalTree"
+      ]
+    },
+    {
+      "id": "tree_dead_1",
+      "file": "models/nature/tree_dead_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "dead",
+        "bare",
+        "woodland",
+        "dungeon"
+      ],
+      "bytes": 288408,
+      "size": {
+        "x": 6.149,
+        "y": 9.495,
+        "z": 5.749
+      },
+      "animations": [],
+      "materials": [
+        "Bark_DeadTree"
+      ]
+    },
+    {
+      "id": "tree_dead_2",
+      "file": "models/nature/tree_dead_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "dead",
+        "bare",
+        "woodland",
+        "dungeon"
+      ],
+      "bytes": 307512,
+      "size": {
+        "x": 6.73,
+        "y": 11.488,
+        "z": 6.379
+      },
+      "animations": [],
+      "materials": [
+        "Bark_DeadTree"
+      ]
+    },
+    {
+      "id": "tree_dead_3",
+      "file": "models/nature/tree_dead_3.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "dead",
+        "bare",
+        "woodland",
+        "dungeon"
+      ],
+      "bytes": 283408,
+      "size": {
+        "x": 6.388,
+        "y": 13.28,
+        "z": 6.43
+      },
+      "animations": [],
+      "materials": [
+        "Bark_DeadTree"
+      ]
+    },
+    {
+      "id": "tree_dead_4",
+      "file": "models/nature/tree_dead_4.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "dead",
+        "bare",
+        "woodland",
+        "dungeon"
+      ],
+      "bytes": 274880,
+      "size": {
+        "x": 7.961,
+        "y": 12.771,
+        "z": 7.732
+      },
+      "animations": [],
+      "materials": [
+        "Bark_DeadTree"
+      ]
+    },
+    {
+      "id": "tree_dead_5",
+      "file": "models/nature/tree_dead_5.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "dead",
+        "bare",
+        "woodland",
+        "dungeon"
+      ],
+      "bytes": 270248,
+      "size": {
+        "x": 8.356,
+        "y": 16.437,
+        "z": 8.413
+      },
+      "animations": [],
+      "materials": [
+        "Bark_DeadTree"
+      ]
+    },
+    {
+      "id": "tree_pine_1",
+      "file": "models/nature/tree_pine_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "pine",
+        "conifer",
+        "woodland",
+        "highlands"
+      ],
+      "bytes": 236104,
+      "size": {
+        "x": 4.945,
+        "y": 7.317,
+        "z": 4.538
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_Pine"
+      ]
+    },
+    {
+      "id": "tree_pine_2",
+      "file": "models/nature/tree_pine_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "pine",
+        "conifer",
+        "woodland",
+        "highlands"
+      ],
+      "bytes": 224784,
+      "size": {
+        "x": 5.728,
+        "y": 7.376,
+        "z": 5.221
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_Pine"
+      ]
+    },
+    {
+      "id": "tree_pine_3",
+      "file": "models/nature/tree_pine_3.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "pine",
+        "conifer",
+        "woodland",
+        "highlands"
+      ],
+      "bytes": 280828,
+      "size": {
+        "x": 3.611,
+        "y": 7.392,
+        "z": 3.996
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_Pine"
+      ]
+    },
+    {
+      "id": "tree_pine_4",
+      "file": "models/nature/tree_pine_4.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "pine",
+        "conifer",
+        "woodland",
+        "highlands"
+      ],
+      "bytes": 219652,
+      "size": {
+        "x": 5.802,
+        "y": 10.236,
+        "z": 5.371
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_Pine"
+      ]
+    },
+    {
+      "id": "tree_pine_5",
+      "file": "models/nature/tree_pine_5.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "pine",
+        "conifer",
+        "woodland",
+        "highlands"
+      ],
+      "bytes": 137804,
+      "size": {
+        "x": 6.42,
+        "y": 8.724,
+        "z": 6.222
+      },
+      "animations": [],
+      "materials": [
+        "Bark_NormalTree",
+        "Leaves_Pine"
+      ]
+    },
+    {
+      "id": "tree_twisted_1",
+      "file": "models/nature/tree_twisted_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "twisted",
+        "gnarled",
+        "woodland",
+        "deep-woodland"
+      ],
+      "bytes": 477052,
+      "size": {
+        "x": 13.516,
+        "y": 16.725,
+        "z": 11.549
+      },
+      "animations": [],
+      "materials": [
+        "Bark_TwistedTree",
+        "Leaves_TwistedTree"
+      ]
+    },
+    {
+      "id": "tree_twisted_2",
+      "file": "models/nature/tree_twisted_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "twisted",
+        "gnarled",
+        "woodland",
+        "deep-woodland"
+      ],
+      "bytes": 474872,
+      "size": {
+        "x": 10.563,
+        "y": 18.949,
+        "z": 9.203
+      },
+      "animations": [],
+      "materials": [
+        "Bark_TwistedTree",
+        "Leaves_TwistedTree"
+      ]
+    },
+    {
+      "id": "tree_twisted_3",
+      "file": "models/nature/tree_twisted_3.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "twisted",
+        "gnarled",
+        "woodland",
+        "deep-woodland"
+      ],
+      "bytes": 498168,
+      "size": {
+        "x": 11.357,
+        "y": 16.073,
+        "z": 11.506
+      },
+      "animations": [],
+      "materials": [
+        "Bark_TwistedTree",
+        "Leaves_TwistedTree"
+      ]
+    },
+    {
+      "id": "tree_twisted_4",
+      "file": "models/nature/tree_twisted_4.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "twisted",
+        "gnarled",
+        "woodland",
+        "deep-woodland"
+      ],
+      "bytes": 488824,
+      "size": {
+        "x": 10.381,
+        "y": 18.738,
+        "z": 11.293
+      },
+      "animations": [],
+      "materials": [
+        "Bark_TwistedTree",
+        "Leaves_TwistedTree"
+      ]
+    },
+    {
+      "id": "tree_twisted_5",
+      "file": "models/nature/tree_twisted_5.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "nature",
+      "tags": [
+        "tree",
+        "twisted",
+        "gnarled",
+        "woodland",
+        "deep-woodland"
+      ],
+      "bytes": 519256,
+      "size": {
+        "x": 9.495,
+        "y": 15.662,
+        "z": 9.387
+      },
+      "animations": [],
+      "materials": [
+        "Bark_TwistedTree",
+        "Leaves_TwistedTree"
+      ]
+    },
+    {
+      "id": "vine_1",
+      "file": "models/nature/vine_1.glb",
+      "pack": "medieval-village-megakit",
+      "category": "nature",
+      "tags": [
+        "vine",
+        "ivy",
+        "overgrowth",
+        "ruins",
+        "dungeon"
+      ],
+      "bytes": 13356,
+      "size": {
+        "x": 1.536,
+        "y": 2.603,
+        "z": 0.219
+      },
+      "animations": [],
+      "materials": [
+        "MI_Vine"
+      ]
+    },
+    {
+      "id": "vine_2",
+      "file": "models/nature/vine_2.glb",
+      "pack": "medieval-village-megakit",
+      "category": "nature",
+      "tags": [
+        "vine",
+        "ivy",
+        "overgrowth",
+        "ruins",
+        "dungeon"
+      ],
+      "bytes": 14088,
+      "size": {
+        "x": 2.301,
+        "y": 2.986,
+        "z": 1.126
+      },
+      "animations": [],
+      "materials": [
+        "MI_Vine"
+      ]
+    },
+    {
+      "id": "outfit_female_peasant",
+      "file": "models/outfit/outfit_female_peasant.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "full",
+        "peasant",
+        "villager",
+        "female",
+        "npc",
+        "starter"
+      ],
+      "bytes": 682660,
+      "size": {
+        "x": 1.664,
+        "y": 1.525,
+        "z": 0.335
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant"
+      ]
+    },
+    {
+      "id": "outfit_female_peasant_boots",
+      "file": "models/outfit/outfit_female_peasant_boots.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "feet",
+        "boots",
+        "peasant",
+        "female"
+      ],
+      "bytes": 175776,
+      "size": {
+        "x": 0.403,
+        "y": 0.465,
+        "z": 0.335
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant"
+      ]
+    },
+    {
+      "id": "outfit_female_peasant_chest",
+      "file": "models/outfit/outfit_female_peasant_chest.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "torso",
+        "peasant",
+        "female"
+      ],
+      "bytes": 200580,
+      "size": {
+        "x": 0.344,
+        "y": 0.531,
+        "z": 0.276
+      },
+      "animations": [
+        "Jog_Fwd_Loop"
+      ],
+      "materials": [
+        "MI_Peasant"
+      ]
+    },
+    {
+      "id": "outfit_female_peasant_gloves",
+      "file": "models/outfit/outfit_female_peasant_gloves.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "arms",
+        "gloves",
+        "peasant",
+        "female"
+      ],
+      "bytes": 377948,
+      "size": {
+        "x": 1.664,
+        "y": 0.122,
+        "z": 0.131
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant"
+      ]
+    },
+    {
+      "id": "outfit_female_peasant_legs",
+      "file": "models/outfit/outfit_female_peasant_legs.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "legs",
+        "peasant",
+        "female"
+      ],
+      "bytes": 124400,
+      "size": {
+        "x": 0.376,
+        "y": 0.655,
+        "z": 0.229
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant"
+      ]
+    },
+    {
+      "id": "outfit_female_ranger",
+      "file": "models/outfit/outfit_female_ranger.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "full",
+        "ranger",
+        "armour",
+        "female",
+        "player",
+        "bandit"
+      ],
+      "bytes": 1641632,
+      "size": {
+        "x": 1.664,
+        "y": 1.798,
+        "z": 0.377
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger",
+        "MI_Regular_Female"
+      ]
+    },
+    {
+      "id": "outfit_female_ranger_boots",
+      "file": "models/outfit/outfit_female_ranger_boots.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "feet",
+        "boots",
+        "ranger",
+        "armour",
+        "female"
+      ],
+      "bytes": 684988,
+      "size": {
+        "x": 0.402,
+        "y": 0.56,
+        "z": 0.337
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_female_ranger_chest",
+      "file": "models/outfit/outfit_female_ranger_chest.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "torso",
+        "ranger",
+        "armour",
+        "female"
+      ],
+      "bytes": 405504,
+      "size": {
+        "x": 0.38,
+        "y": 0.622,
+        "z": 0.345
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_female_ranger_gloves",
+      "file": "models/outfit/outfit_female_ranger_gloves.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "arms",
+        "gloves",
+        "ranger",
+        "armour",
+        "female"
+      ],
+      "bytes": 524944,
+      "size": {
+        "x": 1.664,
+        "y": 0.135,
+        "z": 0.137
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger",
+        "MI_Regular_Female"
+      ]
+    },
+    {
+      "id": "outfit_female_ranger_hood",
+      "file": "models/outfit/outfit_female_ranger_hood.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "head",
+        "helmet",
+        "hood",
+        "ranger",
+        "female"
+      ],
+      "bytes": 142468,
+      "size": {
+        "x": 0.327,
+        "y": 0.32,
+        "z": 0.342
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_female_ranger_legs",
+      "file": "models/outfit/outfit_female_ranger_legs.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "legs",
+        "ranger",
+        "armour",
+        "female"
+      ],
+      "bytes": 119664,
+      "size": {
+        "x": 0.411,
+        "y": 0.65,
+        "z": 0.24
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_female_ranger_pauldron",
+      "file": "models/outfit/outfit_female_ranger_pauldron.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "shoulder",
+        "pauldron",
+        "ranger",
+        "armour",
+        "female"
+      ],
+      "bytes": 129628,
+      "size": {
+        "x": 0.211,
+        "y": 0.124,
+        "z": 0.189
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_male_peasant",
+      "file": "models/outfit/outfit_male_peasant.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "full",
+        "peasant",
+        "villager",
+        "male",
+        "npc",
+        "starter"
+      ],
+      "bytes": 643676,
+      "size": {
+        "x": 1.799,
+        "y": 1.563,
+        "z": 0.352
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant",
+        "MI_Regular_Male"
+      ]
+    },
+    {
+      "id": "outfit_male_peasant_boots",
+      "file": "models/outfit/outfit_male_peasant_boots.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "feet",
+        "boots",
+        "peasant",
+        "male"
+      ],
+      "bytes": 174476,
+      "size": {
+        "x": 0.351,
+        "y": 0.452,
+        "z": 0.33
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant"
+      ]
+    },
+    {
+      "id": "outfit_male_peasant_chest",
+      "file": "models/outfit/outfit_male_peasant_chest.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "torso",
+        "peasant",
+        "male"
+      ],
+      "bytes": 245244,
+      "size": {
+        "x": 0.747,
+        "y": 0.637,
+        "z": 0.31
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant"
+      ]
+    },
+    {
+      "id": "outfit_male_peasant_gloves",
+      "file": "models/outfit/outfit_male_peasant_gloves.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "arms",
+        "gloves",
+        "peasant",
+        "male"
+      ],
+      "bytes": 284996,
+      "size": {
+        "x": 1.799,
+        "y": 0.164,
+        "z": 0.169
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant",
+        "MI_Regular_Male"
+      ]
+    },
+    {
+      "id": "outfit_male_peasant_legs",
+      "file": "models/outfit/outfit_male_peasant_legs.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "legs",
+        "peasant",
+        "male"
+      ],
+      "bytes": 97176,
+      "size": {
+        "x": 0.423,
+        "y": 0.651,
+        "z": 0.229
+      },
+      "animations": [],
+      "materials": [
+        "MI_Peasant"
+      ]
+    },
+    {
+      "id": "outfit_male_ranger",
+      "file": "models/outfit/outfit_male_ranger.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "full",
+        "ranger",
+        "armour",
+        "male",
+        "player",
+        "bandit"
+      ],
+      "bytes": 1631888,
+      "size": {
+        "x": 1.799,
+        "y": 1.869,
+        "z": 0.373
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger",
+        "MI_Regular_Male"
+      ]
+    },
+    {
+      "id": "outfit_male_ranger_boots",
+      "file": "models/outfit/outfit_male_ranger_boots.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "feet",
+        "boots",
+        "ranger",
+        "armour",
+        "male"
+      ],
+      "bytes": 684480,
+      "size": {
+        "x": 0.356,
+        "y": 0.56,
+        "z": 0.337
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_male_ranger_chest",
+      "file": "models/outfit/outfit_male_ranger_chest.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "torso",
+        "ranger",
+        "armour",
+        "male"
+      ],
+      "bytes": 343892,
+      "size": {
+        "x": 0.429,
+        "y": 0.691,
+        "z": 0.343
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_male_ranger_gloves",
+      "file": "models/outfit/outfit_male_ranger_gloves.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "arms",
+        "gloves",
+        "ranger",
+        "armour",
+        "male"
+      ],
+      "bytes": 280780,
+      "size": {
+        "x": 1.799,
+        "y": 0.164,
+        "z": 0.16
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger",
+        "MI_Regular_Male"
+      ]
+    },
+    {
+      "id": "outfit_male_ranger_hood",
+      "file": "models/outfit/outfit_male_ranger_hood.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "head",
+        "helmet",
+        "hood",
+        "ranger",
+        "male"
+      ],
+      "bytes": 141948,
+      "size": {
+        "x": 0.303,
+        "y": 0.34,
+        "z": 0.335
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_male_ranger_legs",
+      "file": "models/outfit/outfit_male_ranger_legs.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "legs",
+        "ranger",
+        "armour",
+        "male"
+      ],
+      "bytes": 102508,
+      "size": {
+        "x": 0.363,
+        "y": 0.629,
+        "z": 0.227
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "outfit_male_ranger_pauldron",
+      "file": "models/outfit/outfit_male_ranger_pauldron.glb",
+      "pack": "modular-character-outfits-fantasy",
+      "category": "outfit",
+      "tags": [
+        "outfit",
+        "modular",
+        "equip",
+        "shoulder",
+        "pauldron",
+        "ranger",
+        "armour",
+        "male"
+      ],
+      "bytes": 124628,
+      "size": {
+        "x": 0.233,
+        "y": 0.137,
+        "z": 0.21
+      },
+      "animations": [],
+      "materials": [
+        "MI_Ranger"
+      ]
+    },
+    {
+      "id": "anvil",
+      "file": "models/prop/anvil.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "anvil",
+        "smithing",
+        "forge",
+        "crafting",
+        "station"
+      ],
+      "bytes": 53428,
+      "size": {
+        "x": 1.082,
+        "y": 0.556,
+        "z": 0.402
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "anvil_log",
+      "file": "models/prop/anvil_log.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "anvil",
+        "log",
+        "stump",
+        "smithing",
+        "forge",
+        "crafting"
+      ],
+      "bytes": 225976,
+      "size": {
+        "x": 0.929,
+        "y": 1.073,
+        "z": 0.821
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal",
+        "MI_Trim_Props"
+      ]
+    },
+    {
+      "id": "banner_1",
+      "file": "models/prop/banner_1.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "banner",
+        "flag",
+        "heraldry",
+        "village",
+        "recolour"
+      ],
+      "bytes": 121816,
+      "size": {
+        "x": 1.613,
+        "y": 2.392,
+        "z": 0.191
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal",
+        "MI_Banner"
+      ]
+    },
+    {
+      "id": "banner_2",
+      "file": "models/prop/banner_2.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "banner",
+        "flag",
+        "heraldry",
+        "village",
+        "recolour"
+      ],
+      "bytes": 121344,
+      "size": {
+        "x": 1.613,
+        "y": 2.077,
+        "z": 0.191
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal",
+        "MI_Banner"
+      ]
+    },
+    {
+      "id": "barrel",
+      "file": "models/prop/barrel.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "barrel",
+        "storage",
+        "container",
+        "village",
+        "dock",
+        "fishing"
+      ],
+      "bytes": 113300,
+      "size": {
+        "x": 0.698,
+        "y": 0.898,
+        "z": 0.698
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "barrel_apples",
+      "file": "models/prop/barrel_apples.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "barrel",
+        "apples",
+        "food",
+        "market",
+        "farm"
+      ],
+      "bytes": 194376,
+      "size": {
+        "x": 0.698,
+        "y": 0.898,
+        "z": 0.698
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal",
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "barrel_rack",
+      "file": "models/prop/barrel_rack.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "barrel",
+        "rack",
+        "storage",
+        "tavern"
+      ],
+      "bytes": 185052,
+      "size": {
+        "x": 1.359,
+        "y": 1.257,
+        "z": 0.741
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "bed",
+      "file": "models/prop/bed.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "bed",
+        "inn",
+        "furniture",
+        "interior"
+      ],
+      "bytes": 165572,
+      "size": {
+        "x": 1.876,
+        "y": 0.805,
+        "z": 2.412
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal",
+        "MI_Trim_Cloth"
+      ]
+    },
+    {
+      "id": "bench",
+      "file": "models/prop/bench.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "bench",
+        "seat",
+        "furniture",
+        "village"
+      ],
+      "bytes": 87948,
+      "size": {
+        "x": 2.777,
+        "y": 0.533,
+        "z": 0.534
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "book_stack",
+      "file": "models/prop/book_stack.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "book",
+        "library",
+        "magic",
+        "interior"
+      ],
+      "bytes": 58600,
+      "size": {
+        "x": 0.285,
+        "y": 0.214,
+        "z": 0.226
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "bookcase",
+      "file": "models/prop/bookcase.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "bookcase",
+        "shelf",
+        "library",
+        "interior"
+      ],
+      "bytes": 137904,
+      "size": {
+        "x": 1.461,
+        "y": 2.545,
+        "z": 0.429
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "bottle",
+      "file": "models/prop/bottle.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "bottle",
+        "tavern",
+        "interior"
+      ],
+      "bytes": 58408,
+      "size": {
+        "x": 0.113,
+        "y": 0.365,
+        "z": 0.113
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "bucket_metal",
+      "file": "models/prop/bucket_metal.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "bucket",
+        "well",
+        "water",
+        "farm"
+      ],
+      "bytes": 46932,
+      "size": {
+        "x": 0.485,
+        "y": 0.365,
+        "z": 0.449
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "bucket_wood",
+      "file": "models/prop/bucket_wood.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "bucket",
+        "well",
+        "water",
+        "farm"
+      ],
+      "bytes": 96476,
+      "size": {
+        "x": 0.434,
+        "y": 0.293,
+        "z": 0.383
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "cabinet",
+      "file": "models/prop/cabinet.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "cabinet",
+        "storage",
+        "furniture",
+        "interior"
+      ],
+      "bytes": 150552,
+      "size": {
+        "x": 1.362,
+        "y": 0.997,
+        "z": 0.357
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "cage",
+      "file": "models/prop/cage.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "cage",
+        "prison",
+        "dungeon"
+      ],
+      "bytes": 169728,
+      "size": {
+        "x": 0.855,
+        "y": 0.805,
+        "z": 0.884
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "candle_stand",
+      "file": "models/prop/candle_stand.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "candle",
+        "light",
+        "interior",
+        "dungeon"
+      ],
+      "bytes": 243436,
+      "size": {
+        "x": 0.732,
+        "y": 1.313,
+        "z": 0.731
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal",
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "cauldron",
+      "file": "models/prop/cauldron.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "cauldron",
+        "cooking",
+        "pot",
+        "campfire",
+        "station",
+        "alchemy"
+      ],
+      "bytes": 84016,
+      "size": {
+        "x": 0.989,
+        "y": 0.816,
+        "z": 0.944
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "chain_coil",
+      "file": "models/prop/chain_coil.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "chain",
+        "dungeon",
+        "dock"
+      ],
+      "bytes": 159268,
+      "size": {
+        "x": 1.07,
+        "y": 0.087,
+        "z": 0.908
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "chair",
+      "file": "models/prop/chair.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "chair",
+        "seat",
+        "furniture"
+      ],
+      "bytes": 92168,
+      "size": {
+        "x": 0.581,
+        "y": 1.123,
+        "z": 0.549
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "chandelier",
+      "file": "models/prop/chandelier.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "chandelier",
+        "light",
+        "interior",
+        "tavern"
+      ],
+      "bytes": 296408,
+      "size": {
+        "x": 1.303,
+        "y": 1.458,
+        "z": 1.303
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal",
+        "MI_Trim_Furniture",
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "chest_wood",
+      "file": "models/prop/chest_wood.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "chest",
+        "bank",
+        "storage",
+        "loot",
+        "container",
+        "animated"
+      ],
+      "bytes": 265784,
+      "size": {
+        "x": 1.276,
+        "y": 0.715,
+        "z": 0.755
+      },
+      "animations": [
+        "Chest_Close",
+        "Chest_Closed",
+        "Chest_Open",
+        "Chest_Opened"
+      ],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "chimney",
+      "file": "models/prop/chimney.glb",
+      "pack": "medieval-village-megakit",
+      "category": "prop",
+      "tags": [
+        "chimney",
+        "roof",
+        "house"
+      ],
+      "bytes": 80096,
+      "size": {
+        "x": 0.946,
+        "y": 3.178,
+        "z": 1
+      },
+      "animations": [],
+      "materials": [
+        "MI_RockTrim",
+        "MI_Brick"
+      ]
+    },
+    {
+      "id": "coin",
+      "file": "models/prop/coin.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "coin",
+        "gold",
+        "currency",
+        "loot"
+      ],
+      "bytes": 43408,
+      "size": {
+        "x": 0.068,
+        "y": 0.068,
+        "z": 0.015
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal_Vertex"
+      ]
+    },
+    {
+      "id": "coin_pile",
+      "file": "models/prop/coin_pile.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "coin",
+        "gold",
+        "currency",
+        "loot",
+        "treasure"
+      ],
+      "bytes": 69064,
+      "size": {
+        "x": 0.197,
+        "y": 0.073,
+        "z": 0.154
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal_Vertex"
+      ]
+    },
+    {
+      "id": "cooking_pot",
+      "file": "models/prop/cooking_pot.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "pot",
+        "cooking",
+        "campfire",
+        "kitchen"
+      ],
+      "bytes": 59544,
+      "size": {
+        "x": 0.539,
+        "y": 0.224,
+        "z": 0.486
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "crate_metal",
+      "file": "models/prop/crate_metal.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "crate",
+        "box",
+        "storage",
+        "container",
+        "dungeon"
+      ],
+      "bytes": 166812,
+      "size": {
+        "x": 0.864,
+        "y": 0.868,
+        "z": 0.866
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "crate_village",
+      "file": "models/prop/crate_village.glb",
+      "pack": "medieval-village-megakit",
+      "category": "prop",
+      "tags": [
+        "crate",
+        "box",
+        "storage",
+        "village"
+      ],
+      "bytes": 49568,
+      "size": {
+        "x": 1.084,
+        "y": 1.06,
+        "z": 1.084
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "crate_wood",
+      "file": "models/prop/crate_wood.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "crate",
+        "box",
+        "storage",
+        "container",
+        "dock"
+      ],
+      "bytes": 120236,
+      "size": {
+        "x": 0.842,
+        "y": 0.931,
+        "z": 0.908
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "fence_metal",
+      "file": "models/prop/fence_metal.glb",
+      "pack": "medieval-village-megakit",
+      "category": "prop",
+      "tags": [
+        "fence",
+        "metal",
+        "railing",
+        "village"
+      ],
+      "bytes": 120528,
+      "size": {
+        "x": 1.949,
+        "y": 2.868,
+        "z": 0.156
+      },
+      "animations": [],
+      "materials": [
+        "MI_MetalOrnaments"
+      ]
+    },
+    {
+      "id": "fence_metal_ornate",
+      "file": "models/prop/fence_metal_ornate.glb",
+      "pack": "medieval-village-megakit",
+      "category": "prop",
+      "tags": [
+        "fence",
+        "metal",
+        "gate",
+        "railing",
+        "village"
+      ],
+      "bytes": 152960,
+      "size": {
+        "x": 1.952,
+        "y": 2.852,
+        "z": 0.156
+      },
+      "animations": [],
+      "materials": [
+        "MI_MetalOrnaments"
+      ]
+    },
+    {
+      "id": "fence_wood_extension",
+      "file": "models/prop/fence_wood_extension.glb",
+      "pack": "medieval-village-megakit",
+      "category": "prop",
+      "tags": [
+        "fence",
+        "wood",
+        "farm",
+        "village"
+      ],
+      "bytes": 40696,
+      "size": {
+        "x": 2.045,
+        "y": 0.838,
+        "z": 0.11
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "fence_wood_single",
+      "file": "models/prop/fence_wood_single.glb",
+      "pack": "medieval-village-megakit",
+      "category": "prop",
+      "tags": [
+        "fence",
+        "wood",
+        "farm",
+        "village"
+      ],
+      "bytes": 40824,
+      "size": {
+        "x": 2.064,
+        "y": 0.838,
+        "z": 0.12
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "key",
+      "file": "models/prop/key.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "key",
+        "dungeon",
+        "quest",
+        "loot"
+      ],
+      "bytes": 47284,
+      "size": {
+        "x": 0.048,
+        "y": 0.012,
+        "z": 0.111
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "lamp_wall",
+      "file": "models/prop/lamp_wall.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "lamp",
+        "lantern",
+        "light",
+        "wall",
+        "village",
+        "dungeon"
+      ],
+      "bytes": 128204,
+      "size": {
+        "x": 0.357,
+        "y": 1.337,
+        "z": 1.302
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "market_stall",
+      "file": "models/prop/market_stall.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "stall",
+        "market",
+        "shop",
+        "vendor",
+        "counter"
+      ],
+      "bytes": 158744,
+      "size": {
+        "x": 1.845,
+        "y": 2.627,
+        "z": 0.932
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal",
+        "MI_Trim_Furniture",
+        "MI_Banner"
+      ]
+    },
+    {
+      "id": "market_stall_cart",
+      "file": "models/prop/market_stall_cart.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "stall",
+        "cart",
+        "market",
+        "shop",
+        "vendor"
+      ],
+      "bytes": 257244,
+      "size": {
+        "x": 3.021,
+        "y": 2.632,
+        "z": 1.06
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal",
+        "MI_Trim_Furniture",
+        "MI_Banner"
+      ]
+    },
+    {
+      "id": "mug",
+      "file": "models/prop/mug.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "mug",
+        "tankard",
+        "tavern",
+        "interior"
+      ],
+      "bytes": 82336,
+      "size": {
+        "x": 0.192,
+        "y": 0.184,
+        "z": 0.147
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal",
+        "MI_Trim_Furniture"
+      ]
+    },
+    {
+      "id": "potion_1",
+      "file": "models/prop/potion_1.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "potion",
+        "flask",
+        "alchemy",
+        "loot",
+        "recolour"
+      ],
+      "bytes": 62788,
+      "size": {
+        "x": 0.114,
+        "y": 0.14,
+        "z": 0.114
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "potion_2",
+      "file": "models/prop/potion_2.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "potion",
+        "flask",
+        "alchemy",
+        "loot",
+        "recolour"
+      ],
+      "bytes": 62204,
+      "size": {
+        "x": 0.127,
+        "y": 0.262,
+        "z": 0.127
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "rope_coil",
+      "file": "models/prop/rope_coil.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "rope",
+        "dock",
+        "fishing",
+        "ship"
+      ],
+      "bytes": 74496,
+      "size": {
+        "x": 0.557,
+        "y": 0.098,
+        "z": 0.606
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture"
+      ]
+    },
+    {
+      "id": "sack",
+      "file": "models/prop/sack.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "sack",
+        "bag",
+        "storage",
+        "market",
+        "farm"
+      ],
+      "bytes": 95436,
+      "size": {
+        "x": 0.655,
+        "y": 0.799,
+        "z": 0.544
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Cloth",
+        "MI_Trim_Furniture"
+      ]
+    },
+    {
+      "id": "sack_large",
+      "file": "models/prop/sack_large.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "sack",
+        "pouch",
+        "storage",
+        "market",
+        "farm"
+      ],
+      "bytes": 106068,
+      "size": {
+        "x": 0.225,
+        "y": 0.159,
+        "z": 0.12
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "scroll",
+      "file": "models/prop/scroll.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "scroll",
+        "quest",
+        "magic",
+        "loot"
+      ],
+      "bytes": 85572,
+      "size": {
+        "x": 0.244,
+        "y": 0.059,
+        "z": 0.063
+      },
+      "animations": [],
+      "materials": [
+        "MI_Page_Empty",
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "shelf",
+      "file": "models/prop/shelf.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "shelf",
+        "storage",
+        "shop",
+        "interior"
+      ],
+      "bytes": 55508,
+      "size": {
+        "x": 1.184,
+        "y": 0.309,
+        "z": 0.292
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture"
+      ]
+    },
+    {
+      "id": "shelf_bottles",
+      "file": "models/prop/shelf_bottles.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "shelf",
+        "bottles",
+        "shop",
+        "alchemy",
+        "interior"
+      ],
+      "bytes": 274212,
+      "size": {
+        "x": 1.137,
+        "y": 0.647,
+        "z": 0.285
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex",
+        "MI_Trim_Metal",
+        "MI_Trim_Furniture"
+      ]
+    },
+    {
+      "id": "stool",
+      "file": "models/prop/stool.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "stool",
+        "seat",
+        "furniture"
+      ],
+      "bytes": 48024,
+      "size": {
+        "x": 0.475,
+        "y": 0.589,
+        "z": 0.475
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture"
+      ]
+    },
+    {
+      "id": "support_beam",
+      "file": "models/prop/support_beam.glb",
+      "pack": "medieval-village-megakit",
+      "category": "prop",
+      "tags": [
+        "beam",
+        "post",
+        "pillar",
+        "support",
+        "dock",
+        "pier",
+        "dungeon"
+      ],
+      "bytes": 39704,
+      "size": {
+        "x": 0.199,
+        "y": 1.709,
+        "z": 2.036
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim"
+      ]
+    },
+    {
+      "id": "table_large",
+      "file": "models/prop/table_large.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "table",
+        "counter",
+        "shop",
+        "tavern",
+        "furniture"
+      ],
+      "bytes": 115340,
+      "size": {
+        "x": 2.848,
+        "y": 0.813,
+        "z": 1.097
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "torch",
+      "file": "models/prop/torch.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "torch",
+        "brazier",
+        "light",
+        "fire",
+        "dungeon"
+      ],
+      "bytes": 64708,
+      "size": {
+        "x": 0.223,
+        "y": 0.648,
+        "z": 0.388
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "training_dummy",
+      "file": "models/prop/training_dummy.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "dummy",
+        "training",
+        "combat",
+        "village"
+      ],
+      "bytes": 167160,
+      "size": {
+        "x": 0.809,
+        "y": 1.863,
+        "z": 0.585
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal",
+        "MI_Trim_Cloth"
+      ]
+    },
+    {
+      "id": "wagon",
+      "file": "models/prop/wagon.glb",
+      "pack": "medieval-village-megakit",
+      "category": "prop",
+      "tags": [
+        "wagon",
+        "cart",
+        "market",
+        "village"
+      ],
+      "bytes": 104948,
+      "size": {
+        "x": 1.951,
+        "y": 1.529,
+        "z": 4.024
+      },
+      "animations": [],
+      "materials": [
+        "MI_WoodTrim_Wear"
+      ]
+    },
+    {
+      "id": "weapon_rack",
+      "file": "models/prop/weapon_rack.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "weapon",
+        "rack",
+        "stand",
+        "shop",
+        "smithing"
+      ],
+      "bytes": 130796,
+      "size": {
+        "x": 1.386,
+        "y": 1.109,
+        "z": 0.983
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "whetstone",
+      "file": "models/prop/whetstone.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "whetstone",
+        "smithing",
+        "sharpening",
+        "crafting"
+      ],
+      "bytes": 162024,
+      "size": {
+        "x": 1.141,
+        "y": 1.17,
+        "z": 0.902
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal",
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "workbench",
+      "file": "models/prop/workbench.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "workbench",
+        "crafting",
+        "station",
+        "carpentry"
+      ],
+      "bytes": 120964,
+      "size": {
+        "x": 2.019,
+        "y": 0.895,
+        "z": 1.024
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "workbench_drawers",
+      "file": "models/prop/workbench_drawers.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "prop",
+      "tags": [
+        "workbench",
+        "crafting",
+        "station",
+        "carpentry"
+      ],
+      "bytes": 85112,
+      "size": {
+        "x": 0.423,
+        "y": 0.242,
+        "z": 0.299
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal"
+      ]
+    },
+    {
+      "id": "boulder_large",
+      "file": "models/rock/boulder_large.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "boulder",
+        "cliff",
+        "rock",
+        "highlands",
+        "large",
+        "placeholder-style"
+      ],
+      "bytes": 8956,
+      "size": {
+        "x": 7.379,
+        "y": 3.632,
+        "z": 5.163
+      },
+      "animations": [],
+      "materials": [
+        "Rock"
+      ]
+    },
+    {
+      "id": "boulder_medium",
+      "file": "models/rock/boulder_medium.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "boulder",
+        "cliff",
+        "rock",
+        "highlands",
+        "placeholder-style"
+      ],
+      "bytes": 6116,
+      "size": {
+        "x": 4.81,
+        "y": 2.911,
+        "z": 4.808
+      },
+      "animations": [],
+      "materials": [
+        "Rock"
+      ]
+    },
+    {
+      "id": "cliff_step_1",
+      "file": "models/rock/cliff_step_1.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "cliff",
+        "rock",
+        "highlands",
+        "placeholder-style"
+      ],
+      "bytes": 15768,
+      "size": {
+        "x": 6.399,
+        "y": 5.533,
+        "z": 5.876
+      },
+      "animations": [],
+      "materials": [
+        "Rock"
+      ]
+    },
+    {
+      "id": "cliff_step_2",
+      "file": "models/rock/cliff_step_2.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "cliff",
+        "rock",
+        "highlands",
+        "placeholder-style"
+      ],
+      "bytes": 28564,
+      "size": {
+        "x": 9.319,
+        "y": 4.448,
+        "z": 6.735
+      },
+      "animations": [],
+      "materials": [
+        "Rock"
+      ]
+    },
+    {
+      "id": "cliff_step_3",
+      "file": "models/rock/cliff_step_3.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "cliff",
+        "rock",
+        "highlands",
+        "placeholder-style"
+      ],
+      "bytes": 16712,
+      "size": {
+        "x": 5.996,
+        "y": 4.382,
+        "z": 5.44
+      },
+      "animations": [],
+      "materials": [
+        "Rock"
+      ]
+    },
+    {
+      "id": "cliff_tall",
+      "file": "models/rock/cliff_tall.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "cliff",
+        "boulder",
+        "rock",
+        "highlands",
+        "tall",
+        "placeholder-style"
+      ],
+      "bytes": 6112,
+      "size": {
+        "x": 3.585,
+        "y": 4.258,
+        "z": 3.583
+      },
+      "animations": [],
+      "materials": [
+        "Rock"
+      ]
+    },
+    {
+      "id": "ore_crystal_blue",
+      "file": "models/rock/ore_crystal_blue.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "ore",
+        "ore-node",
+        "crystal",
+        "gem",
+        "minable",
+        "recolour",
+        "placeholder-style"
+      ],
+      "bytes": 2988,
+      "size": {
+        "x": 0.986,
+        "y": 2.109,
+        "z": 0.697
+      },
+      "animations": [],
+      "materials": [
+        "Gem_Blue"
+      ]
+    },
+    {
+      "id": "ore_crystal_green",
+      "file": "models/rock/ore_crystal_green.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "ore",
+        "ore-node",
+        "crystal",
+        "gem",
+        "minable",
+        "recolour",
+        "placeholder-style"
+      ],
+      "bytes": 3380,
+      "size": {
+        "x": 1.497,
+        "y": 1.512,
+        "z": 1.497
+      },
+      "animations": [],
+      "materials": [
+        "Gem_Green"
+      ]
+    },
+    {
+      "id": "ore_crystal_pink",
+      "file": "models/rock/ore_crystal_pink.glb",
+      "pack": "ultimate-platformer-pack",
+      "category": "rock",
+      "tags": [
+        "ore",
+        "ore-node",
+        "crystal",
+        "gem",
+        "minable",
+        "recolour",
+        "placeholder-style"
+      ],
+      "bytes": 1964,
+      "size": {
+        "x": 1.13,
+        "y": 1.938,
+        "z": 1.13
+      },
+      "animations": [],
+      "materials": [
+        "Gem_Pink"
+      ]
+    },
+    {
+      "id": "path_rock_round_thin",
+      "file": "models/rock/path_rock_round_thin.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "path",
+        "road",
+        "ground",
+        "stone"
+      ],
+      "bytes": 143768,
+      "size": {
+        "x": 1.457,
+        "y": 0.11,
+        "z": 2.089
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "path_rock_round_wide",
+      "file": "models/rock/path_rock_round_wide.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "path",
+        "road",
+        "ground",
+        "stone"
+      ],
+      "bytes": 201808,
+      "size": {
+        "x": 2.111,
+        "y": 0.113,
+        "z": 2.129
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "path_rock_small_1",
+      "file": "models/rock/path_rock_small_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "path",
+        "road",
+        "ground",
+        "stone"
+      ],
+      "bytes": 85832,
+      "size": {
+        "x": 1.057,
+        "y": 0.113,
+        "z": 1.476
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "path_rock_small_2",
+      "file": "models/rock/path_rock_small_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "path",
+        "road",
+        "ground",
+        "stone"
+      ],
+      "bytes": 65788,
+      "size": {
+        "x": 0.993,
+        "y": 0.149,
+        "z": 0.966
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "path_rock_square_thin",
+      "file": "models/rock/path_rock_square_thin.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "path",
+        "road",
+        "ground",
+        "stone"
+      ],
+      "bytes": 124424,
+      "size": {
+        "x": 1.56,
+        "y": 0.176,
+        "z": 1.987
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "path_rock_square_wide",
+      "file": "models/rock/path_rock_square_wide.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "path",
+        "road",
+        "ground",
+        "stone"
+      ],
+      "bytes": 146904,
+      "size": {
+        "x": 2.052,
+        "y": 0.176,
+        "z": 1.987
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "pebble_round_1",
+      "file": "models/rock/pebble_round_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "rock",
+        "stone",
+        "pebble",
+        "scatter"
+      ],
+      "bytes": 44032,
+      "size": {
+        "x": 0.449,
+        "y": 0.094,
+        "z": 0.411
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "pebble_round_2",
+      "file": "models/rock/pebble_round_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "rock",
+        "stone",
+        "pebble",
+        "scatter"
+      ],
+      "bytes": 44936,
+      "size": {
+        "x": 0.419,
+        "y": 0.101,
+        "z": 0.346
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "rock_medium_1",
+      "file": "models/rock/rock_medium_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "rock",
+        "stone",
+        "ore",
+        "ore-node",
+        "minable",
+        "recolour"
+      ],
+      "bytes": 50712,
+      "size": {
+        "x": 3.225,
+        "y": 2.26,
+        "z": 2.989
+      },
+      "animations": [],
+      "materials": [
+        "Rocks"
+      ]
+    },
+    {
+      "id": "rock_medium_2",
+      "file": "models/rock/rock_medium_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "rock",
+        "stone",
+        "ore",
+        "ore-node",
+        "minable",
+        "recolour"
+      ],
+      "bytes": 48088,
+      "size": {
+        "x": 3.049,
+        "y": 1.899,
+        "z": 2.479
+      },
+      "animations": [],
+      "materials": [
+        "Rocks"
+      ]
+    },
+    {
+      "id": "rock_medium_3",
+      "file": "models/rock/rock_medium_3.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "rock",
+        "stone",
+        "ore",
+        "ore-node",
+        "minable",
+        "recolour"
+      ],
+      "bytes": 55392,
+      "size": {
+        "x": 3.42,
+        "y": 2.316,
+        "z": 3.476
+      },
+      "animations": [],
+      "materials": [
+        "Rocks"
+      ]
+    },
+    {
+      "id": "rock_small_1",
+      "file": "models/rock/rock_small_1.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "rock",
+        "stone",
+        "pebble",
+        "small",
+        "ore-node",
+        "recolour"
+      ],
+      "bytes": 44056,
+      "size": {
+        "x": 0.435,
+        "y": 0.13,
+        "z": 0.44
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "rock_small_2",
+      "file": "models/rock/rock_small_2.glb",
+      "pack": "stylized-nature-megakit",
+      "category": "rock",
+      "tags": [
+        "rock",
+        "stone",
+        "pebble",
+        "small",
+        "ore-node",
+        "recolour"
+      ],
+      "bytes": 41324,
+      "size": {
+        "x": 0.34,
+        "y": 0.168,
+        "z": 0.291
+      },
+      "animations": [],
+      "materials": [
+        "PathRocks"
+      ]
+    },
+    {
+      "id": "axe",
+      "file": "models/weapon/axe.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "weapon",
+      "tags": [
+        "axe",
+        "melee",
+        "woodcutting",
+        "tool",
+        "equip",
+        "recolour"
+      ],
+      "bytes": 72644,
+      "size": {
+        "x": 0.294,
+        "y": 0.827,
+        "z": 0.046
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "pickaxe",
+      "file": "models/weapon/pickaxe.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "weapon",
+      "tags": [
+        "pickaxe",
+        "mining",
+        "tool",
+        "equip",
+        "recolour"
+      ],
+      "bytes": 72188,
+      "size": {
+        "x": 0.813,
+        "y": 1.198,
+        "z": 0.136
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "shield",
+      "file": "models/weapon/shield.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "weapon",
+      "tags": [
+        "shield",
+        "offhand",
+        "defence",
+        "equip"
+      ],
+      "bytes": 167980,
+      "size": {
+        "x": 0.615,
+        "y": 0.621,
+        "z": 0.179
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal_Vertex",
+        "MI_Trim_Props"
+      ]
+    },
+    {
+      "id": "sword",
+      "file": "models/weapon/sword.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "weapon",
+      "tags": [
+        "sword",
+        "melee",
+        "blade",
+        "equip",
+        "recolour"
+      ],
+      "bytes": 100976,
+      "size": {
+        "x": 0.267,
+        "y": 1.132,
+        "z": 0.065
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    }
+  ]
+}

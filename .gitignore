@@ -7,3 +7,5 @@ test-results/
 # Keep run records, but ignore throwaway local runs.
 runs/local-*/
 
+.asset-cache/
+.stack-probe/
