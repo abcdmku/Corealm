@@ -39,6 +39,7 @@ import { findShot, shotIds } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
 import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
+import { Vfx } from "../render/vfx.js";
 import { DocSearch, buildDocs } from "../api/docs.js";
 
 export interface BootResult {
@@ -260,6 +261,18 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     clear: (id) => overlays.clear(id),
   });
 
+  // Combat and activity feedback, driven off the event stream rather than called by systems. That
+  // keeps the dependency pointing one way, and it means an agent's action produces exactly the same
+  // feedback as a human's because both travel through the same events.
+  const vfx = new Vfx({
+    camera: renderer.camera,
+    root: labelRoot,
+    parent: scene.overlayGroup,
+    entityPosition: (entityId) => entityStore.get(entityId)?.position ?? null,
+    playerPosition: () => store.get().player.position,
+  });
+  events.subscribe((event) => vfx.handle(event, clock.elapsedMs));
+
   // Documentation, generated from the same canonical content the runtime uses, so the docs cannot
   // drift from the game. Public knowledge only — hidden quest state never reaches this index.
   const docs = new DocSearch();
@@ -295,6 +308,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // visible from inside it.
   const playerInDungeon = (): boolean => store.get().player.regionId === "gravelmaw";
   loop.setOverlays(overlays);
+  loop.setVfx(vfx);
   if (rigged) loop.setPlayerRig(playerRig);
   loop.setEntityViews(entityViews, () => {
     const inside = playerInDungeon();

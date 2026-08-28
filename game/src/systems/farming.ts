@@ -484,7 +484,9 @@ export class FarmingSystem implements TickSystem {
     node.state = "available";
     node.respawnAtMs = null;
 
-    this.harvested.delete(plot.plotId);
+    // The harvest tally is deliberately NOT cleared here: `ActivitySystem.stop` reads the summary
+    // one call later, and a stop that reports "completed: 0" for a fully harvested plot is a lie.
+    // It is reset when the next harvest starts.
     this.deps.events.emit(
       "resource.depleted",
       { itemId: cropId, plotId: plot.plotId, respawnSeconds: 0 },

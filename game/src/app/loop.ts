@@ -21,6 +21,7 @@ import type { InputController } from "../input/mouse.js";
 import type { EntityViews } from "../render/entityViews.js";
 import type { Overlays } from "../render/overlays.js";
 import type { CharacterRig } from "../render/characterRig.js";
+import type { Vfx } from "../render/vfx.js";
 import type { SemanticEntity } from "../contracts.js";
 import { SIM_TICK_MS } from "../core/time.js";
 import { AUTOSAVE_INTERVAL_MS } from "./config.js";
@@ -60,6 +61,7 @@ export class GameLoop {
   private viewSyncAccumulatorMs = 0;
   private overlays: Overlays | null = null;
   private playerRig: CharacterRig | null = null;
+  private vfx: Vfx | null = null;
   private lastPlayerPos: [number, number, number] | null = null;
 
   constructor(private readonly deps: LoopDeps) {}
@@ -84,6 +86,11 @@ export class GameLoop {
   /** The player's skinned rig, when one built successfully. */
   setPlayerRig(rig: CharacterRig): void {
     this.playerRig = rig;
+  }
+
+  /** Floating combat and XP feedback. Ticked on real time so it reads the same at any time scale. */
+  setVfx(vfx: Vfx): void {
+    this.vfx = vfx;
   }
 
   /** Later rounds register their systems here. Kept sorted by declared order. */
@@ -153,6 +160,7 @@ export class GameLoop {
     // time-scaled test run should not play idles at 100x.
     this.entityViews?.update(realDeltaMs / 1000, renderer.camera.position);
     this.overlays?.update(this.deps.clock.elapsedMs);
+    this.vfx?.update(nowMs);
     this.syncPlayerRig(state.player.position, state.player.facingRad, realDeltaMs);
     scene.syncPlayer(state.player.position, state.player.facingRad);
     camera.update(state.player.position[0], state.player.position[1], state.player.position[2]);

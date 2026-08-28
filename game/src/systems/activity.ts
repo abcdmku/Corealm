@@ -122,6 +122,8 @@ export class ActivitySystem implements TickSystem {
   private readonly drivers = new Map<ActivityKind, ActivityDriver>();
   private lastHealth: number;
   private lastAtMs = 0;
+  /** Set by a driver in the tick it finishes, merged into that stop's event payload. */
+  private pendingStopData: Record<string, unknown> | null = null;
 
   constructor(
     private readonly store: Store,
@@ -176,21 +178,45 @@ export class ActivitySystem implements TickSystem {
 
   // ------------------------------------------------------------------- stop
 
+  /**
+   * Facts about *how* the current activity ended, to be merged into its `activity.stopped` payload.
+   *
+   * A driver calls this immediately before returning a `done` result. It exists so an agility fail
+   * can report its damage, and a gather can report its yield, on the one event that fires — rather
+   * than every driver emitting a second, near-duplicate `activity.stopped` of its own.
+   */
+  noteStopData(data: Record<string, unknown>): void {
+    this.pendingStopData = { ...this.pendingStopData, ...data };
+  }
+
   /** Returns false when nothing was running. Emits `activity.stopped` with the reason. */
   stop(reason: ActivityStopReason, atMs: number): boolean {
     const state = this.store.get();
     const activity = state.activity;
     if (!activity) return false;
 
+    const driver = this.drivers.get(activity.kind);
+    const summary = driver?.summary(activity, state, atMs);
+    const extra = this.pendingStopData ?? {};
+    this.pendingStopData = null;
+
     state.activity = null;
     this.store.markDirty();
 
-    this.drivers.get(activity.kind)?.onStop?.(activity, state, reason, atMs);
+    driver?.onStop?.(activity, state, reason, atMs);
 
     const entityId = entityIdOf(activity);
     this.events.emit(
       "activity.stopped",
-      { kind: activity.kind, skill: skillOf(activity), reason, entityId },
+      {
+        kind: activity.kind,
+        skill: skillOf(activity),
+        reason,
+        entityId,
+        completed: summary?.completed ?? 0,
+        remaining: summary?.remaining ?? 0,
+        ...extra,
+      },
       entityId,
       atMs,
     );
