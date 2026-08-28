@@ -1,0 +1,17 @@
+{
+ "name": "vfx-shots3",
+ "actions": [
+  { "waitMs": 2000 },
+  { "debug": "setCameraPreset", "args": ["highcairn"] },
+  { "waitMs": 2500 },
+  { "screenshot": "vfx-highcairn-forge" },
+  { "debug": "listEntities", "args": [{ "archetype": "enemy" }] },
+  { "debug": "setCameraPreset", "args": ["spawn"] },
+  { "waitMs": 500 },
+  { "key": "w", "holdMs": 2500 },
+  { "screenshot": "vfx-run-dust" },
+  { "debug": "grantXp", "args": ["mining", 240] },
+  { "waitMs": 300 },
+  { "screenshot": "vfx-xp-drop" }
+ ]
+}

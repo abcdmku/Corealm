@@ -8,7 +8,7 @@
  * views, A4's input. Each depends only on frozen contracts, so no worker had to know about another.
  */
 import * as THREE from "three";
-import type { EntityId, RegionId, SkillId, Vec3 } from "../contracts.js";
+import type { EntityId, RegionId, SemanticEntity, SkillId, Vec3 } from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
 import { Store, addSkillXp } from "../state/store.js";
 import { EventBus } from "../core/events.js";
@@ -17,11 +17,15 @@ import { RngStreams } from "../core/rng.js";
 import { Renderer } from "../render/renderer.js";
 import { OrbitCamera } from "../render/camera.js";
 import { AssetRegistry } from "../render/assets.js";
-import { WorldScene } from "../render/scene.js";
+import {
+  WorldScene, pavingStampFromRect,
+  type PavingStamp, type RoadStamp, type WaterStamp,
+} from "../render/scene.js";
 import { EntityViews } from "../render/entityViews.js";
 import { Physics } from "../systems/physics.js";
-import { Navigation } from "../systems/navigation.js";
+import { Navigation, solidObstacleMeshes } from "../systems/navigation.js";
 import { Movement } from "../systems/movement.js";
+import { Solids } from "../systems/solids.js";
 import { CorealmGameApi } from "../api/gameApi.js";
 import { SaveService } from "../persistence/storage.js";
 import { installBootPlaceholder, installGameDebug, type RecordedError } from "../debug/gameDebug.js";
@@ -60,7 +64,7 @@ import { SPELLS } from "../content/spells.js";
 import { ENEMIES } from "../content/enemies.js";
 import { SHOPS } from "../content/shops.js";
 import { QUESTS } from "../content/quests.js";
-import { scatterWorld, worldExclusions } from "../world/scatter.js";
+import { scatterWorld, worldExclusions, type ScatterResult } from "../world/scatter.js";
 import { findShot, shotIds } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
 import { createUi } from "../ui/panels.js";
@@ -68,7 +72,7 @@ import { keybindings } from "../input/keyboard.js";
 import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
 import { addChamberLights, buildDungeon, type DungeonSpec } from "../render/dungeon.js";
-import { Vfx } from "../render/vfx.js";
+import { Ambience, Vfx, type AmbienceEmitter, type AmbienceKind } from "../render/vfx.js";
 import { DocSearch, buildDocs } from "../api/docs.js";
 
 export interface BootResult {
@@ -162,10 +166,25 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   const heightAt = (regionId: RegionId, x: number, z: number): number => scene.heightAt(regionId, x, z);
 
-  // 7b. Roads. Authored as location-to-location links, so the ribbon is built from the endpoints
-  //     and draped onto the finished terrain. Without these the ground is one flat colour and
-  //     nothing tells a new player which direction leads to content.
-  buildRoads(scene);
+  // 7b. Roads, paving and shorelines, stamped INTO the ground rather than laid on top of it.
+  //
+  //     Roads used to be 42 transparent depth-write-off ribbons: the frame's largest overdraw
+  //     source and its largest single draw-call block, with an unpainted hole at every junction
+  //     where the two ribbons' end fades met, and 10% of their vertices below the terrain mesh so
+  //     the road vanished in patches. Stamped into the terrain's own vertex colours and splat
+  //     weights the corridor is mip-correct, shadow-correct and z-fight-free by construction, and
+  //     it costs nothing to draw. Paving and the wet band at a waterline ride the same mechanism.
+  //
+  //     This runs AFTER `buildWorld` deliberately: `setGroundStamps` restamps every chunk that
+  //     already exists, and the water level has to be sampled off the finished terrain. Supplying
+  //     roads here also retires the ribbon path — `scene.buildRoad` returns null once stamps are
+  //     provided — so there is exactly one road in the world rather than two that disagree.
+  scene.setGroundStamps({
+    roads: collectRoadStamps(scene),
+    paving: collectPavingStamps(),
+    water: collectWaterStamps(scene),
+    seed: store.get().meta.seed,
+  });
 
   // 7c. Water. Fishing spots were authored as interaction markers with a note that the water itself
   //     is the render layer's job — and nothing was building it, so every fishing spot sat on dry
@@ -174,7 +193,19 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   // 8. Semantic world. Data in, entities out, deterministic from the seed.
   setStatus("populating the frontier…");
-  const built = buildWorld(store.get().meta.seed, heightAt);
+  //
+  // The ports are what stop the world being placed by accident. `baseY` is the measured bbox
+  // minimum of each GLB, so an entity is placed by its FEET rather than by its origin: without it
+  // the visible gap is exactly `glbMinY * scale * tierSilhouetteScale(tier)`, which is why the
+  // Fallen Duskoak hovered 5.77 m and the Coldbrace fletching bench 1.41 m, and why 74 of 151
+  // measured entities sat more than 5 cm off the ground. `assetSize` sizes the collision volumes
+  // that make the world solid at all.
+  const worldPorts = {
+    heightAt,
+    baseY: (assetId: string): number => assets.baseY(assetId),
+    assetSize: (assetId: string): { x: number; y: number; z: number } | null => assets.assetSize(assetId),
+  };
+  const built = buildWorld(store.get().meta.seed, heightAt, worldPorts);
 
   const skillLevels = (): Record<SkillId, number> => {
     const levels = {} as Record<SkillId, number>;
@@ -219,12 +250,25 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   for (const box of built.buildings) {
     physics.addStaticBox(box.position, box.halfExtents as unknown as Vec3, box.rotationY);
   }
-  // Recast reads raw geometry, so the cheapest way to make a building block a path is to hand the
-  // navmesh an invisible box for it. The vertical sides exceed the 48-degree walkable slope, so the
-  // footprint drops out of the mesh. A box top does generate a small isolated roof polygon, which
-  // is harmless: nothing connects to it, so no path can route over a roof.
-  const navObstacles = buildNavObstacles(built.buildings);
-  renderer.scene.add(navObstacles.group);
+  // Recast reads raw geometry, so the cheapest way to make something block a path is to hand the
+  // navmesh an invisible carve for it.
+  //
+  // Two things changed here and both were measured. The carve source is now `built.solids` rather
+  // than `built.buildings`: solids is a documented SUPERSET (a consumer takes one or the other,
+  // never both, or every building is carved twice), and it is the only list that contains the bank
+  // chest, the anvil, the market stalls, the trees and the ore rocks the player used to walk
+  // straight through. And the geometry is an open-topped ring rather than a closed box, because a
+  // box top rasterises into a WALKABLE ROOF: (-160, 6, -60) snapped to y = 9.041 on the March
+  // Company Hall ridge and the player could stroll five metres along it, and every teleport in the
+  // game — region travel, debug teleport, focusCamera, death respawn — routes through
+  // `nav.closestPoint`, so those polygons were reachable. A ring generates no roof polygon at all.
+  const navCarves = solidObstacleMeshes(built.solids);
+  const navCarveGroup = new THREE.Group();
+  navCarveGroup.name = "nav-obstacles";
+  navCarveGroup.visible = false;
+  for (const mesh of navCarves) navCarveGroup.add(mesh);
+  navCarveGroup.updateMatrixWorld(true);
+  renderer.scene.add(navCarveGroup);
 
   // 9. Navmesh over the walkable terrain, then the route graph above it.
   setStatus("mapping walkable ground…");
@@ -232,7 +276,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     ...scene.getWalkableMeshes(),
     ...(dungeon?.walkable ?? []),
     ...(dungeon?.blockers ?? []),
-    ...navObstacles.meshes,
+    ...navCarves,
   ])) {
     const failure = nav.snapshot(null, null, 0).error ?? "unknown";
     errors.push({ atMs: atMs(), source: "navigation", message: `Navmesh build failed: ${failure}` });
@@ -246,8 +290,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // 10. Procedural dressing, kept clear of anything authored.
   setStatus("dressing the world…");
   registerExclusions(scene);
+  let scatterResults: ScatterResult[] = [];
   try {
-    await scatterWorld(scene, assets, store.get().meta.seed);
+    scatterResults = await scatterWorld(scene, assets, store.get().meta.seed);
   } catch (cause) {
     errors.push({ atMs: atMs(), source: "scatter", message: describeError(cause) });
   }
@@ -256,8 +301,14 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // Rigged characters bypass instancing, so they are the single largest draw-call line item: ten
   // full rigs in the Highcairn frame put that pose 6 calls over the 400 budget. 64 leaves room for
   // the settlement geometry while still dressing every NPC a player is close enough to talk to.
+  // 96 rather than 64. The old number was chosen when a dressed NPC cost 10 skinned meshes; the
+  // characters are now assembled through `render/skinning.ts` and cost 5-6, and the worst measured
+  // pose sits at 322 of the 400 draw-call budget with 78 calls of headroom where it used to have 3.
+  // The pool is split internally between named characters and everything else — as one counter, a
+  // reserve equal to the whole budget left the enemy ceiling at exactly zero and no enemy in the
+  // game had ever animated.
   const entityViews = new EntityViews(scene, assets, scene.materials, {
-    maxUniqueDrawCalls: 64,
+    maxUniqueDrawCalls: 96,
     maxUniqueViews: 16,
   });
   await preloadEntityAssets(assets, entityStore, errors, atMs);
@@ -321,6 +372,15 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   // 14. API and hooks. Everything a human or an agent does goes through here.
   const movement = new Movement(nav, events);
+  // Everything that makes a step honest. `Movement` runs without any of these — that is what let it
+  // be written while boot was frozen — and running without them is what "no collisions" meant:
+  // only the navmesh constrained a step, so direct WASD input walked through the bank chest, the
+  // anvil, both market stalls, an NPC, an enemy, a tree and an ore rock. `solids` does the XZ
+  // push-out with a wall slide; `heightAt` puts the player's feet on the same ground plane
+  // everything else is placed on, instead of 0.147-0.417 m above it on the navmesh; `entities`
+  // pushes out of the things that move, which a navmesh carve cannot follow.
+  const solids = new Solids(built.solids);
+  movement.setPorts({ solids, heightAt, entities: entityStore });
   const api = new CorealmGameApi(store, events, nav, movement, clock);
 
   const interactions = new InteractionDispatcher({
@@ -587,6 +647,22 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
   events.subscribe((event) => vfx.handle(event, clock.elapsedMs));
 
+  // Standing atmosphere, as opposed to the event-driven feedback above. Both are polled from Vfx's
+  // own update, so the loop needs no change. One InstancedMesh for the whole world.
+  const ambience = new Ambience(scene.overlayGroup, { maxParticles: 640 });
+  vfx.setAmbience(ambience);
+  for (const emitter of collectAmbienceEmitters(scene, built)) ambience.addEmitter(emitter);
+  // Polled rather than pushed: a telegraph has to keep drawing for the whole wind-up, and a dropped
+  // frame on an `onTelegraph` listener would leave a ring on the ground after the slam landed.
+  vfx.setTelegraphSource(() => enemyAiSystem.telegraphs().map((telegraph) => ({
+    id: telegraph.enemyId,
+    centre: telegraph.centre,
+    radius: telegraph.radius,
+    progress: telegraph.firesAtMs > telegraph.startedAtMs
+      ? Math.min(1, Math.max(0, (clock.elapsedMs - telegraph.startedAtMs) / (telegraph.firesAtMs - telegraph.startedAtMs)))
+      : 1,
+  })));
+
   // "Click a distant ore" must walk there AND THEN mine it. The API remembers the intent; this is
   // what fires it on arrival. Both a human click and an agent tool call route through here.
   events.subscribe((event) => {
@@ -713,6 +789,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.addSystem(discoverySystem);
 
   if (dungeon) loop.addInterior(dungeon.group, () => store.get().player.regionId === "gravelmaw");
+  // What the player is interacting with, so the rig can pick a pose for it: opening a chest is not
+  // the same animation as swinging at a rock.
+  loop.setArchetypeLookup((id) => entityStore.get(id)?.archetype ?? null);
   loop.setOverlays(overlays);
   loop.setVfx(vfx);
   loop.setCombatHits(() => combatSystem.consumeHits());
@@ -742,7 +821,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
     // Node yields and enemy health are seeded world state, so a reset rebuilds them rather than
     // leaving a half-mined world behind a nominally fresh character.
-    const rebuilt = buildWorld(store.get().meta.seed, heightAt);
+    const rebuilt = buildWorld(store.get().meta.seed, heightAt, worldPorts);
     entityStore.load(rebuilt.entities);
     entityStore.registerLocations(rebuilt.knownLocations);
     nav.setRouteGraph(rebuilt.routeNodes, rebuilt.routeEdges);
@@ -753,6 +832,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   installGameDebug({
     store, events, clock, nav, movement, api, renderer, camera, assets, errors,
     version,
+    // "scatter placed nothing" and "nobody asked scatter" are different bugs, and the debug surface
+    // could not tell them apart while boot threw this array away.
+    scatterStats: () => scatterResults,
     resetWorld,
     isIdle: () => store.get().player.movement.mode === "idle" && store.get().activity === null,
     teleport: (to: Vec3) => {
@@ -831,6 +913,18 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     },
     listShots: () => shotIds(),
     callTool: (name: string, args: unknown) => agent.call(name, (args ?? {}) as Record<string, unknown>),
+  });
+
+  // Every shader the session will need, compiled now rather than the first time a pose reveals it.
+  // Measured before this existed: the program count climbed 19 -> 20 mid-session and the frames
+  // that paid for it were 1130 ms, 994 ms and 346 ms. The two extra passes are for variants three
+  // skips by default — a material only compiles its transparent form when something is actually
+  // transparent, and three skips everything under an invisible ancestor, which is the whole dungeon
+  // and the +3-point-light variant of every material in it.
+  setStatus("warming the shaders…");
+  renderer.warmup({
+    transparentVariants: [scene.root],
+    temporarilyVisible: dungeon ? [dungeon.group] : [],
   });
 
   document.getElementById("boot-screen")?.remove();
@@ -970,13 +1064,17 @@ function buildWaterBodies(scene: WorldScene): number {
 }
 
 /**
- * Draws every authored road as a draped ribbon.
+ * The authored road network, as polylines for the ground stamp.
  *
- * Roads existed only as scatter exclusion corridors until now: the data was read, props were kept
- * off it, and nothing was ever drawn. `scene.buildRoad` had zero callers.
+ * Roads are authored as location-to-location links, so the line is derived from the endpoints.
+ * Only x and z are read by the stamp — the ground supplies y — but the samples are taken along the
+ * link anyway, because a straight two-point line over a rise stamps a corridor that cuts the hill
+ * instead of following it. `setGroundStamps` then meanders each line from the world seed, so the
+ * roads stop being dead straight; the route graph works on node ids rather than on this geometry,
+ * so the Agility distance ledger in `content/regions.ts` is unaffected by the meander.
  */
-function buildRoads(scene: WorldScene): number {
-  let built = 0;
+function collectRoadStamps(scene: WorldScene): RoadStamp[] {
+  const stamps: RoadStamp[] = [];
   for (const region of REGIONS) {
     const locationById = new Map(region.locations.map((location) => [location.id, location]));
     for (const road of region.roads) {
@@ -984,7 +1082,6 @@ function buildRoads(scene: WorldScene): number {
       const to = locationById.get(road.to);
       if (!from || !to) continue;
 
-      // Sample along the link so the ribbon follows the ground instead of cutting through a rise.
       const steps = Math.max(2, Math.ceil(Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1]) / 6));
       const points: Vec3[] = [];
       for (let step = 0; step <= steps; step += 1) {
@@ -993,10 +1090,51 @@ function buildRoads(scene: WorldScene): number {
         const z = from.position[1] + (to.position[1] - from.position[1]) * t;
         points.push([x, scene.heightAt(region.id, x, z), z]);
       }
-      if (scene.buildRoad(points, 3.2, region.id)) built += 1;
+      stamps.push({ points, width: 3.2 });
     }
   }
-  return built;
+  return stamps;
+}
+
+/**
+ * Paved ground, from whatever the settlements author.
+ *
+ * Empty until a settlement carries a `paving` array. The tiles themselves are instanced scenery
+ * emitted by `world/regionBuilder.ts`; this is the ground UNDER them, which has to read as cobble
+ * rather than as grass showing through a 2 cm gap between 2 m tiles.
+ */
+function collectPavingStamps(): PavingStamp[] {
+  const stamps: PavingStamp[] = [];
+  for (const region of REGIONS) {
+    for (const paving of region.settlement?.paving ?? []) {
+      stamps.push(pavingStampFromRect(paving.rect));
+    }
+  }
+  return stamps;
+}
+
+/**
+ * Where water meets land, so the bank gets mud and wet stone instead of dry grass to the waterline.
+ *
+ * Centred and sized on the fishing CLUSTER rather than the scenic location marker, for the same
+ * reason `buildWaterBodies` is: centring on the marker put every fishing spot on dry grass beside a
+ * pond, which reads as a bug even though both were where they were authored. The two must agree, so
+ * they derive from the same numbers.
+ */
+function collectWaterStamps(scene: WorldScene): WaterStamp[] {
+  const stamps: WaterStamp[] = [];
+  for (const region of REGIONS) {
+    for (const cluster of region.clusters) {
+      if (cluster.archetype !== "fishing_spot") continue;
+      const [x, z] = cluster.centre;
+      stamps.push({
+        centre: [x, z],
+        radius: cluster.radius + 14,
+        level: scene.heightAt(region.id, x, z) + WATER_BASIN_DEPTH * 0.55,
+      });
+    }
+  }
+  return stamps;
 }
 
 /**
@@ -1040,31 +1178,6 @@ function buildDungeonSpec(scene: WorldScene): DungeonSpec | null {
   return null;
 }
 
-/**
- * Invisible collision proxies handed to Recast so paths route around buildings.
- * Never rendered: `visible = false` keeps them out of every draw call while Recast still reads
- * their geometry, which it takes from the buffers rather than from the render list.
- */
-function buildNavObstacles(boxes: readonly BuildingBox[]): { group: THREE.Group; meshes: THREE.Mesh[] } {
-  const group = new THREE.Group();
-  group.name = "nav-obstacles";
-  group.visible = false;
-  const meshes: THREE.Mesh[] = [];
-  const material = new THREE.MeshBasicMaterial();
-
-  for (const box of boxes) {
-    const [halfX, halfY, halfZ] = box.halfExtents;
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(halfX * 2, halfY * 2, halfZ * 2), material);
-    mesh.position.set(box.position[0], box.position[1], box.position[2]);
-    mesh.rotation.y = box.rotationY;
-    mesh.name = `nav-obstacle-${box.id}`;
-    mesh.visible = false;
-    group.add(mesh);
-    meshes.push(mesh);
-  }
-  group.updateMatrixWorld(true);
-  return { group, meshes };
-}
 
 /**
  * Keeps procedural dressing off anything authored. Trees growing through the bank door is the
@@ -1146,4 +1259,64 @@ function captureErrors(sink: RecordedError[], atMs: () => number): void {
   window.addEventListener("unhandledrejection", (event) => {
     sink.push({ atMs: atMs(), source: "unhandledrejection", message: String(event.reason) });
   });
+}
+
+/**
+ * Standing atmosphere, placed off the same authored data everything else is placed off.
+ *
+ * There is no "atmosphere" content type and there should not be one: every emitter here is implied
+ * by something the world already contains. A chimney is a cottage's chimney, a forge fire is a
+ * smithing station, a ripple is a fishing spot. Deriving them means a settlement that adds a house
+ * gets its smoke for free, and a settlement that moves one does not leave a plume behind.
+ *
+ * All of it lands in ONE InstancedMesh, so the whole world's smoke, sparks and ripples cost a
+ * single draw call. Each emitter carries its own cull distance, so a chimney 200 m away contributes
+ * nothing at all rather than a sub-pixel sprite.
+ */
+function collectAmbienceEmitters(scene: WorldScene, built: { entities: readonly SemanticEntity[] }): AmbienceEmitter[] {
+  const emitters: AmbienceEmitter[] = [];
+
+  // Chimney smoke, read off the assembled buildings rather than off the building list: `cottage`
+  // and `quarry_hut` place their chimney with a seeded offset, so the only thing that knows where
+  // the flue actually came out is the emitted part.
+  for (const entity of built.entities) {
+    if (entity.view?.assetId !== "chimney") continue;
+    emitters.push({
+      id: `smoke-${entity.id}`,
+      kind: "smoke",
+      // The part is placed at the chimney's base; the smoke leaves the top of it.
+      position: [entity.position[0], entity.position[1] + 3.1, entity.position[2]],
+      scale: 1,
+    });
+  }
+
+  // Forge fire and cooking heat, from the stations themselves.
+  for (const region of REGIONS) {
+    for (const station of region.settlement?.stations ?? []) {
+      const kind: AmbienceKind | null =
+        station.kind === "furnace" ? "spark" : station.kind === "range" ? "smoke" : null;
+      if (!kind) continue;
+      const [x, z] = station.position;
+      emitters.push({
+        id: `station-${station.id}`,
+        kind,
+        position: [x, scene.heightAt(region.id, x, z) + (kind === "spark" ? 0.9 : 0.7), z],
+        scale: kind === "spark" ? 0.7 : 0.8,
+      });
+    }
+
+    // Water movement, on the fishing clusters the water surface is centred on.
+    for (const cluster of region.clusters) {
+      if (cluster.archetype !== "fishing_spot") continue;
+      const [x, z] = cluster.centre;
+      emitters.push({
+        id: `ripple-${cluster.id}`,
+        kind: "ripple",
+        position: [x, scene.heightAt(region.id, x, z) + WATER_BASIN_DEPTH * 0.55, z],
+        scale: Math.max(1, cluster.radius / 8),
+      });
+    }
+  }
+
+  return emitters;
 }

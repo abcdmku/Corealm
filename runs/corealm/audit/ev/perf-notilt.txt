@@ -1,0 +1,36 @@
+[2m3:58:09 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mReferenceError[22m: sameAppearances is not defined
+[39m > CharacterRig.applyEquipment src/render/characterRig.ts:528:6
+    526 |        const parts = stack ? this.appearanceParts(stack.itemId) : [];
+    527 |        const previous = this.gearBySlot.get(slot) ?? [];
+    528 |        if (sameAppearances(previous, parts)) continue;
+        |        ^
+    529 |  
+    530 |        if (parts.length > 0) this.gearBySlot.set(slot, parts);
+ > GameLoop.syncPlayerEquipment src/app/loop.ts:463:13
+ > GameLoop.renderFrame src/app/loop.ts:390:9
+ > frame src/app/loop.ts:292:9
+
+{
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "usedRealGpu": true,
+  "passed": false,
+  "shots": [
+    {
+      "shot": "highcairn",
+      "frames": 1403,
+      "medianFrameMs": 2.6,
+      "p95FrameMs": 4.7,
+      "worstFrameMs": 6.2,
+      "impliedFps": 385,
+      "drawCalls": 322,
+      "triangles": 3592482,
+      "programs": 21,
+      "heapMB": 159,
+      "meetsBudget": true
+    }
+  ],
+  "errors": [
+    "ReferenceError: sameAppearances is not defined",
+    "page.evaluate: Execution context was destroyed, most likely because of a navigation.\n    at runPerfTest (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:160:36)\n    at async main (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:215:18)\n    at async <anonymous> (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:227:3)"
+  ]
+}

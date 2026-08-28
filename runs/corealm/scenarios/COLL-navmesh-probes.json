@@ -1,0 +1,134 @@
+{
+  "name": "collision-navmesh-probes",
+  "actions": [
+    {
+      "inspect": "getNavigationState",
+      "label": "navmesh ready, polyCount"
+    },
+    {
+      "debug": "getNavPath",
+      "args": [
+        [
+          -146,
+          1,
+          -104
+        ],
+        [
+          -160,
+          1,
+          -80
+        ]
+      ],
+      "label": "REGRESSION: from inside coldbrace_house_3 to the square. Must be null, not a 3-point line through the wall."
+    },
+    {
+      "debug": "getNavPath",
+      "args": [
+        [
+          -160,
+          1,
+          -112
+        ],
+        [
+          -160,
+          1,
+          -104
+        ]
+      ],
+      "label": "Coldbrace south gate must be a short straight path, not a detour past x=-163"
+    },
+    {
+      "debug": "getNavPath",
+      "args": [
+        [
+          -160,
+          6,
+          -60
+        ],
+        [
+          -160,
+          6,
+          -59
+        ]
+      ],
+      "label": "March Company Hall roof: must NOT snap to y=9.041"
+    },
+    {
+      "debug": "getNavPath",
+      "args": [
+        [
+          -146,
+          5,
+          -104
+        ],
+        [
+          -146,
+          5,
+          -103
+        ]
+      ],
+      "label": "Cottage roof: must NOT snap to y=7.841"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -160,
+          "y": 9,
+          "z": -60
+        }
+      ],
+      "label": "attempt to teleport onto the hall roof"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "where the roof teleport actually landed"
+    },
+    {
+      "key": "d",
+      "holdMs": 1500,
+      "label": "try to walk along the roof ridge"
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "after walking (5.0 m along the ridge was the Phase 1 measurement)"
+    },
+    {
+      "screenshot": "COLL-roof-attempt"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "town_center"
+        }
+      ],
+      "label": "back to town"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "debug": "getNavPath",
+      "args": [
+        [
+          -160,
+          1,
+          -118
+        ],
+        [
+          -156,
+          3,
+          79
+        ]
+      ],
+      "label": "spawn to the Bracken Pit, the long cross-world route, must survive the carve"
+    },
+    {
+      "screenshot": "COLL-town-after-carve"
+    }
+  ]
+}

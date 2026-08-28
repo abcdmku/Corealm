@@ -1,0 +1,13 @@
+{"name":"settlement-audit3","actions":[
+{"debug":"setPaused","args":[true]},
+{"debug":"getDrawnBounds","args":["highcairn_wall_n#w0"],"label":"hc_wall_n"},
+{"debug":"getDrawnBounds","args":["highcairn_wall_s#w0"],"label":"hc_wall_s"},
+{"debug":"getDrawnBounds","args":["highcairn_hut_5#roof"],"label":"hc_hut5_roof"},
+{"debug":"getDrawnBounds","args":["highcairn_gate#arch_f"],"label":"hc_gate"},
+{"debug":"getDrawnBounds","args":["coldbrace_wall_n#w0"],"label":"cb_wall_n"},
+{"debug":"getDrawnBounds","args":["coldbrace_house_1#roof"],"label":"cb_h1_roof"},
+{"debug":"getDrawnBounds","args":["rootfall_stump#step_1"],"label":"rf_step1"},
+{"debug":"getDrawnBounds","args":["rootfall_stump#step_3"],"label":"rf_step3"},
+{"debug":"getNavPath","args":[[144,0,-40],[144,0,-90]],"label":"nav_hc_ns"},
+{"debug":"listRouteNodes","label":"routes"}
+]}

@@ -1,0 +1,12 @@
+{
+ "name": "vfx-ab-off",
+ "actions": [
+  { "waitMs": 2000 },
+  { "debug": "setCameraPreset", "args": ["hollowcut_seam"] },
+  { "waitMs": 1200 },
+  { "screenshot": "vfx-contact-hollowcut-OFF" },
+  { "debug": "setCameraPreset", "args": ["palewood_copse"] },
+  { "waitMs": 1200 },
+  { "screenshot": "vfx-contact-palewood-OFF" }
+ ]
+}

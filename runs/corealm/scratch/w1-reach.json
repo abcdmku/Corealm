@@ -1,0 +1,15 @@
+{
+  "name": "w1-reach",
+  "actions": [
+    { "inspect": "getPlayerPosition", "label": "spawn" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "bracken_pit" }], "label": "moveTo bracken_pit from spawn" },
+    { "waitMs": 300 },
+    { "inspect": "getNavigationState", "label": "nav after bracken attempt" },
+    { "debug": "groundHeight", "args": [-160, 80], "label": "ground at bracken_pit centre" },
+    { "debug": "getNavPath", "args": [[-160,1,-118],[-160,3,80]], "label": "navpath spawn -> bracken centre" },
+    { "debug": "getNavPath", "args": [[-160,1,-118],[-156,3,79]], "label": "navpath spawn -> bracken ore" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "entityId": "npc_cairnkeeper_ode" }], "label": "moveTo Ode from spawn" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "highcairn" }], "label": "moveTo highcairn from spawn" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "great_cairn" }], "label": "moveTo great_cairn from spawn" }
+  ]
+}

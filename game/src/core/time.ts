@@ -41,6 +41,25 @@ export class SimClock {
     return Math.max(8, Math.ceil(this.timeScale * 12));
   }
 
+  /**
+   * How far the render frame sits between the last committed tick and the next one, 0..1.
+   *
+   * The sim runs at a fixed 100 ms and the frame does not, so without this the player teleports
+   * 42 cm ten times a second while the camera, the world and the UI move smoothly — measured, only
+   * 170 of 11,050 rendered frames contained any player displacement, and the rig was told
+   * "standing still" on 98.5% of them.
+   *
+   * It lives here rather than in `app/loop.ts` because the accumulator is private and the loop was
+   * mirroring this integration to derive the same number: same real delta, same time scale, same
+   * SIM_TICK_MS subtracted per reported tick. Two copies of one integrator is two things that can
+   * drift apart, and the one that drifts is the one nothing tests.
+   */
+  alpha(): number {
+    if (this.paused) return 0;
+    const value = this.accumulator / SIM_TICK_MS;
+    return value < 0 ? 0 : value > 1 ? 1 : value;
+  }
+
   /** Called once per tick actually run. */
   commitTick(): void {
     this.tick += 1;

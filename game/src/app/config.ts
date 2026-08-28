@@ -4,6 +4,37 @@ export const PLAYER_SPEED = 4.2;          // m/s over the navmesh
 export const PLAYER_RADIUS = 0.35;        // m, capsule radius for collision and navmesh inset
 export const PLAYER_HEIGHT = 1.8;         // m
 
+/**
+ * How the player gets up to speed and which locomotion clip that speed selects.
+ *
+ * NOT to be confused with `WALK_SPEED_MPS` in `content/regions.ts`, which is also 4.2 and is the
+ * figure every route-graph edge cost and the whole Agility route-flip ledger is computed from.
+ * That one is a content constant and must not move. These are the movement feel.
+ *
+ * `walkSpeed` exists because `Walk_Loop` was unreachable. `characterRig.poseFor` picks the run clip
+ * above 3.0 m/s, and 4.2 m/s was the only speed the player ever moved at, so of 11,050 recorded
+ * frames of continuous movement exactly one landed in the walk band. Forward-kinematics stride
+ * analysis of `animation_library_1.glb` (240 samples per clip, planted-foot velocity of `ball_l`)
+ * gives `Walk_Loop` an implied ground speed of 0.98 m/s and `Jog_Fwd_Loop` 5.92 m/s, so a 1.6 m/s
+ * walk plays `Walk_Loop` at 1.6x and reads as a walk.
+ *
+ * `walkPoseThreshold` is the speed above which the rig should choose `Jog_Fwd_Loop` over
+ * `Walk_Loop`. 2.2 sits between the two gaits rather than above both, which 3.0 did.
+ *
+ * `accelMps2` / `decelMps2` replace binary velocity. Movement today is a switch: the player covers
+ * 0.4202 m per 100 ms sim tick or stands still, and an input tap shorter than ~40 ms produces no
+ * displacement at all. 18 m/s^2 takes 0 -> 4.2 in 0.23 s, 25 m/s^2 takes 4.2 -> 0 in 0.17 s —
+ * short enough that the walk still feels immediate, long enough that a tap moves you and that the
+ * animation time scale has a ramp to follow.
+ */
+export const MOVEMENT = {
+  walkSpeed: 1.6,                 // m/s, the slow gait
+  runSpeed: PLAYER_SPEED,         // m/s, the default gait — the same 4.2 the navmesh is walked at
+  walkPoseThreshold: 2.2,         // m/s, above this the rig plays a jog rather than a walk
+  accelMps2: 18,
+  decelMps2: 25,
+} as const;
+
 export const INTERACT_RANGE = 2.4;        // m, walk-into-range threshold for gathering and talking
 export const MELEE_RANGE = 1.6;           // m
 export const SPELL_RANGE = 9.0;           // m
@@ -31,7 +62,13 @@ export const CAMERA: CameraConfig = {
   defaultDistance: 18,
   minPitch: 0.18,
   maxPitch: 1.32,
-  defaultPitch: 0.72,
+  // 0.72 put the camera 11.9 m above every roofline, so the occlusion probe had nothing to hit:
+  // 0 occluded frames out of 3,449 around Coldbrace square, 0 of 1,202 under the Vellenwood canopy,
+  // and 0 of 1,001 inside the Gravelmaw chamber (camera at y = 22.36, filming through the rock).
+  // The probe is not broken — at pitch 0.18 on the Karrowmoor terraces it reports occluded on
+  // 401-1,058 frames per direction and pulls distance from 18 to 12.2. 0.52 is a shoulder view that
+  // still clears a 5 m roof at distance 18 but sits low enough to be blocked by one.
+  defaultPitch: 0.52,
   fov: 55,
   near: 0.1,
   // Fog ends at 260 m, so anything between there and the old 600 m far plane was drawn fully
@@ -43,13 +80,29 @@ export const CAMERA: CameraConfig = {
 export const NAV_CONFIG = {
   cs: 0.3,
   ch: 0.2,
-  walkableRadius: 2,     // voxels
+  // 1 voxel, not 2. `navigation.ts` picks LARGE_WORLD_CELL_SIZE 0.45 m because the world extent is
+  // 700 m, so radius 2 erodes 0.90 m per side — 2.6x PLAYER_RADIUS. A 2 m gatehouse arch erodes to
+  // 0.20 m, under one cell, and Recast never connects it: all three gatehouse arches in the game are
+  // impassable, and every measured nav path detours 4-5 m around them, including the south gate of
+  // the town the player spawns in front of. At radius 1 the inset is 0.45 m — still 0.10 m more than
+  // PLAYER_RADIUS 0.35 — and a 2 m arch becomes a 1.10 m corridor. polyCount rises from 3169.
+  walkableRadius: 1,     // voxels
   walkableClimb: 2,      // voxels
   walkableHeight: 9,     // voxels
   walkableSlopeAngle: 48,
   minRegionArea: 4,
 } as const;
 
+/**
+ * Unchanged, deliberately. The budget is the point.
+ *
+ * Headroom as measured by `npm run perf`: the worst of the 18 poses is `highcairn` at 397 of 400
+ * draw calls, so there are 3 calls spare at the tightest pose. The world-polish wave both adds
+ * calls (ground-normal tilt splits no groups, but layered character parts and settlement props add
+ * new (asset, tier) groups) and removes them (merging same-material outfit parts, dropping the
+ * ~525 buried scatter pebbles). Anyone who needs more room pays for it by removing calls
+ * elsewhere; do not raise `maxDrawCalls` to make a pose fit.
+ */
 export const RENDER_BUDGET = { maxDrawCalls: 400, targetFps: 55 } as const;
 
 export const AUTOSAVE_INTERVAL_MS = 10_000;

@@ -1,0 +1,17 @@
+{"name":"settlement-audit2","actions":[
+{"debug":"setPaused","args":[true]},
+{"debug":"getNavPath","args":[[-160,0,-112],[-160,0,-100]],"label":"nav_through_south_gate"},
+{"debug":"getNavPath","args":[[-128,0,-80],[-140,0,-80]],"label":"nav_through_east_gate"},
+{"debug":"getNavPath","args":[[166,0,-58],[150,0,-58]],"label":"nav_through_highcairn_gate"},
+{"debug":"getNavPath","args":[[-160,0,-80],[-230,0,-60]],"label":"nav_west_exit"},
+{"debug":"groundHeight","args":[60,120],"label":"gh_rootfall"},
+{"debug":"groundHeight","args":[-160,-80],"label":"gh_coldbrace"},
+{"debug":"groundHeight","args":[-160,-104],"label":"gh_coldbrace_s"},
+{"debug":"groundHeight","args":[-186,-84],"label":"gh_coldbrace_w"},
+{"debug":"groundHeight","args":[144,-66],"label":"gh_highcairn"},
+{"debug":"groundHeight","args":[160,-58],"label":"gh_highcairn_gate"},
+{"debug":"groundHeight","args":[122,-68],"label":"gh_highcairn_wallw"},
+{"debug":"getDrawnBounds","args":["coldbrace_anvil"],"label":"anvil"},
+{"debug":"getDrawnBounds","args":["highcairn_bank_counter"],"label":"hcbank"},
+{"debug":"getMetrics","label":"metrics"}
+]}

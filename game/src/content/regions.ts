@@ -80,9 +80,17 @@
  */
 import type { ItemId, QuestId, RecipeId, RegionId, SkillId } from "../contracts.js";
 import {
-  COMPOSITION_IDS, KIT_IDS, PREFAB_IDS, compositionPartAssetIds, isCompositionId, isKitId,
-  isPrefabId, prefabPartAssetIds, type CompositionId, type KitId,
+  COMPOSITION_IDS, KIT_IDS, MODULE_METRES, PREFAB_IDS, compositionPartAssetIds, isCompositionId,
+  isKitId, isPrefabId, prefabPartAssetIds, type CompositionId, type KitId, type PrefabId,
 } from "../render/buildings.js";
+// The three settlements are data, and each one is a whole town's worth of it. They live in
+// `content/settlements/` so three people can lay out three towns without touching the same file;
+// the types, the region wiring and `validateRegions` stay here, which is the only thing all three
+// share. Those files import `SettlementDef` back from here with `import type`, so the cycle is
+// erased at compile time and there is no runtime import loop.
+import { COLDBRACE } from "./settlements/coldbrace.js";
+import { HIGHCAIRN } from "./settlements/highcairn.js";
+import { ROOTFALL } from "./settlements/rootfall.js";
 
 // ------------------------------------------------------------------ primitives
 
@@ -153,9 +161,18 @@ export interface ResourceClusterDef {
   locationId: string;
 }
 
-export type PrefabId =
-  | "cottage" | "hall" | "tower" | "stall" | "wall_segment"
-  | "gatehouse" | "shed" | "ruin" | "quarry_hut";
+/**
+ * Re-exported rather than declared, because there were two of these and only one could be right.
+ *
+ * `render/buildings.ts` owns the union: it is the file that has to have a `buildPrefab` branch, a
+ * `prefabHeight` and a `prefabCollision` for every member, so a name it does not know is a name
+ * nothing can draw. This file used to declare its own copy, which was a strict subset — so the five
+ * prefabs added for the settlement work (`forge`, `porch`, `arcade`, `market_row`, `well`) existed,
+ * were dispatched by `world/regionBuilder.ts`, and could not be named by any settlement without a
+ * type error. `CompositionId` was already imported from the same place; this makes the pair
+ * consistent.
+ */
+export type { PrefabId };
 
 /**
  * Buildings are composed, not loaded: the Medieval Village kit ships no prebuilt house, only a 2 m
@@ -173,6 +190,21 @@ export interface BuildingDef {
   footprint: readonly [number, number];
 }
 
+/**
+ * How close a thing has to be to whatever it says it is `attachedTo` before `validateRegions`
+ * calls it a lie. Metres, measured to the *edge* of the attachment (a building's footprint
+ * rectangle, a wall run's centreline, a prop's origin), not to its centre.
+ *
+ * 3 m is the diagnosis's number and it clears the layouts it was chosen for with a metre to spare.
+ * Checked against the replacement layouts in
+ * runs/corealm/diagnosis/settlement-layout-coldbrace-rootfall-hig.md using this exact metric: the
+ * Coldbrace furnace and anvil and the Highcairn anvil measure 0.0 m (they stand inside their
+ * forge's 6x5 footprint), the Rootfall smith's pitch measures 0.5 m, the Coldbrace bank counter
+ * 1.4 m off the vault tower, and the worst case is the Coldbrace smith's cart in front of its
+ * forge at 2.0 m.
+ */
+export const ATTACHMENT_MARGIN_METRES = 3;
+
 export interface StationDef {
   id: string;
   name: string;
@@ -184,6 +216,20 @@ export interface StationDef {
   scale?: number;
   /** Filled in by round 3's `content/recipes.ts`. Empty here on purpose. */
   recipeIds: RecipeId[];
+  /**
+   * The `BuildingDef.id`, `WallRunDef.id` or `PropDef.id` in the same settlement that this station
+   * is part of: the forge it stands inside, the lean-to it stands under, the counter it stands
+   * behind.
+   *
+   * This exists so that a claim can be checked. Measured today, all five Coldbrace stations stand
+   * loose on grass — the Forge Shed's own door faces south while the furnace and anvil it serves
+   * are 6 m away on its north side, and the fletching bench is a 68 cm drawer unit 6 m from
+   * anything at all. Naming the structure lets `validateRegions`
+   * assert the station is within `ATTACHMENT_MARGIN_METRES` of it, which is what stops the next
+   * author dropping an anvil in a field. Optional, because nothing authored today attaches to
+   * anything; once a settlement is re-laid out, everything in it should name its structure.
+   */
+  attachedTo?: string;
 }
 
 export interface BankDef {
@@ -192,6 +238,8 @@ export interface BankDef {
   position: Spot;
   rotationY: number;
   assetId: string;
+  /** See `StationDef.attachedTo`. The bank counter, porch or vault the chest belongs to. */
+  attachedTo?: string;
 }
 
 export interface ShopDef {
@@ -201,6 +249,8 @@ export interface ShopDef {
   position: Spot;
   rotationY: number;
   assetId: string;
+  /** See `StationDef.attachedTo`. The arcade, market row or forge the pitch belongs to. */
+  attachedTo?: string;
 }
 
 export interface NpcStandDef {
@@ -212,6 +262,172 @@ export interface NpcStandDef {
   /** Round 5 (`content/dialogue.ts`) owns the tree behind this id. */
   dialogueRootId: string;
   questIds: QuestId[];
+}
+
+/**
+ * A gap in a wall run: a gate, a postern, a collapsed span.
+ *
+ * `at` is metres along the run measured from `from`, at the CENTRE of the gap. `width` is the full
+ * clear span, so a gate authored as `{ at: 26, width: 8 }` on a 52 m run leaves the wall standing
+ * from 0-22 m and 30-52 m. Author the opening's centre at the gatehouse's own position projected
+ * onto the run, and its width at the gatehouse footprint's width, or the arch and the hole in the
+ * wall will not line up.
+ */
+export interface WallOpeningDef {
+  /** Metres along the run from `from`, at the centre of the gap. */
+  at: number;
+  /** Full clear span in metres. Rounds outward to whole 2 m modules; there is no half panel. */
+  width: number;
+}
+
+/**
+ * One straight run of town wall, from `from` to `to`, with gates cut out of it.
+ *
+ * WHY THIS TYPE EXISTS. There was no way to author a wall, only to author individual
+ * `wall_segment` buildings with an 8 m footprint. Measured on the current data: Coldbrace has 44 m
+ * of wall (four 8 m stubs plus two 6 m gatehouses) on a 212 m circuit — 79% open, largest single
+ * gap 46 m, all four corners missing. Highcairn has 30 m of 139 m. Rootfall has none at all and no
+ * gate. The stubs are worse than nothing: `getNavPath(144,-40 -> 144,-90)` detours to x = 149.5 to
+ * walk around two free-standing panels in open moor. The player's complaint was, verbatim, "a
+ * random gate without a wall". Four `WallRunDef`s close a whole circuit in four lines of data.
+ *
+ * INTENDED EMITTER SEMANTICS, for whoever writes it in `world/regionBuilder.ts`:
+ *
+ *   length   = spotDistance(from, to)
+ *   count    = round(length / MODULE_METRES)      MODULE_METRES is 2, from render/buildings.ts;
+ *                                                 author runs as whole multiples of 2 m
+ *   module i = centre at (i + 0.5) / count along the run, i in [0, count)
+ *   yaw      = atan2(-(to[1] - from[1]), to[0] - from[0])
+ *
+ * That yaw is the value that maps a part's LOCAL +X onto the run direction under the transform
+ * `world = (dx*cos + dz*sin, -dx*sin + dz*cos)` that `regionBuilder.emitParts` applies — the same
+ * convention `wallSegment()` in render/buildings.ts already lays its panels out in, which is why
+ * `coldbrace_wall_w` at rotationY PI/2 runs north-south.
+ *
+ * Per kept module the emitter places the settlement kit's `wall` asset and one `wall_bottom_trim`
+ * at the same XZ (`wallSegment` offsets the trim by dz 0.01 to stop it z-fighting the panel), and
+ * pushes one `BuildingBox` 0.5 m thick along the run's normal and `prefabHeight`-tall — the same
+ * 0.5 m the existing `prefabCollision("wall_segment")` uses, because the collider should be as
+ * thick as the panel, not as deep as a footprint. `kit.corner` goes at both ends of the run, at
+ * `from` and `to` exactly, so two runs meeting at a corner share a post instead of leaving a hole.
+ *
+ * A module is SKIPPED when its centre distance falls inside `[at - width/2, at + width/2]` of any
+ * opening. Skipped modules emit no panel, no trim and no collision box, so the gatehouse standing
+ * in the gap is the only thing there.
+ *
+ * The runs are authored per settlement and are not required to form a closed loop — a town on a
+ * cliff edge (Highcairn's south side) may want one run standing on the lip and nothing behind it.
+ */
+export interface WallRunDef {
+  id: string;
+  name: string;
+  from: Spot;
+  to: Spot;
+  /** Gates and posterns. Absent or empty means a solid run. */
+  openings?: WallOpeningDef[];
+}
+
+/**
+ * The tile assets that pave a settlement. Constrained to a union rather than left as a bare string
+ * because these four are the only meshes in the manifest that tile the module grid exactly:
+ * `floor_cobble`, `floor_brick`, `floor_wood` and `floor_wood_light` all measure 2.00 x 0.02 x
+ * 2.00 m, so a paving rect needs no authoring beyond its corners. Anything else here would need a
+ * bespoke tiling rule, and the union is what makes that a compile error instead of a gap in a
+ * pavement.
+ */
+export type PavingAssetId = "floor_cobble" | "floor_brick" | "floor_wood" | "floor_wood_light";
+
+/** An axis-aligned ground rectangle in world metres. */
+export interface PavingRect {
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
+}
+
+/**
+ * A paved area: a square, a street, a fork, a yard.
+ *
+ * WHY THIS TYPE EXISTS. Coldbrace's square is 7,238 m2 of ground with a measured relief of exactly
+ * 0.0000 m — `settlementRadius()` flattens a disc and nothing then differentiates it from open
+ * grass. There is no texture on the terrain material and the 46 m scatter-exclusion circle in
+ * boot.ts forbids a single blade of grass, pebble or flower inside it, so the middle of every town
+ * is a plain grey-green field with a bank chest standing alone in it.
+ *
+ * Tiling is free of authoring: snap the rect to the 2 m module grid and lay one instance per
+ * module at ground + 0.02, which is one `InstancedMesh` and therefore one draw call for a whole
+ * square (a 20 x 16 m square is 80 instances). Measured budget headroom at the time of writing:
+ * 276 draw calls of a 400 cap.
+ *
+ * `kerb` rings the rect with `kerb_straight` (2.00 x 0.134 x 0.70 m, one per module edge, long
+ * axis along the edge) and `kerb_corner` (0.70 x 0.13 x 0.70 m, one at each of the four corners).
+ * Kerbs are dressing: no collision, or the player trips on a 13 cm lip walking into their own
+ * town square.
+ *
+ * There is deliberately NO separate `square` field. The ground/terrain diagnosis asked for
+ * `square?: { centre, radius, kind }` to stamp a cobble weight into the terrain splat; a union of
+ * paving rects expresses that strictly better (it follows the streets, not just the plaza) and
+ * `assetId` already carries the `kind`, so the splat stamp should be driven off `paving` and a
+ * second overlapping field would only be able to disagree with it.
+ */
+export interface PavingDef {
+  id: string;
+  rect: PavingRect;
+  assetId: PavingAssetId;
+  /** Ring the rect with `kerb_straight` plus `kerb_corner` at the corners. Never solid. */
+  kerb?: boolean;
+}
+
+/**
+ * One piece of set dressing: a barrel, a crate, a bench, a woodpile log, a wall lamp, a fence post.
+ *
+ * WHY THIS TYPE EXISTS. There was nowhere in the entire content layer to author a barrel.
+ * `SettlementDef` had buildings, stations, a bank, shops and NPCs and nothing else, and
+ * `render/buildings.ts` only emits props as fixed parts of a prefab or a landmark composition. So
+ * the bank chest (drawn 1.28 x 0.76 m), the anvil (1.08 x 0.40 m), the furnace cauldron (0.99 x
+ * 0.94 m) and both market pitches stand alone on open grass — that single missing array is the
+ * whole reason. `table_large`, `bench`, `stool`, `chair`, `barrel`, `barrel_rack`, `barrel_apples`,
+ * `crate_wood`, `crate_village`, `sack` and the `farm_crate_*` family all ship in the manifest and
+ * are used by nothing.
+ *
+ * `dy` is metres above the resolved ground height, for the things that do not sit on it: a
+ * `lamp_wall` at 2.4 m on a wall face, a `roof_log` laid flat in a woodpile at -1.00 (the log's
+ * pivot is above its own axis). `scale` is a true metre multiplier in the same sense as
+ * `PartPlacement.scale`. `solid` asks the root's boot wiring for a collider; leave it off for
+ * anything the player should be able to walk over or through, which is most ground dressing.
+ */
+export interface PropDef {
+  id: string;
+  assetId: string;
+  position: Spot;
+  rotationY: number;
+  scale?: number;
+  /** Metres above the resolved ground height. Defaults to 0. */
+  dy?: number;
+  /** Give it a collider. Defaults to false: dressing you can walk through is better than a snag. */
+  solid?: boolean;
+}
+
+/**
+ * A rectangular flat pad instead of the default disc, in the settlement's own frame, centred on
+ * `SettlementDef.centre` and rotated by `rotationY` about it.
+ *
+ * WHY THIS TYPE EXISTS. `worldSpec.settlementRadius()` sizes one circular pad from the furthest
+ * thing the settlement places, and at Highcairn that disc spans the terrace 2 / terrace 3 boundary
+ * at z = -76, where `KARROWMOOR.terraces` authors an 18 m riser. Measured: `getDrawnBounds` puts
+ * `highcairn_wall_n#w0` and `highcairn_wall_s#w0` both at base y = 26.810 while standing 30 m
+ * apart in z. The pad has flattened the single terrain feature the region is built around, and the
+ * result reads on screen as a grey table with a hard arc cut into the hillside. A rectangle can be
+ * kept wholly inside one terrace; a disc sized to reach the far corner of the town cannot.
+ *
+ * `halfX` / `halfZ` are half-extents in metres, so Highcairn's proposed 44 x 28 m pad is
+ * `{ halfX: 22, halfZ: 14, rotationY: 0 }`. The existing blend width is unchanged and still
+ * applies outside the rectangle.
+ */
+export interface PadShapeDef {
+  halfX: number;
+  halfZ: number;
+  rotationY: number;
 }
 
 export interface SettlementDef {
@@ -230,6 +446,21 @@ export interface SettlementDef {
   bank: BankDef;
   shops: ShopDef[];
   npcs: NpcStandDef[];
+  /**
+   * The town wall as runs rather than as free-standing panels. Optional so the current data keeps
+   * typechecking while the emitter is written; a settlement with no `walls` is exactly what
+   * Rootfall is today, which is the bug.
+   */
+  walls?: WallRunDef[];
+  /** Paved ground. See `PavingDef`; this also feeds the terrain splat's cobble weight. */
+  paving?: PavingDef[];
+  /** Set dressing. See `PropDef`. */
+  props?: PropDef[];
+  /**
+   * Override the circular flat pad with a rectangle. See `PadShapeDef`. Consumed by
+   * `app/worldSpec.ts`, which is root-only.
+   */
+  padShape?: PadShapeDef;
 }
 
 /**
@@ -567,54 +798,7 @@ const FALLOWMARCH: RegionDef = {
     },
   ],
 
-  settlement: {
-    id: "coldbrace",
-    name: "Coldbrace",
-    // Lime-washed plaster, fired pantiles, a steep pitch. A river-plain farming village.
-    kit: "plaster",
-    centre: [-160, -80],
-    respawnPointId: "coldbrace",
-    buildings: [
-      { id: "coldbrace_hall", name: "March Company Hall", prefab: "hall", position: [-160, -60], rotationY: Math.PI, footprint: [12, 6] },
-      { id: "coldbrace_vault", name: "The Vault Tower", prefab: "tower", position: [-168, -90], rotationY: 0, footprint: [6, 6] },
-      { id: "coldbrace_house_1", name: "Carter's House", prefab: "cottage", position: [-182, -104], rotationY: 0, footprint: [6, 4] },
-      { id: "coldbrace_house_2", name: "Pitmaster's House", prefab: "cottage", position: [-172, -104], rotationY: 0, footprint: [6, 4] },
-      { id: "coldbrace_house_3", name: "Weaver's House", prefab: "cottage", position: [-146, -104], rotationY: 0, footprint: [6, 4] },
-      { id: "coldbrace_house_4", name: "Drover's House", prefab: "cottage", position: [-136, -104], rotationY: 0, footprint: [6, 4] },
-      { id: "coldbrace_house_5", name: "Warden's House", prefab: "cottage", position: [-182, -64], rotationY: Math.PI, footprint: [6, 4] },
-      { id: "coldbrace_house_6", name: "Rope House", prefab: "cottage", position: [-176, -68], rotationY: Math.PI, footprint: [6, 4] },
-      { id: "coldbrace_house_7", name: "Old Surveyor's House", prefab: "cottage", position: [-144, -68], rotationY: Math.PI, footprint: [6, 4] },
-      { id: "coldbrace_house_8", name: "Empty House", prefab: "cottage", position: [-136, -64], rotationY: Math.PI, footprint: [6, 4] },
-      { id: "coldbrace_forge_shed", name: "Forge Shed", prefab: "shed", position: [-152, -98], rotationY: 0, footprint: [4, 4] },
-      { id: "coldbrace_gate_south", name: "South Gatehouse", prefab: "gatehouse", position: [-160, -108], rotationY: 0, footprint: [6, 3] },
-      { id: "coldbrace_gate_east", name: "East Gatehouse", prefab: "gatehouse", position: [-134, -80], rotationY: Math.PI / 2, footprint: [6, 3] },
-      { id: "coldbrace_wall_w", name: "West Wall", prefab: "wall_segment", position: [-186, -84], rotationY: Math.PI / 2, footprint: [8, 1] },
-      { id: "coldbrace_wall_n", name: "North Wall", prefab: "wall_segment", position: [-160, -54], rotationY: 0, footprint: [8, 1] },
-      { id: "coldbrace_wall_e", name: "East Wall", prefab: "wall_segment", position: [-134, -96], rotationY: Math.PI / 2, footprint: [8, 1] },
-      { id: "coldbrace_wall_s", name: "South Wall", prefab: "wall_segment", position: [-176, -108], rotationY: 0, footprint: [8, 1] },
-    ],
-    stations: [
-      // No furnace or forge mesh exists (asset-report gap 11); a cauldron plus the anvil and a
-      // torch reads as a forge at gameplay distance.
-      { id: "coldbrace_furnace", name: "Coldbrace Furnace", kind: "furnace", skill: "smithing", position: [-150, -94], rotationY: 0, assetId: "cauldron", recipeIds: [] },
-      { id: "coldbrace_anvil", name: "Coldbrace Anvil", kind: "anvil", skill: "smithing", position: [-154, -94], rotationY: 0, assetId: "anvil", recipeIds: [] },
-      { id: "coldbrace_range", name: "Coldbrace Cooking Range", kind: "range", skill: "cooking", position: [-166, -94], rotationY: 0, assetId: "cooking_pot", scale: 1.6, recipeIds: [] },
-      { id: "coldbrace_crafting", name: "Coldbrace Crafting Table", kind: "crafting_table", skill: "crafting", position: [-172, -92], rotationY: 0, assetId: "workbench", recipeIds: [] },
-      { id: "coldbrace_fletching", name: "Coldbrace Fletching Bench", kind: "fletching_bench", skill: "fletching", position: [-177, -92], rotationY: 0, assetId: "workbench_drawers", scale: 1.6, recipeIds: [] },
-    ],
-    bank: { id: "coldbrace_bank", name: "Coldbrace Bank", position: [-160, -88], rotationY: 0, assetId: "chest_wood" },
-    shops: [
-      { id: "coldbrace_general", name: "Coldbrace General Supplies", shopKind: "general", position: [-176, -80], rotationY: Math.PI / 2, assetId: "market_stall" },
-      { id: "coldbrace_smith", name: "Harrow's Metal", shopKind: "smith", position: [-144, -80], rotationY: -Math.PI / 2, assetId: "market_stall_cart" },
-    ],
-    npcs: [
-      { id: "npc_warden_ilse", name: "Warden Ilse", position: [-160, -74], facingRad: Math.PI, assetId: "base_female", dialogueRootId: "ilse_root", questIds: [] },
-      { id: "npc_pitmaster_dorn", name: "Pitmaster Dorn", position: [-166, -86], facingRad: Math.PI / 2, assetId: "base_male", dialogueRootId: "dorn_root", questIds: [] },
-      { id: "npc_smith_harrow", name: "Harrow the Smith", position: [-146, -84], facingRad: -Math.PI / 2, assetId: "base_male", dialogueRootId: "harrow_root", questIds: [] },
-      { id: "npc_ranger_syb", name: "Ranger Syb", position: [-178, -74], facingRad: 0, assetId: "base_female", dialogueRootId: "syb_root", questIds: [] },
-      { id: "npc_carter_bel", name: "Carter Bel", position: [-158, -102], facingRad: 0, assetId: "base_male", dialogueRootId: "bel_root", questIds: [] },
-    ],
-  },
+  settlement: COLDBRACE,
 
   obstacles: [
     {
@@ -801,40 +985,7 @@ const VELLENWOOD: RegionDef = {
     },
   ],
 
-  settlement: {
-    id: "rootfall",
-    name: "Rootfall",
-    // Exposed frame, a felled log along every ridge, dormers in the roof. A logging town.
-    kit: "timber",
-    centre: [60, 120],
-    respawnPointId: "rootfall",
-    buildings: [
-      { id: "rootfall_house_1", name: "Stumpside House", prefab: "cottage", position: [46, 132], rotationY: -Math.PI / 2, footprint: [6, 4] },
-      { id: "rootfall_house_2", name: "Woodward's House", prefab: "cottage", position: [46, 118], rotationY: -Math.PI / 2, footprint: [6, 4] },
-      { id: "rootfall_house_3", name: "Trapper's House", prefab: "cottage", position: [48, 108], rotationY: 0, footprint: [6, 4] },
-      { id: "rootfall_house_4", name: "Cook House", prefab: "cottage", position: [60, 106], rotationY: 0, footprint: [6, 4] },
-      { id: "rootfall_house_5", name: "Root House", prefab: "cottage", position: [72, 108], rotationY: 0, footprint: [6, 4] },
-      { id: "rootfall_house_6", name: "Seamer's House", prefab: "cottage", position: [74, 118], rotationY: Math.PI / 2, footprint: [6, 4] },
-      // Pulled 5 m south of its round-1 spot: assembled, its 6x4 footprint swallowed the Root
-      // Tunnel entrance at (76,134), whose 155 m saving is measured from that exact coordinate.
-      { id: "rootfall_house_7", name: "Warden's House", prefab: "cottage", position: [74, 127], rotationY: Math.PI / 2, footprint: [6, 4] },
-      { id: "rootfall_house_8", name: "North House", prefab: "cottage", position: [62, 140], rotationY: Math.PI, footprint: [6, 4] },
-      { id: "rootfall_shed", name: "Drying Shed", prefab: "shed", position: [50, 140], rotationY: Math.PI, footprint: [4, 4] },
-    ],
-    stations: [
-      { id: "rootfall_range", name: "Rootfall Cooking Range", kind: "range", skill: "cooking", position: [54, 112], rotationY: 0, assetId: "cooking_pot", scale: 1.6, recipeIds: [] },
-      { id: "rootfall_anvil", name: "Rootfall Anvil", kind: "anvil", skill: "smithing", position: [68, 112], rotationY: 0, assetId: "anvil", recipeIds: [] },
-    ],
-    bank: { id: "rootfall_bank_chest", name: "Rootfall Bank Chest", position: [60, 128], rotationY: Math.PI, assetId: "chest_wood" },
-    shops: [
-      { id: "rootfall_general", name: "Rootfall Trade Post", shopKind: "general", position: [52, 126], rotationY: Math.PI / 2, assetId: "market_stall" },
-    ],
-    npcs: [
-      { id: "npc_woodward_ansel", name: "Woodward Ansel", position: [56, 122], facingRad: Math.PI / 2, assetId: "base_male", dialogueRootId: "ansel_root", questIds: [] },
-      { id: "npc_seamer_juno", name: "Seamer Juno", position: [64, 126], facingRad: -Math.PI / 2, assetId: "base_female", dialogueRootId: "juno_root", questIds: [] },
-      { id: "npc_trapper_mott", name: "Trapper Mott", position: [66, 116], facingRad: Math.PI, assetId: "base_male", dialogueRootId: "mott_root", questIds: [] },
-    ],
-  },
+  settlement: ROOTFALL,
 
   obstacles: [
     {
@@ -1065,45 +1216,7 @@ const KARROWMOOR: RegionDef = {
     },
   ],
 
-  settlement: {
-    id: "highcairn",
-    name: "Highcairn",
-    // Brick and cut stone to the eaves, brick piers, gable ends closed in stone, and the shallower
-    // six-wide roof. A town built out of the quarry it works.
-    kit: "stone",
-    centre: [144, -66],
-    respawnPointId: "highcairn",
-    buildings: [
-      { id: "highcairn_hut_1", name: "Crew Hut", prefab: "quarry_hut", position: [132, -58], rotationY: 0, footprint: [5, 4] },
-      // Moved 4 m west and 2 m south of its round-1 spot: with the hut actually assembled, its 5x4
-      // footprint enclosed the Highcairn furnace at (136,-72).
-      { id: "highcairn_hut_2", name: "Foreman's Hut", prefab: "quarry_hut", position: [130, -74], rotationY: 0, footprint: [5, 4] },
-      { id: "highcairn_hut_3", name: "Store Hut", prefab: "quarry_hut", position: [146, -56], rotationY: Math.PI, footprint: [5, 4] },
-      { id: "highcairn_hut_4", name: "Watch Hut", prefab: "quarry_hut", position: [156, -68], rotationY: Math.PI / 2, footprint: [5, 4] },
-      { id: "highcairn_hut_5", name: "Tool Hut", prefab: "quarry_hut", position: [142, -78], rotationY: 0, footprint: [5, 4] },
-      { id: "highcairn_hut_6", name: "Long Hut", prefab: "quarry_hut", position: [126, -66], rotationY: -Math.PI / 2, footprint: [5, 4] },
-      { id: "highcairn_gate", name: "Highcairn Gate", prefab: "gatehouse", position: [160, -58], rotationY: Math.PI / 2, footprint: [6, 3] },
-      { id: "highcairn_wall_n", name: "North Wall", prefab: "wall_segment", position: [144, -52], rotationY: 0, footprint: [8, 1] },
-      { id: "highcairn_wall_s", name: "South Wall", prefab: "wall_segment", position: [144, -82], rotationY: 0, footprint: [8, 1] },
-      { id: "highcairn_wall_w", name: "West Wall", prefab: "wall_segment", position: [122, -68], rotationY: Math.PI / 2, footprint: [8, 1] },
-    ],
-    stations: [
-      { id: "highcairn_furnace", name: "Highcairn Furnace", kind: "furnace", skill: "smithing", position: [136, -72], rotationY: 0, assetId: "cauldron", recipeIds: [] },
-      { id: "highcairn_anvil", name: "Highcairn Anvil", kind: "anvil", skill: "smithing", position: [140, -72], rotationY: 0, assetId: "anvil", recipeIds: [] },
-      { id: "highcairn_range", name: "Highcairn Cooking Range", kind: "range", skill: "cooking", position: [148, -76], rotationY: 0, assetId: "cooking_pot", scale: 1.6, recipeIds: [] },
-    ],
-    bank: { id: "highcairn_bank_counter", name: "Highcairn Bank", position: [150, -70], rotationY: Math.PI, assetId: "chest_wood" },
-    shops: [
-      { id: "highcairn_general", name: "Highcairn Camp Store", shopKind: "general", position: [138, -62], rotationY: Math.PI / 2, assetId: "market_stall" },
-      { id: "highcairn_smith", name: "Quarry Smith", shopKind: "smith", position: [152, -60], rotationY: -Math.PI / 2, assetId: "market_stall_cart" },
-    ],
-    npcs: [
-      { id: "npc_foreman_arden", name: "Foreman Arden", position: [144, -60], facingRad: Math.PI, assetId: "base_male", dialogueRootId: "arden_root", questIds: [] },
-      { id: "npc_quarrier_vess", name: "Quarrier Vess", position: [148, -66], facingRad: -Math.PI / 2, assetId: "base_female", dialogueRootId: "vess_root", questIds: [] },
-      { id: "npc_cairnkeeper_ode", name: "Cairnkeeper Ode", position: [138, -68], facingRad: Math.PI / 2, assetId: "base_female", dialogueRootId: "ode_root", questIds: [] },
-      { id: "npc_watcher_hale", name: "Watcher Hale", position: [152, -74], facingRad: 0, assetId: "base_male", dialogueRootId: "hale_root", questIds: [] },
-    ],
-  },
+  settlement: HIGHCAIRN,
 
   obstacles: [
     {
@@ -1330,12 +1443,52 @@ export function spotDistance(a: Spot, b: Spot): number {
 }
 
 /**
+ * Shortest distance from `point` to the segment `a`->`b`, in metres, clamped at both ends.
+ */
+function distanceToSegment(point: Spot, a: Spot, b: Spot): number {
+  const abx = b[0] - a[0];
+  const abz = b[1] - a[1];
+  const lengthSq = abx * abx + abz * abz;
+  if (lengthSq === 0) return spotDistance(point, a);
+  const along = ((point[0] - a[0]) * abx + (point[1] - a[1]) * abz) / lengthSq;
+  const t = Math.min(1, Math.max(0, along));
+  return spotDistance(point, [a[0] + abx * t, a[1] + abz * t]);
+}
+
+/**
+ * Shortest distance from `point` to a building's footprint rectangle. Zero when the point is
+ * inside the building, which is the normal answer for a station under a roof.
+ *
+ * The footprint is authored in the building's own frame, so the point is rotated into that frame
+ * first. The forward transform `world/regionBuilder.ts` applies to every prefab part is
+ * `world = (dx*cos + dz*sin, -dx*sin + dz*cos)`; that matrix is orthogonal, so its inverse is its
+ * transpose and the local coordinates are `(wx*cos - wz*sin, wx*sin + wz*cos)`.
+ */
+function distanceToFootprint(point: Spot, building: BuildingDef): number {
+  const cos = Math.cos(building.rotationY);
+  const sin = Math.sin(building.rotationY);
+  const wx = point[0] - building.position[0];
+  const wz = point[1] - building.position[1];
+  const dx = wx * cos - wz * sin;
+  const dz = wx * sin + wz * cos;
+  const overX = Math.max(0, Math.abs(dx) - building.footprint[0] / 2);
+  const overZ = Math.max(0, Math.abs(dz) - building.footprint[1] / 2);
+  return Math.hypot(overX, overZ);
+}
+
+/**
  * Content validation, for `content/validate.ts` to call at boot. Returns a list of problems rather
  * than throwing, so the root can surface all of them at once in `getErrors()`.
  *
  * It checks the things that silently produce a broken world: a road pointing at a location that
  * does not exist, an obstacle wired to a missing route node, a cluster outside its region bounds,
  * a palette that is not eight swatches, or a settlement placed outside its own region.
+ *
+ * It also checks the settlement dressing vocabulary, because every one of those is silent too: a
+ * wall run whose gate opening falls off the end of the run leaves the wall solid where the gate
+ * should be, a degenerate paving rect lays no tiles at all, a prop naming a missing asset draws
+ * nothing, and a station `attachedTo` a building 6 m away is the "anvil standing in a field"
+ * failure the field was added to catch.
  *
  * Pass `knownAssetIds` (`new Set(assetRegistry.ids())` once the manifest has loaded) and it also
  * checks every asset id the content names, including every part id the prefabs and landmark
@@ -1449,6 +1602,119 @@ export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
         problems.push(`${region.id}: building ${building.id} is outside the region bounds`);
       }
     }
+
+    // Wall runs. Both failure modes here are invisible: a run that leaves the region gets built on
+    // terrain the region never generated, and a gate opening that falls outside the run's length
+    // leaves the wall solid where the gatehouse stands, which is the current bug in reverse.
+    const wallRuns = settlement.walls ?? [];
+    for (const run of wallRuns) {
+      if (seenIds.has(run.id)) problems.push(`duplicate wall run id ${run.id}`);
+      seenIds.add(run.id);
+      if (!inBounds(region.bounds, run.from) || !inBounds(region.bounds, run.to)) {
+        problems.push(`${region.id}: wall run ${run.id} leaves the region bounds`);
+      }
+      const runLength = spotDistance(run.from, run.to);
+      if (runLength < MODULE_METRES) {
+        problems.push(
+          `${region.id}: wall run ${run.id} is ${runLength.toFixed(2)} m long, ` +
+          `shorter than one ${MODULE_METRES} m wall module`,
+        );
+      }
+      for (const opening of run.openings ?? []) {
+        if (!(opening.width > 0)) {
+          problems.push(`${region.id}: wall run ${run.id} has an opening of width ${opening.width}`);
+          continue;
+        }
+        const start = opening.at - opening.width / 2;
+        const end = opening.at + opening.width / 2;
+        if (start < 0 || end > runLength) {
+          problems.push(
+            `${region.id}: wall run ${run.id} has a ${opening.width} m opening centred at ` +
+            `${opening.at} m, which falls outside the run's ${runLength.toFixed(2)} m length`,
+          );
+        }
+      }
+    }
+
+    // Paving. A rect with min >= max lays no tiles and reports nothing, so the square is silently
+    // still bare grass.
+    for (const paving of settlement.paving ?? []) {
+      if (seenIds.has(paving.id)) problems.push(`duplicate paving id ${paving.id}`);
+      seenIds.add(paving.id);
+      checkAsset(`${region.id}: paving ${paving.id}`, paving.assetId);
+      const rect = paving.rect;
+      if (!(rect.maxX > rect.minX) || !(rect.maxZ > rect.minZ)) {
+        problems.push(
+          `${region.id}: paving ${paving.id} is degenerate: ` +
+          `x [${rect.minX}, ${rect.maxX}] z [${rect.minZ}, ${rect.maxZ}]`,
+        );
+      }
+      if (!inBounds(region.bounds, [rect.minX, rect.minZ]) ||
+          !inBounds(region.bounds, [rect.maxX, rect.maxZ])) {
+        problems.push(`${region.id}: paving ${paving.id} leaves the region bounds`);
+      }
+    }
+
+    for (const prop of settlement.props ?? []) {
+      if (seenIds.has(prop.id)) problems.push(`duplicate prop id ${prop.id}`);
+      seenIds.add(prop.id);
+      checkAsset(`${region.id}: prop ${prop.id}`, prop.assetId);
+      if (!inBounds(region.bounds, prop.position)) {
+        problems.push(`${region.id}: prop ${prop.id} is outside the region bounds`);
+      }
+      if (prop.scale !== undefined && !(prop.scale > 0)) {
+        problems.push(`${region.id}: prop ${prop.id} has scale ${prop.scale}`);
+      }
+    }
+
+    const padShape = settlement.padShape;
+    if (padShape && (!(padShape.halfX > 0) || !(padShape.halfZ > 0) ||
+        !Number.isFinite(padShape.rotationY))) {
+      problems.push(
+        `${region.id}: settlement ${settlement.id} padShape must have positive half-extents and a ` +
+        `finite rotation, got halfX ${padShape.halfX}, halfZ ${padShape.halfZ}, ` +
+        `rotationY ${padShape.rotationY}`,
+      );
+    }
+
+    // `attachedTo` is a claim, and this is the check that makes the claim worth authoring. The
+    // distance is measured to the edge of the structure - a building's footprint rectangle, a wall
+    // run's centreline, a prop's origin - so a station standing under a roof measures 0.
+    const attachmentDistance = (point: Spot, targetId: string): number | undefined => {
+      const building = settlement.buildings.find((candidate) => candidate.id === targetId);
+      if (building) return distanceToFootprint(point, building);
+      const run = wallRuns.find((candidate) => candidate.id === targetId);
+      if (run) return distanceToSegment(point, run.from, run.to);
+      const prop = (settlement.props ?? []).find((candidate) => candidate.id === targetId);
+      if (prop) return spotDistance(point, prop.position);
+      return undefined;
+    };
+    const checkAttachment = (
+      what: string, id: string, position: Spot, attachedTo: string | undefined,
+    ): void => {
+      if (attachedTo === undefined) return;
+      const distance = attachmentDistance(position, attachedTo);
+      if (distance === undefined) {
+        problems.push(
+          `${region.id}: ${what} ${id} is attachedTo "${attachedTo}", which is not a building, ` +
+          `wall run or prop in settlement ${settlement.id}`,
+        );
+        return;
+      }
+      if (distance > ATTACHMENT_MARGIN_METRES) {
+        problems.push(
+          `${region.id}: ${what} ${id} claims to be attachedTo ${attachedTo} but stands ` +
+          `${distance.toFixed(1)} m from it (limit ${ATTACHMENT_MARGIN_METRES} m)`,
+        );
+      }
+    };
+    for (const station of settlement.stations) {
+      checkAttachment("station", station.id, station.position, station.attachedTo);
+    }
+    for (const shop of settlement.shops) {
+      checkAttachment("shop", shop.id, shop.position, shop.attachedTo);
+    }
+    checkAttachment("bank", settlement.bank.id, settlement.bank.position, settlement.bank.attachedTo);
 
     for (const shop of settlement.shops) checkAsset(`${region.id}: shop ${shop.id}`, shop.assetId);
     for (const station of settlement.stations) checkAsset(`${region.id}: station ${station.id}`, station.assetId);

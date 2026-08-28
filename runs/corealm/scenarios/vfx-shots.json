@@ -1,0 +1,28 @@
+{
+ "name": "vfx-shots",
+ "actions": [
+  { "waitMs": 2000, "label": "settle" },
+  { "debug": "setCameraPreset", "args": ["town_center"] },
+  { "waitMs": 1500 },
+  { "screenshot": "vfx-town-smoke" },
+  { "debug": "teleport", "args": [{ "entityId": "coldbrace_anvil" }] },
+  { "waitMs": 1500 },
+  { "screenshot": "vfx-forge-sparks" },
+  { "debug": "setCameraPreset", "args": ["redsill_shallows"] },
+  { "waitMs": 1500 },
+  { "screenshot": "vfx-fishing-ripple" },
+  { "debug": "setCameraPreset", "args": ["vellenwood_canopy"] },
+  { "waitMs": 2000 },
+  { "screenshot": "vfx-canopy-leaves" },
+  { "debug": "setCameraPreset", "args": ["karrowmoor_terraces"] },
+  { "waitMs": 1200 },
+  { "screenshot": "vfx-terraces-contact" },
+  { "debug": "callTool", "args": ["corealm_overlay", { "op": "set", "id": "ring1", "kind": "highlight", "entityId": "upper_karrow_kaldite_1", "colour": "#ffd98a" }] },
+  { "debug": "callTool", "args": ["corealm_overlay", { "op": "set", "id": "ring2", "kind": "marker", "entityId": "upper_karrow_kaldite_2", "colour": "#7fd4ff" }] },
+  { "debug": "callTool", "args": ["corealm_overlay", { "op": "set", "id": "route1", "kind": "path", "path": [[196.76, 50.04, -131.76], [230, 40, -110], [253.77, 43.12, -95.94]], "colour": "#9dff8a" }] },
+  { "debug": "setCameraPreset", "args": ["upper_karrow_seam"] },
+  { "waitMs": 1500 },
+  { "screenshot": "vfx-overlay-conform" },
+  { "debug": "listEntities", "args": [{ "archetype": "enemy", "regionId": "fallowmarch" }] }
+ ]
+}

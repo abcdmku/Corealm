@@ -77,7 +77,34 @@ export interface DebugDeps {
   groundHeight(x: number, z: number): number;
   /** Every assembled building, with the footprint the terrain has to be flat across. */
   listBuildings(): { id: string; prefab: string; x: number; z: number; width: number; depth: number; rotationY: number }[];
+  /**
+   * Whatever the scatter system reported for its last run, one entry per region.
+   *
+   * OPTIONAL because boot does not supply it yet: `scatterWorld` already returns `ScatterResult[]`
+   * (placed, rejected, instancedMeshes, estimatedDrawCalls, estimatedTriangles, byLayer,
+   * missingAssets) and boot.ts discards the value at the `await`. Until that is wired,
+   * `getScatterStats()` answers `{ available: false }` rather than guessing.
+   */
+  scatterStats?(): unknown;
 }
+
+/**
+ * Archetypes whose entity origin is placed on the terrain by `spotToVec3`, so a gap between the
+ * drawn mesh and the ground is a defect rather than an authored offset.
+ *
+ * `landmark` is excluded on purpose: 725 of the world's 892 entities are landmark rows, almost all
+ * of them prefab or composition PARTS, which are authored in their parent asset's own frame with
+ * deliberate offsets (the worst is a `wall_bottom_trim` sunk 0.134 m, which is how the trim reads).
+ * `checkBuildingFooting()` already covers whether those parents stand level.
+ */
+const GROUND_PLACED_ARCHETYPES: readonly string[] = [
+  "ore", "tree", "fishing_spot", "farm_plot",
+  "enemy", "boss", "npc", "station", "bank", "shop",
+  "obstacle", "door", "portal", "loot", "recovery_cache",
+];
+
+/** Worst rows returned by `checkGrounding()`. 892 entities of full detail blows the serialiser. */
+const GROUNDING_REPORT_LIMIT = 200;
 
 function xyz(value: Vec3): { x: number; y: number; z: number } {
   return { x: value[0], y: value[1], z: value[2] };
@@ -432,6 +459,92 @@ export function installGameDebug(deps: DebugDeps): void {
           return { id: building.id, worst: round3(worst) };
         })
         .sort((a, b) => b.worst - a.worst);
+    },
+
+    /**
+     * Terrain height at a world XZ — the same function the world layer places entities with.
+     *
+     * Wired in boot.ts since round 1 and declared in `DebugDeps`, but never exposed here, so
+     * `window.__gameDebug.groundHeight` read `undefined` and every grounding audit had to rebuild
+     * the height field offline to ask the question.
+     */
+    groundHeight(x: number, z: number): number {
+      if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
+      return round3(deps.groundHeight(x, z));
+    },
+
+    /** Every assembled building and the footprint the terrain has to be flat across. Same story. */
+    listBuildings(): unknown[] {
+      return deps.listBuildings();
+    },
+
+    /**
+     * How far every ground-placed entity's drawn mesh sits above or below the ground under it.
+     *
+     * This is the number the whole floating/sinking class reduces to. Nothing placed an entity by
+     * its mesh: `spotToVec3` put the GLB ORIGIN at ground level, and 119 of the 213 assets in the
+     * library have |bbox.min.y| > 2 cm, so the visible gap came out as exactly
+     * `glbMinY x scale x tierSilhouetteScale(tier)` — verified to three decimals across 159 surface
+     * entities. That is why the Fallen Duskoak hovered 5.773 m (a `roof_log` at scale 1.5), the
+     * Coldbrace fletching bench hovered 1.411 m, and all ten farm plots drew with their TOP 7.7 cm
+     * underground.
+     *
+     * `gap` is `drawnMinY - groundY`: positive floats, negative sinks. Anything past a few
+     * centimetres is visible in a screenshot, so a gate line can assert `worst < 0.05`.
+     *
+     * Two things to know before reading the numbers. `groundY` is the ANALYTIC height field, which
+     * is what entities are placed against; the tessellated mesh the player sees differs from it by
+     * meanAbs 0.031 m over 38,332 samples, so treat sub-5 cm rows as noise. And an entity the
+     * renderer draws nothing for has no bounds at all — those are counted in `notDrawn`, never
+     * silently scored as zero.
+     */
+    checkGrounding(): Record<string, unknown> {
+      const all = api.hooks.entities?.all() ?? [];
+      const rows: { id: string; archetype: string; assetId: string; drawnMinY: number; groundY: number; gap: number }[] = [];
+      let considered = 0;
+      let notDrawn = 0;
+      for (const entity of all) {
+        if (!GROUND_PLACED_ARCHETYPES.includes(entity.archetype)) continue;
+        // "parent#part" ids are composition parts, authored in the parent's frame.
+        if (entity.id.includes("#")) continue;
+        considered += 1;
+        const bounds = deps.drawnBounds(entity.id);
+        if (!bounds) { notDrawn += 1; continue; }
+        const groundY = deps.groundHeight(entity.position[0], entity.position[2]);
+        rows.push({
+          id: entity.id,
+          archetype: entity.archetype,
+          assetId: entity.view?.assetId ?? "",
+          drawnMinY: round3(bounds.min[1]),
+          groundY: round3(groundY),
+          gap: round3(bounds.min[1] - groundY),
+        });
+      }
+      rows.sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+      const worstRow = rows[0];
+      return {
+        considered,
+        measured: rows.length,
+        notDrawn,
+        worst: worstRow ? Math.abs(worstRow.gap) : 0,
+        overTolerance: rows.filter((row) => Math.abs(row.gap) > 0.05).length,
+        // Worst-first, capped. `measured` is the true population; `entries` is a window onto it.
+        entries: rows.slice(0, GROUNDING_REPORT_LIMIT),
+      };
+    },
+
+    /**
+     * What the procedural scatter pass placed, per region.
+     *
+     * `scatterWorld` already computes this — placed, rejected, instancedMeshes, estimatedDrawCalls,
+     * estimatedTriangles, byLayer, missingAssets — and boot throws the array away at the `await`,
+     * so ~525 buried pebbles and every rejection were invisible from outside the page. When boot
+     * has not supplied the port this answers `{ available: false }` rather than an empty array,
+     * because "scatter placed nothing" and "nobody asked scatter" are different bugs.
+     */
+    getScatterStats(): unknown {
+      if (!deps.scatterStats) return { available: false, reason: "boot did not supply a scatter port" };
+      return { available: true, regions: deps.scatterStats() };
     },
 
     /** Instancing, rig and draw-call budget state for the entity layer. */

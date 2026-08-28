@@ -1,0 +1,15 @@
+npc_warden_ilse path=animated:Idle_Loop meshes=6 height=1.76 topAboveGround=1.753 baseGap=-0.006
+npc_pitmaster_dorn path=animated:Idle_Talking_Loop meshes=6 height=1.793 topAboveGround=1.789 baseGap=-0.004
+npc_smith_harrow path=animated:Idle_No_Loop meshes=6 height=1.722 topAboveGround=1.717 baseGap=-0.004
+npc_ranger_syb path=instanced meshes=6 height=1.767 topAboveGround=1.763 baseGap=-0.004
+npc_carter_bel path=instanced meshes=6 height=1.758 topAboveGround=1.755 baseGap=-0.004
+npc_woodward_ansel path=instanced meshes=6 height=1.792 topAboveGround=1.788 baseGap=-0.004
+npc_seamer_juno path=instanced meshes=6 height=1.748 topAboveGround=1.742 baseGap=-0.006
+npc_trapper_mott path=instanced meshes=6 height=1.792 topAboveGround=1.788 baseGap=-0.004
+npc_foreman_arden path=instanced meshes=6 height=1.792 topAboveGround=1.788 baseGap=-0.004
+npc_quarrier_vess path=instanced meshes=6 height=1.767 topAboveGround=1.763 baseGap=-0.004
+npc_cairnkeeper_ode path=instanced meshes=6 height=1.751 topAboveGround=1.745 baseGap=-0.006
+npc_watcher_hale path=instanced meshes=6 height=1.792 topAboveGround=1.788 baseGap=-0.004
+ordrun path=undefined meshes=undefined height=undefined topAboveGround=- baseGap=-
+enemies 50 animated 2
+views {"entities":1203,"groups":138,"instancedMeshes":300,"uniqueViews":6,"riggedViews":6,"animatedLastFrame":0,"bakedPoses":21,"highlights":0,"estimatedDrawCalls":660,"uniqueDrawCalls":60,"namedDrawCalls":36,"otherDrawCalls":24,"dressedCharacters":3,"dressedGroups":10,"movingViews":0,"triangles":1076967,"missingAssets":[]}

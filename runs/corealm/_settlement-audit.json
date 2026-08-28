@@ -1,0 +1,14 @@
+{"name":"settlement-audit","actions":[
+{"debug":"setPaused","args":[true]},
+{"debug":"checkBuildingFooting","label":"footing"},
+{"debug":"getSceneStats","label":"scene"},
+{"debug":"listEntities","args":[{"regionId":"karrowmoor"}],"label":"karrow"},
+{"debug":"getEntity","args":["highcairn_plot_beds_1"],"label":"plot1"},
+{"debug":"getEntity","args":["highcairn_plot_beds_2"],"label":"plot2"},
+{"debug":"getEntity","args":["highcairn_plot_beds_3"],"label":"plot3"},
+{"debug":"getEntity","args":["highcairn_plot_beds_4"],"label":"plot4"},
+{"debug":"getDrawnBounds","args":["coldbrace_bank"],"label":"bankbounds"},
+{"debug":"getDrawnBounds","args":["rootfall_stump"],"label":"stumpbounds"},
+{"debug":"getNavPath","args":[[-160,0,-118],[-160,0,-60]],"label":"nav_gate_to_hall"},
+{"debug":"getErrors","label":"errors"}
+]}

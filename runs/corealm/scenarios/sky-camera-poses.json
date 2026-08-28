@@ -1,0 +1,83 @@
+{
+ "name": "sky-camera-poses",
+ "actions": [
+  {
+   "waitMs": 1500
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "karrowmoor_terraces"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "town_center"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "bank"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "vellenwood_canopy"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "gravelmaw_entrance"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "spawn"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "inspect": "getMetrics"
+  }
+ ]
+}

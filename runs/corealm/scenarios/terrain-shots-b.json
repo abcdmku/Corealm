@@ -1,0 +1,126 @@
+{
+ "name": "terrain-shots-b",
+ "actions": [
+  {
+   "waitMs": 1500,
+   "label": "settle"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "vellenwood_canopy"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-vellenwood_canopy"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "hollowcut_seam"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-hollowcut_seam"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "karrowmoor_terraces"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-karrowmoor_terraces"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "highcairn"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-highcairn"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "upper_karrow_seam"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-upper_karrow_seam"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "sunder_ledge"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-sunder_ledge"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "gravelmaw_entrance"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-gravelmaw_entrance"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "great_cairn"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-great_cairn"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "march_road"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "terrain-march_road"
+  },
+  {
+   "debug": "getSceneStats"
+  },
+  {
+   "debug": "getMetrics"
+  },
+  {
+   "debug": "getEntityViewStats"
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+PASS  navigation     path points 14, travelled 37.9 m
+PASS  mining         mining xp 0 -> 40 on bracken_pit_grithe_1
+PASS  woodcutting    woodcutting xp 0 -> 40 on palewood_copse_trees_1
+PASS  fishing        fishing xp 0 -> 50 on redsill_spots_1
+PASS  depletion      bracken_pit_grithe_1 depleted by mining it out
+PASS  spent-node     bracken_pit_grithe_1 draws 3.9 x 2.0 m in 1 meshes, live sibling 3.9 x 2.0 m in 2 (vein gone)
+PASS  farming        farming xp 0 -> 3
+PASS  smithing       smithing xp 0 -> 16 via smelt_grithe_bar
+PASS  cooking        cooking xp 0 -> 15 via cook_seared_minnow
+PASS  crafting       crafting xp 0 -> 24 via craft_essence_shard_t1
+PASS  fletching      fletching xp 0 -> 20 via fletch_palewood_shaft
+PASS  melee          melee xp 0 -> 1761, killed=true
+PASS  magic          magic xp 0 -> 1776
+PASS  agility        agility xp 6746 -> 6764, displaced 50.3 m via brookvault_planks
+PASS  death          carried 5 -> dropped=true, respawned 134 m away, cache=2, recovered=true
+PASS  quest          cold_iron active stage 0/5 :: Mine 6 Grithe ore at the Bracken Pit.
+PASS  dungeon        entered dungeon=true, region on entry=gravelmaw
+PASS  boss           ordrun 200 -> 0 KILLED :: engaged, player deaths 0
+PASS  combat-clears  killed=true, inCombat true -> false, targetId=null, regenBlocked=false
+PASS  equip-events   equip emitted [item.equipped]
+PASS  ui-panels      6/6 panel keys open their panel, 6 dock buttons on screen
+PASS  building-footing 36 buildings, worst ground tilt across a footprint 0.000 m
+PASS  objective-prose 1 active, 0 printing ids, 1 carrying refs :: Mine 6 Grithe ore at the Bracken Pit.
+FAIL  cold-iron-complete cold_iron active stage 0/5 -- never reached the hand-in :: bracken_pit refused: NOT_REACHABLE
+FAIL  long-cairn     long_cairn unstarted stage 0/7 via stages [0]
+FAIL  long-cairn-complete long_cairn unstarted stage 0/7 via stages [0], levers never reached :: offer: open -> NOT_REACHABLE No walkable path to that destination | counters {}
+PASS  persistence    save 6 KB, 4 skills above level 1
+      skill-summary  melee 30/18195, magic 10/1776, mining 12/2409, woodcutting 1/40, fishing 1/50, farming 1/3, smithing 1/16, crafting 1/24, cooking 1/15, fletching 1/20, agility 20/6764
+
+24/27 gate checks passed

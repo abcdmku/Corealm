@@ -135,9 +135,98 @@ export interface SemanticEntity {
     materialTier?: number;
     /** Metres above `position` for the interaction label and highlight ring. */
     labelHeight?: number;
+    /**
+     * Skinned parts layered onto `assetId`'s skeleton. NOT a replacement for `assetId`.
+     *
+     * Every NPC in Phase 1 was literally headless. `world/regionBuilder.ts` `dressedAssetFor()`
+     * swapped an NPC's body for a full outfit GLB, and the outfit files are not bodies:
+     * `outfit_male_peasant.glb` holds exactly four meshes (Arms, Body, Feet, Legs), tops out at
+     * y = 1.559 against `base_male`'s 1.810, and carries no Head, Eyes or Eyebrows — measured by
+     * structural dump of the GLB. The fix is body + parts, so `assetId` stays `base_male` /
+     * `base_female` (which carry the face) and the clothing arrives here.
+     *
+     * `render/skinning.ts` binds each part to the BODY's `Bone` objects while keeping the PART's
+     * own `boneInverses` — that is what makes cross-file mixing correct. It is safe because all
+     * four humanoid rigs in the 213-asset library carry the same 65 joints in the same order
+     * (verified name-by-name: root, pelvis, spine_01..03, neck_01, Head, clavicle/upperarm/
+     * lowerarm/hand + 5 fingers x 4 per side, thigh/calf/foot/ball per side). They differ only in
+     * bind pose; the residual is 0 mm for the female set and <= 23.7 mm for the male set, and it
+     * sits inside the clothing everywhere except the wrists. Do NOT retarget: the joint lists
+     * already match, so retargeting can only add error.
+     *
+     * A part whose skeleton fails to bind must be DROPPED, not drawn. An unbound part renders
+     * forever in bind pose — that is the T-posed tunic lying across the player's shoulders in
+     * runs/corealm/screenshots/RIG-town-player.png — which reads far worse than a missing sleeve.
+     */
+    partAssetIds?: readonly string[];
+    /**
+     * Terrain normal under this entity: UNIT LENGTH, WORLD SPACE, Y-up.
+     *
+     * Computed in the WORLD layer from a central difference on the same `heightAt` port that
+     * places the entity (no Three.js in `world/`), and clamped to about 20 degrees off vertical.
+     * Nothing tilted to the ground in Phase 1: `writeSlot` composed its matrix from a Y-axis
+     * rotation only, and 34 of 159 surface entities stand on ground steeper than 10 degrees —
+     * worst case `lower_quarry_kaldite_3`, a 5.3 m ore rock on a 48.9-degree slope with 3.02 m of
+     * daylight under one edge.
+     *
+     * `render/` must SLERP toward this, scaled by `tiltStrength`, not apply it raw. A tree laid
+     * over at the full slope of the hill reads worse than a tree standing plumb; a pebble does not.
+     */
+    groundNormal?: readonly [number, number, number];
+    /**
+     * 0..1, how much of `groundNormal` to apply. Per-archetype defaults live in `render/`, not
+     * here, because they are a look decision: trees want about 0.10, pebbles and flat plants 1.0.
+     * Set it per entity only to override that table.
+     */
+    tiltStrength?: number;
   };
   meta?: Record<string, string | number | boolean>;
 }
+
+// ----------------------------------------------------------------- solids
+
+/**
+ * A volume the player must not walk into.
+ *
+ * This type sits in contracts rather than in either layer that touches it, because both do: the
+ * world layer PRODUCES the list while it builds a region (it is the only layer that knows a
+ * gatehouse has two piers and a gap between them), and `systems/solids.ts` CONSUMES it to clamp
+ * movement and to carve the navmesh. Neither may import the other, and neither owns the shape.
+ *
+ * Why this exists at all, measured before it was written: the whole world had 40 colliders — one
+ * terrain heightfield and 39 boxes derived from the 36 authored buildings. 892 semantic entities
+ * registered no volume whatsoever, so the player walked through the bank chest, the anvil, both
+ * market stalls, an NPC, an enemy, a resource tree, an ore rock, the region gate arch, and across
+ * a pond floor 0.50 m under the water plane.
+ *
+ * Two rules that are not obvious and are load-bearing:
+ *
+ *  - `radius`, or half the diagonal of a box, must stay under `INTERACT_RANGE` (2.4 m). A volume
+ *    wider than the interaction reach makes its own entity unreachable: `moveTo({ entityId })`
+ *    walks to the surface of the carve and can then never get close enough to click the thing.
+ *    Seven gate-check lines depend on that reach.
+ *  - `y` is the volume's BASE, not its centre, because everything that produces one knows where
+ *    the ground is and not where the middle of the mesh ended up.
+ */
+export type SolidVolume =
+  | {
+      kind: "box";
+      /** Owning entity or building part, for debugging and for skipping a volume when it is removed. */
+      id: string;
+      /** Centre in XZ; `y` is the base of the box. */
+      position: Vec3;
+      /** Full extents in the box's own frame, before `rotationY`. */
+      size: readonly [number, number, number];
+      rotationY: number;
+    }
+  | {
+      kind: "cylinder";
+      id: string;
+      /** Centre in XZ; `y` is the base of the cylinder. */
+      position: Vec3;
+      radius: number;
+      height: number;
+    };
 
 // ------------------------------------------------------------- observation
 

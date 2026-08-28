@@ -1,0 +1,9 @@
+{
+  "name": "rb-probe",
+  "actions": [
+    { "debug": "listEntities", "args": [{ "archetype": "obstacle" }], "label": "obstacle views" },
+    { "debug": "getDrawnBounds", "args": ["fallen_duskoak"], "label": "fallen duskoak drawn bounds" },
+    { "debug": "getDrawnBounds", "args": ["coldbrace_fletching"], "label": "fletching drawn bounds" },
+    { "debug": "getDrawnBounds", "args": ["marchfield_plots_1"], "label": "plot drawn bounds" }
+  ]
+}

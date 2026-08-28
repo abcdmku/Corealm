@@ -9,10 +9,16 @@
  *
  * A shape is chosen by what the item DOES, in this order:
  *
- *   1. The equipment slot it goes in — a sword, a shield, a helm, a boot. Equipment is the largest
+ *   1. The item's own id, for the equipment archetypes the slot cannot tell apart — a staff and a
+ *      sword are both `mainHand`, an orb and a shield are both `offHand`. Measured on the 57 rows
+ *      in content/equipment.ts: slot alone drew 21 of them wrong (3 staffs and 3 daggers as swords,
+ *      3 foci as shields, 6 pendants and charms as rings, 3 robes as plate cuirasses, 3 hoods as
+ *      helms), which is why the Worn panel showed a sword glyph for the Cairnpine Staff
+ *      (runs/corealm/screenshots/eq-05-worn-panel-zoom.png).
+ *   2. The equipment slot it goes in — a sword, a shield, a helm, a boot. Equipment is the largest
  *      category and the one where "which of these am I looking at" matters most.
- *   2. What it heals, plants, buys or builds — food, seed, currency, tool, component.
- *   3. Its raw category, for anything left over.
+ *   3. What it heals, plants, buys or builds — food, seed, currency, tool, component.
+ *   4. Its raw category, for anything left over.
  *
  * Colour still comes from `itemGlyphColour`, so tier and category hue are unchanged; the shape is
  * what is new. Every path is a filled outline with no strokes, which stays readable at 26 px in the
@@ -22,6 +28,7 @@ import type { EquipSlot, ItemCategory, ItemDef } from "../contracts.js";
 
 export type IconShape =
   | "helm" | "cuirass" | "greaves" | "boot" | "glove" | "sword" | "shield" | "ring"
+  | "staff" | "dagger" | "orb" | "amulet" | "robe" | "hood"
   | "ore" | "bar" | "food" | "tool" | "seed" | "scroll" | "coin" | "shard" | "log";
 
 /** Filled paths on a 24x24 viewBox. Two paths where a silhouette needs a cut-out or a second mass. */
@@ -53,6 +60,31 @@ const PATHS: Record<IconShape, string[]> = {
   ring: [
     "M12 6.6a6.6 6.6 0 1 0 0 13.2 6.6 6.6 0 0 0 0-13.2zm0 3.2a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8z",
     "M12 1.8 15 5.4 12 8 9 5.4z",
+  ],
+  staff: [
+    "M10.9 7.4h2.2V21.6h-2.2z",
+    "M12 1.4 15.4 5.4 12 9.4 8.6 5.4z",
+  ],
+  dagger: [
+    "M12 2.2 14.6 8.4v5.4H9.4V8.4z",
+    "M6.6 13.9h10.8v2.1h-4.3v5.8h-2.2v-5.8H6.6z",
+  ],
+  orb: [
+    "M12 3.4a6.9 6.9 0 1 0 0 13.8 6.9 6.9 0 0 0 0-13.8z",
+    "M6.2 17.2h11.6l-1.5 3.6H7.7z",
+  ],
+  amulet: [
+    "M5.4 3.1 6.9 1.9l5.1 6.5 5.1-6.5 1.5 1.2-6.6 8.4z",
+    "M12 11.5 15.7 15.7 12 21.1 8.3 15.7z",
+  ],
+  robe: [
+    // The sash is a REVERSED subpath, so the default nonzero fill-rule cuts it out as a hole. A
+    // same-winding second mass (which is what `cuirass` and `helm` do) draws in the fill colour and
+    // is invisible; the hole is what separates a robe from a plate cuirass at 26 px.
+    "M8.8 2.6h6.4l3.6 4.1-2.1 2.7 1 12.2H6.3l1-12.2-2.1-2.7zM8.9 11.9v2.1h6.2v-2.1z",
+  ],
+  hood: [
+    "M12 2.2c-4.5 0-7.8 3.7-7.8 8.4 0 4 2.1 7.8 4.2 10.2l1.9-1.4c-1-1.9-1.6-4.2-1.6-6.3 0-2.6 1.3-4.6 3.3-4.6s3.3 2 3.3 4.6c0 2.1-.6 4.4-1.6 6.3l1.9 1.4c2.1-2.4 4.2-6.2 4.2-10.2 0-4.7-3.3-8.4-7.8-8.4z",
   ],
   ore: [
     "M8.6 3.6 16 4.8l3.6 6.4-4.4 8.2-8.8-1.4L3 10.4z",
@@ -115,12 +147,29 @@ const BY_CATEGORY: Record<ItemCategory, IconShape> = {
   component: "shard",
 };
 
+/**
+ * Equipment archetypes the slot cannot distinguish, checked before the slot. Ordered, first match
+ * wins; every pattern is anchored so it cannot catch a resource id (`palewood_shaft` is not a
+ * staff — but it also has no `equip` block, so it never reaches here).
+ */
+const BY_ITEM_ID: readonly { readonly pattern: RegExp; readonly shape: IconShape }[] = [
+  { pattern: /_staff$/, shape: "staff" },
+  { pattern: /_dagger$/, shape: "dagger" },
+  { pattern: /_focus$/, shape: "orb" },
+  { pattern: /_pendant$|_charm$/, shape: "amulet" },
+  { pattern: /_robe$/, shape: "robe" },
+  { pattern: /_hood$/, shape: "hood" },
+];
+
 /** Ids whose category is too broad to pick a shape from. Woodcutting drops are not ore. */
 const LOG_ITEM = /_log$|_plank|_shaft$/;
 
 export function iconShapeFor(def: ItemDef | undefined): IconShape {
   if (!def) return "shard";
-  if (def.equip) return BY_EQUIP_SLOT[def.equip.slot];
+  if (def.equip) {
+    for (const rule of BY_ITEM_ID) if (rule.pattern.test(def.id)) return rule.shape;
+    return BY_EQUIP_SLOT[def.equip.slot];
+  }
   if (def.category === "resource" && LOG_ITEM.test(def.id)) return "log";
   return BY_CATEGORY[def.category] ?? "shard";
 }

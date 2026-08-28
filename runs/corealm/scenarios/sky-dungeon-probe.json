@@ -1,0 +1,83 @@
+{
+ "name": "sky-dungeon-probe",
+ "actions": [
+  {
+   "waitMs": 1500,
+   "label": "settle"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    40,
+    -40
+   ]
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    30,
+    -58
+   ]
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    22,
+    -76
+   ]
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    {
+     "x": 40,
+     "y": 17.9,
+     "z": -40
+    }
+   ]
+  },
+  {
+   "waitMs": 600
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "screenshot": "sky-dungeon-chamber1"
+  },
+  {
+   "drag": [
+    640,
+    460,
+    640,
+    300
+   ],
+   "button": "right"
+  },
+  {
+   "waitMs": 300
+  },
+  {
+   "screenshot": "sky-dungeon-chamber1-up"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    {
+     "x": 22,
+     "y": 9.9,
+     "z": -76
+    }
+   ]
+  },
+  {
+   "waitMs": 600
+  },
+  {
+   "screenshot": "sky-dungeon-chamber3"
+  },
+  {
+   "inspect": "getMetrics"
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "rb-grounding",
+  "actions": [
+    { "inspect": "checkGrounding", "label": "worst / overTolerance across every drawn entity" },
+    { "inspect": "getEntityViewStats", "label": "entity, group and draw-call counts" },
+    { "debug": "listEntities", "args": [{ "archetype": "npc" }], "label": "NPC bodies and outfit parts" }
+  ]
+}

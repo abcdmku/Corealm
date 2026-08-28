@@ -1,0 +1,10 @@
+{
+ "name": "vfx-probe",
+ "actions": [
+  { "waitMs": 1500, "label": "settle" },
+  { "debug": "listEntities", "args": [{ "regionId": "karrowmoor" }] },
+  { "debug": "listEntities", "args": [{ "archetype": "fishing_spot" }] },
+  { "debug": "listEntities", "args": [{ "archetype": "station" }] },
+  { "debug": "listEntities", "args": [{ "archetype": "boss" }] }
+ ]
+}

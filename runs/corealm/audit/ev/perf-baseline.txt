@@ -1,0 +1,73 @@
+{
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "usedRealGpu": true,
+  "passed": true,
+  "shots": [
+    {
+      "shot": "highcairn",
+      "frames": 1560,
+      "medianFrameMs": 2.5,
+      "p95FrameMs": 3.8,
+      "worstFrameMs": 11.2,
+      "impliedFps": 400,
+      "drawCalls": 300,
+      "triangles": 3456220,
+      "programs": 20,
+      "heapMB": 133,
+      "meetsBudget": true
+    },
+    {
+      "shot": "town_center",
+      "frames": 1791,
+      "medianFrameMs": 2.1,
+      "p95FrameMs": 3.5,
+      "worstFrameMs": 11.7,
+      "impliedFps": 476,
+      "drawCalls": 224,
+      "triangles": 2532619,
+      "programs": 20,
+      "heapMB": 133,
+      "meetsBudget": true
+    },
+    {
+      "shot": "bank",
+      "frames": 1544,
+      "medianFrameMs": 2.5,
+      "p95FrameMs": 4.1,
+      "worstFrameMs": 7.8,
+      "impliedFps": 400,
+      "drawCalls": 239,
+      "triangles": 2574380,
+      "programs": 20,
+      "heapMB": 133,
+      "meetsBudget": true
+    },
+    {
+      "shot": "rootfall",
+      "frames": 2063,
+      "medianFrameMs": 1.8,
+      "p95FrameMs": 3.4,
+      "worstFrameMs": 8,
+      "impliedFps": 556,
+      "drawCalls": 202,
+      "triangles": 2800936,
+      "programs": 20,
+      "heapMB": 133,
+      "meetsBudget": true
+    },
+    {
+      "shot": "spawn",
+      "frames": 1656,
+      "medianFrameMs": 2.3,
+      "p95FrameMs": 3.9,
+      "worstFrameMs": 21.9,
+      "impliedFps": 435,
+      "drawCalls": 253,
+      "triangles": 2194372,
+      "programs": 20,
+      "heapMB": 133,
+      "meetsBudget": true
+    }
+  ],
+  "errors": []
+}

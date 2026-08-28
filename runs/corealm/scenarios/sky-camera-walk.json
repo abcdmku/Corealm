@@ -1,0 +1,98 @@
+{
+ "name": "sky-camera-walk",
+ "actions": [
+  {
+   "waitMs": 1500,
+   "label": "settle"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    {
+     "x": -160,
+     "y": 2,
+     "z": -104
+    }
+   ]
+  },
+  {
+   "waitMs": 500
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "w",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "w",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "a",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "a",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "s",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "s",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "d",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "d",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "w",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "key": "w",
+   "holdMs": 700
+  },
+  {
+   "inspect": "getCamera"
+  },
+  {
+   "screenshot": "sky-walk-town"
+  }
+ ]
+}

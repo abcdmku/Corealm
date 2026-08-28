@@ -1,0 +1,16 @@
+{
+ "name": "vfx-telegraph",
+ "actions": [
+  { "waitMs": 2000 },
+  { "debug": "teleport", "args": [{ "x": -60, "y": 0, "z": -60 }] },
+  { "waitMs": 700 },
+  { "screenshot": "vfx-telegraph-a" },
+  { "waitMs": 700 },
+  { "screenshot": "vfx-telegraph-b" },
+  { "waitMs": 700 },
+  { "screenshot": "vfx-telegraph-c" },
+  { "debug": "setCameraPreset", "args": ["karrowmoor_terraces"] },
+  { "waitMs": 700 },
+  { "screenshot": "vfx-telegraph-slope" }
+ ]
+}

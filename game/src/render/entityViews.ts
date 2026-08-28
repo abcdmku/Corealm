@@ -22,6 +22,26 @@
  *    per-entity idle clip and phase, and — this is the part that matters at scale — the ones that
  *    do NOT get a mixer are instanced from a CPU-baked idle pose rather than from bind pose, so a
  *    background NPC is a still character instead of a scarecrow.
+ *
+ * Round 4 fixes four more, all of them measured in the browser before and after:
+ *
+ *  - Every NPC in the world was headless. `view.assetId` was a clothes-only outfit GLB
+ *    (`outfit_male_peasant.glb` = Arms/Body/Feet/Legs, top vertex y 1.559 against `base_male`'s
+ *    1.810, no Head/Eyes/Eyebrows), so you could see the wall through the neck. Characters are now
+ *    assembled through `render/skinning.ts`: a head-capped base body carrying its own Eyes and
+ *    Eyebrows, the outfit layered on and rebound to the body's bones, and a deterministic hair
+ *    asset on top. Measured mesh counts per character, offline against the real GLBs
+ *    (runs/corealm/audit/ev-assemble.ts): male peasant 5 -> 6, female peasant 4 -> 6, male ranger
+ *    10 -> 6, female ranger 10 -> 5. Across the world's 12 NPCs that is 92 -> 70 meshes, i.e. 44
+ *    FEWER draw calls than the headless version cost.
+ *  - No enemy in the world could ever be animated, because `NAMED_CHARACTER_RESERVE` (64) equalled
+ *    the `maxUniqueDrawCalls` boot passes (64) and the non-npc ceiling was therefore exactly 0.
+ *    The budget is now split into two independent pools; see `canAffordUnique`.
+ *  - A rigged entity had one clip for its whole life. Enemies now select idle / walk / death from
+ *    what their own GLB ships, and the instanced fallback bakes one pose per state instead of one
+ *    pose full stop.
+ *  - Nothing bedded into a slope. `writeSlot` now slerps the instance orientation toward
+ *    `view.groundNormal` by `view.tiltStrength`, defaulted per archetype by `DEFAULT_TILT`.
  */
 import * as THREE from "three";
 import { clone as cloneRigged } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -32,9 +52,25 @@ import type { WorldScene } from "./scene.js";
 import type { PaletteSwatch } from "./materials.js";
 import { Rng } from "../core/rng.js";
 import { MaterialLibrary, tierSilhouetteScale } from "./materials.js";
+import {
+  assembleDressedCharacter,
+  hairAssetFor,
+  headCapHeightFor,
+  type CharacterPartSource,
+  type DressedCharacter,
+} from "./skinning.js";
 
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+// Module-scope scratch. `writeSlot` runs once per entity per sync over ~900 entities; a fresh
+// Quaternion and Vector3 per call is garbage the collector walks during exactly the passes that are
+// already the most expensive. Each of these is written and consumed within one synchronous call.
+const SCRATCH_QUATERNION = new THREE.Quaternion();
+const SCRATCH_SCALE = new THREE.Vector3();
+const SCRATCH_NORMAL = new THREE.Vector3();
+const SCRATCH_TILT = new THREE.Quaternion();
+const SCRATCH_BLEND = new THREE.Quaternion();
 
 /** States that render with the spent treatment. Everything else renders live. */
 const SPENT_STATES = new Set(["depleted", "dead", "empty", "harvested", "closed", "spent"]);
@@ -103,18 +139,155 @@ const ROOF_MATERIAL = /roundtiles|rooftile/i;
 const PROTECTED_MATERIAL = /eye|teeth|tongue|hair|white|black/i;
 
 /**
- * Humanoid idles, from the shared 65-bone clip library. Every character pack shares one skeleton
- * (stack-findings.md section 2), so these play on any rig with no retargeting.
+ * Humanoid idles, from the shared 65-joint clip library.
  *
- * Four of them, picked per entity, because a settlement where five NPCs breathe in unison reads
- * worse than five NPCs standing still.
+ * CORRECTION. The comment that stood here claimed "every character pack shares one skeleton", and
+ * that claim is why the headless-NPC and bind-pose bugs got written. It is false. Hashing each GLB's
+ * `inverseBindMatrices` buffer across models/character, models/outfit and models/animation finds
+ * FOUR distinct 65-joint humanoid skeletons: `base_male` alone (ba5af210); `base_female` plus
+ * hair_long/hair_buns plus every female outfit part (eea9805d); eyebrows plus
+ * hair_short/hair_buzzed/hair_beard plus every male outfit part (3c715354); and both animation
+ * libraries (0d2ac055). What they share is the JOINT LIST — 65 joints, identical names in identical
+ * order — which is what makes a name-keyed rebind legal and a raw bone-array share illegal. The
+ * residual is the rest-pose delta between two rigs: 0 mm for base_female + female parts, at most
+ * 23.7 mm (foot) / 23.3 mm (hand) for base_male + male parts. See `render/skinning.ts`, which owns
+ * the rebind and re-verified all of this across 17 files.
+ *
+ * Four idles, picked per entity, because a settlement where five NPCs breathe in unison reads worse
+ * than five NPCs standing still.
  */
 const HUMANOID_IDLES: readonly string[] = [
   "Idle_Loop", "Idle_Talking_Loop", "Idle_FoldArms_Loop", "Idle_No_Loop",
 ];
 
-/** Where a rigged asset ships its own clips, prefer these names before falling back to its first. */
-const OWN_IDLE_PATTERN = /idle/i;
+/**
+ * What a character is doing, as far as this layer can tell from semantics alone.
+ *
+ * Deliberately narrow. `render/` reads `SemanticEntity` and nothing else, so it cannot see
+ * `state.world.enemies[id].state` (idle/aggro/returning) — that lives in the store and belongs to
+ * `systems/`. What it CAN see is `entity.state` (alive/dead) and whether `entity.position` moved
+ * between syncs, and those two cover idle / walk / death. `attack` and `hit` are one-shots the
+ * owner of the combat stream pushes in through `playAction`.
+ */
+export type CharacterMotion = "idle" | "walk" | "attack" | "hit" | "death";
+
+/**
+ * Clip names to try per motion for an asset that ships its OWN clips, best first.
+ *
+ * Measured from the manifest rather than assumed: enemy_crab, enemy_blob and enemy_skull each ship
+ * ["Bite_Front", "Bite_InPlace", "Dance", "Death", "HitRecieve", "Idle", "Jump", "No", "Walk",
+ * "Yes"]; enemy_bee ships ["Bite_Front", "Death", "Flying", "HitRecieve"] and has NO Idle and NO
+ * Walk, which is why `Flying` appears in both of those rows — a bee that stops flapping when it
+ * stops moving reads as dead.
+ */
+const OWN_CLIP_PATTERNS: Record<CharacterMotion, readonly RegExp[]> = {
+  idle: [/^idle/i, /^flying/i],
+  walk: [/^walk/i, /^flying/i, /^jump/i],
+  attack: [/^bite_front/i, /^bite/i, /attack/i],
+  hit: [/^hitrecieve/i, /^hit/i],
+  death: [/^death/i],
+};
+
+/**
+ * The same table against the shared 65-joint library, for anything built on a humanoid body.
+ *
+ * All of these resolve: `__gameDebug.listClips()` returns 85 names and every one of these is in it.
+ * `Death01` is spelt without an underscore in the library; that is the file's spelling, not a typo.
+ */
+const HUMANOID_CLIPS: Record<CharacterMotion, readonly string[]> = {
+  idle: HUMANOID_IDLES,
+  walk: ["Walk_Loop", "Jog_Fwd_Loop"],
+  attack: ["Sword_Attack", "Sword_Regular_A", "Punch_Jab"],
+  hit: ["Hit_Chest", "Hit_Knockback"],
+  death: ["Death01"],
+};
+
+/** Motions that play once and hand back to the entity's resting motion. */
+const ONE_SHOT_MOTIONS: ReadonlySet<CharacterMotion> = new Set<CharacterMotion>(["attack", "hit"]);
+
+/**
+ * Which base body a clothes-only outfit GLB needs under it, and what its own part id is.
+ *
+ * This is the local fallback the rig diagnosis' recommendation 1 offers: `world/regionBuilder.ts`
+ * is moving NPCs to `view.assetId = base_male|base_female` plus `view.partAssetIds`, but until that
+ * lands `view.assetId` is one of these four clothes-only files, and drawing one as a whole body is
+ * exactly the headless NPC. Keying the body off the outfit id here means the fix is live either way
+ * and becomes dead weight — not a conflict — the day the world layer starts authoring parts.
+ */
+const OUTFIT_BODIES: Readonly<Record<string, string>> = {
+  outfit_male_peasant: "base_male",
+  outfit_male_ranger: "base_male",
+  outfit_female_peasant: "base_female",
+  outfit_female_ranger: "base_female",
+};
+
+/**
+ * Outfits that already cover the skull, so hair is skipped.
+ *
+ * Male_Ranger_Head_Hood spans y 1.5253-1.8650 and hair_short spans 1.661-1.840, i.e. the hair sits
+ * entirely inside the hood and pokes through its crown. A hooded NPC keeps the face it gets from
+ * the head cap and goes without hair.
+ */
+const HOODED_PARTS: ReadonlySet<string> = new Set([
+  "outfit_male_ranger", "outfit_female_ranger",
+  "outfit_male_ranger_hood", "outfit_female_ranger_hood",
+]);
+
+const HAIR_PART = /^hair_/;
+
+/**
+ * How far each archetype beds into the terrain normal, 0..1, when the world layer supplies one.
+ *
+ * `contracts.ts` deliberately leaves this table to `render/` because it is a look decision, not a
+ * fact about the world. The numbers:
+ *
+ *   tree 0.10       A tree grows toward the light, not perpendicular to the hill. The measured
+ *                   problem was 2.74 m of daylight under duskoak_stand_trees_5 on a 42.4-degree
+ *                   slope, and a tenth of the normal closes most of that without laying the trunk
+ *                   over.
+ *   ore 0.75        A rock IS bedded into the hill it came out of. lower_quarry_kaldite_3 is 5.3 m
+ *                   wide on 48.9-degree ground with 3.02 m of daylight — the worst case in the
+ *                   world and the one this number is set by.
+ *   obstacle 0.55   Fallen logs and boulders: same argument as ore, less of it, because several are
+ *                   authored as climbable and a hard tilt moves the climb line.
+ *   fishing_spot,
+ *   farm_plot 1.0   Flat things. A lily pad or a furrow that does not lie in the ground is not a
+ *                   lily pad. This is the "flat plants and pebbles" row.
+ *
+ * Everything absent resolves to 0. That includes `landmark`, and it is not an oversight: building
+ * parts are emitted as `landmark` entities (world/regionBuilder.ts:530), 36 buildings' worth of
+ * them, and `checkBuildingFooting()` already returns worst 0 for every one. Tilting a wall segment
+ * toward the ground normal would break the only part of the grounding audit that was already clean.
+ * A genuine standalone landmark can still opt in per entity with `view.tiltStrength`.
+ */
+const DEFAULT_TILT: Partial<Record<Archetype, number>> = {
+  tree: 0.1,
+  ore: 0.75,
+  obstacle: 0.55,
+  fishing_spot: 1,
+  farm_plot: 1,
+};
+
+/**
+ * Archetypes whose position is expected to change while the game runs.
+ *
+ * Only these are walked by `syncMotion`, which the render frame may call at full rate; everything
+ * else is reconciled by `sync` at whatever cadence the loop chooses.
+ */
+const MOVING_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["enemy", "boss", "npc"]);
+
+/**
+ * How many syncs a character keeps walking after the last observed position change.
+ *
+ * `EnemyAI.stepToward` writes a position every 100 ms sim tick while `sync` runs at 250 ms, so a
+ * moving enemy shows a position change on most but not all syncs. Two syncs of hysteresis (~500 ms)
+ * stops the walk pose flickering off between steps; the same 20-per-second idle/run thrash on the
+ * player is what froze the player's run clip (animation diagnosis finding 2).
+ */
+const MOVING_HOLD_SYNCS = 2;
+
+/** Metres of movement between syncs below which an entity counts as standing still. */
+const MOVING_EPSILON = 0.03;
 
 /** Shards in an ore seam. Five reads as a vein from any bearing and costs 40 triangles. */
 const SEAM_SHARDS = 5;
@@ -133,17 +306,42 @@ const TREE_STUMP_FRACTION = 0.22;
 /** Same trick for a harvested plot: the crop is cut back to stubble rather than swapped for a crate. */
 const CROP_STUBBLE_FRACTION = 0.3;
 
-/** Fraction of the idle clip to freeze at for the instanced fallback. Mid-clip, i.e. settled. */
-const BAKE_PHASE = 0.35;
+/**
+ * Fraction of the chosen clip to freeze at for the instanced fallback, per motion.
+ *
+ * Mid-clip for the looping ones, i.e. settled rather than at the loop seam. Death is the exception
+ * and the reason this stopped being one number: a corpse baked at 35% of `Death` is a character
+ * halfway to the floor, hanging in the air. 0.98 is the clip's final frame, which is the pose the
+ * live one-shot clamps to, so an instanced corpse and an animated corpse match.
+ */
+const BAKE_PHASES: Record<CharacterMotion, number> = {
+  idle: 0.35,
+  walk: 0.28,
+  attack: 0.5,
+  hit: 0.5,
+  death: 0.98,
+};
 
 /**
- * Draw calls held in reserve for named characters, out of `maxUniqueDrawCalls`.
+ * Share of `maxUniqueDrawCalls` reserved for named characters. The remainder is everything else's.
  *
- * Without this the budget is first-come, and entity order is region order: forty wilderness
- * enemies would spend the whole allowance before the first shopkeeper in Coldbrace is reached, so
- * the characters the player actually stands in front of would be the ones rendered as statues.
+ * The reserve exists because the budget is first-come and entity order is region order: forty
+ * wilderness enemies would spend the whole allowance before the first shopkeeper in Coldbrace is
+ * reached, so the characters the player stands in front of would be the statues.
+ *
+ * Round 3 wrote it as an absolute 64 subtracted from `maxUniqueDrawCalls`, and boot passes
+ * `maxUniqueDrawCalls: 64`, so the ceiling for anything that is not an NPC was EXACTLY ZERO and
+ * `uniqueDrawCalls + cost <= 0` could not be true at any spend including none. Measured
+ * consequence: 872 entities produced `uniqueViews: 4`, all four of them NPCs, and
+ * `animatedLastFrame` read 0 in every frame sampled outside Coldbrace square. No enemy in the game
+ * had ever animated.
+ *
+ * A ratio alone does not fix it, which is the part worth writing down. With ONE shared counter and
+ * a ceiling of `max - reserve`, the named characters are reached first and spend past that ceiling,
+ * so every later enemy is still refused — the arithmetic changes and the outcome does not. The two
+ * classes therefore get two independent counters below, and the split is a hard one.
  */
-const NAMED_CHARACTER_RESERVE = 64;
+const NAMED_CHARACTER_SHARE = 0.6;
 
 interface SourcePart {
   geometry: THREE.BufferGeometry;
@@ -152,9 +350,25 @@ interface SourcePart {
   triangles: number;
 }
 
+/**
+ * What a dressed humanoid is made of: a base body plus the parts layered onto its skeleton.
+ *
+ * Resolved from `view.partAssetIds` when the world layer authors them, and from `OUTFIT_BODIES`
+ * when it still hands over a clothes-only outfit as the whole body.
+ */
+interface CharacterSpec {
+  bodyAssetId: string;
+  /** Layered onto the body's bones, in draw order. Includes the hair pick. */
+  partAssetIds: string[];
+  /** Stable identity for grouping and cost caching: body plus parts, in order. */
+  key: string;
+}
+
 interface InstanceGroup {
   key: string;
   assetId: string;
+  /** Set when this group draws a dressed humanoid rather than a single GLB. */
+  character: CharacterSpec | null;
   depletedAssetId: string | null;
   archetype: Archetype;
   tier: number;
@@ -165,8 +379,17 @@ interface InstanceGroup {
   liveParts: SourcePart[];
   /** Built on first spent slot. See `ensureSpent`. */
   spentParts: SourcePart[] | null;
+  /**
+   * Built on the first slot that actually moves. See `ensureMoving`.
+   *
+   * Lazy for the same reason `spentParts` is: a second baked pose is a second set of
+   * `InstancedMesh`es, and nothing in the world moves at any of the 18 poses in debug/shots.ts, so
+   * building it eagerly would spend draw calls on geometry no screenshot ever contains.
+   */
+  movingParts: SourcePart[] | null;
   live: THREE.InstancedMesh[];
   spent: THREE.InstancedMesh[];
+  moving: THREE.InstancedMesh[];
   /** True when this group's parts came from a rigged asset baked into a pose. */
   posed: boolean;
   /** True when the asset is rigged but no baked pose was available when the group was built. */
@@ -177,8 +400,15 @@ interface InstanceGroup {
 /** A live skeletal animation on one non-instanced entity. */
 interface RigState {
   mixer: THREE.AnimationMixer;
+  /** The node the mixer was built on: for a dressed character that is the BODY, not the group. */
+  root: THREE.Object3D;
   action: THREE.AnimationAction;
   clipName: string;
+  motion: CharacterMotion;
+  /** Motion to fall back to when a one-shot finishes. */
+  resting: CharacterMotion;
+  /** Per-entity timescale jitter, reapplied on every clip switch. */
+  timeScale: number;
 }
 
 interface ViewRecord {
@@ -188,20 +418,36 @@ interface ViewRecord {
   slot: number;
   /** Non-instanced fallback for rigged characters. */
   unique: THREE.Object3D | null;
+  /** Assembly backing `unique` when it is a dressed humanoid. Owns geometries; must be disposed. */
+  dressed: DressedCharacter | null;
   /** Mixer driving `unique`, when this entity earned one. */
   rig: RigState | null;
   /** Meshes in `unique`, counted once at build rather than guessed. */
   uniqueMeshes: number;
   /** Draw calls `unique` costs, shadow pass included. Returned to the pool on release. */
   uniqueCost: number;
+  /** True when this record's cost came out of the named pool. See `canAffordUnique`. */
+  named: boolean;
   /** Set when a rigged entity was built before its skeleton source was available. */
   awaitingRig: boolean;
   /** Cheap change detection so a steady frame writes nothing. */
   signature: string;
+  /** Where this entity is DRAWN. Equal to `target` unless `syncMotion` is interpolating. */
   position: THREE.Vector3;
+  /** The last position semantics reported. */
+  target: THREE.Vector3;
+  /** The one before that, so a render frame can interpolate between the two. */
+  previous: THREE.Vector3;
   rotationY: number;
+  targetRotationY: number;
+  previousRotationY: number;
+  /** Syncs left before this entity stops counting as moving. See `MOVING_HOLD_SYNCS`. */
+  movingTicks: number;
   scale: number;
   spent: boolean;
+  /** Unit terrain normal from `view.groundNormal`, or null. */
+  normal: readonly [number, number, number] | null;
+  tilt: number;
   labelHeight: number;
   radius: number;
 }
@@ -229,6 +475,15 @@ export interface EntityViewStats {
   estimatedDrawCalls: number;
   /** Draw calls currently spent on the non-instanced character path, against its own budget. */
   uniqueDrawCalls: number;
+  /** That total split by pool, because the two are budgeted separately. See `canAffordUnique`. */
+  namedDrawCalls: number;
+  otherDrawCalls: number;
+  /** Unique views assembled from a base body plus layered parts rather than from one GLB. */
+  dressedCharacters: number;
+  /** Instance groups whose parts were baked from a dressed body-plus-parts assembly. */
+  dressedGroups: number;
+  /** Records currently drawn in their walk pose. */
+  movingViews: number;
   triangles: number;
   missingAssets: string[];
 }
@@ -290,7 +545,19 @@ export class EntityViews {
   private animatedLastFrame = 0;
   /** Meshes per rigged asset, so the budget can be checked BEFORE paying for a skeleton clone. */
   private readonly meshCounts = new Map<string, number>();
+  /**
+   * Draw calls a fully assembled dressed character costs, keyed by `CharacterSpec.key`.
+   *
+   * Filled in by `bakedParts`, which assembles every character spec once while building its
+   * instance group — and `ensureGroup` always runs before the unique decision in `acquire`, so by
+   * the time the budget is checked the true merged cost is known rather than estimated.
+   */
+  private readonly characterCosts = new Map<string, number>();
+  /** Resolved character specs, keyed by (entity, assetId, authored parts). See `characterFor`. */
+  private readonly characterSpecs = new Map<string, CharacterSpec | null>();
   private uniqueDrawCalls = 0;
+  private namedDrawCalls = 0;
+  private otherDrawCalls = 0;
 
   private readonly maxUniqueDrawCalls: number;
   private readonly maxUniqueViews: number;
@@ -334,6 +601,12 @@ export class EntityViews {
       if (!entity.view) continue;
       wanted.add(entity.view.assetId);
       if (entity.view.depletedAssetId) wanted.add(entity.view.depletedAssetId);
+      // A dressed character needs its body, every outfit part and its hair before the first sync,
+      // or it is built from whatever HAS landed and re-acquired later — which is a visible pop.
+      const character = characterSpecFor(entity.id, entity.view.assetId, entity.view.partAssetIds);
+      if (!character) continue;
+      wanted.add(character.bodyAssetId);
+      for (const partId of character.partAssetIds) wanted.add(partId);
     }
 
     const ids = [...wanted].filter((id) => {
@@ -449,17 +722,85 @@ export class EntityViews {
     }
   }
 
+  /**
+   * Position-and-facing refresh for the archetypes that move, cheap enough to call every frame.
+   *
+   * OPT-IN and currently uncalled; `app/loop.ts` owns the decision to call it. `sync` runs at 4 Hz
+   * (loop.ts:266 returns early until 250 ms have passed) while `EnemyAI.stepToward` writes a
+   * position every 100 ms sim tick, so three of every four enemy movement steps are invisible and
+   * the fourth is a 40 cm jump. This closes that: pass the same entity list every render frame plus
+   * `alpha = accumulator / SIM_TICK_MS`, and a moving entity is drawn between the last two ticks
+   * instead of at the last one.
+   *
+   * Structure — asset, tier, state, add and remove — is still `sync`'s job at whatever cadence the
+   * loop likes. This only moves things that already exist, so calling it is always safe and never
+   * allocates a group.
+   *
+   * `alpha` is clamped to 0..1. Passing 1 (the default) is "no interpolation, just the current
+   * position at full rate", which on its own already removes three quarters of the stepping.
+   */
+  syncMotion(entities: readonly SemanticEntity[], alpha = 1): void {
+    if (this.records.size === 0) return;
+    const blend = Math.min(1, Math.max(0, alpha));
+
+    for (const entity of entities) {
+      if (!MOVING_ARCHETYPES.has(entity.archetype)) continue;
+      const record = this.records.get(entity.id);
+      if (!record) continue;
+
+      const view = entity.view;
+      const rotationY = view?.rotationY ?? record.targetRotationY;
+      const dx = entity.position[0] - record.target.x;
+      const dz = entity.position[2] - record.target.z;
+      if (Math.hypot(dx, dz) > MOVING_EPSILON) {
+        record.previous.copy(record.target);
+        record.target.set(entity.position[0], entity.position[1], entity.position[2]);
+        // Re-arm the hold here too. Without it, calling this every frame consumes the position
+        // change before `sync` ever sees one, `updateMoving` decays the counter to zero, and the
+        // walking pose could never latch for anything.
+        record.movingTicks = MOVING_HOLD_SYNCS;
+      }
+      if (rotationY !== record.targetRotationY) {
+        record.previousRotationY = record.targetRotationY;
+        record.targetRotationY = rotationY;
+      }
+
+      record.position.lerpVectors(record.previous, record.target, blend);
+      record.rotationY = shortestArc(record.previousRotationY, record.targetRotationY, blend);
+
+      if (record.unique) {
+        this.placeUnique(record);
+        continue;
+      }
+      const group = this.groups.get(record.groupKey);
+      if (!group) continue;
+      this.writeSlot(group, record);
+      group.dirty = true;
+    }
+
+    this.flush();
+  }
+
   private syncOne(entity: SemanticEntity): void {
     const view = entity.view!;
     if (this.missing.has(view.assetId) || !this.assets.isLoaded(view.assetId)) return;
 
     const tier = view.materialTier ?? entity.tier;
     const clip = view.clipFraction ?? 0;
-    const groupKey = `${view.assetId}|${view.depletedAssetId ?? "-"}|${tier}|${entity.archetype}|${clip}`;
+    const character = this.characterFor(entity.id, view.assetId, view.partAssetIds);
+    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${groupTier(entity.archetype, tier)}|${entity.archetype}|${clip}`;
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
-    const signature = `${groupKey}|${spent ? 1 : 0}|${round(entity.position[0])},${round(entity.position[1])},${round(entity.position[2])}|${round(view.rotationY ?? 0)}|${round(scale)}`;
+    const rotationY = view.rotationY ?? 0;
+    const normal = view.groundNormal ?? null;
+    const tilt = normal ? (view.tiltStrength ?? DEFAULT_TILT[entity.archetype] ?? 0) : 0;
+
+    // Movement has to be decided BEFORE the signature, because it is part of it: an enemy that
+    // stops walking stops changing position, so a signature built from position alone would never
+    // notice the stop and the walk pose would stick forever.
+    const moving = this.updateMoving(entity);
+    const signature = `${groupKey}|${spent ? 1 : 0}|${moving ? 1 : 0}|${round(entity.position[0])},${round(entity.position[1])},${round(entity.position[2])}|${round(rotationY)}|${round(scale)}|${tiltKey(normal, tilt)}`;
 
     let existing = this.records.get(entity.id);
 
@@ -469,7 +810,7 @@ export class EntityViews {
     // loading, and anything that was not in the entity list on that exact pass never got a second
     // look. Ordrun is in the dungeon, the dungeon is not in the list until the player is inside
     // it, and so the boss of the game stood through a two-phase fight in bind-adjacent pose.
-    if (existing?.awaitingRig && this.sourceOf(view.assetId)) {
+    if (existing?.awaitingRig && this.characterReady(view.assetId, character)) {
       this.release(existing);
       this.records.delete(entity.id);
       existing = undefined;
@@ -482,27 +823,32 @@ export class EntityViews {
       this.records.delete(entity.id);
     }
 
-    const record = this.records.get(entity.id) ?? this.acquire(entity, groupKey, tier, clip);
+    const record = this.records.get(entity.id) ?? this.acquire(entity, groupKey, tier, clip, character);
     if (!record) return;
 
     record.signature = signature;
-    record.position.set(entity.position[0], entity.position[1], entity.position[2]);
-    record.rotationY = view.rotationY ?? 0;
+    record.target.set(entity.position[0], entity.position[1], entity.position[2]);
+    record.position.copy(record.target);
+    record.previousRotationY = record.targetRotationY;
+    record.targetRotationY = rotationY;
+    record.rotationY = rotationY;
     record.scale = scale;
     record.spent = spent;
+    record.normal = normal;
+    record.tilt = tilt;
     record.labelHeight = view.labelHeight ?? 1.6;
     record.radius = Math.max(this.minHighlightRadius, this.assetRadius(view.assetId) * scale);
 
     const group = this.groups.get(groupKey);
     if (!group) return;
 
+    this.setMotion(record, spent ? "death" : moving ? "walk" : "idle");
+
     if (record.unique) {
-      record.unique.position.copy(record.position);
-      record.unique.rotation.y = record.rotationY;
-      record.unique.scale.setScalar(scale);
+      this.placeUnique(record);
       this.applyUniqueState(record, tier);
     } else {
-      this.writeSlot(group, record.slot, record.position, record.rotationY, scale, spent);
+      this.writeSlot(group, record);
       group.dirty = true;
     }
 
@@ -510,10 +856,37 @@ export class EntityViews {
     if (highlight) this.placeHighlight(highlight, record);
   }
 
-  private acquire(entity: SemanticEntity, groupKey: string, tier: number, clip: number): ViewRecord | null {
+  /**
+   * Tracks whether an entity moved since the last sync, with hysteresis.
+   *
+   * Only `MOVING_ARCHETYPES` are tracked. Everything else in the world is placed once at boot and
+   * never moves again, and paying a vector compare per ore node per sync buys nothing.
+   */
+  private updateMoving(entity: SemanticEntity): boolean {
+    if (!MOVING_ARCHETYPES.has(entity.archetype)) return false;
+    const record = this.records.get(entity.id);
+    if (!record) return false;
+    const dx = entity.position[0] - record.target.x;
+    const dz = entity.position[2] - record.target.z;
+    if (Math.hypot(dx, dz) > MOVING_EPSILON) {
+      record.previous.copy(record.target);
+      record.movingTicks = MOVING_HOLD_SYNCS;
+    } else if (record.movingTicks > 0) {
+      record.movingTicks -= 1;
+    }
+    return record.movingTicks > 0;
+  }
+
+  private acquire(
+    entity: SemanticEntity,
+    groupKey: string,
+    tier: number,
+    clip: number,
+    character: CharacterSpec | null,
+  ): ViewRecord | null {
     const view = entity.view!;
     const group = this.ensureGroup(
-      groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier, clip,
+      groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier, clip, character,
     );
     if (!group) return null;
 
@@ -521,16 +894,20 @@ export class EntityViews {
     // a capped number of them get their own object and a mixer. The rest fall back to an instance
     // of the baked idle pose, which is cheap and — unlike bind pose — looks like a person.
     const rigged = group.liveParts.length === 0 || this.isRigged(view.assetId);
-    const source = rigged ? this.sourceOf(view.assetId) : null;
+    const ready = rigged && this.characterReady(view.assetId, character);
+    const source = ready ? this.sourceOf(view.assetId) : null;
+    const named = entity.archetype === "npc" || entity.archetype === "boss";
     let unique: THREE.Object3D | null = null;
+    let dressed: DressedCharacter | null = null;
     let rig: RigState | null = null;
     let uniqueMeshes = 0;
     let uniqueCost = 0;
 
-    if (source && this.canAffordUnique(entity.archetype, view.assetId, source)) {
-      uniqueMeshes = this.meshesIn(view.assetId, source);
+    if (source && this.canAffordUnique(entity.archetype, view.assetId, source, character)) {
+      dressed = character ? this.assembleCharacter(character) : null;
+      unique = dressed ? dressed.group : cloneRigged(source);
+      uniqueMeshes = dressed ? dressed.drawCalls : this.meshesIn(view.assetId, source);
       uniqueCost = uniqueMeshes * 2;
-      unique = cloneRigged(source);
       unique.userData.entityId = entity.id;
       unique.traverse((child) => {
         child.userData.entityId = entity.id;
@@ -546,12 +923,15 @@ export class EntityViews {
         mesh.userData.baseMaterial = mesh.material;
       });
       this.group.add(unique);
-      this.uniqueDrawCalls += uniqueCost;
-      rig = this.attachRig(entity, unique, view.assetId);
+      this.spend(named, uniqueCost);
+      rig = this.attachRig(entity, dressed?.animationRoot ?? unique, view.assetId);
     }
 
     const slot = unique ? -1 : this.takeSlot(group, entity.id);
-    if (!unique && slot < 0) return null;
+    if (!unique && slot < 0) {
+      dressed?.dispose();
+      return null;
+    }
 
     const record: ViewRecord = {
       entityId: entity.id,
@@ -559,21 +939,33 @@ export class EntityViews {
       groupKey,
       slot,
       unique,
+      dressed,
       rig,
       uniqueMeshes,
       uniqueCost,
+      named,
       // A rigged entity built before its skeleton source arrived is re-acquired on the next sync.
-      awaitingRig: rigged && !source,
+      awaitingRig: rigged && !ready,
       signature: "",
       position: new THREE.Vector3(),
+      target: new THREE.Vector3(entity.position[0], entity.position[1], entity.position[2]),
+      previous: new THREE.Vector3(entity.position[0], entity.position[1], entity.position[2]),
       rotationY: view.rotationY ?? 0,
+      targetRotationY: view.rotationY ?? 0,
+      previousRotationY: view.rotationY ?? 0,
+      movingTicks: 0,
       scale: 1,
       spent: false,
+      normal: null,
+      tilt: 0,
       labelHeight: view.labelHeight ?? 1.6,
       radius: this.minHighlightRadius,
     };
     this.records.set(entity.id, record);
-    if (rig) this.animated.add(record);
+    if (rig) {
+      this.animated.add(record);
+      this.bindRigEvents(record);
+    }
     return record;
   }
 
@@ -581,14 +973,19 @@ export class EntityViews {
     if (record.rig) {
       record.rig.action.stop();
       record.rig.mixer.stopAllAction();
-      if (record.unique) record.rig.mixer.uncacheRoot(record.unique);
+      record.rig.mixer.uncacheRoot(record.rig.root);
       this.animated.delete(record);
       record.rig = null;
     }
     if (record.unique) {
       record.unique.removeFromParent();
+      // `DressedCharacter.dispose` frees the head-cap and merged geometries this assembly allocated
+      // and nothing else owns. The source geometries and materials are shared with the loaded asset
+      // and are deliberately left alone.
+      record.dressed?.dispose();
+      record.dressed = null;
       record.unique = null;
-      this.uniqueDrawCalls = Math.max(0, this.uniqueDrawCalls - record.uniqueCost);
+      this.refund(record.named, record.uniqueCost);
       record.uniqueCost = 0;
       record.uniqueMeshes = 0;
       return;
@@ -599,7 +996,20 @@ export class EntityViews {
     group.free.push(record.slot);
     for (const mesh of group.live) mesh.setMatrixAt(record.slot, HIDDEN);
     for (const mesh of group.spent) mesh.setMatrixAt(record.slot, HIDDEN);
+    for (const mesh of group.moving) mesh.setMatrixAt(record.slot, HIDDEN);
     group.dirty = true;
+  }
+
+  private spend(named: boolean, cost: number): void {
+    if (named) this.namedDrawCalls += cost;
+    else this.otherDrawCalls += cost;
+    this.uniqueDrawCalls += cost;
+  }
+
+  private refund(named: boolean, cost: number): void {
+    if (named) this.namedDrawCalls = Math.max(0, this.namedDrawCalls - cost);
+    else this.otherDrawCalls = Math.max(0, this.otherDrawCalls - cost);
+    this.uniqueDrawCalls = Math.max(0, this.uniqueDrawCalls - cost);
   }
 
   /**
@@ -628,7 +1038,7 @@ export class EntityViews {
     for (const key of stale) {
       const group = this.groups.get(key);
       if (!group) continue;
-      for (const mesh of [...group.live, ...group.spent]) mesh.removeFromParent();
+      for (const mesh of [...group.live, ...group.spent, ...group.moving]) mesh.removeFromParent();
       this.groups.delete(key);
     }
   }
@@ -642,14 +1052,15 @@ export class EntityViews {
     archetype: Archetype,
     tier: number,
     clipFraction = 0,
+    character: CharacterSpec | null = null,
   ): InstanceGroup | null {
     const existing = this.groups.get(key);
     if (existing) return existing;
 
     const rigged = this.isRigged(assetId);
-    const source = rigged ? this.sourceOf(assetId) : null;
-    let liveParts = rigged && source
-      ? this.bakedParts(source, assetId, archetype, tier, false)
+    const ready = rigged && this.characterReady(assetId, character);
+    let liveParts = ready
+      ? this.bakedParts(assetId, character, archetype, tier, false, "idle")
       : this.collectParts(assetId, archetype, tier, false);
 
     // `view.clipFraction` keeps only the bottom of the mesh. One geometry per group, built once.
@@ -668,6 +1079,7 @@ export class EntityViews {
     const group: InstanceGroup = {
       key,
       assetId,
+      character,
       depletedAssetId,
       archetype,
       tier,
@@ -676,10 +1088,12 @@ export class EntityViews {
       free: [],
       liveParts,
       spentParts: null,
+      movingParts: null,
       live: [],
       spent: [],
-      posed: rigged && source !== null,
-      needsPose: rigged && source === null,
+      moving: [],
+      posed: ready,
+      needsPose: rigged && !ready,
       dirty: false,
     };
     this.groups.set(key, group);
@@ -703,6 +1117,33 @@ export class EntityViews {
     // changes colour, and that vanishing is exactly what Phase 1 shipped.
     if (group.spentParts.length === 0) return;
     group.spent = this.buildMeshes(group, group.spentParts, "spent");
+  }
+
+  /**
+   * Builds the walking variant on first use, for a rigged group only.
+   *
+   * The instanced path cannot animate — an `InstancedMesh` ignores skinning entirely — but it can
+   * hold a DIFFERENT baked pose depending on what the entity is doing, which is the difference
+   * between fifty enemies that are all one frozen statue and fifty that at least stand differently
+   * when they are chasing you. Only built when something in the group actually moves, so the 18
+   * static poses in debug/shots.ts pay nothing for it.
+   */
+  private ensureMoving(group: InstanceGroup): void {
+    if (group.moving.length > 0 || !group.posed) return;
+    if (!group.movingParts) {
+      group.movingParts = this.bakedParts(
+        group.assetId, group.character, group.archetype, group.tier, false, "walk",
+      );
+    }
+    if (group.movingParts.length !== group.liveParts.length) {
+      // The walk bake must line up part-for-part with the live bake or `writeSlot`'s index
+      // arithmetic addresses the wrong geometry. A mismatch means the clip changed the mesh set,
+      // which it cannot, so treat it as "no walk variant" rather than drawing a scrambled one.
+      group.movingParts = [];
+      return;
+    }
+    if (group.movingParts.length === 0) return;
+    group.moving = this.buildMeshes(group, group.movingParts, "moving");
   }
 
   /**
@@ -742,7 +1183,7 @@ export class EntityViews {
       const rigged = this.isRigged(group.depletedAssetId);
       const source = rigged ? this.sourceOf(group.depletedAssetId) : null;
       const parts = rigged && source
-        ? this.bakedParts(source, group.depletedAssetId, group.archetype, group.tier, true)
+        ? this.bakedParts(group.depletedAssetId, null, group.archetype, group.tier, true, "death")
         : this.collectParts(group.depletedAssetId, group.archetype, group.tier, true);
       if (parts.length > 0) return parts;
     }
@@ -750,12 +1191,18 @@ export class EntityViews {
     return live;
   }
 
-  /** The live parts again, re-materialised with the spent variant. Geometry is shared, not copied. */
+  /**
+   * The live parts again, re-materialised with the spent variant. Geometry is shared, not copied.
+   *
+   * For a rigged group the pose changes too: this is the corpse, and every one of the four enemy
+   * packs ships a `Death` clip. Baking that clip's final frame is what turns a killed enemy from a
+   * grey statue standing to attention into a body on the ground, at zero extra draw calls — the
+   * spent variant already existed, it was just holding the idle pose.
+   */
   private spentMaterialParts(group: InstanceGroup): SourcePart[] {
     const rigged = this.isRigged(group.assetId);
-    const source = rigged ? this.sourceOf(group.assetId) : null;
-    const parts = rigged && source
-      ? this.bakedParts(source, group.assetId, group.archetype, group.tier, true)
+    const parts = rigged && this.characterReady(group.assetId, group.character)
+      ? this.bakedParts(group.assetId, group.character, group.archetype, group.tier, true, "death")
       : this.collectParts(group.assetId, group.archetype, group.tier, true);
     if (group.archetype !== "ore" || parts.length === 0) return parts;
 
@@ -799,30 +1246,46 @@ export class EntityViews {
   }
 
   /**
-   * The instanced fallback for a rigged asset: one idle frame, CPU-skinned into static geometry.
+   * The instanced fallback for a rigged asset: one frame of one clip, CPU-skinned into static
+   * geometry.
    *
    * An `InstancedMesh` ignores skinning entirely, so instancing a skinned geometry raw draws it in
    * bind pose — the arms-straight-out look that was the single strongest "unfinished build" signal
    * in the round-1 screenshots. Baking costs a few milliseconds once per asset and nothing per
    * frame, and keeps forty background characters at four draw calls instead of a hundred and sixty.
    *
+   * `motion` picks WHICH pose, so a group can hold an idle set, a walking set and a corpse set and
+   * `writeSlot` chooses between them per slot. `character` makes the baked body a full dressed
+   * humanoid — head, clothes and hair — rather than the clothes-only GLB that produced twelve
+   * headless NPCs.
+   *
    * Falls back to the raw (bind-pose) parts if anything about the rig is unexpected. A slightly
    * wrong pose is worth having; a boot failure over a cosmetic path is not.
    */
   private bakedParts(
-    source: THREE.Object3D,
     assetId: string,
+    character: CharacterSpec | null,
     archetype: Archetype,
     tier: number,
     spent: boolean,
+    motion: CharacterMotion,
   ): SourcePart[] {
+    const source = this.sourceOf(assetId);
+    if (!source) return this.collectParts(assetId, archetype, tier, spent);
+    let dressed: DressedCharacter | null = null;
+    // Set when a mesh could not be CPU-skinned and its SOURCE geometry was handed out instead. That
+    // geometry may be one the assembly owns, so freeing the assembly would tear it out from under
+    // the InstancedMesh that now points at it.
+    let sharedGeometry = false;
     try {
-      const posed = cloneRigged(source);
-      const clip = this.firstFittingClip(this.idleCandidates(assetId, assetId), posed);
+      dressed = character ? this.assembleCharacter(character) : null;
+      const posed = dressed ? dressed.group : cloneRigged(source);
+      const animationRoot = dressed ? dressed.animationRoot : posed;
+      const clip = this.firstFittingClip(assetId, this.clipCandidates(assetId, assetId, motion), animationRoot);
       if (clip) {
-        const mixer = new THREE.AnimationMixer(posed);
+        const mixer = new THREE.AnimationMixer(animationRoot);
         mixer.clipAction(clip).play();
-        mixer.setTime(clip.duration * BAKE_PHASE);
+        mixer.setTime(clip.duration * BAKE_PHASES[motion]);
       }
       posed.updateMatrixWorld(true);
 
@@ -850,6 +1313,7 @@ export class EntityViews {
             return;
           }
         }
+        sharedGeometry = true;
         parts.push({
           geometry: mesh.geometry,
           material,
@@ -860,8 +1324,138 @@ export class EntityViews {
       if (parts.length > 0) return parts;
     } catch {
       // fall through to the unposed path
+    } finally {
+      // `freezeSkin` clones every geometry it bakes, so the assembly's own merged and head-capped
+      // geometries are dead the moment the bake is done and can be freed here.
+      if (!sharedGeometry) dressed?.dispose();
+      else dressed?.group.removeFromParent();
     }
     return this.collectParts(assetId, archetype, tier, spent);
+  }
+
+  // -------------------------------------------------------- characters
+
+  /**
+   * Resolves an entity's dressed-character spec, memoised on the resolved key.
+   *
+   * Memoised because `sync` runs a few times a second over every entity in the world and this
+   * allocates an array and a string. The map is keyed by (entityId, assetId, parts) so a semantic
+   * change to the outfit still re-resolves.
+   */
+  private characterFor(
+    entityId: EntityId,
+    assetId: string,
+    partAssetIds: readonly string[] | undefined,
+  ): CharacterSpec | null {
+    const cacheKey = `${entityId}|${assetId}|${partAssetIds?.join("+") ?? ""}`;
+    const cached = this.characterSpecs.get(cacheKey);
+    if (cached !== undefined) return cached;
+    const spec = characterSpecFor(entityId, assetId, partAssetIds);
+    this.characterSpecs.set(cacheKey, spec);
+    // Start the clothes loading the FIRST time this entity is seen, not when its instance group is
+    // built. `boot.preloadEntityAssets` does not know about `view.partAssetIds`, so if the request
+    // waits for `ensureGroup` the group is built undressed and only a later `dropUnposed` round can
+    // fix it. Kicking it here means the parts are in flight during boot's own first sync.
+    if (spec) this.characterReady(assetId, spec);
+    return spec;
+  }
+
+  /**
+   * Like `sourceOf`, but STARTS the load for an asset the registry was never asked for.
+   *
+   * `sourceOf` refuses anything `assets.isLoaded` says no to, which is right for `view.assetId`:
+   * boot preloads those and a miss means a genuine content error. Outfit parts are different.
+   * `boot.preloadEntityAssets` (boot.ts:1116) collects `view.assetId` and `view.depletedAssetId`
+   * only — it has never heard of `view.partAssetIds` — so every one of the 4-6 clothing GLBs an NPC
+   * needs is unloaded at first sync. Without this, `characterReady` is false forever and every NPC
+   * in the world renders as a naked base body. Measured: 12 of 12, `meshes: 3`, no clothes.
+   *
+   * Bounded by construction: only character parts reach here, at most six per NPC across four
+   * outfits, and `sourceRequests` makes each id one request. Setting `sourcesChanged` is what makes
+   * `sync` rebuild the affected groups once the clothes land.
+   */
+  private requestSource(id: string): THREE.Object3D | null {
+    const cached = this.sources.get(id);
+    if (cached) return cached;
+    if (this.missing.has(id)) return null;
+    if (!this.assets.entry(id)) {
+      this.missing.add(id);
+      return null;
+    }
+    if (this.assets.isLoaded(id) || this.sourceRequests.has(id)) return this.sourceOf(id);
+    this.sourceRequests.add(id);
+    void this.assets
+      .load(id)
+      .then((group) => {
+        this.sources.set(id, group);
+        this.sourcesChanged = true;
+      })
+      .catch(() => {
+        this.missing.add(id);
+        // Flip it on failure too, or a character waiting on a part that will never arrive is never
+        // rebuilt without it and stays naked for the session.
+        this.sourcesChanged = true;
+      });
+    return null;
+  }
+
+  /**
+   * Whether every GLB a character needs has landed. A half-dressed character is not worth building.
+   *
+   * Requests EVERY part before answering, rather than returning false at the first one that is not
+   * in yet. That is not tidiness: `sourcesChanged` triggers one `dropUnposed` rebuild round per
+   * batch of arrivals, so short-circuiting means one round per part file — thirty part files across
+   * twelve NPCs, at a 250 ms sync cadence, is seven seconds of NPCs standing around in their
+   * underwear. Asking for all of them at once collapses that to two rounds.
+   */
+  private characterReady(assetId: string, character: CharacterSpec | null): boolean {
+    if (!character) return this.sourceOf(assetId) !== null;
+    let ready = this.requestSource(character.bodyAssetId) !== null;
+    for (const partId of character.partAssetIds) {
+      // A part that failed to load, or that the manifest does not carry at all, is never going to
+      // arrive; dress the character without it rather than waiting forever.
+      if (this.missing.has(partId)) continue;
+      if (!this.requestSource(partId)) ready = false;
+    }
+    return ready;
+  }
+
+  /**
+   * Builds one dressed humanoid: head-capped body + outfit + hair, one skeleton, merged.
+   *
+   * `headCap: true` is the load-bearing flag and the counter-intuitive half of the fix. Outfit parts
+   * are authored to REPLACE the body below the neck, not to cover it — measured in bind space, the
+   * peasant trousers sit 5.4 mm INSIDE base_male's bare thigh and the boot is 27.5 mm narrower than
+   * the bare foot — so layering clothes onto an intact body leaks skin through them. Cutting the
+   * body to a head cap (base_male at y 1.55, base_female at 1.50) and layering that onto the full
+   * outfit is the way round that works, and it keeps the body's own Eyes and Eyebrows meshes, which
+   * sit entirely above the cut.
+   */
+  private assembleCharacter(character: CharacterSpec): DressedCharacter | null {
+    const body = this.requestSource(character.bodyAssetId);
+    if (!body) return null;
+    const parts: CharacterPartSource[] = [];
+    for (const assetId of character.partAssetIds) {
+      const source = this.requestSource(assetId);
+      if (source) parts.push({ assetId, source });
+    }
+    try {
+      const dressed = assembleDressedCharacter({
+        bodyAssetId: character.bodyAssetId,
+        body,
+        parts,
+        headCap: true,
+        merge: true,
+        mergeOptions: { materialKey: characterMaterialKey },
+        name: `character-${character.key}`,
+      });
+      this.characterCosts.set(character.key, dressed.drawCalls);
+      return dressed;
+    } catch {
+      // A body with no SkinnedMesh throws by design. Falling back to the plain clone keeps the
+      // entity on screen rather than dropping it, which is the right trade for a cosmetic path.
+      return null;
+    }
   }
 
   /** Which tier treatment a given source material on a given archetype gets. */
@@ -964,7 +1558,7 @@ export class EntityViews {
   // ---------------------------------------------------------- animation
 
   /**
-   * Gives one rigged object a looping idle.
+   * Gives one rigged object a looping clip and a motion state machine.
    *
    * Two sources of variety, both deterministic from the entity id so a screenshot is reproducible:
    * WHICH idle clip (four humanoid idles, so a row of NPCs is not doing the same thing) and WHERE
@@ -973,7 +1567,7 @@ export class EntityViews {
    */
   private attachRig(entity: SemanticEntity, root: THREE.Object3D, assetId: string): RigState | null {
     const rng = new Rng(hashString(entity.id));
-    const clip = this.firstFittingClip(this.idleCandidates(assetId, entity.id), root);
+    const clip = this.firstFittingClip(assetId, this.clipCandidates(assetId, entity.id, "idle"), root);
     if (!clip) return null;
 
     const mixer = new THREE.AnimationMixer(root);
@@ -983,30 +1577,167 @@ export class EntityViews {
     // setTime applies the pose as well as setting it, so the very first rendered frame is already
     // mid-idle. Without it the object holds bind pose until the first update() lands.
     mixer.setTime(rng.float(0, Math.max(0.001, clip.duration)));
-    action.timeScale = rng.float(0.88, 1.12);
-    return { mixer, action, clipName: clip.name };
+    const timeScale = rng.float(0.88, 1.12);
+    action.timeScale = timeScale;
+    return {
+      mixer, root, action, clipName: clip.name, motion: "idle", resting: "idle", timeScale,
+    };
   }
 
   /**
-   * Idle clip names to try, best first.
+   * Switches a rigged entity's clip when what it is doing changes.
+   *
+   * Crossfades rather than cutting, and — this is the guard the animation diagnosis asks for — does
+   * nothing at all when the motion is unchanged. Re-selecting the same pose and calling
+   * `action.reset()` for it is exactly what froze the player's run clip: the loop asked for it
+   * twenty times a second and the clip never advanced past its first two milliseconds.
+   *
+   * Death is a one-way door: it plays once, clamps on its last frame, and the record leaves the
+   * animated set so a corpse costs no mixer time. Nothing brings a rig back out of it except a
+   * respawn, which rebuilds the record.
+   */
+  private setMotion(record: ViewRecord, motion: CharacterMotion): void {
+    const rig = record.rig;
+    if (!rig || !record.unique) return;
+    if (rig.motion === motion) return;
+    // Death is a one-way door while the entity is still dead, so a stray one-shot cannot stand a
+    // corpse back up. `EnemyAI.respawnDead` writes `state: "alive"` back onto the entity, and that
+    // is the one thing that reopens it — otherwise a respawned enemy would lie on the ground for
+    // the rest of the session.
+    if (rig.motion === "death" && (motion === "death" || record.spent)) return;
+    if (!ONE_SHOT_MOTIONS.has(motion)) rig.resting = motion;
+    // A swing or a flinch owns the rig until it finishes. `sync` runs while it is playing and would
+    // otherwise ask for "idle" a quarter of a second in and cut it off; the `finished` listener is
+    // what hands the rig back, to whatever resting motion was recorded in the meantime.
+    if (ONE_SHOT_MOTIONS.has(rig.motion) && !ONE_SHOT_MOTIONS.has(motion) && motion !== "death") return;
+
+    const assetId = this.groups.get(record.groupKey)?.assetId ?? "";
+    const clip = this.firstFittingClip(
+      assetId, this.clipCandidates(assetId, record.entityId, motion), rig.root,
+    );
+    // Two motions can resolve to the same clip — enemy_bee has neither Idle nor Walk and answers
+    // `Flying` to both. Crossfading an action from itself zeroes its weight; record the state change
+    // and leave the clip running.
+    if (clip && clip.name === rig.clipName) {
+      rig.motion = motion;
+      return;
+    }
+    if (!clip) {
+      // No death clip on this rig: hold the last live pose rather than idling as a corpse. This is
+      // the old `action.paused = spent` behaviour, kept for exactly the case it was written for.
+      if (motion === "death") {
+        rig.action.paused = true;
+        rig.motion = "death";
+        this.animated.delete(record);
+      }
+      return;
+    }
+
+    const next = rig.mixer.clipAction(clip);
+    const oneShot = ONE_SHOT_MOTIONS.has(motion) || motion === "death";
+    next.setLoop(oneShot ? THREE.LoopOnce : THREE.LoopRepeat, oneShot ? 1 : Infinity);
+    next.clampWhenFinished = oneShot;
+    next.timeScale = rig.timeScale;
+    next.reset();
+    next.enabled = true;
+    next.setEffectiveWeight(1);
+    // 0.06 s for a one-shot, 0.18 s for locomotion. Hit_Chest is 0.333 s long; an 0.18 s crossfade
+    // spends over half the clip getting into it and the flinch never reads.
+    next.crossFadeFrom(rig.action, oneShot ? 0.06 : 0.18, false).play();
+
+    rig.action = next;
+    rig.clipName = clip.name;
+    rig.motion = motion;
+    // A dying rig stays in `animated` until the clip actually reaches its end — a corpse dropped
+    // from the tick set the instant the crossfade starts freezes halfway into the fall. The
+    // `finished` listener in `bindRigEvents` is what takes it out.
+    this.animated.add(record);
+  }
+
+  /**
+   * Wires a rig's `finished` events: one-shots hand back to the resting motion, and a finished
+   * death clip drops the record out of the tick set for good.
+   *
+   * Attached here rather than in `attachRig` because it closes over the record, and the record does
+   * not exist until after the rig is built.
+   */
+  private bindRigEvents(record: ViewRecord): void {
+    const rig = record.rig;
+    if (!rig) return;
+    rig.mixer.addEventListener("finished", (event) => {
+      // Fades leave old actions running for a moment; only the CURRENT action's end means anything.
+      if (event.action !== rig.action) return;
+      if (rig.motion === "death") {
+        this.animated.delete(record);
+        return;
+      }
+      this.setMotion(record, rig.resting);
+    });
+  }
+
+  /**
+   * Plays a one-shot on an entity's rig: a swing, or a flinch when it takes one.
+   *
+   * OPT-IN and currently uncalled. `app/loop.ts` already drains `CombatSystem.consumeHits()` for the
+   * floating damage numbers; feeding the same stream in here is what makes an enemy react to being
+   * hit. Returns false when the entity has no live mixer, which is the common case — an instanced
+   * character cannot play a one-shot at all, and pretending otherwise would make the caller think
+   * it worked.
+   */
+  playAction(entityId: EntityId, motion: "attack" | "hit"): boolean {
+    const record = this.records.get(entityId);
+    if (!record?.rig || record.rig.motion === "death") return false;
+    const before = record.rig.motion;
+    this.setMotion(record, motion);
+    return record.rig.motion !== before;
+  }
+
+  /**
+   * Clip names to try for a motion, best first.
    *
    * An asset that ships its own clips uses them and nothing else: the monster packs are not the
-   * shared 65-bone humanoid, so a humanoid clip would bind to bones that do not exist. Everything
-   * else draws from the shared library, rotated by a seed so the choice varies per entity.
+   * 65-joint humanoid, so a humanoid clip would bind to bones that do not exist. Everything else
+   * draws from the shared library; for `idle` that list is rotated by a seed so a row of NPCs is not
+   * doing the same thing.
+   *
+   * The catch-all "then anything it ships" tail applies to `idle` only. For the other motions a
+   * miss returns nothing and `setMotion` leaves the current clip alone, which is right: playing
+   * whatever clip happened to be first because a pack has no Walk would make a bee dance across the
+   * meadow.
    */
-  private idleCandidates(assetId: string, varySeed: string): string[] {
+  private clipCandidates(assetId: string, varySeed: string, motion: CharacterMotion): string[] {
     const own = this.assets.entry(assetId)?.animations ?? [];
     if (own.length > 0) {
-      const idles = own.filter((name) => OWN_IDLE_PATTERN.test(name));
-      return [...idles, ...own.filter((name) => !idles.includes(name))];
+      const picked: string[] = [];
+      for (const pattern of OWN_CLIP_PATTERNS[motion]) {
+        for (const name of own) if (pattern.test(name) && !picked.includes(name)) picked.push(name);
+      }
+      if (motion !== "idle") return picked;
+      for (const name of own) if (!picked.includes(name)) picked.push(name);
+      return picked;
     }
+    if (motion !== "idle") return [...HUMANOID_CLIPS[motion]];
     const start = new Rng(hashString(varySeed) ^ 0x51ed_27b1).int(0, HUMANOID_IDLES.length - 1);
     return [...HUMANOID_IDLES.slice(start), ...HUMANOID_IDLES.slice(0, start)];
   }
 
-  private firstFittingClip(names: readonly string[], root: THREE.Object3D): THREE.AnimationClip | null {
+  /**
+   * The first clip in `names` that this rig can actually play, or null.
+   *
+   * `assetId` is not decoration. `AssetRegistry` keeps the shared 65-joint library in one
+   * name-keyed map and every pack's own clips in a SECOND map keyed `assetId:clipName`, precisely
+   * because enemy_crab, enemy_blob and enemy_skull all export clips called `Idle`, `Walk` and
+   * `Death` on three different skeletons. `assets.clip("Idle")` therefore returns undefined for a
+   * monster pack — asking it alone means no enemy ever resolves a clip at all and every one of them
+   * bakes from bind pose. Try the asset's own clip first, fall back to the shared library.
+   */
+  private firstFittingClip(
+    assetId: string,
+    names: readonly string[],
+    root: THREE.Object3D,
+  ): THREE.AnimationClip | null {
     for (const name of names) {
-      const clip = this.assets.clip(name);
+      const clip = this.assets.clipOf(assetId, name) ?? this.assets.clip(name);
       if (clip && clipFits(root, clip)) return clip;
     }
     return null;
@@ -1017,9 +1748,20 @@ export class EntityViews {
    *
    * Deciding after cloning would mean paying for ~50 rejected character clones at boot, which is
    * the kind of cost that only shows up as "the loading screen got slower" with nothing to blame.
+   *
+   * TWO POOLS, not one ceiling. `NAMED_CHARACTER_SHARE` explains why at length; the short version is
+   * that a single counter plus a reserve cannot work, because entity order is region order and the
+   * named characters are reached first, so they spend past the non-named ceiling and every enemy in
+   * the world is refused regardless of what the ceiling is set to. That was the measured state:
+   * `uniqueViews: 4`, all four NPCs, `animatedLastFrame: 0` everywhere else.
    */
-  private canAffordUnique(archetype: Archetype, assetId: string, source: THREE.Object3D): boolean {
-    const cost = this.meshesIn(assetId, source) * 2;
+  private canAffordUnique(
+    archetype: Archetype,
+    assetId: string,
+    source: THREE.Object3D,
+    character: CharacterSpec | null,
+  ): boolean {
+    const cost = this.uniqueCostOf(assetId, source, character);
     if (cost === 0) return false;
 
     // A boss is never instanced. There is one of them, the fight is the climax of its region, and
@@ -1030,8 +1772,37 @@ export class EntityViews {
     if (this.countUnique() >= this.maxUniqueViews) return false;
 
     const named = archetype === "npc";
-    const ceiling = named ? this.maxUniqueDrawCalls : this.maxUniqueDrawCalls - NAMED_CHARACTER_RESERVE;
-    return this.uniqueDrawCalls + cost <= ceiling;
+    const namedBudget = Math.round(this.maxUniqueDrawCalls * NAMED_CHARACTER_SHARE);
+    return named
+      ? this.namedDrawCalls + cost <= namedBudget
+      : this.otherDrawCalls + cost <= this.maxUniqueDrawCalls - namedBudget;
+  }
+
+  /**
+   * What one non-instanced copy of this entity costs in draw calls, shadow pass included.
+   *
+   * For a dressed character that is the MERGED mesh count, not the sum of the parts: `ensureGroup`
+   * has already assembled this exact spec once to bake its instanced pose, and recorded the answer.
+   * Measured against the real GLBs, merging matters — an unmerged male ranger is 13 meshes and a
+   * merged one is 6.
+   */
+  private uniqueCostOf(
+    assetId: string,
+    source: THREE.Object3D,
+    character: CharacterSpec | null,
+  ): number {
+    if (!character) return this.meshesIn(assetId, source) * 2;
+    const known = this.characterCosts.get(character.key);
+    if (known !== undefined) return known * 2;
+    // No assembly has happened yet: charge the unmerged sum, which can only over-estimate.
+    let meshes = this.countMeshesOf(character.bodyAssetId);
+    for (const partId of character.partAssetIds) meshes += this.countMeshesOf(partId);
+    return Math.max(2, meshes * 2);
+  }
+
+  private countMeshesOf(assetId: string): number {
+    const source = this.sources.get(assetId);
+    return source ? this.meshesIn(assetId, source) : 1;
   }
 
   private meshesIn(assetId: string, source: THREE.Object3D): number {
@@ -1077,20 +1848,23 @@ export class EntityViews {
   /** Rebuilds a group's instanced meshes at a larger capacity, preserving every slot. */
   private resize(group: InstanceGroup, capacity: number): void {
     const hadSpent = group.spent.length > 0;
-    for (const mesh of [...group.live, ...group.spent]) mesh.removeFromParent();
+    const hadMoving = group.moving.length > 0;
+    for (const mesh of [...group.live, ...group.spent, ...group.moving]) mesh.removeFromParent();
     group.live = [];
     group.spent = [];
+    group.moving = [];
     group.capacity = capacity;
 
     group.live = this.buildMeshes(group, group.liveParts, "live");
     if (hadSpent && group.spentParts) group.spent = this.buildMeshes(group, group.spentParts, "spent");
+    if (hadMoving && group.movingParts) group.moving = this.buildMeshes(group, group.movingParts, "moving");
 
     // A resize throws away the old instance buffers, so every slot that already had an entity in it
     // has to be written back. Missing this is the classic instancing bug where half the world
     // disappears the moment one more node is added.
     for (const record of this.records.values()) {
       if (record.groupKey !== group.key || record.slot < 0 || record.slot >= capacity) continue;
-      this.writeSlot(group, record.slot, record.position, record.rotationY, record.scale, record.spent);
+      this.writeSlot(group, record);
     }
     group.dirty = true;
   }
@@ -1116,30 +1890,38 @@ export class EntityViews {
     });
   }
 
-  private writeSlot(
-    group: InstanceGroup,
-    slot: number,
-    position: THREE.Vector3,
-    rotationY: number,
-    scale: number,
-    spent: boolean,
-  ): void {
-    if (spent) this.ensureSpent(group);
+  /**
+   * Writes one entity's instance matrix into whichever pose variant it is currently in.
+   *
+   * The orientation is where the terrain normal lands. Round 3 composed it from `rotationY` alone,
+   * so nothing in the world bedded into a slope: 34 of 159 surface entities stand on ground steeper
+   * than 10 degrees and the worst — a 5.3 m ore rock on a 48.9-degree face — had 3.02 m of daylight
+   * under one edge. `view.groundNormal` is slerped in from vertical by `tilt`, applied OUTSIDE the
+   * yaw so a rock still faces the bearing the world layer gave it.
+   */
+  private writeSlot(group: InstanceGroup, record: ViewRecord): void {
+    const slot = record.slot;
+    if (slot < 0) return;
+    const moving = record.movingTicks > 0 && !record.spent;
+    if (record.spent) this.ensureSpent(group);
+    else if (moving) this.ensureMoving(group);
 
     const placement = new THREE.Matrix4().compose(
-      position,
-      new THREE.Quaternion().setFromAxisAngle(Y_AXIS, rotationY),
-      new THREE.Vector3(scale, scale, scale),
+      record.position,
+      orientation(record.rotationY, record.normal, record.tilt, SCRATCH_QUATERNION),
+      SCRATCH_SCALE.setScalar(record.scale),
     );
     const transform = new THREE.Matrix4();
 
     // A spent group with no geometry of its own falls back to the live meshes rather than to
     // nothing. Hiding the live instance without drawing a replacement is how a worked-out node
-    // used to disappear from the world entirely.
-    const spentReady = spent && group.spent.length > 0;
-    const active = spentReady ? group.spent : group.live;
-    const activeParts = spentReady ? group.spentParts ?? [] : group.liveParts;
-    const hidden = spentReady ? group.live : group.spent;
+    // used to disappear from the world entirely. The walk variant works the same way.
+    const spentReady = record.spent && group.spent.length > 0;
+    const movingReady = !record.spent && moving && group.moving.length > 0;
+    const active = spentReady ? group.spent : movingReady ? group.moving : group.live;
+    const activeParts = spentReady
+      ? group.spentParts ?? []
+      : movingReady ? group.movingParts ?? [] : group.liveParts;
 
     for (const [index, mesh] of active.entries()) {
       const part = activeParts[index];
@@ -1147,7 +1929,20 @@ export class EntityViews {
       transform.multiplyMatrices(placement, part.matrix);
       mesh.setMatrixAt(slot, transform);
     }
-    for (const mesh of hidden) mesh.setMatrixAt(slot, HIDDEN);
+    for (const variant of [group.live, group.spent, group.moving]) {
+      if (variant === active) continue;
+      for (const mesh of variant) mesh.setMatrixAt(slot, HIDDEN);
+    }
+  }
+
+  /** Applies a record's drawn transform to its non-instanced object. */
+  private placeUnique(record: ViewRecord): void {
+    if (!record.unique) return;
+    record.unique.position.copy(record.position);
+    record.unique.quaternion.copy(
+      orientation(record.rotationY, record.normal, record.tilt, SCRATCH_QUATERNION),
+    );
+    record.unique.scale.setScalar(record.scale);
   }
 
   /**
@@ -1155,16 +1950,11 @@ export class EntityViews {
    *
    * A dead character keeps its rig but stops being ticked, so it holds whatever pose it stopped in
    * rather than popping back to bind — which is the one thing that would put the arms-out silhouette
-   * back on screen after all this.
+   * back on screen after all this. `setMotion` is what stops the ticking now: it switches the rig to
+   * the pack's own `Death` clip, clamps on the last frame and drops the record out of `animated`.
    */
   private applyUniqueState(record: ViewRecord, tier: number): void {
     if (!record.unique) return;
-
-    if (record.rig) {
-      record.rig.action.paused = record.spent;
-      if (record.spent) this.animated.delete(record);
-      else this.animated.add(record);
-    }
 
     restoreBaseMaterials(record.unique);
     const look = APPEARANCE[record.archetype] ?? NEUTRAL;
@@ -1202,7 +1992,7 @@ export class EntityViews {
   private flush(): void {
     for (const group of this.groups.values()) {
       if (!group.dirty) continue;
-      for (const mesh of [...group.live, ...group.spent]) {
+      for (const mesh of [...group.live, ...group.spent, ...group.moving]) {
         mesh.count = group.slots.length;
         mesh.instanceMatrix.needsUpdate = true;
         mesh.computeBoundingSphere();
@@ -1359,7 +2149,10 @@ export class EntityViews {
 
     const group = this.groups.get(record.groupKey);
     if (!group || record.slot < 0) return null;
-    const active = record.spent && group.spent.length > 0 ? group.spent : group.live;
+    const moving = record.movingTicks > 0 && !record.spent;
+    const active = record.spent && group.spent.length > 0
+      ? group.spent
+      : moving && group.moving.length > 0 ? group.moving : group.live;
     const matrix = new THREE.Matrix4();
     const scale = new THREE.Vector3();
     for (const mesh of active) {
@@ -1381,9 +2174,11 @@ export class EntityViews {
     let instancedMeshes = 0;
     let triangles = 0;
     let bakedPoses = 0;
+    let dressedGroups = 0;
     for (const group of this.groups.values()) {
-      instancedMeshes += group.live.length + group.spent.length;
+      instancedMeshes += group.live.length + group.spent.length + group.moving.length;
       if (group.posed) bakedPoses += 1;
+      if (group.character) dressedGroups += 1;
       const active = group.slots.filter((slot) => slot !== null).length;
       for (const part of group.liveParts) triangles += part.triangles * active;
     }
@@ -1391,9 +2186,13 @@ export class EntityViews {
     let unique = 0;
     let uniqueMeshes = 0;
     let uniqueTriangles = 0;
+    let dressedCharacters = 0;
+    let movingViews = 0;
     for (const record of this.records.values()) {
+      if (record.movingTicks > 0) movingViews += 1;
       if (!record.unique) continue;
       unique += 1;
+      if (record.dressed) dressedCharacters += 1;
       uniqueMeshes += record.uniqueMeshes;
       record.unique.traverse((child) => {
         const mesh = child as THREE.Mesh;
@@ -1415,6 +2214,11 @@ export class EntityViews {
       // and are not, so a ring plus a pip is two.
       estimatedDrawCalls: instancedMeshes * 2 + uniqueMeshes * 2 + this.highlights.size * 2,
       uniqueDrawCalls: this.uniqueDrawCalls,
+      namedDrawCalls: this.namedDrawCalls,
+      otherDrawCalls: this.otherDrawCalls,
+      dressedCharacters,
+      dressedGroups,
+      movingViews,
       triangles: Math.round(triangles + uniqueTriangles),
       missingAssets: [...this.missing],
     };
@@ -1428,7 +2232,11 @@ export class EntityViews {
     this.records.clear();
     this.animated.clear();
     this.meshCounts.clear();
+    this.characterCosts.clear();
+    this.characterSpecs.clear();
     this.uniqueDrawCalls = 0;
+    this.namedDrawCalls = 0;
+    this.otherDrawCalls = 0;
     for (const geometry of this.seamGeometries.values()) geometry.dispose();
     for (const geometry of this.bakedGeometries) geometry.dispose();
     this.seamGeometries.clear();
@@ -1445,6 +2253,136 @@ export class EntityViews {
 
 function round(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * Resolves what a dressed humanoid is made of, or null when the entity is not one.
+ *
+ * Two inputs, in priority order. `view.partAssetIds` is the authored answer and the one the world
+ * layer is moving to. Failing that, `OUTFIT_BODIES` recognises the four clothes-only outfit GLBs
+ * that `view.assetId` still carries today and puts the right base body under them — without which
+ * every NPC in the game renders with no head, no eyes and no eyebrows.
+ *
+ * Hair is appended here rather than authored upstream because it is a look decision and it must be
+ * a pure function of the entity id: the harness calls `__gameDebug.reset({seed})` and diffs, so an
+ * unseeded pick would make every screenshot flap. `hairAssetFor` is a fresh `Rng` per call and
+ * consumes no shared stream, so adding this shifts nothing else.
+ */
+function characterSpecFor(
+  entityId: EntityId,
+  assetId: string,
+  partAssetIds: readonly string[] | undefined,
+): CharacterSpec | null {
+  let bodyAssetId = assetId;
+  let parts: string[] = partAssetIds ? [...partAssetIds] : [];
+
+  if (parts.length === 0) {
+    const implied = OUTFIT_BODIES[assetId];
+    if (!implied) return null;
+    bodyAssetId = implied;
+    parts = [assetId];
+  }
+
+  // Only the two base bodies have a measured head-cap plane, and without one this assembly would
+  // layer clothes over an intact body — the case that leaks bare skin through the trousers.
+  if (headCapHeightFor(bodyAssetId) === null) return null;
+
+  const hooded = parts.some((id) => HOODED_PARTS.has(id));
+  const haired = parts.some((id) => HAIR_PART.test(id));
+  if (!hooded && !haired) {
+    parts.push(hairAssetFor(entityId, bodyAssetId === "base_female" ? "female" : "male"));
+  }
+
+  return { bodyAssetId, partAssetIds: parts, key: `${bodyAssetId}>${parts.join("+")}` };
+}
+
+/**
+ * Archetypes whose tier stays out of the instance-group key, because it changes nothing they draw.
+ *
+ * `npc` and nothing else, and the two guards below say why it is safe rather than assuming it. An
+ * NPC's tier feeds exactly two things: `tierSilhouetteScale`, which only applies to
+ * `TIERED_ARCHETYPES`, and `MaterialLibrary.variant`, which returns the SOURCE material instance
+ * unchanged at strength 0 — and `APPEARANCE` has no `npc` row. So `outfit X at tier 1` and
+ * `outfit X at tier 10` were two groups holding byte-identical geometry and the identical material
+ * objects. Measured: 10 NPC groups collapse to 6, which is 24 fewer `InstancedMesh`es and 48 fewer
+ * world-wide draw calls for no visible change.
+ *
+ * `landmark` deliberately stays out of this, even though `APPEARANCE` has no row for it either:
+ * `appearanceFor` gives any material matching `ROOF_MATERIAL` a 0.42 tier tint, which is how
+ * Karrowmoor's roofs weather toward its blue-grey, and building parts are landmark entities.
+ */
+const TIER_BLIND_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc"]);
+
+function groupTier(archetype: Archetype, tier: number): number | string {
+  if (!TIER_BLIND_ARCHETYPES.has(archetype)) return tier;
+  if (TIERED_ARCHETYPES.has(archetype)) return tier;
+  return (APPEARANCE[archetype]?.strength ?? 0) > 0 ? tier : "-";
+}
+
+/**
+ * Material identity for a character part, ACROSS separately loaded GLBs.
+ *
+ * `mergeSkinnedMeshes` defaults to material UUID, which never merges two files: `world/regionBuilder`
+ * dresses an NPC from four to six separate part GLBs, and two loads of MI_Peasant are two Material
+ * instances holding two Texture instances. Measured effect of leaving it at the default: a dressed
+ * male ranger is 11 meshes and a female ranger 11, against 6 for the same outfit shipped as one GLB.
+ * With this key all four outfits land at 6 meshes — merges of 9->6, 12->6, 8->6 and 13->6.
+ *
+ * It is safe because the images really are the same image. sha1 over each GLB's embedded texture
+ * bytes: T_Peasant_BaseColor is cbc36fd517 in _chest, _legs, _boots and _gloves alike, and
+ * T_Ranger_BaseColor is add5a3c8ba across the ranger set; base_male's eyebrow material MI_Hair_1
+ * carries T_Hair_1_BaseColor ffe6590578, byte-identical to hair_short's and hair_buzzed's. So the
+ * merged mesh drawing under the FIRST material draws exactly the pixels the others would have.
+ *
+ * Name plus texture name plus colour, not name alone: a name collision between two unrelated packs
+ * would otherwise silently paint one with the other's texture.
+ */
+function characterMaterialKey(material: THREE.Material): string {
+  const standard = material as THREE.MeshStandardMaterial;
+  const map = standard.map;
+  return [
+    material.name,
+    material.type,
+    map ? map.name : "-",
+    standard.color ? standard.color.getHexString() : "-",
+    standard.transparent ? "t" : "o",
+    material.side,
+  ].join("|");
+}
+
+/**
+ * The orientation an entity is drawn at: its authored yaw, then tilted toward the ground normal.
+ *
+ * `setFromUnitVectors(UP, normal)` is the full lie-flat-on-the-hill rotation; slerping vertical
+ * toward it by `strength` is what lets a tree take 10% of a slope and a lily pad take all of it.
+ * Applied by premultiply, i.e. AFTER the yaw in local terms, so tilting never spins the model.
+ */
+function orientation(
+  rotationY: number,
+  normal: readonly [number, number, number] | null,
+  strength: number,
+  out: THREE.Quaternion,
+): THREE.Quaternion {
+  out.setFromAxisAngle(Y_AXIS, rotationY);
+  if (!normal || strength <= 0) return out;
+  SCRATCH_NORMAL.set(normal[0], normal[1], normal[2]);
+  if (SCRATCH_NORMAL.lengthSq() < 1e-6) return out;
+  SCRATCH_NORMAL.normalize();
+  SCRATCH_TILT.setFromUnitVectors(Y_AXIS, SCRATCH_NORMAL);
+  SCRATCH_BLEND.identity().slerp(SCRATCH_TILT, Math.min(1, strength));
+  return out.premultiply(SCRATCH_BLEND);
+}
+
+/** Normal and tilt folded into the change-detection signature at 0.01 resolution. */
+function tiltKey(normal: readonly [number, number, number] | null, strength: number): string {
+  if (!normal || strength <= 0) return "-";
+  return `${round(normal[0])},${round(normal[1])},${round(normal[2])}:${round(strength)}`;
+}
+
+/** Interpolates an angle the short way round, so a turn through north does not spin 350 degrees. */
+function shortestArc(from: number, to: number, alpha: number): number {
+  const delta = ((to - from + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return from + delta * alpha;
 }
 
 /**

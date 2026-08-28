@@ -1,0 +1,9 @@
+{ "name": "w1-stats", "actions": [
+ { "inspect": "getSceneStats" },
+ { "inspect": "getEntityViewStats" },
+ { "inspect": "getScatterStats" },
+ { "inspect": "getMetrics" },
+ { "inspect": "getNavigationState" },
+ { "inspect": "getVersion" },
+ { "inspect": "getErrors" }
+]}

@@ -20,6 +20,7 @@ import type { Store } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
 import type { Navigation } from "../systems/navigation.js";
 import type { Movement } from "../systems/movement.js";
+import { equipmentTotalsOf } from "../systems/equipment.js";
 import type { SimClock } from "../core/time.js";
 import { levelProgress, xpToNextLevel } from "../content/xp.js";
 import { distanceXZ } from "../core/math.js";
@@ -152,7 +153,12 @@ export class CorealmGameApi implements GameApiContract {
     if (hook) return { slots: hook.slots(), totals: hook.totals() };
     const slots = {} as Record<EquipSlot, ItemStack | null>;
     for (const slot of EQUIP_SLOTS) slots[slot] = this.store.get().equipment[slot];
-    return { slots, totals: emptyBonuses() };
+    // Derive the totals rather than answering zero. An agent or a panel asking what the player is
+    // wearing used to get a confident all-zero `EquipmentBonuses` whenever the equipment hook was
+    // absent, which is indistinguishable from wearing nothing — the worst of the three possible
+    // answers, because it is wrong and it looks right. `equipmentTotalsOf` is the same derivation
+    // the hook runs, over the slots this branch has already read out of the store.
+    return { slots, totals: equipmentTotalsOf(slots) };
   }
 
   getActivity(): ActivitySummary | null {

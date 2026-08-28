@@ -1,0 +1,6 @@
+lower_quarry_kaldite_3 arch=ore normal=undefined tilt=0.85 groundY=15.76 drawnMinY=15.397 gap=-0.363
+duskoak_stand_trees_5 arch=tree normal=[0.3413,0.9397,0.0228] tilt=0.12 groundY=5.94 drawnMinY=5.548 gap=-0.392
+hollowcut_corven_5 arch=ore normal=[0.3414,0.9397,0.0203] tilt=0.85 groundY=8.28 drawnMinY=7.578 gap=-0.702
+thornbound_elders_ridge_3 arch=enemy normal=undefined tilt=undefined groundY=58.8 drawnMinY=58.857 gap=0.057
+upper_karrow_seam_1 missing
+karrow_scree_1 missing

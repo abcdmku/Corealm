@@ -1,0 +1,117 @@
+{
+ "name": "sky-shots-a",
+ "actions": [
+  {
+   "waitMs": 1500,
+   "label": "settle"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "spawn"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-spawn"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "town_entrance"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-town_entrance"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "town_center"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-town_center"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "bank"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-bank"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "bracken_pit"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-bracken_pit"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "palewood_copse"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-palewood_copse"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "redsill_shallows"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-redsill_shallows"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "marchfield_farm"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-marchfield_farm"
+  },
+  {
+   "debug": "setCameraPreset",
+   "args": [
+    "rootfall"
+   ]
+  },
+  {
+   "waitMs": 400
+  },
+  {
+   "screenshot": "sky-rootfall"
+  }
+ ]
+}

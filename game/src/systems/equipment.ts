@@ -1,18 +1,23 @@
 /**
- * The nine worn slots, and the one place max health is derived.
+ * The nine worn slots.
  *
- * Two rules carry the weight here. First, gear is never destroyed: a swap only completes if the
- * displaced piece has somewhere to land, and a failed swap rolls back to exactly the state it
- * started in. Second, max health is derived from `computeMaxHealth(state, totals.vitality)` on every
- * change, and current health clamps down when the ceiling drops — so taking off a vitality amulet
- * at 3 hp does not leave you standing at more health than you can hold.
+ * Gear is never destroyed: a swap only completes if the displaced piece has somewhere to land, and
+ * a failed swap rolls back to exactly the state it started in.
  *
- * Owner: W-INV. State lives in `state.equipment` and `state.player.maxHealth`; this file adds none.
+ * MAX HEALTH IS NOT DERIVED HERE, and the header used to say it was. `systems/health.ts` calls
+ * `computeMaxHealth(state, totals.vitality)` and clamps current health at the top of every tick
+ * (health.ts:54), and its comment says it does that so no caller has to remember. This file carried
+ * a second copy of the identical derivation and ran it on every equip and unequip. Both copies were
+ * measured to produce the same numbers — a Kaldite Plate moves maxHealth 140 -> 145 and unequipping
+ * it at full health clamps 145 -> 140 either way — so the copy is gone and the health system is the
+ * single owner of the cap. The visible cost of the deletion is that the Equipment panel's derived
+ * max-health row can be one tick (16 ms at 60 Hz) behind the equip that moved it.
+ *
+ * Owner: W-INV. State lives in `state.equipment`; this file adds none.
  */
 import type { EquipSlot, EquipmentBonuses, ItemId, ItemStack, Result, SkillId } from "../contracts.js";
 import { EQUIP_SLOTS, err, ok } from "../contracts.js";
 import type { GameState, Store } from "../state/store.js";
-import { computeMaxHealth } from "../state/store.js";
 import { content } from "../content/index.js";
 import type { EventBus } from "../core/events.js";
 import type { InventorySystem } from "./inventory.js";
@@ -28,6 +33,34 @@ export interface EquipmentDeps {
 
 export function emptyEquipmentBonuses(): EquipmentBonuses {
   return { accuracy: 0, power: 0, armour: 0, magicAccuracy: 0, magicPower: 0, magicArmour: 0, vitality: 0 };
+}
+
+/**
+ * The seven-field sum over nine worn slots, from the slots alone.
+ *
+ * Pulled out of the class so a caller that has the slots but not the system can still get an
+ * HONEST answer. `gameApi.getEquipment()` currently pairs the real worn slots with
+ * `emptyBonuses()` when the equipment hook is missing, which renders as "9 of 9 slots worn" with
+ * every total at 0 — a self-contradictory view that is indistinguishable from wearing nothing. Two
+ * lines up, `getInventory()`'s fallback degrades honestly. This is the function that lets
+ * `getEquipment()` do the same; it needs no system and no state beyond what it is handed.
+ */
+export function equipmentTotalsOf(slots: Readonly<Record<EquipSlot, ItemStack | null>>): EquipmentBonuses {
+  const totals = emptyEquipmentBonuses();
+  for (const slot of EQUIP_SLOTS) {
+    const worn = slots[slot];
+    if (!worn) continue;
+    const bonuses = content.item(worn.itemId)?.equip?.bonuses;
+    if (!bonuses) continue;
+    totals.accuracy += bonuses.accuracy;
+    totals.power += bonuses.power;
+    totals.armour += bonuses.armour;
+    totals.magicAccuracy += bonuses.magicAccuracy;
+    totals.magicPower += bonuses.magicPower;
+    totals.magicArmour += bonuses.magicArmour;
+    totals.vitality += bonuses.vitality;
+  }
+  return totals;
 }
 
 export class EquipmentSystem {
@@ -54,21 +87,7 @@ export class EquipmentSystem {
   }
 
   totals(): EquipmentBonuses {
-    const totals = emptyEquipmentBonuses();
-    for (const slot of EQUIP_SLOTS) {
-      const worn = this.state.equipment[slot];
-      if (!worn) continue;
-      const bonuses = content.item(worn.itemId)?.equip?.bonuses;
-      if (!bonuses) continue;
-      totals.accuracy += bonuses.accuracy;
-      totals.power += bonuses.power;
-      totals.armour += bonuses.armour;
-      totals.magicAccuracy += bonuses.magicAccuracy;
-      totals.magicPower += bonuses.magicPower;
-      totals.magicArmour += bonuses.magicArmour;
-      totals.vitality += bonuses.vitality;
-    }
-    return totals;
+    return equipmentTotalsOf(this.state.equipment);
   }
 
   equip(itemId: ItemId): Result<{ slot: EquipSlot; replaced: ItemId | null }> {
@@ -107,7 +126,6 @@ export class EquipmentSystem {
     }
 
     this.state.equipment[slot] = { itemId, quantity: 1 };
-    this.refreshMaxHealth();
     this.deps.store.markDirty();
     this.deps.events.emit(
       "item.equipped",
@@ -137,7 +155,6 @@ export class EquipmentSystem {
     if (!returned.ok) return { ok: false, error: returned.error };
 
     this.state.equipment[slot] = null;
-    this.refreshMaxHealth();
     this.deps.store.markDirty();
     this.deps.events.emit(
       "item.unequipped",
@@ -146,22 +163,6 @@ export class EquipmentSystem {
       this.deps.now(),
     );
     return ok({ itemId: worn.itemId });
-  }
-
-  // ---------------------------------------------------------------- derived
-
-  /**
-   * Recomputes max health from skills plus worn vitality and clamps current health into it. Public
-   * because a melee or magic level-up moves the same number; the levelling system can call this
-   * instead of duplicating the formula.
-   */
-  refreshMaxHealth(): number {
-    const state = this.state;
-    const max = computeMaxHealth(state, this.totals().vitality);
-    state.player.maxHealth = max;
-    if (state.player.health > max) state.player.health = max;
-    this.deps.store.markDirty();
-    return max;
   }
 
   /** Human-readable reasons, e.g. "melee level 40 (you have 12)". Empty when everything passes. */

@@ -28,7 +28,7 @@
 import * as THREE from "three";
 import { init as initRecast, NavMeshQuery, type NavMesh } from "@recast-navigation/core";
 import { threeToSoloNavMesh, threeToTiledNavMesh } from "@recast-navigation/three";
-import type { EntityId, Vec3 } from "../contracts.js";
+import type { EntityId, SolidVolume, Vec3 } from "../contracts.js";
 import { NAV_CONFIG, PLAYER_SPEED } from "../app/config.js";
 import { distance, distanceXZ, pathLength } from "../core/math.js";
 
@@ -55,6 +55,51 @@ const LARGE_WORLD_CELL_SIZE = 0.45;
  * nothing.
  */
 const QUERY_HALF_EXTENTS = { x: 4, y: 40, z: 4 } as const;
+
+/**
+ * How far short of the requested destination a computed path may finish and still count as having
+ * arrived. Same number as `isConnected`'s default tolerance, and for the same reason: Detour never
+ * fails a query, it returns a partial path to the nearest reachable polygon, so "a path exists" is
+ * not proof of anything.
+ */
+const ARRIVAL_TOLERANCE = 2.5;
+
+/**
+ * Below this gap the snapped destination is appended to the path, above it the path is left
+ * ending where Detour actually stopped.
+ *
+ * This used to be unconditional, and it is the single worst movement bug measured in Phase 1:
+ * `findPath` from inside `coldbrace_house_3` to the town square returned 3 points whose last leg
+ * was a 26 m straight line, and `Movement.followPath` walked it literally — out through the
+ * cottage wall and then through the Forge Shed footprint at (-150.8, -97.7) and (-151.4, -96.5).
+ * The reverse trip reported a valid 28.34 m path and parked the player at (-146, -103.8), inside
+ * the building. 0.6 m is a little over one cell at the large-world cs of 0.45, which is the real
+ * size of the "destination sits just off-mesh" case the append was written for.
+ */
+const APPEND_TOLERANCE = 0.6;
+
+/**
+ * Vertical extent added BELOW a solid volume's base when it is carved out of the navmesh.
+ *
+ * The ring has to intersect the terrain triangles or Recast never merges the two spans and the
+ * ground under the volume stays walkable. Volume bases come from the analytic height field and the
+ * drawn mesh is a 2 m lattice sampled from it, so they differ by a few centimetres on flat ground
+ * and by more on a ridge; 1.5 m covers it everywhere measured.
+ */
+const CARVE_SKIRT = 1.5;
+
+/**
+ * Shortest ring a carve may be.
+ *
+ * `walkableClimb` is 2 voxels at ch 0.2 = 0.40 m. `rcAddSpan` merges a new span into an existing
+ * one and keeps the WALKABLE area flag when the two tops are within that threshold, so a carve
+ * shorter than 0.40 m above the terrain merges back into the ground span as walkable and does
+ * nothing at all. 1.0 m is 2.5x the threshold, which is enough margin for the ch quantisation.
+ */
+const MIN_CARVE_HEIGHT = 1;
+
+/** Sides on a cylinder carve. 10 gives a decagon within 5% of the circle it stands in for. */
+const CYLINDER_SEGMENTS = 10;
 
 export interface NavigationSnapshot {
   /** The harness checks this exact string. Do not rename. */
@@ -351,8 +396,32 @@ export class Navigation {
     return distanceXZ(snapped, point) <= maxDistance ? snapped : null;
   }
 
-  /** A walkable path between two points, snapped to the navmesh. Null when unreachable. */
+  /**
+   * A walkable path between two points, snapped to the navmesh. Null when unreachable OR when the
+   * best Detour could do stops more than `ARRIVAL_TOLERANCE` short of where it was asked to go.
+   *
+   * That second case used to return a path with a fabricated straight last leg. It is why
+   * click-to-move walked through cottage walls, and why a destination inside a building reported a
+   * successful path. Callers that need to distinguish "no route" from "route that stops short"
+   * call `findPathDetailed`.
+   */
   findPath(from: Vec3, to: Vec3): Vec3[] | null {
+    const detailed = this.findPathDetailed(from, to);
+    if (!detailed || detailed.partial) return null;
+    return detailed.path;
+  }
+
+  /**
+   * The honest version of `findPath`: the path Detour actually computed, plus how far short of the
+   * request it stopped. Nothing is ever invented here except the last 0.6 m, and only when the
+   * destination genuinely sits just off-mesh.
+   *
+   * `Movement.startPath` needs `partial` so it can emit `navigation.failed { reason:
+   * "unreachable" }` rather than walk a straight line into a wall, and it needs `arrivalGap` so a
+   * walk-into-interaction-range still counts as arrival when the destination is an ore rock whose
+   * own footprint is carved out of the mesh.
+   */
+  findPathDetailed(from: Vec3, to: Vec3): { path: Vec3[]; partial: boolean; arrivalGap: number } | null {
     if (!this.query) return null;
     try {
       const start = this.query.findClosestPoint(
@@ -369,12 +438,17 @@ export class Navigation {
       if (!result?.success || !result.path || result.path.length === 0) return null;
 
       const points: Vec3[] = result.path.map((point) => [point.x, point.y, point.z] as Vec3);
-      // computePath can stop short when the destination sits just off-mesh. Keep the snapped end so
-      // arrival checks and reported path length agree with what the player actually walks.
       const last = points[points.length - 1]!;
       const snappedEnd: Vec3 = [end.point.x, end.point.y, end.point.z];
-      if (distance(last, snappedEnd) > 0.05) points.push(snappedEnd);
-      return points;
+      const arrivalGap = distanceXZ(last, snappedEnd);
+
+      // Only close the gap when it is one navmesh cell wide. Anything larger is Detour telling us
+      // the destination is on a polygon island it cannot reach, and the straight line across it
+      // goes through whatever made the island.
+      if (arrivalGap <= APPEND_TOLERANCE && distance(last, snappedEnd) > 0.05) {
+        points.push(snappedEnd);
+      }
+      return { path: points, partial: arrivalGap > ARRIVAL_TOLERANCE, arrivalGap };
     } catch {
       return null;
     }
@@ -393,12 +467,10 @@ export class Navigation {
    * existing is not proof of connectivity. This checks the path actually ARRIVES, which is what
    * PRD acceptance B3 (Coldbrace bank -> Upper Karrow seam, one mesh, 380-460 m) needs.
    */
-  isConnected(from: Vec3, to: Vec3, tolerance = 2.5): boolean {
-    const path = this.findPath(from, to);
-    if (!path || path.length === 0) return false;
-    const arrival = path[path.length - 1]!;
-    const target = this.closestPoint(to) ?? to;
-    return distanceXZ(arrival, target) <= tolerance;
+  isConnected(from: Vec3, to: Vec3, tolerance = ARRIVAL_TOLERANCE): boolean {
+    const detailed = this.findPathDetailed(from, to);
+    if (!detailed || detailed.path.length === 0) return false;
+    return detailed.arrivalGap <= tolerance;
   }
 
   /** Connectivity matrix over a set of probe points. The root asserts three-region connectivity. */
@@ -645,4 +717,96 @@ export class Navigation {
 
 function now(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+// ------------------------------------------------------------- nav carving
+
+/**
+ * Invisible geometry handed to Recast so it carves a footprint out of the navmesh, one mesh per
+ * volume. Never rendered — `visible = false` keeps them out of every draw call while Recast still
+ * reads the buffers directly, so the measured cost against the 400-call budget is zero.
+ *
+ * OPEN-TOPPED on purpose. The closed `BoxGeometry` this replaces rasterises its top face into a
+ * perfectly flat walkable polygon, and those polygons are real: probing the navmesh at (-146, 5,
+ * -104) snapped to y = 7.841 on a cottage roof, (-160, 6, -60) to y = 9.041 on the March Company
+ * Hall, and teleporting there let the player walk 5 m along the ridge (screenshot
+ * runs/corealm/screenshots/collision-on-hall-roof.png). Every teleport in the game — region
+ * travel, debug teleport, focus camera, death respawn — routes through `closestPoint`, so a roof
+ * polygon is not "harmless because nothing connects to it", which is what the old comment claimed.
+ * A ring has no top face and generates no roof polygon.
+ *
+ * The sides are what actually block: a vertical quad exceeds `walkableSlopeAngle` 48 degrees, so
+ * it rasterises with the NULL area flag, and because the ring skirts 1.5 m below the volume base
+ * its span merges with the terrain span underneath and takes the ring's flag rather than the
+ * ground's. That is the whole carve.
+ *
+ * Callers must add these to the scene graph (or otherwise leave their world matrices valid) before
+ * `nav.build`; matrices are updated here, so adding them to an identity group is enough.
+ */
+export function solidObstacleMeshes(volumes: readonly SolidVolume[]): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  // One shared material: it is never rendered, and a material per volume would be ~900 objects
+  // allocated for nothing.
+  const material = new THREE.MeshBasicMaterial();
+
+  for (const volume of volumes) {
+    const base = volume.position[1] - CARVE_SKIRT;
+    const geometry =
+      volume.kind === "box"
+        ? ringGeometry(boxFootprint(volume.size[0], volume.size[2]), CARVE_SKIRT + Math.max(volume.size[1], MIN_CARVE_HEIGHT))
+        : ringGeometry(circleFootprint(volume.radius, CYLINDER_SEGMENTS), CARVE_SKIRT + Math.max(volume.height, MIN_CARVE_HEIGHT));
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(volume.position[0], base, volume.position[2]);
+    if (volume.kind === "box") mesh.rotation.y = volume.rotationY;
+    mesh.name = `solid-carve-${volume.id}`;
+    mesh.visible = false;
+    mesh.updateMatrixWorld(true);
+    meshes.push(mesh);
+  }
+  return meshes;
+}
+
+function boxFootprint(sizeX: number, sizeZ: number): [number, number][] {
+  const hx = sizeX * 0.5;
+  const hz = sizeZ * 0.5;
+  return [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]];
+}
+
+function circleFootprint(radius: number, segments: number): [number, number][] {
+  const points: [number, number][] = [];
+  for (let i = 0; i < segments; i += 1) {
+    const angle = (i / segments) * Math.PI * 2;
+    points.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+  }
+  return points;
+}
+
+/** A closed skirt of vertical quads around `footprint`, rising from y = 0 to y = `height`. */
+function ringGeometry(footprint: readonly [number, number][], height: number): THREE.BufferGeometry {
+  const count = footprint.length;
+  const positions = new Float32Array(count * 2 * 3);
+  const indices: number[] = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const [x, z] = footprint[i]!;
+    positions[i * 6 + 0] = x;
+    positions[i * 6 + 1] = 0;
+    positions[i * 6 + 2] = z;
+    positions[i * 6 + 3] = x;
+    positions[i * 6 + 4] = height;
+    positions[i * 6 + 5] = z;
+  }
+  for (let i = 0; i < count; i += 1) {
+    const a = i * 2;
+    const b = a + 1;
+    const c = ((i + 1) % count) * 2;
+    const d = c + 1;
+    indices.push(a, c, b, b, c, d);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  return geometry;
 }

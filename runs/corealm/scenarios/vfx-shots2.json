@@ -1,0 +1,24 @@
+{
+ "name": "vfx-shots2",
+ "actions": [
+  { "waitMs": 2000, "label": "settle" },
+  { "debug": "teleport", "args": [{ "entityId": "coldbrace_anvil" }] },
+  { "waitMs": 2500 },
+  { "screenshot": "vfx-forge-sparks" },
+  { "debug": "setCameraPreset", "args": ["town_entrance"] },
+  { "waitMs": 2500 },
+  { "screenshot": "vfx-town-smoke" },
+  { "debug": "setCameraPreset", "args": ["vellenwood_canopy"] },
+  { "waitMs": 2500 },
+  { "screenshot": "vfx-canopy-leaves" },
+  { "debug": "setCameraPreset", "args": ["palewood_copse"] },
+  { "waitMs": 1200 },
+  { "screenshot": "vfx-contact-palewood" },
+  { "debug": "setCameraPreset", "args": ["bracken_pit"] },
+  { "waitMs": 1200 },
+  { "screenshot": "vfx-contact-bracken" },
+  { "debug": "setCameraPreset", "args": ["hollowcut_seam"] },
+  { "waitMs": 1200 },
+  { "screenshot": "vfx-contact-hollowcut" }
+ ]
+}

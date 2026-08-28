@@ -1,0 +1,21 @@
+{
+  "name": "w1-reach3",
+  "actions": [
+    { "debug": "teleport", "args": [{ "locationId": "karrowmoor_terraces" }] },
+    { "waitMs": 800 },
+    { "inspect": "getPlayerPosition", "label": "pos in karrowmoor" },
+    { "inspect": "getNavigationState", "label": "nav state karrowmoor" },
+    { "debug": "groundHeight", "args": [144, -66], "label": "ground at highcairn_outpost" },
+    { "debug": "groundHeight", "args": [46, -24], "label": "ground at gravelmaw_entrance" },
+    { "debug": "getNavPath", "args": [[60,0,-16],[144,0,-66]], "label": "terraces -> highcairn_outpost" },
+    { "debug": "getNavPath", "args": [[60,0,-16],[46,0,-24]], "label": "terraces -> gravelmaw_entrance" },
+    { "debug": "getNavPath", "args": [[60,0,-16],[150,0,-70]], "label": "terraces -> highcairn_bank" },
+    { "debug": "getNavPath", "args": [[60,0,-16],[170,0,-6]], "label": "terraces -> moor_road_bend" },
+    { "debug": "getNavPath", "args": [[60,0,-16],[100,0,-80]], "label": "terraces -> karrow_ramp_two" },
+    { "debug": "getNavPath", "args": [[60,0,-16],[140,0,-176]], "label": "terraces -> great_cairn" },
+    { "debug": "getNavPath", "args": [[60,0,-16],[128,0,-58]], "label": "terraces -> highcairn_plots" },
+    { "debug": "getNavPath", "args": [[60,0,-16],[50,0,-22]], "label": "terraces -> near gravelmaw" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "highcairn_outpost" }], "label": "moveTo highcairn_outpost from terraces" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "gravelmaw_entrance" }], "label": "moveTo gravelmaw_entrance from terraces" }
+  ]
+}

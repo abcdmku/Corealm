@@ -20,6 +20,8 @@
  *   npx tsx tools/build-assets.ts --force    rebuild everything
  *   npx tsx tools/build-assets.ts --check    confirm every catalog source exists
  *   npx tsx tools/build-assets.ts --verify   parse every manifest GLB and report
+ *   npx tsx tools/build-assets.ts --metrics  re-measure size/base from source, no rebuild
+ *   npx tsx tools/build-assets.ts --metrics --write   ...and write them into the manifest
  *   npx tsx tools/build-assets.ts --probe <zip-key> <substring>   inspect sources
  */
 import path from "node:path";
@@ -719,6 +721,19 @@ interface ManifestAsset {
   tags: string[];
   bytes: number;
   size: { x: number; y: number; z: number };
+  /**
+   * World-space bounding-box MINIMUM corner, metres, same traversal and same source document as
+   * `size` (so `base + size` is the maximum corner exactly).
+   *
+   * `base.y` is the offset from the GLB's own origin to the bottom of its geometry, and it is not
+   * zero: 117 of the 213 assets are off by more than 2 cm and the extremes are `roof_log` at
+   * +3.849 and `vine_1` at -2.121. Placing an asset's origin on the ground therefore floats or
+   * sinks it by exactly `base.y * scale` — measured across 159 world entities during the Phase 2
+   * grounding sweep (runs/corealm/diagnosis/grounding-objects-floating-above-sunk-in.md), where it
+   * left the Fallen Duskoak hovering 5.77 m and every farm plot fully underground. Ground-aligned
+   * placement is `y = groundHeight - base.y * scale`.
+   */
+  base: { x: number; y: number; z: number };
   animations: string[];
   materials: string[];
 }
@@ -847,17 +862,38 @@ interface LoadedSource {
   sourceBytes: number;
 }
 
-/** World-space bounding-box extent of a document's default scene, in metres. */
-function measure(document: Document): { x: number; y: number; z: number } {
+interface Metrics {
+  size: { x: number; y: number; z: number };
+  base: { x: number; y: number; z: number };
+}
+
+const ZERO_METRICS: Metrics = { size: { x: 0, y: 0, z: 0 }, base: { x: 0, y: 0, z: 0 } };
+
+/**
+ * World-space bounding box of a document's default scene, in metres, as extent (`size`) and
+ * minimum corner (`base`).
+ *
+ * Both come out of one `getBounds` call on purpose: a base offset that disagrees with the size
+ * field by a node transform is worse than no base offset at all, because the caller would compose
+ * them and get a mesh that neither sits on the ground nor is the height it claims.
+ */
+function measure(document: Document): Metrics {
   const root = document.getRoot();
   const scene = root.getDefaultScene() ?? root.listScenes()[0];
-  if (!scene) return { x: 0, y: 0, z: 0 };
+  if (!scene) return ZERO_METRICS;
   const bounds = getBounds(scene);
-  if (![...bounds.min, ...bounds.max].every((value) => Number.isFinite(value))) return { x: 0, y: 0, z: 0 };
+  if (![...bounds.min, ...bounds.max].every((value) => Number.isFinite(value))) return ZERO_METRICS;
   return {
-    x: round(bounds.max[0] - bounds.min[0]),
-    y: round(bounds.max[1] - bounds.min[1]),
-    z: round(bounds.max[2] - bounds.min[2]),
+    size: {
+      x: round(bounds.max[0] - bounds.min[0]),
+      y: round(bounds.max[1] - bounds.min[1]),
+      z: round(bounds.max[2] - bounds.min[2]),
+    },
+    base: {
+      x: round(bounds.min[0]),
+      y: round(bounds.min[1]),
+      z: round(bounds.min[2]),
+    },
   };
 }
 
@@ -1102,7 +1138,10 @@ async function buildOne(
   const inputHash = fingerprintSource(zip, plan);
 
   const cached = state[pick.id];
-  if (!force && cached && cached.optionsHash === optionsHash && cached.inputHash === inputHash) {
+  // A record written before `base` existed would be replayed into the manifest verbatim and
+  // silently delete the field for that asset, so it counts as stale even when its hashes match.
+  const cacheable = cached?.asset.base !== undefined;
+  if (!force && cached && cacheable && cached.optionsHash === optionsHash && cached.inputHash === inputHash) {
     let onDisk = -1;
     try {
       onDisk = (await stat(outFile)).size;
@@ -1119,7 +1158,10 @@ async function buildOne(
   const { document, sourceBytes } = await materialize(zip, plan);
   // Measured on the untouched source: quantization rewrites skinned vertex data
   // into normalized space, so post-transform bounds would lie for characters.
-  const size = measure(document);
+  // `base` has to come from here too: the two animation libraries ship with their meshes
+  // stripped, so the OUTPUT GLB has no bounds at all — getBounds returns NaN on it — and only
+  // the source still knows where the geometry sat.
+  const metrics = measure(document);
   let note: string | undefined;
 
   if (pick.animationLibrary) {
@@ -1131,7 +1173,7 @@ async function buildOne(
       const glb = await io.writeBinary(original.document);
       await mkdir(path.dirname(outFile), { recursive: true });
       await writeFile(outFile, glb);
-      const asset = describe(pick, relative, glb.byteLength, original.document, size);
+      const asset = describe(pick, relative, glb.byteLength, original.document, metrics);
       state[pick.id] = { inputHash, optionsHash, sourceBytes, asset };
       return { asset, sourceBytes, reused: false, note };
     }
@@ -1143,7 +1185,7 @@ async function buildOne(
   await mkdir(path.dirname(outFile), { recursive: true });
   await writeFile(outFile, glb);
 
-  const asset = describe(pick, relative, glb.byteLength, document, size);
+  const asset = describe(pick, relative, glb.byteLength, document, metrics);
   state[pick.id] = { inputHash, optionsHash, sourceBytes, asset };
   return { asset, sourceBytes, reused: false, note };
 }
@@ -1153,7 +1195,7 @@ function describe(
   relative: string,
   bytes: number,
   document: Document,
-  size: { x: number; y: number; z: number },
+  metrics: Metrics,
 ): ManifestAsset {
   const root = document.getRoot();
   return {
@@ -1167,7 +1209,8 @@ function describe(
     is: pick.tags[0] ?? pick.category,
     tags: pick.tags,
     bytes,
-    size,
+    size: metrics.size,
+    base: metrics.base,
     animations: root.listAnimations().map((animation) => animation.getName()),
     materials: root.listMaterials().map((material) => material.getName()),
   };
@@ -1214,6 +1257,53 @@ async function verify(): Promise<number> {
   return failures;
 }
 
+/**
+ * Re-measures `size` and `base` for every catalog entry straight from its source document and
+ * compares them with the manifest. Nothing is decoded to disk, no GLB is rebuilt and no texture is
+ * re-encoded, so this is the cheap way to confirm the manifest's measured metadata still describes
+ * the sources — a full `--force` rebuild costs the whole 37.6 MB of output.
+ *
+ * With `--write` it also writes the measured values back. That path exists so `base` can be added
+ * to a manifest whose GLBs are already correct, which is exactly how it was introduced: the
+ * geometry did not change, only what we record about it.
+ */
+async function metrics(write: boolean): Promise<number> {
+  const manifestFile = path.join(OUT_DIR, "manifest.json");
+  const manifest = JSON.parse(await readFile(manifestFile, "utf8")) as Manifest;
+  const byId = new Map(manifest.assets.map((asset) => [asset.id, asset]));
+  let changed = 0;
+  for (const pick of CATALOG) {
+    const asset = byId.get(pick.id);
+    if (!asset) {
+      console.error(`MISSING from manifest: ${pick.id}`);
+      changed += 1;
+      continue;
+    }
+    // Source, not output: quantization rewrites skinned vertex data into normalized space, and
+    // the animation libraries have no mesh left in the output at all.
+    const { document } = await loadSource(pick);
+    const measured = measure(document);
+    // Compared as serialized text because that is what ends up in the file: it makes -0 and 0
+    // equal, which is the only way rounding a negative bound to 3 dp can differ from itself.
+    const before = JSON.stringify({ size: asset.size, base: asset.base ?? null });
+    const after = JSON.stringify({ size: measured.size, base: measured.base });
+    if (before !== after) {
+      changed += 1;
+      console.log(`${pick.id.padEnd(24)} ${before} -> ${after}`);
+      asset.size = measured.size;
+      asset.base = measured.base;
+    }
+  }
+  for (const zip of archives.values()) await zip.close();
+  if (write && changed > 0) {
+    await writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
+    console.log(`metrics: rewrote ${changed} of ${manifest.assets.length} entries`);
+  } else {
+    console.log(`metrics: ${manifest.assets.length - changed}/${manifest.assets.length} entries match their source`);
+  }
+  return changed;
+}
+
 async function probe(zipKey: string, needle: string): Promise<void> {
   const pack = PACKS.find((entry) => entry.id === zipKey);
   const file = pack ? path.join(CACHE_DIR, pack.zip) : path.join(CACHE_DIR, zipKey);
@@ -1251,6 +1341,11 @@ async function main(): Promise<void> {
   }
   if (args[0] === "--verify") {
     process.exitCode = (await verify()) === 0 ? 0 : 1;
+    return;
+  }
+  if (args[0] === "--metrics") {
+    const changed = await metrics(args.includes("--write"));
+    process.exitCode = changed === 0 || args.includes("--write") ? 0 : 1;
     return;
   }
 

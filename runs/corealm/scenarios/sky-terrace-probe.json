@@ -1,0 +1,26 @@
+{
+ "name": "sky-terrace-probe",
+ "actions": [
+  { "waitMs": 1500, "label": "settle" },
+  { "debug": "setCameraPreset", "args": ["karrowmoor_terraces"] },
+  { "waitMs": 400 },
+  { "inspect": "getCamera" },
+  { "inspect": "getPlayerPosition" },
+  { "screenshot": "sky-probe-yaw0" },
+  { "drag": [640, 360, 900, 360], "button": "right" },
+  { "waitMs": 300 },
+  { "screenshot": "sky-probe-yaw90" },
+  { "drag": [640, 360, 900, 360], "button": "right" },
+  { "waitMs": 300 },
+  { "screenshot": "sky-probe-yaw180" },
+  { "drag": [640, 360, 900, 360], "button": "right" },
+  { "waitMs": 300 },
+  { "screenshot": "sky-probe-yaw270" },
+  { "debug": "setCameraPreset", "args": ["karrowmoor_terraces"] },
+  { "waitMs": 300 },
+  { "drag": [640, 500, 640, 220], "button": "right" },
+  { "waitMs": 300 },
+  { "inspect": "getCamera" },
+  { "screenshot": "sky-probe-pitchup" }
+ ]
+}

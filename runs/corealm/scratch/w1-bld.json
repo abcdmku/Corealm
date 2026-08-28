@@ -1,0 +1,4 @@
+{ "name": "w1-bld", "actions": [
+ { "debug": "listBuildings" },
+ { "debug": "listEntities", "args": [{ "archetype": "landmark", "regionId": "fallowmarch" }] }
+]}

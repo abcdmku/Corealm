@@ -1,0 +1,333 @@
+{
+ "name": "w1-slope",
+ "actions": [
+  {
+   "debug": "groundHeight",
+   "args": [
+    170.0,
+    -6.0
+   ],
+   "label": "170.0,-6.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    169.35,
+    -7.5
+   ],
+   "label": "169.3,-7.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    168.7,
+    -9.0
+   ],
+   "label": "168.7,-9.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    168.05,
+    -10.5
+   ],
+   "label": "168.1,-10.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    167.4,
+    -12.0
+   ],
+   "label": "167.4,-12.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    166.75,
+    -13.5
+   ],
+   "label": "166.8,-13.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    166.1,
+    -15.0
+   ],
+   "label": "166.1,-15.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    165.45,
+    -16.5
+   ],
+   "label": "165.4,-16.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    164.8,
+    -18.0
+   ],
+   "label": "164.8,-18.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    164.15,
+    -19.5
+   ],
+   "label": "164.2,-19.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    163.5,
+    -21.0
+   ],
+   "label": "163.5,-21.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    162.85,
+    -22.5
+   ],
+   "label": "162.8,-22.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    162.2,
+    -24.0
+   ],
+   "label": "162.2,-24.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    161.55,
+    -25.5
+   ],
+   "label": "161.6,-25.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    160.9,
+    -27.0
+   ],
+   "label": "160.9,-27.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    160.25,
+    -28.5
+   ],
+   "label": "160.2,-28.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    159.6,
+    -30.0
+   ],
+   "label": "159.6,-30.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    158.95,
+    -31.5
+   ],
+   "label": "158.9,-31.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    158.3,
+    -33.0
+   ],
+   "label": "158.3,-33.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    157.65,
+    -34.5
+   ],
+   "label": "157.7,-34.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    157.0,
+    -36.0
+   ],
+   "label": "157.0,-36.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    156.35,
+    -37.5
+   ],
+   "label": "156.3,-37.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    155.7,
+    -39.0
+   ],
+   "label": "155.7,-39.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    155.05,
+    -40.5
+   ],
+   "label": "155.1,-40.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    154.4,
+    -42.0
+   ],
+   "label": "154.4,-42.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    153.75,
+    -43.5
+   ],
+   "label": "153.8,-43.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    153.1,
+    -45.0
+   ],
+   "label": "153.1,-45.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    152.45,
+    -46.5
+   ],
+   "label": "152.4,-46.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    151.8,
+    -48.0
+   ],
+   "label": "151.8,-48.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    151.15,
+    -49.5
+   ],
+   "label": "151.2,-49.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    150.5,
+    -51.0
+   ],
+   "label": "150.5,-51.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    149.85,
+    -52.5
+   ],
+   "label": "149.8,-52.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    149.2,
+    -54.0
+   ],
+   "label": "149.2,-54.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    148.55,
+    -55.5
+   ],
+   "label": "148.6,-55.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    147.9,
+    -57.0
+   ],
+   "label": "147.9,-57.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    147.25,
+    -58.5
+   ],
+   "label": "147.2,-58.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    146.6,
+    -60.0
+   ],
+   "label": "146.6,-60.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    145.95,
+    -61.5
+   ],
+   "label": "145.9,-61.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    145.3,
+    -63.0
+   ],
+   "label": "145.3,-63.0"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    144.65,
+    -64.5
+   ],
+   "label": "144.7,-64.5"
+  },
+  {
+   "debug": "groundHeight",
+   "args": [
+    144.0,
+    -66.0
+   ],
+   "label": "144.0,-66.0"
+  }
+ ]
+}

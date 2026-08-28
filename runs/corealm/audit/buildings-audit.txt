@@ -1,0 +1,145 @@
+
+=== forge [6,5] kit plaster — 26 parts
+  non-roof extent x[  -3.16,   3.16] z[  -2.67,   2.67]   footprint x±3.00 z±2.50
+  wall top 3.123   roof/canopy top 7.771
+  box back    centre(   0.00,  -2.20) size    6.00 x    0.60 h    6.12 halfDiag 3.01
+  box left    centre(  -2.70,   0.30) size    0.60 x    4.40 h    6.12 halfDiag 2.22
+  box right   centre(   2.70,   0.30) size    0.60 x    4.40 h    6.12 halfDiag 2.22
+
+=== forge [6,5] kit timber — 28 parts
+  non-roof extent x[  -3.16,   3.16] z[  -2.67,   2.67]   footprint x±3.00 z±2.50
+  wall top 3.123   roof/canopy top 8.338
+  box back    centre(   0.00,  -2.20) size    6.00 x    0.60 h    6.12 halfDiag 3.01
+  box left    centre(  -2.70,   0.30) size    0.60 x    4.40 h    6.12 halfDiag 2.22
+  box right   centre(   2.70,   0.30) size    0.60 x    4.40 h    6.12 halfDiag 2.22
+
+=== forge [6,5] kit stone — 28 parts
+  non-roof extent x[  -3.52,   3.52] z[  -3.02,   3.02]   footprint x±3.00 z±2.50
+  wall top 3.123   roof/canopy top 7.198
+  box back    centre(   0.00,  -2.20) size    6.00 x    0.60 h    6.12 halfDiag 3.01
+  box left    centre(  -2.70,   0.30) size    0.60 x    4.40 h    6.12 halfDiag 2.22
+  box right   centre(   2.70,   0.30) size    0.60 x    4.40 h    6.12 halfDiag 2.22
+
+=== forge [4,4] kit plaster — 20 parts
+  non-roof extent x[  -2.16,   2.16] z[  -2.16,   2.16]   footprint x±2.00 z±2.00
+  wall top 3.123   roof/canopy top 6.841
+  box back    centre(   0.00,  -1.70) size    4.00 x    0.60 h    6.12 halfDiag 2.02
+  box left    centre(  -1.70,   0.30) size    0.60 x    3.40 h    6.12 halfDiag 1.73
+  box right   centre(   1.70,   0.30) size    0.60 x    3.40 h    6.12 halfDiag 1.73
+
+=== porch [4,3] kit plaster — 8 parts
+  non-roof extent x[  -2.04,   2.04] z[  -1.80,   0.54]   footprint x±2.00 z±1.50
+  wall top -Infinity   roof/canopy top 3.028
+  box back    centre(   0.00,  -1.39) size    4.00 x    0.41 h    3.12 halfDiag 2.01
+  box post_l  centre(  -1.88,   0.38) size    0.40 x    0.40 h    3.00 halfDiag 0.28
+  box post_r  centre(   1.88,   0.38) size    0.40 x    0.40 h    3.00 halfDiag 0.28
+
+=== porch [4,3] kit stone — 10 parts
+  non-roof extent x[  -2.40,   2.27] z[  -1.81,   0.90]   footprint x±2.00 z±1.50
+  wall top 3.123   roof/canopy top 3.389
+  box back    centre(   0.00,  -1.39) size    4.00 x    0.41 h    3.12 halfDiag 2.01
+  box post_l  centre(  -1.88,   0.38) size    0.40 x    0.40 h    3.00 halfDiag 0.28
+  box post_r  centre(   1.88,   0.38) size    0.40 x    0.40 h    3.00 halfDiag 0.28
+
+=== porch [6,2.4] kit timber — 10 parts
+  non-roof extent x[  -3.04,   3.04] z[  -1.50,   0.84]   footprint x±3.00 z±1.20
+  wall top -Infinity   roof/canopy top 3.028
+  box back    centre(   0.00,  -1.09) size    6.00 x    0.41 h    3.12 halfDiag 3.01
+  box post_l  centre(  -2.88,   0.68) size    0.40 x    0.40 h    3.00 halfDiag 0.28
+  box post_r  centre(   2.88,   0.68) size    0.40 x    0.40 h    3.00 halfDiag 0.28
+
+=== arcade [6,3] kit plaster — 14 parts
+  non-roof extent x[  -3.16,   3.16] z[  -1.80,   0.50]   footprint x±3.00 z±1.50
+  wall top -Infinity   roof/canopy top 3.028
+  box back    centre(   0.00,  -1.39) size    6.00 x    0.41 h    3.12 halfDiag 3.01
+
+=== arcade [6,3] kit stone — 17 parts
+  non-roof extent x[  -3.52,   3.39] z[  -1.89,   0.76]   footprint x±3.00 z±1.50
+  wall top 3.123   roof/canopy top 3.389
+  box back    centre(   0.00,  -1.39) size    6.00 x    0.41 h    3.12 halfDiag 3.01
+
+=== market_row [9,3] kit plaster — 12 parts
+  non-roof extent x[Infinity,-Infinity] z[Infinity,-Infinity]   footprint x±4.50 z±1.50
+  wall top -Infinity   roof/canopy top -Infinity
+  box pitch0  centre(  -3.00,  -0.95) size    1.90 x    0.70 h    2.70 halfDiag 1.01
+  box pitch1  centre(   0.00,  -0.95) size    1.90 x    0.70 h    2.70 halfDiag 1.01
+  box pitch2  centre(   3.00,  -0.95) size    1.90 x    0.70 h    2.70 halfDiag 1.01
+
+=== well [2,2] kit plaster — 14 parts
+  non-roof extent x[  -0.82,   0.82] z[  -0.82,   0.82]   footprint x±1.00 z±1.00
+  wall top -Infinity   roof/canopy top 3.215
+  box curb    centre(   0.00,   0.00) size    1.60 x    1.60 h    1.00 halfDiag 1.13
+
+=== well [2,2] kit stone — 14 parts
+  non-roof extent x[  -1.10,   1.10] z[  -1.10,   1.10]   footprint x±1.00 z±1.00
+  wall top -Infinity   roof/canopy top 3.215
+  box curb    centre(   0.00,   0.00) size    1.60 x    1.60 h    1.00 halfDiag 1.13
+
+=== gatehouse [8,3] kit plaster — 28 parts
+  non-roof extent x[  -4.16,   4.16] z[  -1.66,   1.66]   footprint x±4.00 z±1.50
+  wall top 6.246   roof/canopy top -Infinity
+  box pier_l  centre(  -3.00,   0.00) size    2.00 x    3.00 h    6.25 halfDiag 1.80
+  box pier_r  centre(   3.00,   0.00) size    2.00 x    3.00 h    6.25 halfDiag 1.80
+
+=== gatehouse [8,3] kit stone — 28 parts
+  non-roof extent x[  -4.52,   4.52] z[  -2.02,   2.02]   footprint x±4.00 z±1.50
+  wall top 6.246   roof/canopy top -Infinity
+  box pier_l  centre(  -3.00,   0.00) size    2.00 x    3.00 h    6.25 halfDiag 1.80
+  box pier_r  centre(   3.00,   0.00) size    2.00 x    3.00 h    6.25 halfDiag 1.80
+
+=== gatehouse [6,3] kit stone — 26 parts
+  non-roof extent x[  -3.52,   3.52] z[  -2.02,   2.02]   footprint x±3.00 z±1.50
+  wall top 6.246   roof/canopy top -Infinity
+  box pier_l  centre(  -2.00,   0.00) size    2.00 x    3.00 h    6.25 halfDiag 1.80
+  box pier_r  centre(   2.00,   0.00) size    2.00 x    3.00 h    6.25 halfDiag 1.80
+
+=== cottage [6,4] kit plaster — 27 parts
+  non-roof extent x[  -3.16,   3.16] z[  -2.16,   2.16]   footprint x±3.00 z±2.00
+  wall top 3.123   roof/canopy top 6.841
+  box body    centre(   0.00,   0.00) size    6.00 x    4.00 h    6.82 halfDiag 3.61
+
+=== gate clearance
+  width 6: collided gap 2.000 m, drawn gap 2.000 m
+    head course covers x[-1.00,1.00] over a 2.00 m gap
+  width 8: collided gap 4.000 m, drawn gap 4.000 m
+    head course covers x[-2.00,2.00] over a 4.00 m gap
+  width 10: collided gap 6.000 m, drawn gap 6.000 m
+    head course covers x[-3.00,3.00] over a 6.00 m gap
+  width 12: collided gap 4.000 m, drawn gap 4.000 m
+    head course covers x[-2.00,2.00] over a 4.00 m gap
+
+=== wall runs
+  L=52 openings=[]
+    26 panels, 26 trims, 2 posts, 1 boxes, 52.0 m built of 52 m
+    parts span x[-0.159,52.159], |z| max 0.314
+    spans [0.0,52.0]
+  L=52 openings=[{"at":26,"width":8}]
+    22 panels, 22 trims, 4 posts, 2 boxes, 44.0 m built of 52 m
+    parts span x[-0.159,52.159], |z| max 0.314
+    spans [0.0,22.0] [30.0,52.0]
+  L=34 openings=[{"at":8,"width":4},{"at":26,"width":6}]
+    11 panels, 11 trims, 6 posts, 3 boxes, 22.0 m built of 34 m
+    parts span x[-0.159,34.159], |z| max 0.314
+    spans [0.0,6.0] [10.0,22.0] [30.0,34.0]
+  L=42 openings=[{"at":0,"width":4},{"at":42,"width":4}]
+    19 panels, 19 trims, 2 posts, 1 boxes, 38.0 m built of 42 m
+    parts span x[1.841,40.159], |z| max 0.314
+    spans [2.0,40.0]
+
+=== compositions
+  bank_counter  plaster  12 parts x[  -2.06,   2.06] y[  -0.12,   3.73] z[  -1.50,   1.75]
+  bank_counter  stone    14 parts x[  -2.42,   2.29] y[  -0.12,   3.73] z[  -1.51,   1.75]
+  forge_yard    plaster   6 parts x[  -2.73,   2.78] y[  -0.00,   1.86] z[  -0.29,   3.57]
+  forge_yard    stone     6 parts x[  -2.73,   2.78] y[  -0.00,   1.86] z[  -0.29,   3.57]
+  market_pitch  plaster   7 parts x[  -1.91,   1.94] y[  -0.05,   1.69] z[  -1.04,   1.36]
+  market_pitch  stone     7 parts x[  -1.91,   1.94] y[  -0.05,   1.69] z[  -1.04,   1.36]
+  wood_pile     plaster   4 parts x[  -1.39,   1.49] y[   0.00,   0.62] z[  -0.45,   0.45]
+  wood_pile     stone     4 parts x[  -1.39,   1.49] y[   0.00,   0.62] z[  -0.45,   0.45]
+  garden        plaster   8 parts x[  -3.09,   4.19] y[  -0.03,   1.82] z[  -2.46,   1.73]
+  garden        stone     8 parts x[  -3.09,   4.19] y[  -0.03,   1.82] z[  -2.46,   1.73]
+
+prefabPartAssetIds(): 39 ids, all in the manifest
+compositionPartAssetIds(): 39 ids, all in the manifest
+PREFAB_IDS covers 14; MODULE_METRES 2; GATE_GAP_METRES 4
+
+OK — no problems

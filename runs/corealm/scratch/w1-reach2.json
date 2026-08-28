@@ -1,0 +1,17 @@
+{
+  "name": "w1-reach2",
+  "actions": [
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "vellenwood_east_gate" }], "label": "vellenwood_east_gate" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "karrowmoor_north_gate" }], "label": "karrowmoor_north_gate" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "moor_road_bend" }], "label": "moor_road_bend" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "karrowmoor_terraces" }], "label": "karrowmoor_terraces" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "highcairn_outpost" }], "label": "highcairn_outpost" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "highcairn_bank" }], "label": "highcairn_bank" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "karrow_ramp_two" }], "label": "karrow_ramp_two" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "karrow_ramp_three" }], "label": "karrow_ramp_three" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "great_cairn" }], "label": "great_cairn" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "gravelmaw_entrance" }], "label": "gravelmaw_entrance" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "rootfall" }], "label": "rootfall" },
+    { "debug": "callTool", "args": ["corealm_move_to", { "locationId": "town_center" }], "label": "town_center" }
+  ]
+}

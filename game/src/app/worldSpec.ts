@@ -73,12 +73,30 @@ function flatSpotsFor(region: RegionDef): FlatSpot[] {
     // so a house whose far corner sat 40 cm up the falloff had that corner buried and the opposite
     // one hanging in the air. That is the "wall panels float at an angle, roof sections rest on
     // grass" finding — the assembly was right and the ground under it was not.
-    flats.push({
-      x: settlement.centre[0],
-      z: settlement.centre[1],
-      radius: settlementRadius(settlement),
-      blend: 26,
-    });
+    // A rectangular pad when the settlement asks for one, a circle otherwise.
+    //
+    // A circle cannot hold a terrace. Highcairn is authored around an 18 m riser and its circular
+    // pad erased the whole thing — measured, its north and south walls shared y = 26.810, so the
+    // one piece of designed verticality in Karrowmoor became a disc of uniform grey. A rectangle
+    // whose long axis runs ALONG the terrace flattens the building ground and leaves the riser
+    // above and below it alone. `padShape` is authored per settlement; `settlementRadius` still
+    // sizes the falloff sweep, because the falloff has to clear whatever the pad's corners reach.
+    const padShape = settlement.padShape;
+    flats.push(padShape
+      ? {
+          x: settlement.centre[0],
+          z: settlement.centre[1],
+          radius: Math.hypot(padShape.halfX, padShape.halfZ),
+          blend: 26,
+          halfExtents: [padShape.halfX, padShape.halfZ] as const,
+          rotationY: padShape.rotationY,
+        }
+      : {
+          x: settlement.centre[0],
+          z: settlement.centre[1],
+          radius: settlementRadius(settlement),
+          blend: 26,
+        });
   }
 
   // Named locations are where the player stands still: banks, seams, camps, gates. A 7 m pad keeps

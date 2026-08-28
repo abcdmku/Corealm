@@ -1,0 +1,8047 @@
+{
+ "hist": {
+  "<1cm": 21595,
+  "1-5cm": 10844,
+  "5-10cm": 4106,
+  "10-25cm": 1651,
+  "25-50cm": 64,
+  ">50cm": 72
+ },
+ "worst": {
+  "d": -21.633155445502695,
+  "x": 253.32299999999984,
+  "z": -101.76400000000024,
+  "field": 43.12025237028715,
+  "mesh": 21.487096924784453
+ },
+ "per": [
+  {
+   "id": "ordrun",
+   "arch": "boss",
+   "asset": "outfit_male_ranger",
+   "field": 7.905589739336101,
+   "mesh": 41.086,
+   "d": 33.181,
+   "drawMin": 7.895730234852853
+  },
+  {
+   "id": "gravelmaw_arena_marker",
+   "arch": "landmark",
+   "asset": "torch",
+   "field": 7.905589739336101,
+   "mesh": 33.278,
+   "d": 25.373,
+   "drawMin": 7.461354494094849
+  },
+  {
+   "id": "ordrun_gate",
+   "arch": "door",
+   "asset": "cage",
+   "field": 8.9055897393361,
+   "mesh": 34.208,
+   "d": 25.302,
+   "drawMin": 8.812228298694405
+  },
+  {
+   "id": "gravelmaw_ch3_elders_1",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 9.9055897393361,
+   "mesh": 28.246,
+   "d": 18.341,
+   "drawMin": 9.910464855816247
+  },
+  {
+   "id": "gravelmaw_chamber3_marker",
+   "arch": "landmark",
+   "asset": "torch",
+   "field": 9.9055897393361,
+   "mesh": 27.313,
+   "d": 17.407,
+   "drawMin": 9.461354494094849
+  },
+  {
+   "id": "gravelmaw_ch3_elders_2",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 9.9055897393361,
+   "mesh": 26.832,
+   "d": 16.927,
+   "drawMin": 9.910464855816247
+  },
+  {
+   "id": "gravelmaw_stone_door",
+   "arch": "door",
+   "asset": "cage",
+   "field": 11.9055897393361,
+   "mesh": 27.354,
+   "d": 15.448,
+   "drawMin": 11.812228298694405
+  },
+  {
+   "id": "gravelmaw_chamber2_marker",
+   "arch": "landmark",
+   "asset": "torch",
+   "field": 13.9055897393361,
+   "mesh": 28.032,
+   "d": 14.127,
+   "drawMin": 13.461354494094849
+  },
+  {
+   "id": "gravelmaw_ch2_skitterlings_3",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 13.9055897393361,
+   "mesh": 27.081,
+   "d": 13.175,
+   "drawMin": 13.897516807579665
+  },
+  {
+   "id": "gravelmaw_ch2_skitterlings_5",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 13.9055897393361,
+   "mesh": 26.921,
+   "d": 13.016,
+   "drawMin": 13.897516807579665
+  },
+  {
+   "id": "chimney_climb",
+   "arch": "obstacle",
+   "asset": "stairs_stone",
+   "field": 13.9055897393361,
+   "mesh": 26.663,
+   "d": 12.758,
+   "drawMin": 13.885464407102733
+  },
+  {
+   "id": "gravelmaw_ch2_skitterlings_2",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 13.9055897393361,
+   "mesh": 26.484,
+   "d": 12.579,
+   "drawMin": 13.897516807579665
+  },
+  {
+   "id": "gravelmaw_ch2_skitterlings_6",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 13.9055897393361,
+   "mesh": 26.264,
+   "d": 12.358,
+   "drawMin": 13.897516807579665
+  },
+  {
+   "id": "gravelmaw_ch2_skitterlings_4",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 13.9055897393361,
+   "mesh": 26.223,
+   "d": 12.317,
+   "drawMin": 13.897516807579665
+  },
+  {
+   "id": "gravelmaw_ch2_skitterlings_1",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 13.9055897393361,
+   "mesh": 25.808,
+   "d": 11.903,
+   "drawMin": 13.897516807579665
+  },
+  {
+   "id": "gravelmaw_ch1_wights_3",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 17.9055897393361,
+   "mesh": 28.079,
+   "d": 10.174,
+   "drawMin": 17.843643046852293
+  },
+  {
+   "id": "gravelmaw_ch1_wights_1",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 17.9055897393361,
+   "mesh": 25.145,
+   "d": 7.24,
+   "drawMin": 17.843643046852293
+  },
+  {
+   "id": "gravelmaw_ch1_wights_2",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 17.9055897393361,
+   "mesh": 23.889,
+   "d": 5.984,
+   "drawMin": 17.843643046852293
+  },
+  {
+   "id": "gravelmaw_ch1_wights_4",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 17.9055897393361,
+   "mesh": 20.899,
+   "d": 2.993,
+   "drawMin": 17.843643046852293
+  },
+  {
+   "id": "gravelmaw_chamber1_marker",
+   "arch": "landmark",
+   "asset": "torch",
+   "field": 17.9055897393361,
+   "mesh": 20.405,
+   "d": 2.499,
+   "drawMin": 17.46135449409485
+  },
+  {
+   "id": "highcairn_crane#brace_l",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 24.87,
+   "mesh": 26.81,
+   "d": 1.94,
+   "drawMin": 26.554548533310527
+  },
+  {
+   "id": "highcairn_crane#brace_r",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 24.87,
+   "mesh": 26.81,
+   "d": 1.94,
+   "drawMin": 26.554548533310527
+  },
+  {
+   "id": "highcairn_hut_1#prop_l",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_1#prop_r",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_2#prop_l",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_2#prop_r",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_3#prop_l",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_3#prop_r",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_4#prop_l",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_4#prop_r",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_5#prop_l",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_5#prop_r",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_6#prop_l",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "highcairn_hut_6#prop_r",
+   "arch": "landmark",
+   "asset": "support_beam",
+   "field": 25.24,
+   "mesh": 26.81,
+   "d": 1.57,
+   "drawMin": 26.60874161679311
+  },
+  {
+   "id": "gravelmaw_mouth_portal#shoulder_r",
+   "arch": "landmark",
+   "asset": "cliff_step_1",
+   "field": 19.91,
+   "mesh": 20.754,
+   "d": 0.844,
+   "drawMin": 19.675798655873262
+  },
+  {
+   "id": "thornline_stones#stone1",
+   "arch": "landmark",
+   "asset": "cliff_tall",
+   "field": 5.29,
+   "mesh": 5.972,
+   "d": 0.682,
+   "drawMin": 5.290000677108765
+  },
+  {
+   "id": "thornline_stones#low_2",
+   "arch": "landmark",
+   "asset": "rock_medium_1",
+   "field": 5.29,
+   "mesh": 5.824,
+   "d": 0.534,
+   "drawMin": 5.088294271627213
+  },
+  {
+   "id": "thornline_stones#stone3",
+   "arch": "landmark",
+   "asset": "cliff_tall",
+   "field": 5.29,
+   "mesh": 5.739,
+   "d": 0.449,
+   "drawMin": 5.290000796318054
+  },
+  {
+   "id": "thornline_stones#stone2",
+   "arch": "landmark",
+   "asset": "cliff_tall",
+   "field": 5.29,
+   "mesh": 5.665,
+   "d": 0.375,
+   "drawMin": 5.290000319480896
+  },
+  {
+   "id": "hollowcut_corven_5",
+   "arch": "ore",
+   "asset": "rock_medium_2",
+   "field": 7.13,
+   "mesh": 7.409,
+   "d": 0.279,
+   "drawMin": 7.075314251406715
+  },
+  {
+   "id": "duskoak_stand_trees_8",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 3.08,
+   "mesh": 3.24,
+   "d": 0.16,
+   "drawMin": 2.7798380851745605
+  },
+  {
+   "id": "marchwolves_deepwood_2",
+   "arch": "enemy",
+   "asset": "enemy_blob",
+   "field": 3.8,
+   "mesh": 3.959,
+   "d": 0.159,
+   "drawMin": 3.777832483372384
+  },
+  {
+   "id": "bramble_skitterlings_5",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 1.23,
+   "mesh": 1.369,
+   "d": 0.139,
+   "drawMin": 1.2227577582604958
+  },
+  {
+   "id": "duskoak_stand_trees_7",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 2.1,
+   "mesh": 2.212,
+   "d": 0.112,
+   "drawMin": 1.7998380661010742
+  },
+  {
+   "id": "duskoak_stand_trees_10",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 4.73,
+   "mesh": 4.839,
+   "d": 0.109,
+   "drawMin": 4.429837703704834
+  },
+  {
+   "id": "bramble_skitterlings_2",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 3.47,
+   "mesh": 3.566,
+   "d": 0.096,
+   "drawMin": 3.462757767797239
+  },
+  {
+   "id": "marchwolves_deepwood_4",
+   "arch": "enemy",
+   "asset": "enemy_blob",
+   "field": 3.1,
+   "mesh": 3.196,
+   "d": 0.096,
+   "drawMin": 3.077832435688668
+  },
+  {
+   "id": "cairnwights_fields_5",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 42.86,
+   "mesh": 42.936,
+   "d": 0.076,
+   "drawMin": 42.79805359983081
+  },
+  {
+   "id": "duskoak_stand_trees_3",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 3.63,
+   "mesh": 3.703,
+   "d": 0.073,
+   "drawMin": 3.329838275909424
+  },
+  {
+   "id": "scree_skitterlings_1",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 58.49,
+   "mesh": 58.553,
+   "d": 0.063,
+   "drawMin": 58.48192842867341
+  },
+  {
+   "id": "duskoak_stand_trees_4",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 3.85,
+   "mesh": 3.893,
+   "d": 0.043,
+   "drawMin": 3.549837589263916
+  },
+  {
+   "id": "bracken_pit_grithe_6",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 3.05,
+   "mesh": 3.091,
+   "d": 0.041,
+   "drawMin": 2.806033936470077
+  },
+  {
+   "id": "scree_skitterlings_5",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 57.44,
+   "mesh": 57.477,
+   "d": 0.037,
+   "drawMin": 57.4319253769156
+  },
+  {
+   "id": "thornbound_elders_ridge_3",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 25.13,
+   "mesh": 25.166,
+   "d": 0.036,
+   "drawMin": 25.134873959209802
+  },
+  {
+   "id": "scree_skitterlings_2",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 58.38,
+   "mesh": 58.414,
+   "d": 0.034,
+   "drawMin": 58.37192781832185
+  },
+  {
+   "id": "thornbound_husks_5",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 7.66,
+   "mesh": 7.687,
+   "d": 0.027,
+   "drawMin": 7.66422971261307
+  },
+  {
+   "id": "rill_skitterlings_3",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": -1.51,
+   "mesh": -1.495,
+   "d": 0.015,
+   "drawMin": -1.5158941703774949
+  },
+  {
+   "id": "cairnwights_fields_4",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 29.46,
+   "mesh": 29.475,
+   "d": 0.015,
+   "drawMin": 29.398052073951902
+  },
+  {
+   "id": "marchwolves_deepwood_1",
+   "arch": "enemy",
+   "asset": "enemy_blob",
+   "field": 7.25,
+   "mesh": 7.263,
+   "d": 0.013,
+   "drawMin": 7.2278325310561
+  },
+  {
+   "id": "duskoak_stand_trees_5",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 5.94,
+   "mesh": 5.95,
+   "d": 0.01,
+   "drawMin": 5.639837741851807
+  },
+  {
+   "id": "bracken_pit_grithe_5",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 2.71,
+   "mesh": 2.719,
+   "d": 0.009,
+   "drawMin": 2.4660340223007653
+  },
+  {
+   "id": "palewood_copse_trees_6",
+   "arch": "tree",
+   "asset": "tree_common_1",
+   "field": -0.48,
+   "mesh": -0.471,
+   "d": 0.009,
+   "drawMin": -0.6766455173492432
+  },
+  {
+   "id": "scree_skitterlings_4",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 54.83,
+   "mesh": 54.839,
+   "d": 0.009,
+   "drawMin": 54.821928581261304
+  },
+  {
+   "id": "marchwolf_pups_4",
+   "arch": "enemy",
+   "asset": "enemy_blob",
+   "field": 0.23,
+   "mesh": 0.238,
+   "d": 0.008,
+   "drawMin": 0.2126031358447893
+  },
+  {
+   "id": "thornbound_elders_ridge_1",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 15.58,
+   "mesh": 15.588,
+   "d": 0.008,
+   "drawMin": 15.584874722149255
+  },
+  {
+   "id": "bracken_pit_grithe_3",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 2.7,
+   "mesh": 2.706,
+   "d": 0.006,
+   "drawMin": 2.4560337934189294
+  },
+  {
+   "id": "marchfield_plots_1",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": -1.94,
+   "mesh": -1.936,
+   "d": 0.004,
+   "drawMin": -2.153992788785226
+  },
+  {
+   "id": "marchfield_plots_2",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": -1.94,
+   "mesh": -1.936,
+   "d": 0.004,
+   "drawMin": -2.153992788785226
+  },
+  {
+   "id": "marchfield_plots_3",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": -1.94,
+   "mesh": -1.936,
+   "d": 0.004,
+   "drawMin": -2.153992788785226
+  },
+  {
+   "id": "marchfield_plots_4",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": -1.94,
+   "mesh": -1.936,
+   "d": 0.004,
+   "drawMin": -2.153992788785226
+  },
+  {
+   "id": "marchfield_plots_5",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": -1.94,
+   "mesh": -1.936,
+   "d": 0.004,
+   "drawMin": -2.153992788785226
+  },
+  {
+   "id": "marchfield_plots_6",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": -1.94,
+   "mesh": -1.936,
+   "d": 0.004,
+   "drawMin": -2.153992788785226
+  },
+  {
+   "id": "coldbrace_hall#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t0_0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t0_1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t0_2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w0_3",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t0_3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w0_4",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t0_4",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w0_5",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t0_5",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#w1_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t2_0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t2_1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t2_2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w2_3",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t2_3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w2_4",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t2_4",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w2_5",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#t2_5",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_hall#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#w3_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_hall#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_hall#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_hall#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_hall#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_vault#w0_0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_0_2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_1_2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_2_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_2_1",
+   "arch": "landmark",
+   "asset": "wall_brick_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_2_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_3_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_3_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#w0_3_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_vault#c0_0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_vault#c0_1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_vault#c0_2",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_vault#c0_3",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_house_1#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_1#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_1#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_1#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_1#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_1#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_1#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_1#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_1#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_1#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_1#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_1#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_1#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_1#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_2#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_2#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_2#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_2#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_2#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_2#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_2#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_2#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_2#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_2#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_2#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_2#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_2#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_2#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_3#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_3#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_3#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_3#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_3#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_3#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_3#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_3#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_3#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_3#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_3#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_3#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_3#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_3#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_4#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_4#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_4#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_4#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_4#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_4#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_4#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_4#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_4#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_4#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_4#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_4#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_4#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_4#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_5#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_5#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_5#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_5#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_5#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_5#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_5#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_5#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_5#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_5#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_5#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_5#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_5#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_5#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_6#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_6#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_6#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_6#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_6#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_6#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_6#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_6#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_6#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_6#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_6#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_6#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_6#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_6#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_7#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_7#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_7#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_7#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_7#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_7#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_7#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_7#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_7#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_7#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_7#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_7#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_7#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_7#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_8#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_8#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_8#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_8#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_8#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_8#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_8#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_8#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_8#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_house_8#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_house_8#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_8#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_8#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_house_8#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_forge_shed#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_forge_shed#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_forge_shed#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_forge_shed#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_forge_shed#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_forge_shed#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_forge_shed#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_forge_shed#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8876712322235107
+  },
+  {
+   "id": "coldbrace_forge_shed#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_forge_shed#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_forge_shed#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_forge_shed#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899997472763062
+  },
+  {
+   "id": "coldbrace_forge_shed#crate",
+   "arch": "landmark",
+   "asset": "crate_village",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8937018604540798
+  },
+  {
+   "id": "coldbrace_gate_south#pf0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_gate_south#pb0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_gate_south#pf0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_gate_south#pb0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_gate_south#post0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_gate_south#post1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_gate_south#arch_f",
+   "arch": "landmark",
+   "asset": "wall_arch",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899998664855957
+  },
+  {
+   "id": "coldbrace_gate_south#arch_b",
+   "arch": "landmark",
+   "asset": "wall_arch",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899998664855957
+  },
+  {
+   "id": "coldbrace_gate_east#pf0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_gate_east#pb0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_gate_east#pf0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_gate_east#pb0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_gate_east#post0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_gate_east#post1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_gate_east#arch_f",
+   "arch": "landmark",
+   "asset": "wall_arch",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899998664855957
+  },
+  {
+   "id": "coldbrace_gate_east#arch_b",
+   "arch": "landmark",
+   "asset": "wall_arch",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899998664855957
+  },
+  {
+   "id": "coldbrace_wall_w#w0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_w#t0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_w#w1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_w#t1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_w#w2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_w#t2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_w#w3",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_w#t3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_w#end_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_wall_w#end_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_wall_n#w0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_n#t0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_n#w1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_n#t1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_n#w2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_n#t2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_n#w3",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_n#t3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_n#end_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_wall_n#end_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_wall_e#w0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_e#t0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_e#w1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_e#t1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_e#w2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_e#t2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_e#w3",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_e#t3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_e#end_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_wall_e#end_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_wall_s#w0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_s#t0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_s#w1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_s#t1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_s#w2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_s#t2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_s#w3",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899999856948853
+  },
+  {
+   "id": "coldbrace_wall_s#t3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.7602456866281457
+  },
+  {
+   "id": "coldbrace_wall_s#end_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_wall_s#end_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8821210861206055
+  },
+  {
+   "id": "coldbrace_bank",
+   "arch": "bank",
+   "asset": "chest_wood",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8673031032085419
+  },
+  {
+   "id": "coldbrace_general",
+   "arch": "shop",
+   "asset": "market_stall",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8851820230484009
+  },
+  {
+   "id": "coldbrace_smith",
+   "arch": "shop",
+   "asset": "market_stall_cart",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.886062450417958
+  },
+  {
+   "id": "coldbrace_furnace",
+   "arch": "station",
+   "asset": "cauldron",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8871382324336945
+  },
+  {
+   "id": "coldbrace_anvil",
+   "arch": "station",
+   "asset": "anvil",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8926749161508014
+  },
+  {
+   "id": "coldbrace_range",
+   "arch": "station",
+   "asset": "cooking_pot",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8538444919985935
+  },
+  {
+   "id": "coldbrace_crafting",
+   "arch": "station",
+   "asset": "workbench",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8902297244865209
+  },
+  {
+   "id": "coldbrace_fletching",
+   "arch": "station",
+   "asset": "workbench_drawers",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 2.3046349995078126
+  },
+  {
+   "id": "npc_warden_ilse",
+   "arch": "npc",
+   "asset": "outfit_female_peasant",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8832563776522875
+  },
+  {
+   "id": "npc_pitmaster_dorn",
+   "arch": "npc",
+   "asset": "outfit_male_ranger",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8860327312722802
+  },
+  {
+   "id": "npc_smith_harrow",
+   "arch": "npc",
+   "asset": "outfit_male_peasant",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8860327303409576
+  },
+  {
+   "id": "npc_ranger_syb",
+   "arch": "npc",
+   "asset": "outfit_female_ranger",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8860327322036028
+  },
+  {
+   "id": "npc_carter_bel",
+   "arch": "npc",
+   "asset": "outfit_male_peasant",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8860327303409576
+  },
+  {
+   "id": "wall_vault",
+   "arch": "obstacle",
+   "asset": "wall_plaster_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8879040479660034
+  },
+  {
+   "id": "march_vault_tower",
+   "arch": "landmark",
+   "asset": "door_frame_round",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.875758171081543
+  },
+  {
+   "id": "march_vault_tower#kerb_l",
+   "arch": "landmark",
+   "asset": "kerb_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899892815214366
+  },
+  {
+   "id": "march_vault_tower#kerb_r",
+   "arch": "landmark",
+   "asset": "kerb_straight",
+   "field": 0.89,
+   "mesh": 0.894,
+   "d": 0.004,
+   "drawMin": 0.8899892815214366
+  },
+  {
+   "id": "fallowmarch_north_gate",
+   "arch": "portal",
+   "asset": "wall_arch",
+   "field": 3.31,
+   "mesh": 3.314,
+   "d": 0.004,
+   "drawMin": 3.309999704360962
+  },
+  {
+   "id": "fallowmarch_north_gate#wall_l",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 3.31,
+   "mesh": 3.314,
+   "d": 0.004,
+   "drawMin": 3.309999942779541
+  },
+  {
+   "id": "fallowmarch_north_gate#wall_r",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 3.31,
+   "mesh": 3.314,
+   "d": 0.004,
+   "drawMin": 3.309999942779541
+  },
+  {
+   "id": "fallowmarch_north_gate#post_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 3.31,
+   "mesh": 3.314,
+   "d": 0.004,
+   "drawMin": 3.298969030380249
+  },
+  {
+   "id": "fallowmarch_north_gate#post_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 3.31,
+   "mesh": 3.314,
+   "d": 0.004,
+   "drawMin": 3.298969030380249
+  },
+  {
+   "id": "ridge_pines_trees_6",
+   "arch": "tree",
+   "asset": "tree_pine_2",
+   "field": 8.84,
+   "mesh": 8.844,
+   "d": 0.004,
+   "drawMin": 8.583043098449707
+  },
+  {
+   "id": "scree_skitterlings_6",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 58.2,
+   "mesh": 58.204,
+   "d": 0.004,
+   "drawMin": 58.19192751314607
+  },
+  {
+   "id": "bracken_pit_grithe_4",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 2.69,
+   "mesh": 2.693,
+   "d": 0.003,
+   "drawMin": 2.4460338029556725
+  },
+  {
+   "id": "bracken_pit_stone_2",
+   "arch": "ore",
+   "asset": "rock_medium_3",
+   "field": 2.37,
+   "mesh": 2.373,
+   "d": 0.003,
+   "drawMin": 2.0859234620374663
+  },
+  {
+   "id": "rill_skitterlings_6",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": -1.29,
+   "mesh": -1.287,
+   "d": 0.003,
+   "drawMin": -1.2958941417672654
+  },
+  {
+   "id": "broken_milestone",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": -0.68,
+   "mesh": -0.677,
+   "d": 0.003,
+   "drawMin": -0.6800000071525574
+  },
+  {
+   "id": "broken_milestone#top",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": -0.68,
+   "mesh": -0.677,
+   "d": 0.003,
+   "drawMin": -0.6859090924263
+  },
+  {
+   "id": "broken_milestone#rub1",
+   "arch": "landmark",
+   "asset": "rubble_brick_1",
+   "field": -0.68,
+   "mesh": -0.677,
+   "d": 0.003,
+   "drawMin": -0.9988690662905008
+  },
+  {
+   "id": "broken_milestone#rub2",
+   "arch": "landmark",
+   "asset": "rubble_brick_2",
+   "field": -0.68,
+   "mesh": -0.677,
+   "d": 0.003,
+   "drawMin": -0.9662991499545741
+  },
+  {
+   "id": "broken_milestone#stone",
+   "arch": "landmark",
+   "asset": "rock_medium_1",
+   "field": -0.68,
+   "mesh": -0.677,
+   "d": 0.003,
+   "drawMin": -0.8155366985044507
+  },
+  {
+   "id": "broken_milestone#kerb_l",
+   "arch": "landmark",
+   "asset": "kerb_straight",
+   "field": -0.68,
+   "mesh": -0.677,
+   "d": 0.003,
+   "drawMin": -0.680010711326006
+  },
+  {
+   "id": "broken_milestone#kerb_r",
+   "arch": "landmark",
+   "asset": "kerb_straight",
+   "field": -0.68,
+   "mesh": -0.677,
+   "d": 0.003,
+   "drawMin": -0.680010711326006
+  },
+  {
+   "id": "bramble_skitterlings_4",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 4.38,
+   "mesh": 4.383,
+   "d": 0.003,
+   "drawMin": 4.3727578536279275
+  },
+  {
+   "id": "vellenwood_marchgate",
+   "arch": "portal",
+   "asset": "wall_arch",
+   "field": 5.81,
+   "mesh": 5.813,
+   "d": 0.003,
+   "drawMin": 5.8099998235702515
+  },
+  {
+   "id": "vellenwood_marchgate#wall_l",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 5.81,
+   "mesh": 5.813,
+   "d": 0.003,
+   "drawMin": 5.809999942779541
+  },
+  {
+   "id": "vellenwood_marchgate#wall_r",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 5.81,
+   "mesh": 5.813,
+   "d": 0.003,
+   "drawMin": 5.809999942779541
+  },
+  {
+   "id": "vellenwood_marchgate#post_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 5.81,
+   "mesh": 5.813,
+   "d": 0.003,
+   "drawMin": 5.8007659912109375
+  },
+  {
+   "id": "vellenwood_marchgate#post_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 5.81,
+   "mesh": 5.813,
+   "d": 0.003,
+   "drawMin": 5.8007659912109375
+  },
+  {
+   "id": "vellenwood_east_gate",
+   "arch": "portal",
+   "asset": "wall_arch",
+   "field": 5.73,
+   "mesh": 5.732,
+   "d": 0.002,
+   "drawMin": 5.729999899864197
+  },
+  {
+   "id": "vellenwood_east_gate#wall_l",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 5.73,
+   "mesh": 5.732,
+   "d": 0.002,
+   "drawMin": 5.730000019073486
+  },
+  {
+   "id": "vellenwood_east_gate#wall_r",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 5.73,
+   "mesh": 5.732,
+   "d": 0.002,
+   "drawMin": 5.730000019073486
+  },
+  {
+   "id": "vellenwood_east_gate#post_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 5.73,
+   "mesh": 5.732,
+   "d": 0.002,
+   "drawMin": 5.720766067504883
+  },
+  {
+   "id": "vellenwood_east_gate#post_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 5.73,
+   "mesh": 5.732,
+   "d": 0.002,
+   "drawMin": 5.720766067504883
+  },
+  {
+   "id": "palewood_copse_trees_3",
+   "arch": "tree",
+   "asset": "tree_common_1",
+   "field": -0.81,
+   "mesh": -0.809,
+   "d": 0.001,
+   "drawMin": -1.0066454410552979
+  },
+  {
+   "id": "brookvault_planks",
+   "arch": "obstacle",
+   "asset": "floor_wood",
+   "field": -3.1,
+   "mesh": -3.099,
+   "d": 0.001,
+   "drawMin": -3.1160160186442303
+  },
+  {
+   "id": "rill_skitterlings_1",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": -1.35,
+   "mesh": -1.349,
+   "d": 0.001,
+   "drawMin": -1.355894203756096
+  },
+  {
+   "id": "thornbound_husks_2",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 7.69,
+   "mesh": 7.691,
+   "d": 0.001,
+   "drawMin": 7.694229922421419
+  },
+  {
+   "id": "thornbound_husks_3",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 6.53,
+   "mesh": 6.531,
+   "d": 0.001,
+   "drawMin": 6.53423007500931
+  },
+  {
+   "id": "bramble_skitterlings_1",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 3.21,
+   "mesh": 3.211,
+   "d": 0.001,
+   "drawMin": 3.202757777333982
+  },
+  {
+   "id": "lower_quarry_kaldite_1",
+   "arch": "ore",
+   "asset": "rock_medium_3",
+   "field": 15.76,
+   "mesh": 15.761,
+   "d": 0.001,
+   "drawMin": 15.396840499013287
+  },
+  {
+   "id": "lower_quarry_kaldite_2",
+   "arch": "ore",
+   "asset": "rock_medium_3",
+   "field": 15.76,
+   "mesh": 15.761,
+   "d": 0.001,
+   "drawMin": 15.396840499013287
+  },
+  {
+   "id": "upper_karrow_kaldite_1",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 50.04,
+   "mesh": 50.041,
+   "d": 0.001,
+   "drawMin": 49.72811904883302
+  },
+  {
+   "id": "upper_karrow_kaldite_2",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 50.04,
+   "mesh": 50.041,
+   "d": 0.001,
+   "drawMin": 49.72811904883302
+  },
+  {
+   "id": "upper_karrow_kaldite_3",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 50.04,
+   "mesh": 50.041,
+   "d": 0.001,
+   "drawMin": 49.72811904883302
+  },
+  {
+   "id": "great_cairn_stone",
+   "arch": "landmark",
+   "asset": "boulder_large",
+   "field": 58.09,
+   "mesh": 58.091,
+   "d": 0.001,
+   "drawMin": 58.090069696028415
+  },
+  {
+   "id": "great_cairn_stone#flank_l",
+   "arch": "landmark",
+   "asset": "boulder_medium",
+   "field": 58.09,
+   "mesh": 58.091,
+   "d": 0.001,
+   "drawMin": 58.090067497123265
+  },
+  {
+   "id": "great_cairn_stone#flank_r",
+   "arch": "landmark",
+   "asset": "boulder_medium",
+   "field": 58.09,
+   "mesh": 58.091,
+   "d": 0.001,
+   "drawMin": 58.09005791668664
+  },
+  {
+   "id": "great_cairn_stone#skirt",
+   "arch": "landmark",
+   "asset": "rock_medium_2",
+   "field": 58.09,
+   "mesh": 58.091,
+   "d": 0.001,
+   "drawMin": 58.050212310624886
+  },
+  {
+   "id": "redsill_spots_1",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": -0.9,
+   "mesh": -0.9,
+   "d": 0,
+   "drawMin": -0.9290144754113883
+  },
+  {
+   "id": "redsill_spots_2",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": -0.9,
+   "mesh": -0.9,
+   "d": 0,
+   "drawMin": -0.9290144754113883
+  },
+  {
+   "id": "redsill_spots_3",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": -0.9,
+   "mesh": -0.9,
+   "d": 0,
+   "drawMin": -0.9290144754113883
+  },
+  {
+   "id": "redsill_spots_4",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": -0.9,
+   "mesh": -0.9,
+   "d": 0,
+   "drawMin": -0.9290144754113883
+  },
+  {
+   "id": "hollowcut_corven_1",
+   "arch": "ore",
+   "asset": "rock_medium_2",
+   "field": 7.09,
+   "mesh": 7.09,
+   "d": 0,
+   "drawMin": 7.035314289553687
+  },
+  {
+   "id": "hollowcut_corven_2",
+   "arch": "ore",
+   "asset": "rock_medium_2",
+   "field": 7.09,
+   "mesh": 7.09,
+   "d": 0,
+   "drawMin": 7.035314289553687
+  },
+  {
+   "id": "hollowcut_corven_3",
+   "arch": "ore",
+   "asset": "rock_medium_2",
+   "field": 7.09,
+   "mesh": 7.09,
+   "d": 0,
+   "drawMin": 7.035314289553687
+  },
+  {
+   "id": "duskoak_stand_trees_1",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 3.67,
+   "mesh": 3.67,
+   "d": 0,
+   "drawMin": 3.369838237762451
+  },
+  {
+   "id": "blackwater_spots_1",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 3.1,
+   "mesh": 3.1,
+   "d": 0,
+   "drawMin": 3.0653397157630473
+  },
+  {
+   "id": "blackwater_spots_2",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 3.1,
+   "mesh": 3.1,
+   "d": 0,
+   "drawMin": 3.0653397157630473
+  },
+  {
+   "id": "blackwater_spots_3",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 3.1,
+   "mesh": 3.1,
+   "d": 0,
+   "drawMin": 3.0653397157630473
+  },
+  {
+   "id": "blackwater_spots_4",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 3.1,
+   "mesh": 3.1,
+   "d": 0,
+   "drawMin": 3.0653397157630473
+  },
+  {
+   "id": "blackwater_spots_5",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 3.1,
+   "mesh": 3.1,
+   "d": 0,
+   "drawMin": 3.0653397157630473
+  },
+  {
+   "id": "fallen_duskoak",
+   "arch": "obstacle",
+   "asset": "roof_log",
+   "field": 2.25,
+   "mesh": 2.25,
+   "d": 0,
+   "drawMin": 8.023323972853778
+  },
+  {
+   "id": "ridge_pines_trees_1",
+   "arch": "tree",
+   "asset": "tree_pine_2",
+   "field": 43.12,
+   "mesh": 43.12,
+   "d": 0,
+   "drawMin": 42.863043785095215
+  },
+  {
+   "id": "ridge_pines_trees_3",
+   "arch": "tree",
+   "asset": "tree_pine_2",
+   "field": 10.79,
+   "mesh": 10.79,
+   "d": 0,
+   "drawMin": 10.533042907714844
+  },
+  {
+   "id": "ridge_pines_trees_4",
+   "arch": "tree",
+   "asset": "tree_pine_2",
+   "field": 12.17,
+   "mesh": 12.17,
+   "d": 0,
+   "drawMin": 11.913043022155762
+  },
+  {
+   "id": "cairn_tarn_spots_1",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 7.1,
+   "mesh": 7.1,
+   "d": 0,
+   "drawMin": 7.06290835964162
+  },
+  {
+   "id": "cairn_tarn_spots_2",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 7.1,
+   "mesh": 7.1,
+   "d": 0,
+   "drawMin": 7.06290835964162
+  },
+  {
+   "id": "far_tarn_spots_1",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 7.1,
+   "mesh": 7.1,
+   "d": 0,
+   "drawMin": 7.06290835964162
+  },
+  {
+   "id": "far_tarn_spots_2",
+   "arch": "fishing_spot",
+   "asset": "rope_coil",
+   "field": 7.1,
+   "mesh": 7.1,
+   "d": 0,
+   "drawMin": 7.06290835964162
+  },
+  {
+   "id": "highcairn_plot_beds_1",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.536434291798255
+  },
+  {
+   "id": "highcairn_plot_beds_2",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.536434291798255
+  },
+  {
+   "id": "highcairn_plot_beds_3",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.536434291798255
+  },
+  {
+   "id": "highcairn_plot_beds_4",
+   "arch": "farm_plot",
+   "asset": "crop_carrot",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.536434291798255
+  },
+  {
+   "id": "highcairn_hut_1#w0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w0_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w2_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w2_1",
+   "arch": "landmark",
+   "asset": "wall_brick_door",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w2_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w3_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#w3_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_1#c0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_1#c1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_1#c2",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_1#c3",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_1#crate",
+   "arch": "landmark",
+   "asset": "crate_metal",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.812743693590164
+  },
+  {
+   "id": "highcairn_hut_2#w0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w0_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w2_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w2_1",
+   "arch": "landmark",
+   "asset": "wall_brick_door",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w2_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w3_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#w3_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_2#c0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_2#c1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_2#c2",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_2#c3",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_2#crate",
+   "arch": "landmark",
+   "asset": "crate_metal",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.812743693590164
+  },
+  {
+   "id": "highcairn_hut_3#w0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w0_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w2_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w2_1",
+   "arch": "landmark",
+   "asset": "wall_brick_door",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w2_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w3_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#w3_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_3#c0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_3#c1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_3#c2",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_3#c3",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_3#crate",
+   "arch": "landmark",
+   "asset": "crate_metal",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.812743693590164
+  },
+  {
+   "id": "highcairn_hut_4#w0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w0_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w2_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w2_1",
+   "arch": "landmark",
+   "asset": "wall_brick_door",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w2_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w3_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#w3_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_4#c0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_4#c1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_4#c2",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_4#c3",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_4#crate",
+   "arch": "landmark",
+   "asset": "crate_metal",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.812743693590164
+  },
+  {
+   "id": "highcairn_hut_5#w0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w0_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w2_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w2_1",
+   "arch": "landmark",
+   "asset": "wall_brick_door",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w2_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w3_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#w3_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_5#c0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_5#c1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_5#c2",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_5#c3",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_5#crate",
+   "arch": "landmark",
+   "asset": "crate_metal",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.812743693590164
+  },
+  {
+   "id": "highcairn_hut_6#w0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w0_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w2_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w2_1",
+   "arch": "landmark",
+   "asset": "wall_brick_door",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w2_2",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w3_0",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#w3_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_hut_6#c0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_6#c1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_6#c2",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_6#c3",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_hut_6#crate",
+   "arch": "landmark",
+   "asset": "crate_metal",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.812743693590164
+  },
+  {
+   "id": "highcairn_gate#pf0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_gate#pb0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_gate#pf0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_gate#pb0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_gate#post0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_gate#post1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_gate#arch_f",
+   "arch": "landmark",
+   "asset": "wall_arch",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80999994277954
+  },
+  {
+   "id": "highcairn_gate#arch_b",
+   "arch": "landmark",
+   "asset": "wall_arch",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80999994277954
+  },
+  {
+   "id": "highcairn_wall_n#w0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_n#t0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_n#w1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_n#t1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_n#w2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_n#t2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_n#w3",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_n#t3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_n#end_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_wall_n#end_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_wall_s#w0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_s#t0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_s#w1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_s#t1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_s#w2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_s#t2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_s#w3",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_s#t3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_s#end_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_wall_s#end_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_wall_w#w0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_w#t0",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_w#w1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_w#t1",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_w#w2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_w#t2",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_w#w3",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809999465942383
+  },
+  {
+   "id": "highcairn_wall_w#t3",
+   "arch": "landmark",
+   "asset": "wall_bottom_trim",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.70849519019401
+  },
+  {
+   "id": "highcairn_wall_w#end_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_wall_w#end_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80383610725403
+  },
+  {
+   "id": "highcairn_bank_counter",
+   "arch": "bank",
+   "asset": "chest_wood",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.78730258345604
+  },
+  {
+   "id": "highcairn_general",
+   "arch": "shop",
+   "asset": "market_stall",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80518114566803
+  },
+  {
+   "id": "highcairn_smith",
+   "arch": "shop",
+   "asset": "market_stall_cart",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.80606157303759
+  },
+  {
+   "id": "highcairn_furnace",
+   "arch": "station",
+   "asset": "cauldron",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.807139023983378
+  },
+  {
+   "id": "highcairn_anvil",
+   "arch": "station",
+   "asset": "anvil",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.812675230863327
+  },
+  {
+   "id": "highcairn_range",
+   "arch": "station",
+   "asset": "cooking_pot",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.773843614618222
+  },
+  {
+   "id": "npc_foreman_arden",
+   "arch": "npc",
+   "asset": "outfit_male_ranger",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.806032211519778
+  },
+  {
+   "id": "npc_quarrier_vess",
+   "arch": "npc",
+   "asset": "outfit_female_ranger",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.8060322124511
+  },
+  {
+   "id": "npc_cairnkeeper_ode",
+   "arch": "npc",
+   "asset": "outfit_female_peasant",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.803255857899785
+  },
+  {
+   "id": "npc_watcher_hale",
+   "arch": "npc",
+   "asset": "outfit_male_ranger",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.806032211519778
+  },
+  {
+   "id": "sunder_ledge",
+   "arch": "obstacle",
+   "asset": "cliff_step_2",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.582598593039506
+  },
+  {
+   "id": "highcairn_crane",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.809998989105225
+  },
+  {
+   "id": "highcairn_crane#crate",
+   "arch": "landmark",
+   "asset": "crate_metal",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.81297117471695
+  },
+  {
+   "id": "highcairn_crane#barrel",
+   "arch": "landmark",
+   "asset": "barrel",
+   "field": 26.81,
+   "mesh": 26.81,
+   "d": 0,
+   "drawMin": 26.813584625720978
+  },
+  {
+   "id": "gravelmaw_mouth_portal",
+   "arch": "portal",
+   "asset": "wall_arch",
+   "field": 19.9055897393361,
+   "mesh": 19.906,
+   "d": 0,
+   "drawMin": 19.90558910369873
+  },
+  {
+   "id": "palewood_copse_trees_4",
+   "arch": "tree",
+   "asset": "tree_common_1",
+   "field": -0.78,
+   "mesh": -0.781,
+   "d": -0.001,
+   "drawMin": -0.9766454696655273
+  },
+  {
+   "id": "palewood_copse_trees_8",
+   "arch": "tree",
+   "asset": "tree_common_1",
+   "field": -1.14,
+   "mesh": -1.141,
+   "d": -0.001,
+   "drawMin": -1.3366453647613525
+  },
+  {
+   "id": "thornbound_husks_1",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 7.86,
+   "mesh": 7.859,
+   "d": -0.001,
+   "drawMin": 7.8642299987153645
+  },
+  {
+   "id": "split_duskoak",
+   "arch": "landmark",
+   "asset": "tree_twisted_2",
+   "field": 5.13,
+   "mesh": 5.129,
+   "d": -0.001,
+   "drawMin": 4.980082035064697
+  },
+  {
+   "id": "thornline_stones",
+   "arch": "landmark",
+   "asset": "boulder_medium",
+   "field": 5.29,
+   "mesh": 5.289,
+   "d": -0.001,
+   "drawMin": 5.290078770169537
+  },
+  {
+   "id": "cairn_leap",
+   "arch": "obstacle",
+   "asset": "boulder_medium",
+   "field": 11.45,
+   "mesh": 11.449,
+   "d": -0.001,
+   "drawMin": 11.450084973397347
+  },
+  {
+   "id": "gravelmaw_mouth_portal#jaw_r",
+   "arch": "landmark",
+   "asset": "cliff_tall",
+   "field": 19.91,
+   "mesh": 19.909,
+   "d": -0.001,
+   "drawMin": 19.910001277923584
+  },
+  {
+   "id": "palewood_copse_trees_1",
+   "arch": "tree",
+   "asset": "tree_common_1",
+   "field": -0.81,
+   "mesh": -0.812,
+   "d": -0.002,
+   "drawMin": -1.0066454410552979
+  },
+  {
+   "id": "rill_skitterlings_4",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": -1.4,
+   "mesh": -1.402,
+   "d": -0.002,
+   "drawMin": -1.40589415607238
+  },
+  {
+   "id": "duskoak_stand_trees_2",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 3.67,
+   "mesh": 3.668,
+   "d": -0.002,
+   "drawMin": 3.369838237762451
+  },
+  {
+   "id": "rootfall_house_1#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_1#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_2#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_3#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_4#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_5#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_6#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_7#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w0_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w2_2",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_window",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_house_8#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#w0_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#w0_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#w1_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#w1_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#w2_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_door",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#w2_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#w3_0",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#w3_1",
+   "arch": "landmark",
+   "asset": "wall_plaster_timber",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#c0",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#c1",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#c2",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#c3",
+   "arch": "landmark",
+   "asset": "corner_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000200271606
+  },
+  {
+   "id": "rootfall_shed#crate",
+   "arch": "landmark",
+   "asset": "crate_village",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.293099153319062
+  },
+  {
+   "id": "rootfall_bank_chest",
+   "arch": "bank",
+   "asset": "chest_wood",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.267303079366684
+  },
+  {
+   "id": "rootfall_general",
+   "arch": "shop",
+   "asset": "market_stall",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.285181641578674
+  },
+  {
+   "id": "rootfall_range",
+   "arch": "station",
+   "asset": "cooking_pot",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.253844110528867
+  },
+  {
+   "id": "rootfall_anvil",
+   "arch": "station",
+   "asset": "anvil",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.292674773099654
+  },
+  {
+   "id": "npc_woodward_ansel",
+   "arch": "npc",
+   "asset": "outfit_male_ranger",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.286032707430422
+  },
+  {
+   "id": "npc_seamer_juno",
+   "arch": "npc",
+   "asset": "outfit_female_peasant",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.28325635381043
+  },
+  {
+   "id": "npc_trapper_mott",
+   "arch": "npc",
+   "asset": "outfit_male_ranger",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.286032707430422
+  },
+  {
+   "id": "canopy_walk",
+   "arch": "obstacle",
+   "asset": "balcony_straight",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.142871347145867
+  },
+  {
+   "id": "root_tunnel",
+   "arch": "obstacle",
+   "asset": "wall_arch",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.290000081062317
+  },
+  {
+   "id": "marchwolves_deepwood_3",
+   "arch": "enemy",
+   "asset": "enemy_blob",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.267832492909127
+  },
+  {
+   "id": "rootfall_stump",
+   "arch": "landmark",
+   "asset": "tree_twisted_2",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 6.430083758361434
+  },
+  {
+   "id": "rootfall_stump#step_1",
+   "arch": "landmark",
+   "asset": "stairs_exterior",
+   "field": 8.29,
+   "mesh": 8.288,
+   "d": -0.002,
+   "drawMin": 8.100524641561833
+  },
+  {
+   "id": "scree_slide",
+   "arch": "obstacle",
+   "asset": "cliff_step_3",
+   "field": 60.02,
+   "mesh": 60.018,
+   "d": -0.002,
+   "drawMin": 59.85871451459915
+  },
+  {
+   "id": "palewood_copse_trees_2",
+   "arch": "tree",
+   "asset": "tree_common_1",
+   "field": -0.81,
+   "mesh": -0.813,
+   "d": -0.003,
+   "drawMin": -1.0066454410552979
+  },
+  {
+   "id": "marchwolf_pups_3",
+   "arch": "enemy",
+   "asset": "enemy_blob",
+   "field": 1.11,
+   "mesh": 1.107,
+   "d": -0.003,
+   "drawMin": 1.092603145977579
+  },
+  {
+   "id": "lone_dead_palewood",
+   "arch": "landmark",
+   "asset": "tree_dead_3",
+   "field": 2.25,
+   "mesh": 2.247,
+   "d": -0.003,
+   "drawMin": 1.9331026077270508
+  },
+  {
+   "id": "ridge_pines_trees_5",
+   "arch": "tree",
+   "asset": "tree_pine_2",
+   "field": 10.82,
+   "mesh": 10.817,
+   "d": -0.003,
+   "drawMin": 10.563043594360352
+  },
+  {
+   "id": "thornbound_elders_ridge_2",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 13.94,
+   "mesh": 13.937,
+   "d": -0.003,
+   "drawMin": 13.944874378826501
+  },
+  {
+   "id": "rill_skitterlings_5",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 0.29,
+   "mesh": 0.286,
+   "d": -0.004,
+   "drawMin": 0.2841058117411117
+  },
+  {
+   "id": "hollowcut_corven_4",
+   "arch": "ore",
+   "asset": "rock_medium_2",
+   "field": 7.09,
+   "mesh": 7.086,
+   "d": -0.004,
+   "drawMin": 7.035314289553687
+  },
+  {
+   "id": "bracken_pit_grithe_1",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 2.7,
+   "mesh": 2.695,
+   "d": -0.005,
+   "drawMin": 2.4560337934189294
+  },
+  {
+   "id": "bracken_pit_grithe_2",
+   "arch": "ore",
+   "asset": "rock_medium_1",
+   "field": 2.7,
+   "mesh": 2.695,
+   "d": -0.005,
+   "drawMin": 2.4560337934189294
+  },
+  {
+   "id": "karrowmoor_north_gate",
+   "arch": "portal",
+   "asset": "wall_arch",
+   "field": 9.76,
+   "mesh": 9.755,
+   "d": -0.005,
+   "drawMin": 9.760000228881836
+  },
+  {
+   "id": "karrowmoor_north_gate#wall_l",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 9.76,
+   "mesh": 9.755,
+   "d": -0.005,
+   "drawMin": 9.759999632835388
+  },
+  {
+   "id": "karrowmoor_north_gate#wall_r",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 9.76,
+   "mesh": 9.755,
+   "d": -0.005,
+   "drawMin": 9.759999632835388
+  },
+  {
+   "id": "karrowmoor_north_gate#post_l",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 9.76,
+   "mesh": 9.755,
+   "d": -0.005,
+   "drawMin": 9.751371145248413
+  },
+  {
+   "id": "karrowmoor_north_gate#post_r",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 9.76,
+   "mesh": 9.755,
+   "d": -0.005,
+   "drawMin": 9.751371145248413
+  },
+  {
+   "id": "rill_skitterlings_2",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": -0.46,
+   "mesh": -0.467,
+   "d": -0.007,
+   "drawMin": -0.4658941882588883
+  },
+  {
+   "id": "palewood_copse_trees_5",
+   "arch": "tree",
+   "asset": "tree_common_1",
+   "field": -1.14,
+   "mesh": -1.148,
+   "d": -0.008,
+   "drawMin": -1.3366453647613525
+  },
+  {
+   "id": "palewood_copse_trees_7",
+   "arch": "tree",
+   "asset": "tree_common_1",
+   "field": -0.88,
+   "mesh": -0.888,
+   "d": -0.008,
+   "drawMin": -1.0766453742980957
+  },
+  {
+   "id": "marchwolf_pups_2",
+   "arch": "enemy",
+   "asset": "enemy_blob",
+   "field": -0.07,
+   "mesh": -0.079,
+   "d": -0.009,
+   "drawMin": -0.08739686862555907
+  },
+  {
+   "id": "bracken_pit_stone_1",
+   "arch": "ore",
+   "asset": "rock_medium_3",
+   "field": 2.57,
+   "mesh": 2.56,
+   "d": -0.01,
+   "drawMin": 2.285923509721182
+  },
+  {
+   "id": "lower_quarry_kaldite_4",
+   "arch": "ore",
+   "asset": "rock_medium_3",
+   "field": 15.73,
+   "mesh": 15.72,
+   "d": -0.01,
+   "drawMin": 15.366839812367779
+  },
+  {
+   "id": "ridge_pines_trees_8",
+   "arch": "tree",
+   "asset": "tree_pine_2",
+   "field": 11.89,
+   "mesh": 11.88,
+   "d": -0.01,
+   "drawMin": 11.63304328918457
+  },
+  {
+   "id": "duskoak_stand_trees_6",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 5.49,
+   "mesh": 5.477,
+   "d": -0.013,
+   "drawMin": 5.18983793258667
+  },
+  {
+   "id": "coldbrace_hall#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_vault#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_house_1#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_house_2#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_house_3#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_house_4#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_house_5#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_house_6#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_house_7#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_house_8#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "coldbrace_forge_shed#door",
+   "arch": "landmark",
+   "asset": "door_round_1",
+   "field": 0.91,
+   "mesh": 0.894,
+   "d": -0.016,
+   "drawMin": 0.9467658996582031
+  },
+  {
+   "id": "ridge_pines_trees_7",
+   "arch": "tree",
+   "asset": "tree_pine_2",
+   "field": 12.4,
+   "mesh": 12.381,
+   "d": -0.019,
+   "drawMin": 12.14304256439209
+  },
+  {
+   "id": "highcairn_hut_1#door",
+   "arch": "landmark",
+   "asset": "door_flat_1",
+   "field": 26.83,
+   "mesh": 26.81,
+   "d": -0.02,
+   "drawMin": 26.860618114471436
+  },
+  {
+   "id": "highcairn_hut_2#door",
+   "arch": "landmark",
+   "asset": "door_flat_1",
+   "field": 26.83,
+   "mesh": 26.81,
+   "d": -0.02,
+   "drawMin": 26.860618114471436
+  },
+  {
+   "id": "highcairn_hut_3#door",
+   "arch": "landmark",
+   "asset": "door_flat_1",
+   "field": 26.83,
+   "mesh": 26.81,
+   "d": -0.02,
+   "drawMin": 26.860618114471436
+  },
+  {
+   "id": "highcairn_hut_4#door",
+   "arch": "landmark",
+   "asset": "door_flat_1",
+   "field": 26.83,
+   "mesh": 26.81,
+   "d": -0.02,
+   "drawMin": 26.860618114471436
+  },
+  {
+   "id": "highcairn_hut_5#door",
+   "arch": "landmark",
+   "asset": "door_flat_1",
+   "field": 26.83,
+   "mesh": 26.81,
+   "d": -0.02,
+   "drawMin": 26.860618114471436
+  },
+  {
+   "id": "highcairn_hut_6#door",
+   "arch": "landmark",
+   "asset": "door_flat_1",
+   "field": 26.83,
+   "mesh": 26.81,
+   "d": -0.02,
+   "drawMin": 26.860618114471436
+  },
+  {
+   "id": "lower_quarry_kaldite_5",
+   "arch": "ore",
+   "asset": "rock_medium_3",
+   "field": 19.89,
+   "mesh": 19.869,
+   "d": -0.021,
+   "drawMin": 19.52684156712852
+  },
+  {
+   "id": "marchwolf_pups_1",
+   "arch": "enemy",
+   "asset": "enemy_blob",
+   "field": -0.35,
+   "mesh": -0.372,
+   "d": -0.022,
+   "drawMin": -0.36739686236707136
+  },
+  {
+   "id": "rootfall_house_1#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "rootfall_house_2#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "rootfall_house_3#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "rootfall_house_4#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "rootfall_house_5#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "rootfall_house_6#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "rootfall_house_7#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "rootfall_house_8#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "rootfall_shed#door",
+   "arch": "landmark",
+   "asset": "door_round_2",
+   "field": 8.31,
+   "mesh": 8.288,
+   "d": -0.022,
+   "drawMin": 8.340777039527893
+  },
+  {
+   "id": "bramble_skitterlings_3",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 1.79,
+   "mesh": 1.767,
+   "d": -0.023,
+   "drawMin": 1.7827577010400368
+  },
+  {
+   "id": "cairnwights_fields_1",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 41.3,
+   "mesh": 41.272,
+   "d": -0.028,
+   "drawMin": 41.23805222653979
+  },
+  {
+   "id": "gravelmaw_mouth_portal#jaw_l",
+   "arch": "landmark",
+   "asset": "cliff_tall",
+   "field": 19.91,
+   "mesh": 19.878,
+   "d": -0.032,
+   "drawMin": 19.910001277923584
+  },
+  {
+   "id": "scree_skitterlings_3",
+   "arch": "enemy",
+   "asset": "enemy_crab",
+   "field": 58.96,
+   "mesh": 58.925,
+   "d": -0.035,
+   "drawMin": 58.95192583467927
+  },
+  {
+   "id": "cairnwights_fields_3",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 43.71,
+   "mesh": 43.673,
+   "d": -0.037,
+   "drawMin": 43.6480520739519
+  },
+  {
+   "id": "gravelmaw_mouth_portal#rock_l",
+   "arch": "landmark",
+   "asset": "rock_medium_2",
+   "field": 19.91,
+   "mesh": 19.87,
+   "d": -0.04,
+   "drawMin": 19.830422579199844
+  },
+  {
+   "id": "highcairn_crane#drum",
+   "arch": "landmark",
+   "asset": "chain_coil",
+   "field": 26.86,
+   "mesh": 26.81,
+   "d": -0.05,
+   "drawMin": 26.869032087886897
+  },
+  {
+   "id": "highcairn_crane#rope",
+   "arch": "landmark",
+   "asset": "rope_coil",
+   "field": 26.86,
+   "mesh": 26.81,
+   "d": -0.05,
+   "drawMin": 26.803959594435167
+  },
+  {
+   "id": "gravelmaw_mouth_portal#rock_r",
+   "arch": "landmark",
+   "asset": "rock_medium_3",
+   "field": 19.91,
+   "mesh": 19.856,
+   "d": -0.054,
+   "drawMin": 19.4710693427189
+  },
+  {
+   "id": "cairnwights_fields_2",
+   "arch": "enemy",
+   "asset": "enemy_skull",
+   "field": 37.44,
+   "mesh": 37.38,
+   "d": -0.06,
+   "drawMin": 37.37805161618823
+  },
+  {
+   "id": "thornbound_husks_4",
+   "arch": "enemy",
+   "asset": "enemy_bee",
+   "field": 6.36,
+   "mesh": 6.294,
+   "d": -0.066,
+   "drawMin": 6.3642299987153645
+  },
+  {
+   "id": "duskoak_stand_trees_9",
+   "arch": "tree",
+   "asset": "tree_common_2",
+   "field": 4.97,
+   "mesh": 4.901,
+   "d": -0.069,
+   "drawMin": 4.6698384284973145
+  },
+  {
+   "id": "thornline_stones#low_1",
+   "arch": "landmark",
+   "asset": "rock_medium_2",
+   "field": 5.29,
+   "mesh": 4.787,
+   "d": -0.503,
+   "drawMin": 5.242691216973924
+  },
+  {
+   "id": "thornline_stones#stone0",
+   "arch": "landmark",
+   "asset": "cliff_tall",
+   "field": 5.29,
+   "mesh": 4.614,
+   "d": -0.676,
+   "drawMin": 5.290000796318054
+  },
+  {
+   "id": "lower_quarry_kaldite_3",
+   "arch": "ore",
+   "asset": "rock_medium_3",
+   "field": 17.86,
+   "mesh": 16.815,
+   "d": -1.045,
+   "drawMin": 17.496840880483013
+  },
+  {
+   "id": "rootfall_stump#vine",
+   "arch": "landmark",
+   "asset": "vine_1",
+   "field": 9.39,
+   "mesh": 8.288,
+   "d": -1.102,
+   "drawMin": 7.417701840400696
+  },
+  {
+   "id": "gravelmaw_mouth_portal#spoil_r",
+   "arch": "landmark",
+   "asset": "boulder_medium",
+   "field": 19.91,
+   "mesh": 18.782,
+   "d": -1.128,
+   "drawMin": 19.910074519788022
+  },
+  {
+   "id": "rootfall_stump#step_2",
+   "arch": "landmark",
+   "asset": "stairs_exterior",
+   "field": 9.49,
+   "mesh": 8.288,
+   "d": -1.202,
+   "drawMin": 9.30052445082697
+  },
+  {
+   "id": "coldbrace_hall#lamp_l",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 2.19,
+   "mesh": 0.894,
+   "d": -1.296,
+   "drawMin": 2.290021777153015
+  },
+  {
+   "id": "coldbrace_hall#lamp_r",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 2.19,
+   "mesh": 0.894,
+   "d": -1.296,
+   "drawMin": 2.290021777153015
+  },
+  {
+   "id": "rootfall_stump#shelf_1",
+   "arch": "landmark",
+   "asset": "mushroom_bracket",
+   "field": 9.79,
+   "mesh": 8.288,
+   "d": -1.502,
+   "drawMin": 9.551522473156476
+  },
+  {
+   "id": "gravelmaw_mouth_portal#spoil_l",
+   "arch": "landmark",
+   "asset": "boulder_medium",
+   "field": 19.91,
+   "mesh": 18.349,
+   "d": -1.561,
+   "drawMin": 19.910094307387727
+  },
+  {
+   "id": "gravelmaw_mouth_portal#brazier_l",
+   "arch": "landmark",
+   "asset": "torch",
+   "field": 21.61,
+   "mesh": 19.906,
+   "d": -1.704,
+   "drawMin": 20.789525151252747
+  },
+  {
+   "id": "gravelmaw_mouth_portal#brazier_r",
+   "arch": "landmark",
+   "asset": "torch",
+   "field": 21.61,
+   "mesh": 19.906,
+   "d": -1.704,
+   "drawMin": 20.789525151252747
+  },
+  {
+   "id": "march_vault_tower#torch_l",
+   "arch": "landmark",
+   "asset": "torch",
+   "field": 2.79,
+   "mesh": 0.894,
+   "d": -1.896,
+   "drawMin": 1.9879054427146912
+  },
+  {
+   "id": "march_vault_tower#torch_r",
+   "arch": "landmark",
+   "asset": "torch",
+   "field": 2.79,
+   "mesh": 0.894,
+   "d": -1.896,
+   "drawMin": 1.9879054427146912
+  },
+  {
+   "id": "coldbrace_vault#lamp_l",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 2.99,
+   "mesh": 0.894,
+   "d": -2.096,
+   "drawMin": 3.0991140007972717
+  },
+  {
+   "id": "coldbrace_vault#lamp_r",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 2.99,
+   "mesh": 0.894,
+   "d": -2.096,
+   "drawMin": 3.0991140007972717
+  },
+  {
+   "id": "coldbrace_gate_south#lamp0",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 3.19,
+   "mesh": 0.894,
+   "d": -2.296,
+   "drawMin": 3.2991140484809875
+  },
+  {
+   "id": "coldbrace_gate_south#lamp1",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 3.19,
+   "mesh": 0.894,
+   "d": -2.296,
+   "drawMin": 3.2991140484809875
+  },
+  {
+   "id": "coldbrace_gate_east#lamp0",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 3.19,
+   "mesh": 0.894,
+   "d": -2.296,
+   "drawMin": 3.2991140484809875
+  },
+  {
+   "id": "coldbrace_gate_east#lamp1",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 3.19,
+   "mesh": 0.894,
+   "d": -2.296,
+   "drawMin": 3.2991140484809875
+  },
+  {
+   "id": "highcairn_gate#lamp0",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 29.11,
+   "mesh": 26.81,
+   "d": -2.3,
+   "drawMin": 29.195357263088226
+  },
+  {
+   "id": "highcairn_gate#lamp1",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 29.11,
+   "mesh": 26.81,
+   "d": -2.3,
+   "drawMin": 29.195357263088226
+  },
+  {
+   "id": "rootfall_stump#step_3",
+   "arch": "landmark",
+   "asset": "stairs_exterior",
+   "field": 10.69,
+   "mesh": 8.288,
+   "d": -2.402,
+   "drawMin": 10.500524260092106
+  },
+  {
+   "id": "rootfall_stump#shelf_2",
+   "arch": "landmark",
+   "asset": "mushroom_bracket",
+   "field": 10.69,
+   "mesh": 8.288,
+   "d": -2.402,
+   "drawMin": 10.496230242220843
+  },
+  {
+   "id": "fallowmarch_north_gate#lamp_l",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 5.81,
+   "mesh": 3.314,
+   "d": -2.496,
+   "drawMin": 5.928206205368042
+  },
+  {
+   "id": "fallowmarch_north_gate#lamp_r",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 5.81,
+   "mesh": 3.314,
+   "d": -2.496,
+   "drawMin": 5.928206205368042
+  },
+  {
+   "id": "vellenwood_marchgate#lamp_l",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 8.31,
+   "mesh": 5.813,
+   "d": -2.497,
+   "drawMin": 8.40895801782608
+  },
+  {
+   "id": "vellenwood_marchgate#lamp_r",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 8.31,
+   "mesh": 5.813,
+   "d": -2.497,
+   "drawMin": 8.40895801782608
+  },
+  {
+   "id": "vellenwood_east_gate#lamp_l",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 8.23,
+   "mesh": 5.732,
+   "d": -2.498,
+   "drawMin": 8.328958094120026
+  },
+  {
+   "id": "vellenwood_east_gate#lamp_r",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 8.23,
+   "mesh": 5.732,
+   "d": -2.498,
+   "drawMin": 8.328958094120026
+  },
+  {
+   "id": "karrowmoor_north_gate#lamp_l",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 12.26,
+   "mesh": 9.755,
+   "d": -2.505,
+   "drawMin": 12.352468490600586
+  },
+  {
+   "id": "karrowmoor_north_gate#lamp_r",
+   "arch": "landmark",
+   "asset": "lamp_wall",
+   "field": 12.26,
+   "mesh": 9.755,
+   "d": -2.505,
+   "drawMin": 12.352468490600586
+  },
+  {
+   "id": "coldbrace_hall#banner_l",
+   "arch": "landmark",
+   "asset": "banner_1",
+   "field": 3.49,
+   "mesh": 0.894,
+   "d": -2.596,
+   "drawMin": 1.7692185640335083
+  },
+  {
+   "id": "coldbrace_hall#banner_r",
+   "arch": "landmark",
+   "asset": "banner_1",
+   "field": 3.49,
+   "mesh": 0.894,
+   "d": -2.596,
+   "drawMin": 1.7692185640335083
+  },
+  {
+   "id": "coldbrace_hall#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.709999918937683
+  },
+  {
+   "id": "coldbrace_house_1#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.7100000381469727
+  },
+  {
+   "id": "coldbrace_house_2#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.7100000381469727
+  },
+  {
+   "id": "coldbrace_house_3#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.7100000381469727
+  },
+  {
+   "id": "coldbrace_house_4#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.7100000381469727
+  },
+  {
+   "id": "coldbrace_house_5#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.7100000381469727
+  },
+  {
+   "id": "coldbrace_house_6#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.7100000381469727
+  },
+  {
+   "id": "coldbrace_house_7#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.7100000381469727
+  },
+  {
+   "id": "coldbrace_house_8#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 3.71,
+   "mesh": 0.894,
+   "d": -2.816,
+   "drawMin": 3.7100000381469727
+  },
+  {
+   "id": "rootfall_house_1#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 11.11,
+   "mesh": 8.288,
+   "d": -2.822,
+   "drawMin": 11.109999775886536
+  },
+  {
+   "id": "rootfall_house_2#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 11.11,
+   "mesh": 8.288,
+   "d": -2.822,
+   "drawMin": 11.109999775886536
+  },
+  {
+   "id": "rootfall_house_3#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 11.11,
+   "mesh": 8.288,
+   "d": -2.822,
+   "drawMin": 11.109999775886536
+  },
+  {
+   "id": "rootfall_house_4#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 11.11,
+   "mesh": 8.288,
+   "d": -2.822,
+   "drawMin": 11.109999775886536
+  },
+  {
+   "id": "rootfall_house_5#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 11.11,
+   "mesh": 8.288,
+   "d": -2.822,
+   "drawMin": 11.109999775886536
+  },
+  {
+   "id": "rootfall_house_6#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 11.11,
+   "mesh": 8.288,
+   "d": -2.822,
+   "drawMin": 11.109999775886536
+  },
+  {
+   "id": "rootfall_house_7#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 11.11,
+   "mesh": 8.288,
+   "d": -2.822,
+   "drawMin": 11.109999775886536
+  },
+  {
+   "id": "rootfall_house_8#chimney",
+   "arch": "landmark",
+   "asset": "chimney",
+   "field": 11.11,
+   "mesh": 8.288,
+   "d": -2.822,
+   "drawMin": 11.109999775886536
+  },
+  {
+   "id": "gravelmaw_mouth_portal#shoulder_l",
+   "arch": "landmark",
+   "asset": "cliff_step_1",
+   "field": 19.91,
+   "mesh": 17.088,
+   "d": -2.822,
+   "drawMin": 19.675798655873262
+  },
+  {
+   "id": "highcairn_hut_1#gable0",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_1#gable1",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_2#gable0",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_2#gable1",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_3#gable0",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_3#gable1",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_4#gable0",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_4#gable1",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_5#gable0",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_5#gable1",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_6#gable0",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "highcairn_hut_6#gable1",
+   "arch": "landmark",
+   "asset": "roof_gable_brick",
+   "field": 29.83,
+   "mesh": 26.81,
+   "d": -3.02,
+   "drawMin": 29.75613664252119
+  },
+  {
+   "id": "coldbrace_hall#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_6x12",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.1408946746458053
+  },
+  {
+   "id": "coldbrace_vault#w1_0_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_0_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_0_2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_1_2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_2_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_2_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_2_2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_3_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_3_1",
+   "arch": "landmark",
+   "asset": "wall_brick_window",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#w1_3_2",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_vault#c1_0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.0021209716796875
+  },
+  {
+   "id": "coldbrace_vault#c1_1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.0021209716796875
+  },
+  {
+   "id": "coldbrace_vault#c1_2",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.0021209716796875
+  },
+  {
+   "id": "coldbrace_vault#c1_3",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.0021209716796875
+  },
+  {
+   "id": "coldbrace_house_1#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.436690361196297
+  },
+  {
+   "id": "coldbrace_house_2#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.436690361196297
+  },
+  {
+   "id": "coldbrace_house_3#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.436690361196297
+  },
+  {
+   "id": "coldbrace_house_4#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.436690361196297
+  },
+  {
+   "id": "coldbrace_house_5#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.436690361196297
+  },
+  {
+   "id": "coldbrace_house_6#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.436690361196297
+  },
+  {
+   "id": "coldbrace_house_7#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.436690361196297
+  },
+  {
+   "id": "coldbrace_house_8#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.436690361196297
+  },
+  {
+   "id": "coldbrace_forge_shed#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 3.5513421863051002
+  },
+  {
+   "id": "coldbrace_gate_south#pf1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_gate_south#pb1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_gate_south#pf1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_gate_south#pb1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_gate_south#postb0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.0021209716796875
+  },
+  {
+   "id": "coldbrace_gate_south#postb1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.0021209716796875
+  },
+  {
+   "id": "coldbrace_gate_east#pf1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_gate_east#pb1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_gate_east#pf1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_gate_east#pb1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.009999871253967
+  },
+  {
+   "id": "coldbrace_gate_east#postb0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.0021209716796875
+  },
+  {
+   "id": "coldbrace_gate_east#postb1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 4.01,
+   "mesh": 0.894,
+   "d": -3.116,
+   "drawMin": 4.0021209716796875
+  },
+  {
+   "id": "highcairn_hut_1#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_6x8",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.485990366908226
+  },
+  {
+   "id": "highcairn_hut_2#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_6x8",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.485990366908226
+  },
+  {
+   "id": "highcairn_hut_3#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_6x8",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.485990366908226
+  },
+  {
+   "id": "highcairn_hut_4#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_6x8",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.485990366908226
+  },
+  {
+   "id": "highcairn_hut_5#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_6x8",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.485990366908226
+  },
+  {
+   "id": "highcairn_hut_6#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_6x8",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.485990366908226
+  },
+  {
+   "id": "highcairn_gate#pf1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.93000030517578
+  },
+  {
+   "id": "highcairn_gate#pb1_0",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.93000030517578
+  },
+  {
+   "id": "highcairn_gate#pf1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.93000030517578
+  },
+  {
+   "id": "highcairn_gate#pb1_1",
+   "arch": "landmark",
+   "asset": "wall_brick_straight",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.93000030517578
+  },
+  {
+   "id": "highcairn_gate#postb0",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.923836946487427
+  },
+  {
+   "id": "highcairn_gate#postb1",
+   "arch": "landmark",
+   "asset": "corner_brick",
+   "field": 29.93,
+   "mesh": 26.81,
+   "d": -3.12,
+   "drawMin": 29.923836946487427
+  },
+  {
+   "id": "rootfall_house_1#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 10.930083235389862
+  },
+  {
+   "id": "rootfall_house_2#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 10.930083235389862
+  },
+  {
+   "id": "rootfall_house_3#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 10.930083235389862
+  },
+  {
+   "id": "rootfall_house_4#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 10.930083235389862
+  },
+  {
+   "id": "rootfall_house_5#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 10.930083235389862
+  },
+  {
+   "id": "rootfall_house_6#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 10.930083235389862
+  },
+  {
+   "id": "rootfall_house_7#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 10.930083235389862
+  },
+  {
+   "id": "rootfall_house_8#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 10.930083235389862
+  },
+  {
+   "id": "rootfall_shed#roof",
+   "arch": "landmark",
+   "asset": "roof_tiles_4x6",
+   "field": 11.41,
+   "mesh": 8.288,
+   "d": -3.122,
+   "drawMin": 11.026056016612381
+  },
+  {
+   "id": "march_vault_tower#banner_l",
+   "arch": "landmark",
+   "asset": "banner_1",
+   "field": 4.19,
+   "mesh": 0.894,
+   "d": -3.296,
+   "drawMin": 2.297155976295471
+  },
+  {
+   "id": "march_vault_tower#banner_r",
+   "arch": "landmark",
+   "asset": "banner_1",
+   "field": 4.19,
+   "mesh": 0.894,
+   "d": -3.296,
+   "drawMin": 2.297155976295471
+  },
+  {
+   "id": "rootfall_house_1#dormer",
+   "arch": "landmark",
+   "asset": "roof_dormer",
+   "field": 11.96,
+   "mesh": 8.288,
+   "d": -3.672,
+   "drawMin": 11.987586736679077
+  },
+  {
+   "id": "rootfall_house_2#dormer",
+   "arch": "landmark",
+   "asset": "roof_dormer",
+   "field": 11.96,
+   "mesh": 8.288,
+   "d": -3.672,
+   "drawMin": 11.987586736679077
+  },
+  {
+   "id": "rootfall_house_3#dormer",
+   "arch": "landmark",
+   "asset": "roof_dormer",
+   "field": 11.96,
+   "mesh": 8.288,
+   "d": -3.672,
+   "drawMin": 11.987586736679077
+  },
+  {
+   "id": "rootfall_house_4#dormer",
+   "arch": "landmark",
+   "asset": "roof_dormer",
+   "field": 11.96,
+   "mesh": 8.288,
+   "d": -3.672,
+   "drawMin": 11.987586736679077
+  },
+  {
+   "id": "rootfall_house_5#dormer",
+   "arch": "landmark",
+   "asset": "roof_dormer",
+   "field": 11.96,
+   "mesh": 8.288,
+   "d": -3.672,
+   "drawMin": 11.987586736679077
+  },
+  {
+   "id": "rootfall_house_6#dormer",
+   "arch": "landmark",
+   "asset": "roof_dormer",
+   "field": 11.96,
+   "mesh": 8.288,
+   "d": -3.672,
+   "drawMin": 11.987586736679077
+  },
+  {
+   "id": "rootfall_house_7#dormer",
+   "arch": "landmark",
+   "asset": "roof_dormer",
+   "field": 11.96,
+   "mesh": 8.288,
+   "d": -3.672,
+   "drawMin": 11.987586736679077
+  },
+  {
+   "id": "rootfall_house_8#dormer",
+   "arch": "landmark",
+   "asset": "roof_dormer",
+   "field": 11.96,
+   "mesh": 8.288,
+   "d": -3.672,
+   "drawMin": 11.987586736679077
+  },
+  {
+   "id": "great_cairn_stone#crown_1",
+   "arch": "landmark",
+   "asset": "rock_medium_1",
+   "field": 62.39,
+   "mesh": 58.091,
+   "d": -4.299,
+   "drawMin": 62.06015826030512
+  },
+  {
+   "id": "rootfall_house_1#ridge",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 12.76,
+   "mesh": 8.288,
+   "d": -4.472,
+   "drawMin": 14.767192501244256
+  },
+  {
+   "id": "rootfall_house_2#ridge",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 12.76,
+   "mesh": 8.288,
+   "d": -4.472,
+   "drawMin": 14.767192501244256
+  },
+  {
+   "id": "rootfall_house_3#ridge",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 12.76,
+   "mesh": 8.288,
+   "d": -4.472,
+   "drawMin": 14.767192501244256
+  },
+  {
+   "id": "rootfall_house_4#ridge",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 12.76,
+   "mesh": 8.288,
+   "d": -4.472,
+   "drawMin": 14.767192501244256
+  },
+  {
+   "id": "rootfall_house_5#ridge",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 12.76,
+   "mesh": 8.288,
+   "d": -4.472,
+   "drawMin": 14.767192501244256
+  },
+  {
+   "id": "rootfall_house_6#ridge",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 12.76,
+   "mesh": 8.288,
+   "d": -4.472,
+   "drawMin": 14.767192501244256
+  },
+  {
+   "id": "rootfall_house_7#ridge",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 12.76,
+   "mesh": 8.288,
+   "d": -4.472,
+   "drawMin": 14.767192501244256
+  },
+  {
+   "id": "rootfall_house_8#ridge",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 12.76,
+   "mesh": 8.288,
+   "d": -4.472,
+   "drawMin": 14.767192501244256
+  },
+  {
+   "id": "great_cairn_stone#crown_2",
+   "arch": "landmark",
+   "asset": "rock_medium_3",
+   "field": 62.69,
+   "mesh": 58.091,
+   "d": -4.599,
+   "drawMin": 62.41564528841042
+  },
+  {
+   "id": "highcairn_crane#jib",
+   "arch": "landmark",
+   "asset": "roof_log",
+   "field": 31.94,
+   "mesh": 26.81,
+   "d": -5.13,
+   "drawMin": 34.783554884338706
+  },
+  {
+   "id": "coldbrace_gate_south#banner",
+   "arch": "landmark",
+   "asset": "banner_1",
+   "field": 6.41,
+   "mesh": 0.894,
+   "d": -5.516,
+   "drawMin": 4.517156004905701
+  },
+  {
+   "id": "coldbrace_gate_east#banner",
+   "arch": "landmark",
+   "asset": "banner_1",
+   "field": 6.41,
+   "mesh": 0.894,
+   "d": -5.516,
+   "drawMin": 4.517156004905701
+  },
+  {
+   "id": "highcairn_gate#banner",
+   "arch": "landmark",
+   "asset": "banner_1",
+   "field": 32.33,
+   "mesh": 26.81,
+   "d": -5.52,
+   "drawMin": 30.849270343780518
+  },
+  {
+   "id": "gravelmaw_mouth_portal#brow",
+   "arch": "landmark",
+   "asset": "cliff_step_2",
+   "field": 25.91,
+   "mesh": 19.996,
+   "d": -5.914,
+   "drawMin": 25.5805912768724
+  },
+  {
+   "id": "coldbrace_vault#spire",
+   "arch": "landmark",
+   "asset": "roof_tower",
+   "field": 7.14,
+   "mesh": 0.894,
+   "d": -6.246,
+   "drawMin": 6.397769927978516
+  },
+  {
+   "id": "ridge_pines_trees_2",
+   "arch": "tree",
+   "asset": "tree_pine_2",
+   "field": 43.12,
+   "mesh": 31.701,
+   "d": -11.419,
+   "drawMin": 42.863043785095215
+  }
+ ]
+}

@@ -1,0 +1,24 @@
+{
+ "name": "vfx-shots4",
+ "actions": [
+  { "waitMs": 2000 },
+  { "debug": "teleport", "args": [{ "x": -60, "y": 0, "z": -60 }] },
+  { "waitMs": 600 },
+  { "debug": "callTool", "args": ["corealm_move_to", { "position": [-95, 0, -70] }] },
+  { "waitMs": 1800 },
+  { "screenshot": "vfx-run-dust" },
+  { "waitMs": 900 },
+  { "screenshot": "vfx-run-dust-2" },
+  { "debug": "setSkillLevel", "args": ["attack", 40] },
+  { "debug": "setSkillLevel", "args": ["strength", 40] },
+  { "debug": "teleport", "args": [{ "entityId": "rill_skitterlings_1" }] },
+  { "waitMs": 800 },
+  { "debug": "callTool", "args": ["corealm_attack", { "entityId": "rill_skitterlings_1" }] },
+  { "waitMs": 1600 },
+  { "screenshot": "vfx-damage-numbers" },
+  { "waitMs": 1500 },
+  { "screenshot": "vfx-damage-numbers-2" },
+  { "waitMs": 2500 },
+  { "screenshot": "vfx-damage-numbers-3" }
+ ]
+}

@@ -33,6 +33,14 @@ export interface AssetEntry {
   tags: string[];
   bytes: number;
   size: { x: number; y: number; z: number };
+  /**
+   * World-space bounding-box MINIMUM corner in metres, from the same measurement as `size`, so
+   * `base + size` is the maximum corner. Emitted by tools/build-assets.ts.
+   *
+   * Optional on the type only because a manifest built before Phase 2 will not carry it; read it
+   * through `baseY()`, which falls back to 0. See `baseY` for why it matters.
+   */
+  base?: { x: number; y: number; z: number };
   animations: string[];
   materials: string[];
 }
@@ -91,6 +99,34 @@ export class AssetRegistry {
 
   entry(id: string): AssetEntry | undefined {
     return this.byId.get(id);
+  }
+
+  /**
+   * Distance from an asset's GLB origin down to the bottom of its geometry, metres, unscaled.
+   * 0 for an unknown id or a manifest without the field.
+   *
+   * Placing a GLB's origin at ground height leaves it floating or sunk by exactly
+   * `baseY(id) * scale` — measured to 3 decimals across 159 world entities in the Phase 2
+   * grounding sweep, where it left the Fallen Duskoak (roof_log, base.y +3.849) hovering 5.77 m
+   * and every farm plot (crop_carrot, base.y -0.238) fully underground. Ground-aligned placement
+   * is `y = groundHeight - baseY(id) * scale`; 117 of 213 assets need more than 2 cm of it.
+   *
+   * Synchronous by contract: it is a map lookup against the already-parsed manifest, so world
+   * construction can call it per entity. It takes an id and returns a number and touches nothing
+   * else in this class, so it is injected into the world layer as a plain
+   * `(assetId: string) => number` port the way `heightAt` already is — world/ must not import
+   * render/, and with this shape it does not have to.
+   */
+  baseY(assetId: string): number {
+    return this.byId.get(assetId)?.base?.y ?? 0;
+  }
+
+  /**
+   * An asset's measured world-space bounding-box extent in metres, or null if the id is unknown.
+   * Same data `baseY` reads; together they give the full box.
+   */
+  assetSize(assetId: string): { x: number; y: number; z: number } | null {
+    return this.byId.get(assetId)?.size ?? null;
   }
 
   /** All assets in a category, in manifest order. */

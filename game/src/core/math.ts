@@ -41,3 +41,27 @@ export function round(value: number, decimals = 3): number {
 export function roundVec3(value: Vec3, decimals = 3): Vec3 {
   return [round(value[0], decimals), round(value[1], decimals), round(value[2], decimals)];
 }
+
+/**
+ * Silhouette rule from the PRD: tier changes scale by at most 20% per authored step, and always
+ * changes proportion as well. Colour does the heavy lifting; scale only nudges. Both together make
+ * tier readable at 12 m at the default camera pitch.
+ *
+ * Round 1 ramped this over the PALETTE INDEX, which is why it failed the readability contract:
+ * tiers 1, 5 and 10 are the first three of twelve authored palettes, so the whole of Phase 1's
+ * content resolved to 0.920 / 0.943 / 0.967 — a 5% spread across the entire shipped tier range,
+ * invisible at any distance. Ramping over log(tier) instead spends the budget where the content
+ * actually is: 1 -> 0.900, 5 -> 1.075, 10 -> 1.151, and still only 1.400 at tier 99. The largest
+ * authored step is 1 -> 5 at +19.4%, inside the PRD's 20% ceiling.
+ *
+ * It lives in `core/` rather than in `render/materials.ts`, where it was written, because
+ * `world/regionBuilder.ts` has to cancel it exactly — a 2 m wall module drawn at 1.84 m would not
+ * meet its own grid — and `world/*` may not touch Three.js. Importing it from materials.ts pulled
+ * `import * as THREE` into the world layer transitively. This is four lines of arithmetic with no
+ * dependencies, so the honest fix is to put it where both layers can reach it. `materials.ts`
+ * re-exports it, so every existing caller is unchanged.
+ */
+export function tierSilhouetteScale(tier: number): number {
+  const clamped = Math.min(99, Math.max(1, tier));
+  return 0.9 + 0.5 * (Math.log(clamped) / Math.log(99));
+}

@@ -1,0 +1,9 @@
+{
+  "name": "rb-drawcalls",
+  "actions": [
+    { "inspect": "getSceneStats", "label": "spawn draw calls" },
+    { "debug": "teleport", "args": [{ "locationId": "marchfield_farm" }] },
+    { "waitMs": 1500 },
+    { "inspect": "getSceneStats", "label": "marchfield_farm draw calls" }
+  ]
+}

@@ -15,6 +15,13 @@
  */
 import * as THREE from "three";
 import type { RegionId } from "../contracts.js";
+import {
+  DETAIL_VALUE_OFFSET,
+  createContactDecalTexture,
+  createDetailAtlas,
+  createWaterNormalMap,
+  disposeGeneratedTextures,
+} from "./proceduralTextures.js";
 
 export interface TierPalette {
   tier: number;
@@ -60,22 +67,14 @@ export function paletteForTier(tier: number): TierPalette {
 }
 
 /**
- * Silhouette rule from the PRD: tier changes scale by at most 20% per authored step, and always
- * changes proportion as well. Colour does the heavy lifting; scale only nudges. Both together make
- * tier readable at 12 m at the default camera pitch.
+ * The tier silhouette rule now lives in `core/math.ts` and is re-exported here.
  *
- * Round 1 ramped this over the PALETTE INDEX, which is why it failed the readability contract:
- * tiers 1, 5 and 10 are the first three of twelve authored palettes, so the whole of Phase 1's
- * content resolved to 0.920 / 0.943 / 0.967 — a 5% spread across the entire shipped tier range,
- * invisible at any distance. Ramping over log(tier) instead spends the budget where the content
- * actually is: 1 -> 0.900, 5 -> 1.075, 10 -> 1.151, and still only 1.400 at tier 99.
- *
- * The largest authored step is 1 -> 5 at +19.4%, inside the PRD's 20% ceiling.
+ * It moved because `world/regionBuilder.ts` has to cancel it exactly (a 2 m wall module drawn at
+ * 1.84 m would not meet its own grid), and importing it from this file pulled `import * as THREE`
+ * into the world layer transitively, which the layering rule forbids. The formula and its
+ * derivation are documented at the new site.
  */
-export function tierSilhouetteScale(tier: number): number {
-  const clamped = Math.min(99, Math.max(1, tier));
-  return 0.9 + 0.5 * (Math.log(clamped) / Math.log(99));
-}
+export { tierSilhouetteScale } from "../core/math.js";
 
 /**
  * A locked eight-swatch palette per region (PRD section 4, "Visual system"). Region ground
@@ -150,12 +149,46 @@ export function regionSwatches(regionId: RegionId): string[] {
 /**
  * The colour of a trodden track in a region: its soil, lifted toward its rock tone.
  *
- * Kept next to the palette rather than inside the material so the road ribbon's vertex colours in
- * `render/scene.ts` and the material's base colour cannot drift apart.
+ * Kept for whoever dresses a route with kerbs or path rocks and needs the track's own tone. The
+ * ground itself no longer uses it: the road is stamped into the terrain splat now, and an opaque
+ * ground colour needs a gentler lift than a feathered transparent ribbon did. See `surfaceColour`.
  */
 export function roadColour(regionId: RegionId): number {
   const palette = REGION_PALETTES[regionId];
   return mixHex(palette.soil, palette.rock, 0.45, 1.35);
+}
+
+/**
+ * The four surface tones the terrain splat needs beyond the eight authored swatches.
+ *
+ * All four are DERIVED from the region's own eight, not authored, so the palette contract in the
+ * PRD stays a list of eight and a region cannot acquire a hue nobody signed off. They exist
+ * because slope alone could only ever express "grass or rock": the measured consequence was that
+ * only 12.71% of the world had any surface variation at all, and a worn track, a scree hollow, a
+ * cobbled square and a waterlogged bank were all literally undrawable.
+ */
+export function surfaceColour(
+  regionId: RegionId,
+  kind: "gravel" | "dirt" | "mud" | "cobble" | "wet",
+): number {
+  const palette = REGION_PALETTES[regionId];
+  switch (kind) {
+    // Scree and hollow debris: the region's rock, dragged toward its soil and lifted, so it
+    // separates from a cliff face rather than reading as more of the same stone.
+    case "gravel": return mixHex(palette.rock, palette.soil, 0.45, 1.08);
+    // A trodden track is dust and exposed grit, so it reads BRIGHTER than the vegetation beside
+    // it. Same reasoning as roadColour, but a gentler lift: roadColour's 1.35 was tuned for a
+    // transparent ribbon feathered over the grass, and applied as an opaque ground colour under a
+    // 3.0-intensity sun it bleached Coldbrace square to near white.
+    case "dirt": return mixHex(palette.soil, palette.rock, 0.4, 1.12);
+    // Churned wet earth at a waterline. Dark, and the only place in the palette that goes there.
+    case "mud": return mixHex(palette.soil, palette.water, 0.3, 0.72);
+    // Laid stone. Rock pulled hard toward its own grey and lifted, so a paved square separates
+    // from the natural rock on the hillside behind it.
+    case "cobble": return mixHex(palette.rock, 0x9a978f, 0.55, 1.06);
+    // Saturated ground just above the waterline.
+    default: return mixHex(palette.soil, palette.water, 0.55, 0.85);
+  }
 }
 
 /** Linear mix of two packed colours, then a brightness multiplier, clamped per channel. */
@@ -200,6 +233,152 @@ function swatchColour(palette: TierPalette, swatch: PaletteSwatch): number {
   return palette.metal;
 }
 
+interface GroundUniforms {
+  uDetail: { value: THREE.Texture };
+  uDetailTiling: { value: THREE.Vector2 };
+}
+
+interface WaterUniforms {
+  uTime: { value: number };
+  uShallow: { value: THREE.Color };
+  uDeep: { value: THREE.Color };
+  uNormalB: { value: THREE.Texture };
+  uDepthRange: { value: number };
+  uEdgeFade: { value: number };
+  uWaveScale: { value: THREE.Vector2 };
+  uWaveScrollA: { value: THREE.Vector2 };
+  uWaveScrollB: { value: THREE.Vector2 };
+}
+
+// ------------------------------------------------------------ ground splat
+//
+// Eight surface weights per vertex, packed as two normalised Uint8 vec4s written by
+// `WorldScene.buildChunk` (8 bytes/vertex, about 584 KB over the world's ~73k terrain vertices):
+//
+//   aSplatA = (grass, dryGrass, rock, gravel)
+//   aSplatB = (dirt, mud, cobble, wet)
+//
+// plus `aGround`, which carries the things a weight cannot express:
+//
+//   aGround.x  signed distance to the nearest road centreline, remapped -3.5..3.5 m onto 0..1
+//   aGround.y  1 where a road is within reach, so wheel ruts exist only on roads
+//   aGround.z  spare
+//   aGround.w  spare
+//
+// The ruts are computed in the FRAGMENT shader from the interpolated perpendicular distance, not
+// from a vertex weight, because the terrain lattice is 2 m and a rut band is 0.2 m wide: at vertex
+// resolution a rut lands between samples and is never drawn at all.
+
+const GROUND_VERTEX_HEADER = /* glsl */ `
+attribute vec4 aSplatA;
+attribute vec4 aSplatB;
+attribute vec4 aGround;
+varying vec4 vSplatA;
+varying vec4 vSplatB;
+varying vec4 vGroundExtra;
+varying vec3 vGroundWorld;
+`;
+
+const GROUND_VERTEX_BODY = /* glsl */ `
+vSplatA = aSplatA;
+vSplatB = aSplatB;
+vGroundExtra = aGround;
+vGroundWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+`;
+
+const GROUND_FRAGMENT_HEADER = /* glsl */ `
+uniform sampler2D uDetail;
+uniform vec2 uDetailTiling;
+varying vec4 vSplatA;
+varying vec4 vSplatB;
+varying vec4 vGroundExtra;
+varying vec3 vGroundWorld;
+`;
+
+const GROUND_FRAGMENT_BODY = /* glsl */ `
+{
+  vec4 detail = texture2D( uDetail, vGroundWorld.xz * uDetailTiling.x ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
+  vec4 macro = texture2D( uDetail, vGroundWorld.xz * uDetailTiling.y ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
+
+  // Atlas channels are R grass, G soil, B rock, A gravel. The eight weights fold onto those four.
+  vec4 channel = vec4(
+    vSplatA.x,
+    vSplatA.y + vSplatB.x + vSplatB.y + vSplatB.w,
+    vSplatA.z,
+    vSplatA.w + vSplatB.z
+  );
+  float total = max( 0.001, channel.x + channel.y + channel.z + channel.w );
+  channel /= total;
+
+  // Multiplied, not mixed. The fine read mips away to its own mean by about 30 m, and if the
+  // macro read only modulated it the ground went flat again at exactly the distance the 700 x 400
+  // world is mostly seen from. Multiplying leaves the macro at full contrast once the fine read
+  // has averaged out.
+  float shade = dot( channel, detail ) * mix( 1.0, dot( channel, macro ), 0.85 );
+
+  // Two wheel ruts at +/-0.55 m from the centreline, 0.16 m wide.
+  float perpendicular = ( vGroundExtra.x - 0.5 ) * 7.0;
+  float rut = vGroundExtra.y * exp( -pow( ( abs( perpendicular ) - 0.55 ) / 0.16, 2.0 ) );
+  shade *= 1.0 - 0.18 * rut;
+
+  diffuseColor.rgb *= shade;
+}
+`;
+
+// ------------------------------------------------------------------- water
+
+const WATER_VERTEX_HEADER = /* glsl */ `
+attribute float aWaterDepth;
+varying float vWaterDepth;
+varying vec3 vWaterWorld;
+`;
+
+const WATER_VERTEX_BODY = /* glsl */ `
+vWaterDepth = aWaterDepth;
+vWaterWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+`;
+
+const WATER_FRAGMENT_HEADER = /* glsl */ `
+uniform float uTime;
+uniform vec3 uShallow;
+uniform vec3 uDeep;
+uniform sampler2D uNormalB;
+uniform float uDepthRange;
+uniform float uEdgeFade;
+uniform vec2 uWaveScale;
+uniform vec2 uWaveScrollA;
+uniform vec2 uWaveScrollB;
+varying float vWaterDepth;
+varying vec3 vWaterWorld;
+`;
+
+const WATER_FRAGMENT_BODY = /* glsl */ `
+{
+  float depth01 = clamp( vWaterDepth / uDepthRange, 0.0, 1.0 );
+  diffuseColor.rgb *= mix( uShallow, uDeep, depth01 );
+  // The geometry already stops at the waterline, so this only softens the last few centimetres.
+  diffuseColor.a *= smoothstep( 0.0, uEdgeFade, vWaterDepth );
+}
+`;
+
+const WATER_NORMAL_BODY = /* glsl */ `
+#ifdef USE_NORMALMAP_TANGENTSPACE
+  vec3 waveA = texture2D( normalMap, vWaterWorld.xz * uWaveScale.x + uWaveScrollA * uTime ).xyz * 2.0 - 1.0;
+  vec3 waveB = texture2D( uNormalB, vWaterWorld.xz * uWaveScale.y + uWaveScrollB * uTime ).xyz * 2.0 - 1.0;
+  // Partial-derivative blend: add the slopes, keep the product of the up components.
+  vec3 mapN = normalize( vec3( waveA.xy + waveB.xy, waveA.z * waveB.z ) );
+  mapN.xy *= normalScale;
+  // The surface is an unrotated horizontal plane, so tangent space is world space with y and z
+  // swapped. No tangent attribute and no getTangentFrame call, and it stays correct across
+  // three.js versions that reshuffle the tangent chunk.
+  //
+  // viewMatrix, not normalMatrix: three declares normalMatrix in its VERTEX prefix only, so the
+  // obvious version of this line fails to compile with "undeclared identifier" and the water
+  // silently falls back to an error material.
+  normal = normalize( ( viewMatrix * vec4( mapN.x, mapN.z, mapN.y, 0.0 ) ).xyz );
+#endif
+`;
+
 /**
  * Material cache. Identical descriptors must return the identical material instance, or instancing
  * silently fragments and the draw-call budget is gone.
@@ -209,6 +388,9 @@ export class MaterialLibrary {
   /** Variants are keyed off the source material so a shared base texture stays shared. */
   private variantKeys = new WeakMap<THREE.Material, string>();
   private nextVariantKey = 0;
+  /** Held so the compiled ground program cannot outlive the atlas it samples. */
+  private groundUniforms: GroundUniforms | null = null;
+  private waterUniforms: WaterUniforms[] = [];
 
   private key(parts: (string | number | boolean)[]): string {
     return parts.join("|");
@@ -231,75 +413,158 @@ export class MaterialLibrary {
   /**
    * The one terrain material. Every terrain chunk in every region shares it; the region look comes
    * from baked vertex colours, so three regions cost one material and one shader program.
+   *
+   * The vertex colour still carries all of the hue — region palette, surface type, and the baked
+   * horizon AO. What `onBeforeCompile` adds is the VALUE detail the vertex colour physically
+   * cannot: measured, the colour changed by 0.12 of 255 per channel across a 2 m quad, which is
+   * below the 8-bit display floor, so the ground was one flat colour at every scale a player sees.
+   *
+   * Eight per-vertex surface weights select which channel of the detail atlas is sampled, and the
+   * atlas is read TWICE from the same texture at 2.5 m and 37 m tiling. Two scales from one
+   * texture is what kills the tile repeat across a 700 x 400 m world at zero extra memory.
+   *
+   * Everything here happens to `diffuseColor` before `<lights_fragment_begin>`, so shadows, all
+   * four lights, ACES tone mapping, fog and the sRGB output conversion stay downstream and keep
+   * working untouched. The terrain has `castShadow = false`, so there is no depth-material variant
+   * to keep in sync. This replaces the ground program rather than adding one: same material, same
+   * draw calls, one more `customProgramCacheKey`.
    */
   ground(): THREE.MeshStandardMaterial {
-    return this.remember("ground", () =>
-      new THREE.MeshStandardMaterial({
+    return this.remember("ground", () => {
+      const material = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         vertexColors: true,
         roughness: 0.97,
         metalness: 0,
         flatShading: false,
-      }));
+      });
+      material.name = "ground";
+
+      const uniforms = {
+        uDetail: { value: createDetailAtlas() },
+        // 1/2.5 m for the detail read, 1/37 m for the macro read. 2.5 m is roughly a footstep at
+        // the 6-34 m camera distances in shots.ts; 37 m is a prime-ish multiple of it, so the two
+        // reads do not come back into phase inside the visible radius.
+        uDetailTiling: { value: new THREE.Vector2(1 / 2.5, 1 / 37) },
+      };
+      // Held so a hot reload cannot orphan the atlas while a compiled program still references it.
+      this.groundUniforms = uniforms;
+
+      material.customProgramCacheKey = () => "corealm-ground-splat-v1";
+      material.onBeforeCompile = (shader) => {
+        shader.uniforms.uDetail = uniforms.uDetail;
+        shader.uniforms.uDetailTiling = uniforms.uDetailTiling;
+
+        shader.vertexShader = `${GROUND_VERTEX_HEADER}\n${shader.vertexShader}`.replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>\n${GROUND_VERTEX_BODY}`,
+        );
+        shader.fragmentShader = `${GROUND_FRAGMENT_HEADER}\n${shader.fragmentShader}`.replace(
+          "#include <map_fragment>",
+          `#include <map_fragment>\n${GROUND_FRAGMENT_BODY}`,
+        );
+      };
+      return material;
+    });
   }
 
   /**
-   * Roads and worn paths. Drawn as a thin ribbon laid over the terrain, so it needs a polygon
-   * offset rather than a vertical lift — a lift would float over dips and sink into crests.
-   */
-  /**
-   * Road ribbon.
+   * The 1 x 1 m contact patch drawn under a prop, rock or tree.
    *
-   * `DoubleSide` is load-bearing, not decoration. The ribbon is a flat horizontal strip whose
-   * triangle winding comes out facing down, so with the default `FrontSide` every road in the game
-   * was built, added to the scene, marked visible — and backface-culled from the only angle a
-   * player ever sees it from. Forty-two roads rendered as nothing.
+   * `MultiplyBlending`, not alpha: a contact shadow is a darkening of whatever is already there,
+   * so it needs no sorting against the ground and no depth write of its own, and the generated
+   * texture is pure white outside its falloff, which makes the quad's square edge invisible.
+   * One InstancedMesh of these is ONE draw call for the entire world's contact shadows, against
+   * the alternative of an SSAO pass or a second shadow cascade.
    */
-  /**
-   * A worn track. Lighter than the ground it crosses, not darker.
-   *
-   * `soil` is damp valley-floor earth, and using it raw drew Vellenwood's roads at 0x413630 —
-   * near black, and the strongest thing in the frame. A trodden path is dust and exposed grit: it
-   * reads BRIGHTER than the vegetation beside it, which is also what makes it legible as a route
-   * from the top-down camera the game is actually played at.
-   *
-   * The vertex alpha the ribbon writes feathers the edge, so `transparent` is load-bearing here
-   * rather than incidental.
-   */
-  road(regionId: RegionId = "fallowmarch"): THREE.MeshStandardMaterial {
-    return this.remember(this.key(["road", regionId]), () =>
-      new THREE.MeshStandardMaterial({
-        side: THREE.DoubleSide,
-        color: roadColour(regionId),
-        roughness: 0.99,
-        metalness: 0,
-        vertexColors: true,
+  contactDecal(): THREE.MeshBasicMaterial {
+    return this.remember("contact-decal", () =>
+      new THREE.MeshBasicMaterial({
+        map: createContactDecalTexture(),
+        blending: THREE.MultiplyBlending,
         transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+        side: THREE.DoubleSide,
         polygonOffset: true,
         polygonOffsetFactor: -2,
         polygonOffsetUnits: -4,
-        depthWrite: false,
-      }));
+      })) as THREE.MeshBasicMaterial;
   }
 
   /**
-   * Standing water. No water asset exists in the free library (asset-report gap 10), so this is a
-   * plain tinted plane; the scrolling normal pass is a later art round, not a Phase 1 blocker.
+   * Standing water: depth-tinted, alpha driven by depth, and two generated normal maps scrolling
+   * across each other.
+   *
+   * What was here before was a flat tinted plane whose rim faded to alpha 0 over the outer 40% of
+   * the disc, which dissolved the shoreline instead of drawing one — measured, 55-56% of the tarn
+   * footprints had dry hillside above the surface, so the "shoreline" was a wash lying on a slope.
+   * The geometry now stops exactly where the terrain crosses the surface (see `WorldScene.
+   * buildWater`), and this material fades the last 25 cm of depth so the waterline is a real edge
+   * rather than a drawn line or a smear.
+   *
+   * TWO scrolled normal maps, not one. One always reads as a texture sliding across a plane; two
+   * at different tilings and 33 degrees apart read as a surface. The plane is horizontal and
+   * unrotated, so its tangent frame is world-axis-aligned and the perturbed normal needs no
+   * tangent attribute and no `getTangentFrame` call.
+   *
+   * Roughness 0.14 with no `scene.environment` degrades to a diffuse-lit surface with a specular
+   * sun glint, which is legible on its own; when the sky worker lands an environment map the same
+   * material gains the sky reflection with no change here.
    */
   water(regionId: RegionId = "fallowmarch"): THREE.MeshStandardMaterial {
-    return this.remember(this.key(["water", regionId]), () =>
-      new THREE.MeshStandardMaterial({
-        color: REGION_PALETTES[regionId].water,
-        roughness: 0.22,
-        metalness: 0.05,
+    return this.remember(this.key(["water", regionId]), () => {
+      const palette = REGION_PALETTES[regionId];
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.14,
+        metalness: 0,
         transparent: true,
-        opacity: 0.82,
-        // The disc writes a faded rim into its vertex alpha, which is what dissolves the shoreline
-        // instead of drawing it. Without this the surface is a hard-edged shape on the grass.
-        vertexColors: true,
+        opacity: 0.94,
         side: THREE.DoubleSide,
         depthWrite: false,
-      }));
+        normalMap: createWaterNormalMap("fine"),
+        normalScale: new THREE.Vector2(0.55, 0.55),
+      });
+      material.name = `water-${regionId}`;
+
+      const uniforms = {
+        uTime: { value: 0 },
+        // Shallow lifts 45% toward the region's own low ground so the edge of the water agrees
+        // with the bank it meets; deep darkens 30%, which is the whole depth cue.
+        uShallow: { value: new THREE.Color(mixHex(palette.water, palette.groundLow, 0.45)) },
+        uDeep: { value: new THREE.Color(mixHex(palette.water, 0x000000, 0.3)) },
+        uNormalB: { value: createWaterNormalMap("coarse") },
+        // Metres of depth over which the tint runs, and metres over which the edge fades out.
+        uDepthRange: { value: 1.2 },
+        uEdgeFade: { value: 0.25 },
+        // 8.0 m and 3.7 m tiling. Scroll 0.012 and -0.019 m/s, 33 degrees apart, so neither the
+        // pattern nor the drift direction ever resolves as one moving texture.
+        uWaveScale: { value: new THREE.Vector2(1 / 8, 1 / 3.7) },
+        uWaveScrollA: { value: new THREE.Vector2(0.012, 0.004) },
+        uWaveScrollB: { value: new THREE.Vector2(-0.0159, 0.0104) },
+      };
+      this.waterUniforms.push(uniforms);
+
+      material.customProgramCacheKey = () => "corealm-water-v1";
+      material.onBeforeCompile = (shader) => {
+        for (const [name, uniform] of Object.entries(uniforms)) shader.uniforms[name] = uniform;
+
+        shader.vertexShader = `${WATER_VERTEX_HEADER}\n${shader.vertexShader}`.replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>\n${WATER_VERTEX_BODY}`,
+        );
+        shader.fragmentShader = `${WATER_FRAGMENT_HEADER}\n${shader.fragmentShader}`
+          .replace("#include <map_fragment>", `#include <map_fragment>\n${WATER_FRAGMENT_BODY}`)
+          .replace("#include <normal_fragment_maps>", WATER_NORMAL_BODY);
+      };
+      return material;
+    });
+  }
+
+  /** Advances every animated material. View-only: nothing here feeds semantic state. */
+  setTime(seconds: number): void {
+    for (const uniforms of this.waterUniforms) uniforms.uTime.value = seconds;
   }
 
   /** Exposed stone face for cliffs and terrace risers. */
@@ -496,6 +761,9 @@ export class MaterialLibrary {
   dispose(): void {
     for (const material of this.cache.values()) material.dispose();
     this.cache.clear();
+    this.groundUniforms = null;
+    this.waterUniforms = [];
+    disposeGeneratedTextures();
   }
 }
 

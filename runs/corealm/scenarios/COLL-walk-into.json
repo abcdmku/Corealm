@@ -1,0 +1,407 @@
+{
+  "name": "collision-walk-into-table",
+  "actions": [
+    {
+      "inspect": "getNavigationState",
+      "label": "navmesh ready"
+    },
+    {
+      "debug": "getSolidStats",
+      "args": [],
+      "label": "solid volume count (present only once root wires Solids)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -144.89,
+          "y": 1.04,
+          "z": -111.92
+        }
+      ],
+      "label": "teleport to standoff for cottage wall (coldbrace_house_3)"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START cottage wall (coldbrace_house_3)"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into cottage wall (coldbrace_house_3)"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END cottage wall (coldbrace_house_3) (centre -146, -104)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -161.16,
+          "y": 1.04,
+          "z": -113.94
+        }
+      ],
+      "label": "teleport to standoff for gatehouse pier (coldbrace_gate_south)"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START gatehouse pier (coldbrace_gate_south)"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into gatehouse pier (coldbrace_gate_south)"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END gatehouse pier (coldbrace_gate_south) (centre -162, -108)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -175.16,
+          "y": 1.04,
+          "z": -113.94
+        }
+      ],
+      "label": "teleport to standoff for wall run (coldbrace_wall_s)"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START wall run (coldbrace_wall_s)"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into wall run (coldbrace_wall_s)"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END wall run (coldbrace_wall_s) (centre -176, -108)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -159.16,
+          "y": 1.04,
+          "z": -113.94
+        }
+      ],
+      "label": "teleport to standoff for south gate GAP (must stay OPEN)"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START south gate GAP (must stay OPEN)"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into south gate GAP (must stay OPEN)"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END south gate GAP (must stay OPEN) (centre -160, -108)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -159.3,
+          "y": 1.04,
+          "z": -92.95
+        }
+      ],
+      "label": "teleport to standoff for bank chest (coldbrace_bank)"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START bank chest (coldbrace_bank)"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into bank chest (coldbrace_bank)"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END bank chest (coldbrace_bank) (centre -160, -88)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -154.0,
+          "y": 1.04,
+          "z": -99.0
+        }
+      ],
+      "label": "teleport to standoff for anvil (coldbrace_anvil)"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START anvil (coldbrace_anvil)"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into anvil (coldbrace_anvil)"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END anvil (coldbrace_anvil) (centre -154, -94)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -150.0,
+          "y": 1.04,
+          "z": -99.0
+        }
+      ],
+      "label": "teleport to standoff for cauldron (coldbrace_furnace)"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START cauldron (coldbrace_furnace)"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into cauldron (coldbrace_furnace)"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END cauldron (coldbrace_furnace) (centre -150, -94)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -175.3,
+          "y": 1.04,
+          "z": -84.95
+        }
+      ],
+      "label": "teleport to standoff for market stall (coldbrace_general)"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START market stall (coldbrace_general)"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into market stall (coldbrace_general)"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END market stall (coldbrace_general) (centre -176, -80)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -157.49,
+          "y": 1.04,
+          "z": -105.62
+        }
+      ],
+      "label": "teleport to standoff for npc Carter Bel"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START npc Carter Bel"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into npc Carter Bel"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END npc Carter Bel (centre -158, -102)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -82.38,
+          "y": -1.35,
+          "z": -74.53
+        }
+      ],
+      "label": "teleport to standoff for enemy rill_skitterlings_1"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START enemy rill_skitterlings_1"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into enemy rill_skitterlings_1"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END enemy rill_skitterlings_1 (centre -82.38, -69.53)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -330.78,
+          "y": -0.81,
+          "z": -69.58
+        }
+      ],
+      "label": "teleport to standoff for tree palewood_copse_trees_1"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START tree palewood_copse_trees_1"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into tree palewood_copse_trees_1"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END tree palewood_copse_trees_1 (centre -330.78, -64.58)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -156.19,
+          "y": 3.0,
+          "z": 69.61
+        }
+      ],
+      "label": "teleport to standoff for ore bracken_pit_grithe_1"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START ore bracken_pit_grithe_1"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into ore bracken_pit_grithe_1"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END ore bracken_pit_grithe_1 (centre -156.19, 74.61)"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "x": -38.61,
+          "y": -0.56,
+          "z": -69.9
+        }
+      ],
+      "label": "teleport to standoff for pond Redsill Shallows"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "START pond Redsill Shallows"
+    },
+    {
+      "key": "w",
+      "holdMs": 2500,
+      "label": "hold W into pond Redsill Shallows"
+    },
+    {
+      "waitMs": 300
+    },
+    {
+      "inspect": "getPlayerPosition",
+      "label": "END pond Redsill Shallows (centre -40, -60)"
+    },
+    {
+      "screenshot": "COLL-walkinto-final"
+    }
+  ]
+}

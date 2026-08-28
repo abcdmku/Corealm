@@ -1,0 +1,8 @@
+{ "name": "w1-anvil", "actions": [
+ { "debug": "getEntity", "args": ["coldbrace_anvil"] },
+ { "debug": "getDrawnBounds", "args": ["coldbrace_anvil"] },
+ { "debug": "groundHeight", "args": [-153.5, -99.5] },
+ { "debug": "getEntity", "args": ["rootfall_anvil"] },
+ { "debug": "getDrawnBounds", "args": ["rootfall_anvil"] },
+ { "inspect": "checkGrounding" }
+]}

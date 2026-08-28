@@ -13,11 +13,22 @@
  * cross over at exactly 0.5 each on their shared border. Ground colour blends with the same
  * weights, which is why one vertex-coloured material covers all three region palettes.
  *
+ * The second structural decision, added later: THE GROUND ABSORBS THE THINGS DRAWN ON IT. Roads,
+ * paved squares and waterlogged banks are per-vertex surface weights and colours on the terrain
+ * mesh, not separate geometry laid over it. That removed 42 transparent depth-write-off road
+ * ribbons — the frame's largest overdraw source and its largest single draw-call block — and with
+ * them a whole family of defects that only exist when two surfaces describe the same ground:
+ * z-fighting, a lift tuned against the wrong interpolant, and an unpainted hole at every junction.
+ *
+ * Everything the surface knows is sampled onto ONE 2 m height lattice, the same lattice the chunk
+ * meshes are tessellated from and the same one `heightfieldSamples` hands to Rapier, so the drawn
+ * ground, the physics ground and every derived quantity are the same surface by construction.
+ *
  * This file owns no gameplay state. It reads geometry parameters and draws.
  */
 import * as THREE from "three";
 import type { RegionId, Vec3 } from "../contracts.js";
-import { MaterialLibrary, REGION_PALETTES, roadColour } from "./materials.js";
+import { MaterialLibrary, REGION_PALETTES, surfaceColour } from "./materials.js";
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from "../app/config.js";
 import { Rng } from "../core/rng.js";
 import { clamp } from "../core/math.js";
@@ -75,12 +86,25 @@ export interface RegionTerrainSpec {
 export interface FlatSpot {
   x: number;
   z: number;
-  /** Fully flat inside this radius. */
+  /** Fully flat inside this radius. Ignored when `halfExtents` is set. */
   radius: number;
   /** Metres of falloff outside the radius. */
   blend: number;
   /** Explicit height. Defaults to the natural height at the centre. */
   height?: number;
+  /**
+   * Rectangular pad, as half-extents along the pad's local x and z. When present the core is that
+   * rectangle rather than a circle, and `radius` is only used to size the falloff sweep.
+   *
+   * This exists because a circular pad cannot hold a terrace. Highcairn is authored around an 18 m
+   * riser and its 35 m circular pad erases the whole thing: the region's one piece of designed
+   * verticality becomes a disc of uniform grey, visible in terrain-highcairn as an arc where the
+   * pad boundary meets the hillside. A rectangle whose long axis runs ALONG the terrace flattens
+   * the building ground without touching the riser above or below it.
+   */
+  halfExtents?: readonly [number, number];
+  /** Yaw of a rectangular pad, in radians. Ignored for circular pads. */
+  rotationY?: number;
 }
 
 export interface WorldTerrainSpec {
@@ -236,6 +260,73 @@ interface RegionField {
   spec: RegionTerrainSpec;
   height: (x: number, z: number) => number;
   palette: (typeof REGION_PALETTES)[RegionId];
+  /**
+   * The height range the region's field ACTUALLY produces over its own rect, swept at 4 m.
+   *
+   * The altitude ramp used to normalise against `baseHeight` and `amplitude`, which assumes the
+   * field spans exactly 0..amplitude. It does not. Measured over each rect: Fallowmarch used
+   * -0.35..2.34 of that ramp, so 46.9% of it clamped to `groundLow` and 0.8% clamped to
+   * `groundHigh`; Vellenwood used 0.00..0.33, so #576b3f was never drawn anywhere in the game;
+   * Karrowmoor used -0.13..1.08. Normalising against the measured range instead restores the full
+   * eight-swatch palette that materials.ts had already authored.
+   */
+  hMin: number;
+  hMax: number;
+}
+
+/**
+ * The pieces of the world that change the GROUND rather than stand on it.
+ *
+ * Roads, paved squares and water bodies used to be separate geometry laid over the terrain: 42
+ * transparent depth-write-off road ribbons (the frame's largest overdraw source and largest single
+ * draw-call block), no paving at all, and a water disc that did not know where the bank was.
+ * Stamped into the terrain's own vertex colours and splat weights they are mip-correct,
+ * shadow-correct and z-fight-free by construction, and they cost nothing to draw.
+ */
+export interface RoadStamp {
+  /** World-space polyline. Only x and z are read; the ground supplies y. */
+  points: readonly Vec3[];
+  /** Worn width in metres. Defaults to `ROAD_WORN_HALF * 2`. */
+  width?: number;
+}
+
+export interface PavingStamp {
+  centre: readonly [number, number];
+  halfExtents: readonly [number, number];
+  rotationY?: number;
+}
+
+export interface WaterStamp {
+  centre: readonly [number, number];
+  radius: number;
+  /** Surface height in metres. The mud and wet bands are placed against this. */
+  level: number;
+}
+
+export interface GroundStamps {
+  roads?: readonly RoadStamp[];
+  paving?: readonly PavingStamp[];
+  water?: readonly WaterStamp[];
+  /** Seeds the road meander. Fixed derivation per road index, so it is reproducible. */
+  seed?: number;
+}
+
+/** One instance in a `scatterInstanced` call. */
+export interface ScatterPlacement {
+  position: Vec3;
+  rotationY: number;
+  /** A single number scales uniformly; a triple scales per axis. */
+  scale: number | readonly [number, number, number];
+  /** Terrain normal to lean into. Omitted means upright. */
+  normal?: Vec3;
+  /** 0..1 fraction of the way from upright to fully aligned with `normal`. */
+  tilt?: number;
+}
+
+/** One contact patch. `radius` is the half-width of the darkening, in metres. */
+export interface ContactDecalPlacement {
+  position: Vec3;
+  radius: number;
 }
 
 export interface RegionLayout {
@@ -274,6 +365,26 @@ export class WorldScene {
   private legacySamplers = new Map<RegionId, (x: number, z: number) => number>();
   private scatterByRegion = new Map<RegionId, THREE.Object3D[]>();
 
+  /**
+   * The 2 m height lattice the terrain mesh is actually built from.
+   *
+   * `heightAtXZ` is the analytic field; the surface a player stands on and clicks is the mesh
+   * INTERPOLATED between lattice nodes, and the two disagree by meanAbs 0.031 m (6.1% of samples
+   * over 5 cm). That gap is why 10% of road ribbon vertices were below the drawn ground. Sampling
+   * the lattice once and reading it everywhere makes the mesh, the physics heightfield and every
+   * derived quantity agree by construction, and it turns the 24 horizon-AO samples per vertex from
+   * 1.75M analytic field evaluations into 1.75M array reads.
+   */
+  private lattice: HeightLattice | null = null;
+  private chunks: ChunkRecord[] = [];
+  private roads: RoadSegment[] = [];
+  private roadPolylines: Vec3[][] = [];
+  private roadGrid = new Map<number, number[]>();
+  private paving: PavingStamp[] = [];
+  private waters: WaterStamp[] = [];
+  /** Set once stamps have been supplied, which is what retires the road ribbon path. */
+  private stampsProvided = false;
+
   playerMesh: THREE.Object3D | null = null;
   private playerTarget = new THREE.Vector3();
   private playerFacing = 0;
@@ -304,14 +415,21 @@ export class WorldScene {
     // Flats registered through `addFlatSpot` before the build are kept: settlement pads are
     // registered by whoever knows where the settlement is, which is not this file.
     this.flats = [...this.flats, ...(spec.flats ?? [])].map((flat) => ({ ...flat }));
-    this.fields = spec.regions.map((region) => ({
-      spec: region,
-      height: makeRegionField(region),
-      palette: REGION_PALETTES[region.regionId],
-    }));
+    this.fields = spec.regions.map((region) => {
+      const height = makeRegionField(region);
+      const range = sweepFieldRange(region.rect, height);
+      return {
+        spec: region,
+        height,
+        palette: REGION_PALETTES[region.regionId],
+        hMin: range.min,
+        hMax: range.max,
+      };
+    });
 
     this.resolveFlatTargets();
     this.normaliseFlats();
+    this.buildLattice();
 
     const { bounds, chunkSize } = spec;
     const width = bounds.maxX - bounds.minX;
@@ -363,7 +481,14 @@ export class WorldScene {
       amplitude: spec.amplitude,
     };
     const field = makeRegionField(region);
-    this.fields.push({ spec: region, height: field, palette: REGION_PALETTES[spec.regionId] });
+    const range = sweepFieldRange(rect, field);
+    this.fields.push({
+      spec: region,
+      height: field,
+      palette: REGION_PALETTES[spec.regionId],
+      hMin: range.min,
+      hMax: range.max,
+    });
     this.legacySamplers.set(spec.regionId, field);
     if (!this.world) {
       this.world = {
@@ -374,6 +499,7 @@ export class WorldScene {
         regions: [region],
       };
     }
+    this.buildLattice();
 
     const mesh = this.buildChunk(
       rect.minX, rect.minZ, spec.size, spec.size, spec.segments, spec.segments, this.materials.ground(),
@@ -400,30 +526,35 @@ export class WorldScene {
 
     const position = geometry.getAttribute("position") as THREE.BufferAttribute;
     const colours = new Float32Array(position.count * 3);
+    // Eight surface weights as two normalised Uint8 vec4s, plus the road frame. 12 bytes/vertex,
+    // about 876 KB over the world's ~73k terrain vertices. See the splat block in materials.ts.
+    const splatA = new Uint8Array(position.count * 4);
+    const splatB = new Uint8Array(position.count * 4);
+    const extra = new Uint8Array(position.count * 4);
     const centreX = originX + sizeX / 2;
     const centreZ = originZ + sizeZ / 2;
-    const step = Math.max(0.5, Math.min(sizeX / segmentsX, sizeZ / segmentsZ));
-    const colour = new THREE.Color();
+    const surface: SurfaceSample = emptySurface();
 
     for (let i = 0; i < position.count; i += 1) {
       const worldX = position.getX(i) + centreX;
       const worldZ = position.getZ(i) + centreZ;
-      const height = this.heightAtXZ(worldX, worldZ);
+      // The lattice IS the mesh: chunk vertices land exactly on lattice nodes, so reading the
+      // lattice here rather than re-evaluating the analytic field costs nothing in accuracy and
+      // makes the drawn surface and `meshHeightAt` identical by construction.
+      const height = this.sampleLattice(worldX, worldZ);
       position.setY(i, height);
 
-      // Central-difference slope, used to expose rock on steep faces. Two extra samples per vertex
-      // is cheaper than reconstructing normals afterwards and it matches across chunk borders.
-      const dx = (this.heightAtXZ(worldX + step, worldZ) - this.heightAtXZ(worldX - step, worldZ)) / (2 * step);
-      const dz = (this.heightAtXZ(worldX, worldZ + step) - this.heightAtXZ(worldX, worldZ - step)) / (2 * step);
-      const slope = Math.hypot(dx, dz);
-
-      this.groundColourAt(worldX, worldZ, height, slope, colour);
-      colours[i * 3] = colour.r;
-      colours[i * 3 + 1] = colour.g;
-      colours[i * 3 + 2] = colour.b;
+      this.sampleSurface(worldX, worldZ, height, surface);
+      colours[i * 3] = surface.colour.r;
+      colours[i * 3 + 1] = surface.colour.g;
+      colours[i * 3 + 2] = surface.colour.b;
+      writeSplat(splatA, splatB, extra, i, surface);
     }
     position.needsUpdate = true;
     geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+    geometry.setAttribute("aSplatA", new THREE.BufferAttribute(splatA, 4, true));
+    geometry.setAttribute("aSplatB", new THREE.BufferAttribute(splatB, 4, true));
+    geometry.setAttribute("aGround", new THREE.BufferAttribute(extra, 4, true));
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
 
@@ -433,7 +564,59 @@ export class WorldScene {
     // Terrain never casts. It would double every terrain draw call in the shadow pass and the
     // relief is gentle enough that self-shadowing buys nothing.
     mesh.castShadow = false;
+    this.chunks.push({ mesh, centreX, centreZ, sizeX, sizeZ });
     return mesh;
+  }
+
+  /**
+   * Recomputes the surface of every terrain vertex inside a world-space box.
+   *
+   * Used when a stamp arrives after the chunks are already built, which is the case for the road
+   * corridor: `buildRoad` is called after `buildWorld` and the corridor has to reach the ground
+   * that was drawn without it. Everything is recomputed from scratch against the CURRENT stamp
+   * list rather than blended into what is already there, so restamping the same ground twice
+   * produces the same answer as stamping it once.
+   */
+  private restampArea(minX: number, minZ: number, maxX: number, maxZ: number): void {
+    const surface: SurfaceSample = emptySurface();
+    for (const chunk of this.chunks) {
+      const halfX = chunk.sizeX / 2;
+      const halfZ = chunk.sizeZ / 2;
+      if (chunk.centreX + halfX < minX || chunk.centreX - halfX > maxX) continue;
+      if (chunk.centreZ + halfZ < minZ || chunk.centreZ - halfZ > maxZ) continue;
+
+      const geometry = chunk.mesh.geometry;
+      const position = geometry.getAttribute("position") as THREE.BufferAttribute;
+      const colour = geometry.getAttribute("color") as THREE.BufferAttribute;
+      const splatA = geometry.getAttribute("aSplatA") as THREE.BufferAttribute;
+      const splatB = geometry.getAttribute("aSplatB") as THREE.BufferAttribute;
+      const extra = geometry.getAttribute("aGround") as THREE.BufferAttribute;
+      if (!colour || !splatA || !splatB || !extra) continue;
+
+      const colours = colour.array as Float32Array;
+      const arrayA = splatA.array as Uint8Array;
+      const arrayB = splatB.array as Uint8Array;
+      const arrayExtra = extra.array as Uint8Array;
+      let touched = false;
+
+      for (let i = 0; i < position.count; i += 1) {
+        const worldX = position.getX(i) + chunk.centreX;
+        const worldZ = position.getZ(i) + chunk.centreZ;
+        if (worldX < minX || worldX > maxX || worldZ < minZ || worldZ > maxZ) continue;
+        this.sampleSurface(worldX, worldZ, position.getY(i), surface);
+        colours[i * 3] = surface.colour.r;
+        colours[i * 3 + 1] = surface.colour.g;
+        colours[i * 3 + 2] = surface.colour.b;
+        writeSplat(arrayA, arrayB, arrayExtra, i, surface);
+        touched = true;
+      }
+
+      if (!touched) continue;
+      colour.needsUpdate = true;
+      splatA.needsUpdate = true;
+      splatB.needsUpdate = true;
+      extra.needsUpdate = true;
+    }
   }
 
   /**
@@ -460,6 +643,20 @@ export class WorldScene {
    * the fishing basins — are left alone; theirs is the point.
    */
   private resolveFlatTargets(): void {
+    // Pads that carry an explicit height are clamped against the ground they sit on FIRST, because
+    // every later decision (the implicit pads' targets, the falloff widths) is measured against
+    // them. The fishing basins are authored as a depth below the REGION FLOOR, and Karrowmoor's
+    // terraces climb 36 m above their floor, so the Cairn Tarn and the Far Tarn were both authored
+    // 36 m inside a hillside. Measured consequence: `normaliseFlats` widened their falloffs to
+    // 63.0 m and 84.8 m to keep the sides walkable, which dragged a natural 43 m ridge down to
+    // 10.4 m and left the ridge_pines location pad standing in it as a 7 m-radius, 32.75 m-tall
+    // pillar with an unblended vertical wall. A tarn belongs ON its terrace, not in a crater
+    // through it, so a pad may carve at most MAX_PAD_CARVE below the natural ground at its centre.
+    for (const flat of this.flats) {
+      if (flat.height === undefined) continue;
+      const natural = this.naturalHeight(flat.x, flat.z);
+      flat.height = Math.max(flat.height, natural - MAX_PAD_CARVE);
+    }
     for (let index = 0; index < this.flats.length; index += 1) {
       const flat = this.flats[index];
       if (!flat || flat.height !== undefined) continue;
@@ -467,18 +664,38 @@ export class WorldScene {
     }
   }
 
+  /**
+   * Widens each pad's falloff until its collar is walkable, and no further.
+   *
+   * A 7 m pad with a 9 m falloff on a Karrowmoor terrace riser cuts a mesa with 60-degree sides:
+   * recast drops the sides, and the location on top becomes an island the player can path to but
+   * not reach. So each pad's falloff expands to whatever the local height difference actually
+   * needs — but the previous cap of 4x had no relationship to the pad, which is how a 16 m basin
+   * acquired an 84.8 m falloff and became a regional depression. The cap is now 3x the pad's own
+   * radius, which is a collar, not a landscape.
+   *
+   * The ring is sampled against the FLATTENED height rather than the natural one. Sampling the
+   * natural field meant a pad could not see the neighbour that was about to pull the ground out
+   * from under its collar, which is the other half of how the 32.75 m cliff was cut.
+   */
   private normaliseFlats(): void {
     const maxGradient = 0.6; // about 31 degrees, comfortably inside the 48-degree walkable limit
-    for (const flat of this.flats) {
-      const centre = flat.height ?? this.naturalHeight(flat.x, flat.z);
-      let drop = 0;
-      const ring = flat.radius + flat.blend;
-      for (let step = 0; step < 8; step += 1) {
-        const angle = (step / 8) * Math.PI * 2;
-        const sample = this.naturalHeight(flat.x + Math.cos(angle) * ring, flat.z + Math.sin(angle) * ring);
-        drop = Math.max(drop, Math.abs(sample - centre));
+    // Two passes: the first pass changes the flattened field the second pass measures against.
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (const flat of this.flats) {
+        const centre = flat.height ?? this.naturalHeight(flat.x, flat.z);
+        const reach = padReach(flat);
+        let drop = 0;
+        const ring = reach + flat.blend;
+        for (let step = 0; step < 8; step += 1) {
+          const angle = (step / 8) * Math.PI * 2;
+          const x = flat.x + Math.cos(angle) * ring;
+          const z = flat.z + Math.sin(angle) * ring;
+          drop = Math.max(drop, Math.abs(this.heightAtXZ(x, z) - centre));
+        }
+        const needed = Math.max(flat.blend, drop / maxGradient);
+        flat.blend = Math.min(needed, Math.max(flat.blend, reach * 3));
       }
-      flat.blend = Math.min(flat.blend * 4, Math.max(flat.blend, drop / maxGradient));
     }
   }
 
@@ -536,40 +753,58 @@ export class WorldScene {
   }
 
   /**
-   * Flattens `height` through every pad that reaches this point, in pad order.
+   * Flattens `height` through every pad that reaches this point.
    *
-   * Two rules, and the second one is the load-bearing one:
+   * This used to hard-set `result = target` inside a pad's radius and then SKIP every later pad's
+   * falloff, on the reasoning that a pad's falloff must never disturb ground another pad has
+   * already made flat. The reasoning was right and the implementation cut a cliff: at
+   * (253.3,-101.8) the ridge_pines core kept its natural 43.12 m with both fishing-basin falloffs
+   * skipped, while one metre away the same natural ground took both falloffs and landed at
+   * 10.37 m. That is a 32.75 m step in 1 m, and 3.4% of the world (1317 of 38332 samples) came out
+   * steeper than 45 degrees with a maximum of 86.3.
    *
-   *  1. Inside a pad's radius the ground IS that pad's height. Later pads may still override — a
-   *     location pad inside a settlement resolves to the settlement's own height, so that override
-   *     is a no-op by construction (see `resolveFlatTargets`).
-   *  2. A pad's FALLOFF never disturbs ground another pad has already made flat. Without this, the
-   *     fishing basins reached into the settlements: `normaliseFlats` widens a basin's blend to
-   *     whatever the local drop needs, which on Karrowmoor's terraces is most of a hundred metres,
-   *     and the Cairn Tarn was quietly pulling Highcairn's east side 1.3 m down toward the
-   *     waterline. Buildings are assembled level, so that came out as huts with a corner in the
-   *     air. Flat has to mean flat, or nothing that stands on it can be trusted.
+   * The replacement is inverse-distance weighting. Every pad in range contributes
+   * `((1-t)/t)^3` where `t` is the fraction of the way through its falloff, so:
+   *
+   *  - the weight rises without bound toward a pad's core, which is what makes flat mean flat: at
+   *    Coldbrace's centre the settlement pad outweighs anything else that reaches it by 10^5, so
+   *    the measured relief across the pad stays 0.000 m and buildings still assemble level;
+   *  - it is continuous everywhere, including across a core boundary, so two pads with different
+   *    targets produce a RAMP between them instead of a step;
+   *  - cores weight by penetration depth, so where two cores overlap the deeper one wins smoothly
+   *    rather than by list order.
+   *
+   * `influence` is a separate plain falloff that returns the result to the natural field at the
+   * outer edge of the outermost pad, which the raw weighted mean cannot do on its own.
    */
   private applyFlats(x: number, z: number, height: number, limit = this.flats.length): number {
     if (this.flats.length === 0) return height;
-    let result = height;
-    let cored = false;
+    let accumulated = 0;
+    let weightSum = 0;
+    let influence = 0;
+
     for (let index = 0; index < limit; index += 1) {
       const flat = this.flats[index];
       if (!flat) continue;
-      const distance = Math.hypot(x - flat.x, z - flat.z);
-      if (distance > flat.radius + flat.blend) continue;
+      const distance = padDistance(flat, x, z);
+      if (distance > flat.blend) continue;
       const target = flat.height ?? this.naturalHeight(flat.x, flat.z);
-      if (distance <= flat.radius) {
-        result = target;
-        cored = true;
-        continue;
-      }
-      if (cored) continue;
-      const weight = 1 - smoothstep01((distance - flat.radius) / Math.max(0.001, flat.blend));
-      result = result + (target - result) * weight;
+
+      // ONE expression across the core boundary, which is the whole point. Weighting the core by a
+      // separate constant makes the weight jump by orders of magnitude at `distance == 0`, and a
+      // discontinuous weight is a discontinuous surface: it measured as a 4.4 m step in the ground
+      // 2 m outside a location pad, which is the same class of defect as the 32.75 m cliff.
+      const t = distance <= 0 ? 0 : distance / Math.max(0.001, flat.blend);
+      const falloff = distance <= 0 ? 1 : 1 - smoothstep01(t);
+      const depth = distance < 0 ? -distance : 0;
+      const weight = (1 + depth) / (t * t * t + PAD_CORE_EPSILON);
+      influence = Math.max(influence, falloff);
+      accumulated += target * weight;
+      weightSum += weight;
     }
-    return result;
+
+    if (weightSum <= 0 || influence <= 0) return height;
+    return height + (accumulated / weightSum - height) * influence;
   }
 
   /** Which region owns a point. The rect that contains it, or the nearest one. */
@@ -682,169 +917,473 @@ export class WorldScene {
     };
   }
 
-  // -------------------------------------------------------- ground dress
+  // -------------------------------------------------- the 2 m mesh lattice
 
-  private groundColourAt(x: number, z: number, height: number, slope: number, out: THREE.Color): void {
+  /**
+   * Samples the analytic field once onto the 2 m lattice the chunks are tessellated from.
+   *
+   * ~70k evaluations, and it replaces the ~365k the old `buildChunk` did (five per vertex for the
+   * height and its central differences). Everything downstream — vertex heights, slope, curvature,
+   * horizon AO, `meshHeightAt`, `normalAt`, the water shoreline — reads this array instead, which
+   * is both faster and, more importantly, guarantees they all describe the SAME surface.
+   */
+  private buildLattice(): void {
+    const world = this.world;
+    if (!world) return;
+    const bounds = world.bounds;
+    const step = Math.max(0.25, world.metresPerQuad);
+    const cols = Math.max(1, Math.round((bounds.maxX - bounds.minX) / step)) + 1;
+    const rows = Math.max(1, Math.round((bounds.maxZ - bounds.minZ) / step)) + 1;
+    const heights = new Float32Array(cols * rows);
+    for (let row = 0; row < rows; row += 1) {
+      const z = bounds.minZ + row * step;
+      for (let col = 0; col < cols; col += 1) {
+        heights[row * cols + col] = this.heightAtXZ(bounds.minX + col * step, z);
+      }
+    }
+    this.lattice = { heights, cols, rows, minX: bounds.minX, minZ: bounds.minZ, step };
+  }
+
+  /** Bilinear read of the lattice, falling back to the analytic field before it exists. */
+  private sampleLattice(x: number, z: number): number {
+    const lattice = this.lattice;
+    if (!lattice) return this.heightAtXZ(x, z);
+    const fx = clamp((x - lattice.minX) / lattice.step, 0, lattice.cols - 1);
+    const fz = clamp((z - lattice.minZ) / lattice.step, 0, lattice.rows - 1);
+    const x0 = Math.floor(fx);
+    const z0 = Math.floor(fz);
+    const x1 = Math.min(x0 + 1, lattice.cols - 1);
+    const z1 = Math.min(z0 + 1, lattice.rows - 1);
+    const tx = fx - x0;
+    const tz = fz - z0;
+    const h00 = lattice.heights[z0 * lattice.cols + x0]!;
+    const h10 = lattice.heights[z0 * lattice.cols + x1]!;
+    const h01 = lattice.heights[z1 * lattice.cols + x0]!;
+    const h11 = lattice.heights[z1 * lattice.cols + x1]!;
+    const top = h00 + (h10 - h00) * tx;
+    const bottom = h01 + (h11 - h01) * tx;
+    return top + (bottom - top) * tz;
+  }
+
+  /**
+   * The height of the DRAWN ground, bilinear on the same 2 m lattice the mesh is built from.
+   *
+   * Not the same thing as `heightAtXZ`, which is the analytic field: measured over 38332 samples,
+   * the two differ by meanAbs 0.031 m, 6.1% of samples exceed 5 cm, and 10% of road ribbon
+   * vertices sat BELOW the drawn ground because of it. Anything that has to touch the surface a
+   * player sees — a decal, a shoreline, a placed prop — belongs on this one.
+   */
+  meshHeightAt(x: number, z: number): number {
+    return this.sampleLattice(x, z);
+  }
+
+  /** Unit surface normal of the drawn ground. Central difference on the same 2 m lattice. */
+  normalAt(x: number, z: number): Vec3 {
+    const step = this.lattice?.step ?? 2;
+    const dx = (this.sampleLattice(x + step, z) - this.sampleLattice(x - step, z)) / (2 * step);
+    const dz = (this.sampleLattice(x, z + step) - this.sampleLattice(x, z - step)) / (2 * step);
+    const length = Math.hypot(dx, 1, dz);
+    return [-dx / length, 1 / length, -dz / length];
+  }
+
+  // -------------------------------------------------------- ground stamps
+
+  /**
+   * Hands the ground the things that change it rather than stand on it.
+   *
+   * Call BEFORE `buildWorld` and the stamps are baked into the chunks as they are built. Call
+   * after and only the roads reach the ground, through `restampArea`. Supplying roads here also
+   * retires the ribbon path: `buildRoad` becomes a no-op, because the corridor is already in the
+   * terrain and drawing it twice is exactly the z-fighting the ribbon's polygon offset existed to
+   * paper over.
+   */
+  setGroundStamps(stamps: GroundStamps): void {
+    this.stampsProvided = true;
+    this.paving = (stamps.paving ?? []).map((entry) => ({ ...entry }));
+    this.waters = (stamps.water ?? []).map((entry) => ({ ...entry }));
+    this.roadPolylines = [];
+    this.roads = [];
+    const seed = stamps.seed ?? 0x0a0d;
+    for (const [index, road] of (stamps.roads ?? []).entries()) {
+      const curved = curveRoadPolyline(road.points, (seed ^ (index * 0x9e37)) >>> 0);
+      this.roadPolylines.push(curved);
+      appendRoadSegments(this.roads, curved);
+    }
+    this.rebuildRoadGrid();
+    if (this.chunks.length > 0) this.restampArea(-Infinity, -Infinity, Infinity, Infinity);
+  }
+
+  /**
+   * The road centrelines as they were actually stamped, after the meander.
+   *
+   * Kerbs, path rocks and anything else that follows a route needs the CURVED line, not the
+   * authored endpoints, or the edge dressing runs beside the road rather than along it.
+   */
+  getRoadPolylines(): Vec3[][] {
+    return this.roadPolylines.map((line) => line.map((point) => [point[0], point[1], point[2]] as Vec3));
+  }
+
+  private rebuildRoadGrid(): void {
+    this.roadGrid.clear();
+    for (const [index, segment] of this.roads.entries()) {
+      const minX = Math.min(segment.ax, segment.bx) - ROAD_FADE_HALF;
+      const maxX = Math.max(segment.ax, segment.bx) + ROAD_FADE_HALF;
+      const minZ = Math.min(segment.az, segment.bz) - ROAD_FADE_HALF;
+      const maxZ = Math.max(segment.az, segment.bz) + ROAD_FADE_HALF;
+      for (let cz = Math.floor(minZ / ROAD_CELL); cz <= Math.floor(maxZ / ROAD_CELL); cz += 1) {
+        for (let cx = Math.floor(minX / ROAD_CELL); cx <= Math.floor(maxX / ROAD_CELL); cx += 1) {
+          const key = cellKey(cx, cz);
+          const bucket = this.roadGrid.get(key);
+          if (bucket) bucket.push(index);
+          else this.roadGrid.set(key, [index]);
+        }
+      }
+    }
+  }
+
+  /**
+   * Distance from a point to the nearest road centreline, with the sign of which side it is on.
+   *
+   * Bucketed on an 8 m grid, so a terrain vertex tests a handful of segments rather than all ~700.
+   * Returns `null` past `ROAD_FADE_HALF`, which is most of the world.
+   */
+  private roadAt(x: number, z: number): { distance: number; perpendicular: number } | null {
+    if (this.roads.length === 0) return null;
+    let best = Infinity;
+    let bestPerpendicular = 0;
+    const cx = Math.floor(x / ROAD_CELL);
+    const cz = Math.floor(z / ROAD_CELL);
+    const bucket = this.roadGrid.get(cellKey(cx, cz));
+    if (!bucket) return null;
+    for (const index of bucket) {
+      const segment = this.roads[index]!;
+      const ex = segment.bx - segment.ax;
+      const ez = segment.bz - segment.az;
+      const lengthSquared = ex * ex + ez * ez;
+      const t = lengthSquared <= 1e-9
+        ? 0
+        : clamp(((x - segment.ax) * ex + (z - segment.az) * ez) / lengthSquared, 0, 1);
+      const px = segment.ax + ex * t;
+      const pz = segment.az + ez * t;
+      const distance = Math.hypot(x - px, z - pz);
+      if (distance >= best) continue;
+      best = distance;
+      const length = Math.sqrt(lengthSquared) || 1;
+      bestPerpendicular = ((x - px) * (ez / length) - (z - pz) * (ex / length));
+    }
+    if (best > ROAD_FADE_HALF) return null;
+    return { distance: best, perpendicular: bestPerpendicular };
+  }
+
+  /**
+   * Everything the ground needs to know about itself at one point: eight surface weights, the
+   * colour they blend to, the horizon AO that multiplies it, and the road frame.
+   *
+   * `groundColourAt` before this returned a lerp of two palette swatches by altitude, and altitude
+   * only varies at the 74-190 m feature sizes of the height noise. That is why the terrain read as
+   * a solid colour field, why 21.7% of all sampled vertices in the world were one exact colour,
+   * and why a worn track, a scree hollow, a paved square and a waterlogged bank were all
+   * undrawable. Every weight below comes from data the chunk builder already had (slope, altitude,
+   * the second derivative of the same central differences) or from a stamp.
+   */
+  private sampleSurface(x: number, z: number, height: number, out: SurfaceSample): void {
     const blend = this.world?.blendMetres ?? 45;
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    let rockR = 0;
-    let rockG = 0;
-    let rockB = 0;
     let weightSum = 0;
+    let local = 0;
+    let lowR = 0; let lowG = 0; let lowB = 0;
+    let highR = 0; let highG = 0; let highB = 0;
+    let rockR = 0; let rockG = 0; let rockB = 0;
+    let gravelR = 0; let gravelG = 0; let gravelB = 0;
+    let dirtR = 0; let dirtG = 0; let dirtB = 0;
+    let mudR = 0; let mudG = 0; let mudB = 0;
+    let cobbleR = 0; let cobbleG = 0; let cobbleB = 0;
+    let wetR = 0; let wetG = 0; let wetB = 0;
 
-    const scratch = new THREE.Color();
     for (const field of this.fields) {
       const weight = this.fields.length === 1
         ? 1
         : smoothstep01((signedDepth(field.spec.rect, x, z) + blend) / (2 * blend));
       if (weight <= 0) continue;
-
-      // Altitude within the region's own relief drives the low/high grass mix.
-      const local = clamp(
-        (height - field.spec.baseHeight) / Math.max(1, field.spec.amplitude),
-        0,
-        1,
-      );
-      scratch.setHex(field.palette.groundLow).lerp(new THREE.Color(field.palette.groundHigh), local);
-      r += scratch.r * weight;
-      g += scratch.g * weight;
-      b += scratch.b * weight;
-
-      scratch.setHex(field.palette.rock);
-      rockR += scratch.r * weight;
-      rockG += scratch.g * weight;
-      rockB += scratch.b * weight;
+      const swatches = swatchesFor(field.spec.regionId);
+      // Altitude within the height range the region's field ACTUALLY produces. See RegionField.
+      local += smoothstep01((height - field.hMin) / Math.max(1, field.hMax - field.hMin)) * weight;
+      lowR += swatches.low.r * weight; lowG += swatches.low.g * weight; lowB += swatches.low.b * weight;
+      highR += swatches.high.r * weight; highG += swatches.high.g * weight; highB += swatches.high.b * weight;
+      rockR += swatches.rock.r * weight; rockG += swatches.rock.g * weight; rockB += swatches.rock.b * weight;
+      gravelR += swatches.gravel.r * weight; gravelG += swatches.gravel.g * weight; gravelB += swatches.gravel.b * weight;
+      dirtR += swatches.dirt.r * weight; dirtG += swatches.dirt.g * weight; dirtB += swatches.dirt.b * weight;
+      mudR += swatches.mud.r * weight; mudG += swatches.mud.g * weight; mudB += swatches.mud.b * weight;
+      cobbleR += swatches.cobble.r * weight; cobbleG += swatches.cobble.g * weight; cobbleB += swatches.cobble.b * weight;
+      wetR += swatches.wet.r * weight; wetG += swatches.wet.g * weight; wetB += swatches.wet.b * weight;
       weightSum += weight;
     }
 
     if (weightSum <= 0) {
-      out.setHex(REGION_PALETTES.fallowmarch.groundHigh);
+      const fallback = swatchesFor("fallowmarch");
+      out.colour.copy(fallback.high);
+      out.grass = 1; out.dry = 0; out.rock = 0; out.gravel = 0;
+      out.dirt = 0; out.mud = 0; out.cobble = 0; out.wet = 0;
+      out.roadPerpendicular = 0.5;
+      out.roadPresence = 0;
       return;
     }
-    out.setRGB(r / weightSum, g / weightSum, b / weightSum);
-    // Slope above ~27 degrees loses its soil and shows stone. This is what makes Karrowmoor's
-    // terrace risers read as rock faces without a second material or a second mesh.
-    const rockAmount = smoothstep01((slope - 0.5) / 0.55);
-    if (rockAmount > 0) {
-      out.lerp(new THREE.Color(rockR / weightSum, rockG / weightSum, rockB / weightSum), rockAmount);
+
+    const inverse = 1 / weightSum;
+    local *= inverse;
+
+    const step = this.lattice?.step ?? 2;
+    const hxp = this.sampleLattice(x + step, z);
+    const hxm = this.sampleLattice(x - step, z);
+    const hzp = this.sampleLattice(x, z + step);
+    const hzm = this.sampleLattice(x, z - step);
+    const slope = Math.hypot((hxp - hxm) / (2 * step), (hzp - hzm) / (2 * step));
+    // Laplacian on the same stencil. Positive is a hollow, negative is a crest. Measured over the
+    // world this lands in roughly -0.35..0.35 m, so 0.10 is a pronounced hollow, not a wobble.
+    const curvature = (hxp + hxm + hzp + hzm - 4 * height) / (step * step);
+
+    // Slope above ~23 degrees loses its soil and shows stone. Lowered from the old 0.5 threshold
+    // because at 0.5 only 12.71% of the world had any surface variation at all.
+    const rock = smoothstep01((slope - 0.42) / 0.5);
+    // Debris collects in hollows and washes off crests.
+    const gravel = smoothstep01((curvature - 0.05) / 0.14) * (1 - rock * 0.6);
+
+    // Stamps, in priority order: paving beats a road, a road beats a waterlogged bank.
+    const road = this.roadAt(x, z);
+    let dirt = 0;
+    let roadPerpendicular = 0.5;
+    let roadPresence = 0;
+    if (road) {
+      dirt = 1 - smoothstep01((road.distance - ROAD_WORN_HALF) / (ROAD_FADE_HALF - ROAD_WORN_HALF));
+      roadPerpendicular = clamp(road.perpendicular / (ROAD_PERP_RANGE * 2) + 0.5, 0, 1);
+      roadPresence = dirt > 0.02 ? 1 : 0;
     }
+
+    let cobble = 0;
+    for (const pad of this.paving) {
+      const distance = rectDistance(x, z, pad.centre, pad.halfExtents, pad.rotationY ?? 0);
+      cobble = Math.max(cobble, 1 - smoothstep01(distance / PAVING_FEATHER));
+    }
+
+    let wet = 0;
+    let mud = 0;
+    for (const body of this.waters) {
+      const distance = Math.hypot(x - body.centre[0], z - body.centre[1]);
+      if (distance > body.radius + WATER_BANK_METRES) continue;
+      const above = height - body.level;
+      // Waterlogged right at and below the line, churned mud for the next 0.9 m up the bank.
+      wet = Math.max(wet, 1 - smoothstep01((above + 0.05) / 0.35));
+      mud = Math.max(mud, (1 - smoothstep01((above - 0.2) / 0.9)) * smoothstep01((above + 0.1) / 0.3));
+    }
+
+    // Paving covers a road; both cover the bank.
+    dirt = Math.min(dirt, 1 - cobble);
+    wet = Math.min(wet, 1 - cobble - dirt);
+    mud = Math.min(mud, Math.max(0, 1 - cobble - dirt - wet));
+
+    const stamped = clamp(cobble + dirt + wet + mud, 0, 1);
+    const natural = 1 - stamped;
+    out.rock = rock * natural;
+    out.gravel = clamp(gravel, 0, 1) * (1 - rock) * natural;
+    const remaining = Math.max(0, natural - out.rock - out.gravel);
+    out.dry = remaining * local;
+    out.grass = remaining * (1 - local);
+    out.cobble = cobble;
+    out.dirt = dirt;
+    out.wet = wet;
+    out.mud = mud;
+    out.roadPerpendicular = roadPerpendicular;
+    out.roadPresence = roadPresence;
+
+    out.colour.setRGB(
+      (lowR * out.grass + highR * out.dry + rockR * out.rock + gravelR * out.gravel
+        + dirtR * out.dirt + mudR * out.mud + cobbleR * out.cobble + wetR * out.wet) * inverse,
+      (lowG * out.grass + highG * out.dry + rockG * out.rock + gravelG * out.gravel
+        + dirtG * out.dirt + mudG * out.mud + cobbleG * out.cobble + wetG * out.wet) * inverse,
+      (lowB * out.grass + highB * out.dry + rockB * out.rock + gravelB * out.gravel
+        + dirtB * out.dirt + mudB * out.mud + cobbleB * out.cobble + wetB * out.wet) * inverse,
+    );
+
+    const ao = this.horizonAo(x, z, height);
+    out.colour.multiplyScalar(ao);
   }
 
   /**
-   * A road or worn path, drawn as a ribbon that follows the ground. Roads are NOT walkable meshes:
-   * they sit on the terrain that already is one, and adding them to the navmesh input would only
-   * add duplicate coplanar geometry for recast to argue with.
-   */
-  /**
-   * A trodden track draped over the terrain, from a polyline.
+   * Baked sky occlusion: how much of the horizon is blocked, at 8 azimuths and three ranges.
    *
-   * Four vertices per sample, not two: the outer pair is a skirt at zero alpha, so the track fades
-   * into the grass instead of ending at a drawn line. Round 3 built it as a two-vertex ribbon
-   * lifted 0.3 m, which gave every road in the world a hard edge and a visible lip. The last
-   * sample at each end fades out entirely, so a route stops looking like a plank someone dropped.
+   * There was no ambient occlusion and no contact darkening anywhere in the renderer, which is
+   * why terrain-great_cairn read as a beige card rather than a mountainside — a slope with no
+   * shading break has no form, whatever its silhouette does. 24 lattice reads per vertex over
+   * ~73k vertices is about 40 ms at build time and exactly zero at runtime, and it is the single
+   * change that makes relief legible.
    */
-  buildRoad(points: readonly Vec3[], width = 4.5, regionId: RegionId = "fallowmarch"): THREE.Mesh | null {
-    if (points.length < 2) return null;
-    const samples = resamplePolyline(points, 3);
-    const lanes = [-1, -1, 1, 1];
-    const laneWidth = [ROAD_SKIRT, 1, 1, ROAD_SKIRT];
-    const laneAlpha = [0, 1, 1, 0];
-    const vertexCount = samples.length * 4;
-    const positions = new Float32Array(vertexCount * 3);
-    // RGBA, not RGB: three.js reads vertex alpha off a four-component colour attribute, and the
-    // alpha is what feathers the skirt. A separate custom attribute would need a custom shader.
-    const colours = new Float32Array(vertexCount * 4);
-    const indices: number[] = [];
-    const edge = new THREE.Color(roadColour(regionId));
-
-    for (let i = 0; i < samples.length; i += 1) {
-      const current = samples[i]!;
-      const previous = samples[Math.max(0, i - 1)]!;
-      const next = samples[Math.min(samples.length - 1, i + 1)]!;
-      const dirX = next[0] - previous[0];
-      const dirZ = next[2] - previous[2];
-      const length = Math.hypot(dirX, dirZ) || 1;
-      const nx = -dirZ / length;
-      const nz = dirX / length;
-      // Both ends taper to nothing over one sample, so a route does not end in a cut edge.
-      const endFade = (i === 0 || i === samples.length - 1) ? 0 : 1;
-
-      for (let lane = 0; lane < 4; lane += 1) {
-        const index = i * 4 + lane;
-        const half = (width / 2) * laneWidth[lane]!;
-        const x = current[0] + nx * half * lanes[lane]!;
-        const z = current[2] + nz * half * lanes[lane]!;
-        positions[index * 3] = x;
-        positions[index * 3 + 1] = this.heightAtXZ(x, z) + ROAD_LIFT;
-        positions[index * 3 + 2] = z;
-        colours[index * 4] = edge.r;
-        colours[index * 4 + 1] = edge.g;
-        colours[index * 4 + 2] = edge.b;
-        colours[index * 4 + 3] = laneAlpha[lane]! * endFade;
-      }
-
-      if (i < samples.length - 1) {
-        const base = i * 4;
-        for (let lane = 0; lane < 3; lane += 1) {
-          const a = base + lane;
-          indices.push(a, a + 4, a + 1, a + 1, a + 4, a + 5);
-        }
+  private horizonAo(x: number, z: number, height: number): number {
+    if (!this.lattice) return 1;
+    let maxAngle = 0;
+    for (let step = 0; step < AO_AZIMUTHS; step += 1) {
+      const angle = (step / AO_AZIMUTHS) * Math.PI * 2;
+      const dx = Math.cos(angle);
+      const dz = Math.sin(angle);
+      for (const range of AO_RANGES) {
+        const rise = this.sampleLattice(x + dx * range, z + dz * range) - height;
+        if (rise <= 0) continue;
+        const angleTo = Math.atan2(rise, range);
+        if (angleTo > maxAngle) maxAngle = angleTo;
       }
     }
+    return AO_FLOOR + (1 - AO_FLOOR) * (1 - clamp(maxAngle / (Math.PI / 2), 0, 1));
+  }
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(colours, 4));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
+  /**
+   * A worn track. Stamped into the ground rather than drawn on top of it.
+   *
+   * This used to build a four-lane transparent ribbon per authored link. Measured, that was 42
+   * separate `depthWrite:false` meshes — the frame's largest overdraw source and its largest
+   * single draw-call block — and it had three defects the ribbon form could not be rid of:
+   * `endFade` zeroed the alpha across the whole first and last cross-section, so 3-5 links ending
+   * at the same node punched an unpainted circle of grass at the exact point the routes meet
+   * (visible as green at the centre of the X in terrain-bracken_pit); 10% of the ribbon's vertices
+   * sat below the drawn ground, because the ribbon sampled the analytic field while the mesh is
+   * the 2 m interpolant; and the ribbon and the water disc did not know about each other, so a
+   * road ran across the surface of a pond.
+   *
+   * In the terrain's own splat weights all three stop existing by construction: mip-correct,
+   * shadow-correct, z-fight-free, and a junction is just ground that two corridors both cover.
+   *
+   * Returns null and draws nothing. The signature is kept because boot calls it, and the
+   * `width` and `regionId` arguments still do their jobs — width sets the worn half-width, and
+   * the region decides which soil the track exposes.
+   */
+  buildRoad(points: readonly Vec3[], width = 4.5, regionId: RegionId = "fallowmarch"): THREE.Mesh | null {
+    void regionId;
+    if (points.length < 2) return null;
+    // Stamps supplied up front already contain the roads; stamping them again would double-count
+    // the corridor at every vertex the two descriptions share.
+    if (this.stampsProvided) return null;
 
-    const mesh = new THREE.Mesh(geometry, this.materials.road(regionId));
-    mesh.name = `road-${regionId}`;
-    mesh.receiveShadow = true;
-    mesh.castShadow = false;
-    mesh.renderOrder = 1;
-    // Roads live under the scatter group, not the terrain group: click-to-move raycasts the
-    // terrain group, and a road quad floating 6 cm above the ground would shift every click.
-    this.scatterGroup.add(mesh);
-    return mesh;
+    const curved = curveRoadPolyline(points, (0x0a0d ^ (this.roadPolylines.length * 0x9e37)) >>> 0);
+    this.roadPolylines.push(curved);
+    const before = this.roads.length;
+    appendRoadSegments(this.roads, curved);
+    this.rebuildRoadGrid();
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let index = before; index < this.roads.length; index += 1) {
+      const segment = this.roads[index]!;
+      minX = Math.min(minX, segment.ax, segment.bx);
+      maxX = Math.max(maxX, segment.ax, segment.bx);
+      minZ = Math.min(minZ, segment.az, segment.bz);
+      maxZ = Math.max(maxZ, segment.az, segment.bz);
+    }
+    const reach = Math.max(ROAD_FADE_HALF, width) + 1;
+    this.restampArea(minX - reach, minZ - reach, maxX + reach, maxZ + reach);
+    return null;
   }
 
   /**
    * A still water surface for a pool, tarn or brook. Not walkable, not a collider.
    *
-   * A disc with a faded rim, not a rectangle. The basin under it is a circular flat spot (see
-   * `flatSpotsFor`), so a rectangle was always the wrong shape: it cut four straight edges across
-   * the bank and stopped dead where the pond kept going. The rim vertices fade to zero alpha and
-   * sit slightly LOWER than the centre, so the waterline meets the sloping bank instead of ending
-   * in a drawn line, and the shoreline is wherever the terrain rises through the surface.
+   * A radial grid whose OUTER RING IS THE SHORELINE, not a 34-vertex triangle fan with a faded
+   * rim. Measured, the fan was wrong in three separate ways at once: `CircleGeometry(radius, 32)`
+   * is one hub plus 33 rim vertices over a 46 m disc, so there was no interior geometry to vary;
+   * the rim was dropped 0.35 m and faded to alpha 0, which dissolved the outer 40% of the disc
+   * into a wash instead of drawing a waterline; and the disc was sized `cluster.radius + 14` with
+   * no relationship to the basin, so 55-56% of the tarn footprints had dry hillside above the
+   * surface by up to 7.3 m.
+   *
+   * Instead: 32 azimuths, and along each one a bisection for the exact distance at which the DRAWN
+   * ground crosses the surface height. Ten rings out to that distance. Per-vertex depth into an
+   * `aWaterDepth` attribute, which the material turns into a shallow-to-deep tint and an alpha
+   * that reaches zero exactly at the bank. The shoreline is then a property of the geometry rather
+   * than something the shader has to guess at.
    */
   buildWater(rect: Rect, level: number, regionId: RegionId): THREE.Mesh {
-    const radius = Math.max(rect.maxX - rect.minX, rect.maxZ - rect.minZ) / 2;
-    const geometry = new THREE.CircleGeometry(radius, WATER_SEGMENTS, 0, Math.PI * 2);
-    geometry.rotateX(-Math.PI / 2);
+    const centreX = (rect.minX + rect.maxX) / 2;
+    const centreZ = (rect.minZ + rect.maxZ) / 2;
+    const maxRadius = Math.max(rect.maxX - rect.minX, rect.maxZ - rect.minZ) / 2;
 
-    // CircleGeometry puts the hub at vertex 0 and the rim after it, so the fade is a straight walk
-    // over the vertex list rather than a distance test.
-    const position = geometry.getAttribute("position");
-    const colours = new Float32Array(position.count * 4);
-    for (let index = 0; index < position.count; index += 1) {
-      const rim = index > 0;
-      colours[index * 4] = 1;
-      colours[index * 4 + 1] = 1;
-      colours[index * 4 + 2] = 1;
-      colours[index * 4 + 3] = rim ? 0 : 1;
-      if (rim) position.setY(index, -WATER_RIM_DROP);
+    // Shoreline distance per azimuth. Bisection rather than a linear walk because the bank is
+    // monotonic over the basin's own falloff and 18 samples resolve it to under a centimetre.
+    const shoreline = new Float64Array(WATER_SEGMENTS);
+    for (let step = 0; step < WATER_SEGMENTS; step += 1) {
+      const angle = (step / WATER_SEGMENTS) * Math.PI * 2;
+      const dx = Math.cos(angle);
+      const dz = Math.sin(angle);
+      let low = 0;
+      let high = maxRadius;
+      if (this.meshHeightAt(centreX + dx * high, centreZ + dz * high) < level) {
+        shoreline[step] = high;
+        continue;
+      }
+      for (let iteration = 0; iteration < 18; iteration += 1) {
+        const mid = (low + high) / 2;
+        if (this.meshHeightAt(centreX + dx * mid, centreZ + dz * mid) < level) low = mid;
+        else high = mid;
+      }
+      // A floor, so a basin that was carved too shallow still draws something a player can see is
+      // water rather than collapsing to a point.
+      shoreline[step] = Math.max(WATER_MIN_RADIUS, low);
     }
-    geometry.setAttribute("color", new THREE.BufferAttribute(colours, 4));
-    position.needsUpdate = true;
+
+    const rings = WATER_RINGS;
+    const vertexCount = 1 + WATER_SEGMENTS * rings;
+    const positions = new Float32Array(vertexCount * 3);
+    const depths = new Float32Array(vertexCount);
+    const indices: number[] = [];
+
+    depths[0] = Math.max(0, level - this.meshHeightAt(centreX, centreZ));
+    for (let step = 0; step < WATER_SEGMENTS; step += 1) {
+      const angle = (step / WATER_SEGMENTS) * Math.PI * 2;
+      const dx = Math.cos(angle);
+      const dz = Math.sin(angle);
+      const reach = shoreline[step]!;
+      for (let ring = 0; ring < rings; ring += 1) {
+        const radius = (reach * (ring + 1)) / rings;
+        const index = 1 + step * rings + ring;
+        const x = dx * radius;
+        const z = dz * radius;
+        positions[index * 3] = x;
+        positions[index * 3 + 2] = z;
+        depths[index] = Math.max(0, level - this.meshHeightAt(centreX + x, centreZ + z));
+      }
+    }
+
+    for (let step = 0; step < WATER_SEGMENTS; step += 1) {
+      const next = (step + 1) % WATER_SEGMENTS;
+      const a0 = 1 + step * rings;
+      const b0 = 1 + next * rings;
+      indices.push(0, b0, a0);
+      for (let ring = 0; ring < rings - 1; ring += 1) {
+        const a = a0 + ring;
+        const b = b0 + ring;
+        indices.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("aWaterDepth", new THREE.BufferAttribute(depths, 1));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
 
     const mesh = new THREE.Mesh(geometry, this.materials.water(regionId));
-    mesh.position.set((rect.minX + rect.maxX) / 2, level, (rect.minZ + rect.maxZ) / 2);
+    mesh.position.set(centreX, level, centreZ);
     mesh.name = `water-${regionId}`;
     mesh.renderOrder = 2;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
     this.scatterGroup.add(mesh);
+    // The bank treatment in the terrain splat needs to know where the waterline is. Registering
+    // here rather than requiring a separate call is what keeps the mud and the shoreline agreeing
+    // even when the caller only knows about the water.
+    this.waters.push({ centre: [centreX, centreZ], radius: maxRadius, level });
+    if (this.chunks.length > 0) {
+      const reach = maxRadius + WATER_BANK_METRES;
+      this.restampArea(centreX - reach, centreZ - reach, centreX + reach, centreZ + reach);
+    }
     return mesh;
   }
 
@@ -859,7 +1398,7 @@ export class WorldScene {
    */
   scatterInstanced(
     source: THREE.Object3D,
-    placements: { position: Vec3; rotationY: number; scale: number }[],
+    placements: ScatterPlacement[],
     name: string,
     options: { regionId?: RegionId; castShadow?: boolean } = {},
   ): THREE.InstancedMesh[] {
@@ -879,7 +1418,9 @@ export class WorldScene {
     const transform = new THREE.Matrix4();
     const placement = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion();
+    const tiltQuaternion = new THREE.Quaternion();
     const axis = new THREE.Vector3(0, 1, 0);
+    const normalVector = new THREE.Vector3();
     const scaleVector = new THREE.Vector3();
     const positionVector = new THREE.Vector3();
 
@@ -893,7 +1434,19 @@ export class WorldScene {
       for (const [slot, entry] of placements.entries()) {
         positionVector.set(entry.position[0], entry.position[1], entry.position[2]);
         quaternion.setFromAxisAngle(axis, entry.rotationY);
-        scaleVector.setScalar(entry.scale);
+        // A ground normal leans the instance into the slope it stands on. Applied on the LEFT of
+        // the yaw, so the asset still faces where it was told to and only its footing changes;
+        // multiplying the other way rotates the lean around with the yaw and a row of trees on one
+        // hillside ends up leaning in different directions.
+        if (entry.normal && (entry.tilt ?? 1) > 0) {
+          normalVector.set(entry.normal[0], entry.normal[1], entry.normal[2]).normalize();
+          tiltQuaternion.setFromUnitVectors(axis, normalVector);
+          const amount = clamp(entry.tilt ?? 1, 0, 1);
+          if (amount < 1) tiltQuaternion.slerp(IDENTITY_QUATERNION, 1 - amount);
+          quaternion.premultiply(tiltQuaternion);
+        }
+        if (typeof entry.scale === "number") scaleVector.setScalar(entry.scale);
+        else scaleVector.set(entry.scale[0], entry.scale[1], entry.scale[2]);
         placement.compose(positionVector, quaternion, scaleVector);
         transform.multiplyMatrices(placement, part.matrix);
         instanced.setMatrixAt(slot, transform);
@@ -906,6 +1459,64 @@ export class WorldScene {
       if (options.regionId) this.registerScatter(options.regionId, instanced);
     }
     return created;
+  }
+
+  /**
+   * One InstancedMesh of contact patches — the whole world's contact shadows in ONE draw call.
+   *
+   * There was no ambient occlusion, no cavity term and no contact decal anywhere, so the only
+   * thing joining an object to the ground was the directional shadow, which at the old 50-degree
+   * sun elevation landed metres away from the object's base. terrain-hollowcut_seam showed six ore
+   * boulders meeting the grass at a hard elliptical cut with no darkening at all.
+   *
+   * Each quad is laid on the DRAWN ground (`meshHeightAt`, not the analytic field) and tilted to
+   * the local normal, so it stays in contact on a slope instead of clipping through one edge, and
+   * it multiplies rather than blends so it needs no sorting against the terrain under it.
+   *
+   * Returns null for an empty list rather than an empty InstancedMesh, which would still cost a
+   * draw call.
+   */
+  buildContactDecals(placements: readonly ContactDecalPlacement[], name = "contact-decals"): THREE.InstancedMesh | null {
+    if (placements.length === 0) return null;
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.rotateX(-Math.PI / 2);
+    const mesh = new THREE.InstancedMesh(geometry, this.materials.contactDecal(), placements.length);
+    mesh.name = name;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.renderOrder = 1;
+    mesh.frustumCulled = true;
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    const normalVector = new THREE.Vector3();
+
+    for (const [slot, entry] of placements.entries()) {
+      const x = entry.position[0];
+      const z = entry.position[2];
+      const normal = this.normalAt(x, z);
+      normalVector.set(normal[0], normal[1], normal[2]);
+      quaternion.setFromUnitVectors(up, normalVector);
+      // 3 cm of lift on top of the material's polygon offset. Less and a 2 m quad clips into the
+      // lattice interpolant on a convex rise; more and the patch reads as a floating card.
+      position.set(x, this.meshHeightAt(x, z) + CONTACT_DECAL_LIFT, z);
+      const size = Math.max(0.3, entry.radius * 2);
+      scale.set(size, 1, size);
+      matrix.compose(position, quaternion, scale);
+      mesh.setMatrixAt(slot, matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    this.scatterGroup.add(mesh);
+    return mesh;
+  }
+
+  /** Advances every animated surface. View-only: no gameplay state is read or written here. */
+  updateTime(seconds: number): void {
+    this.materials.setTime(seconds);
   }
 
   /** Ties an object to a region so distance streaming can hide it. */
@@ -977,8 +1588,12 @@ export class WorldScene {
    * factor, and snaps on a large jump so teleports and resets are instant.
    */
   syncPlayer(position: Vec3, facingRad: number, snap = false): void {
-    if (!this.playerMesh) return;
     const now = typeof performance === "undefined" ? 0 : performance.now();
+    // The water's scroll clock lives here rather than in a new per-frame call, so the surface
+    // animates without boot having to wire anything. `updateTime` is still public for whoever
+    // eventually owns the frame loop.
+    this.updateTime(now / 1000);
+    if (!this.playerMesh) return;
     const deltaMs = this.lastSyncMs === 0 ? 16.7 : clamp(now - this.lastSyncMs, 0, 250);
     this.lastSyncMs = now;
 
@@ -1017,6 +1632,14 @@ export class WorldScene {
     this.scatterByRegion.clear();
     this.playerMesh = null;
     this.lastSyncMs = 0;
+    this.lattice = null;
+    this.chunks = [];
+    this.roads = [];
+    this.roadPolylines = [];
+    this.roadGrid.clear();
+    this.paving = [];
+    this.waters = [];
+    this.stampsProvided = false;
   }
 }
 
@@ -1105,34 +1728,317 @@ function terraceRamp(spec: RegionTerrainSpec, x: number, z: number, width: numbe
 }
 
 /**
- * How far a road ribbon floats above the analytic ground height, in metres.
+ * The road corridor, in metres either side of the centreline.
  *
- * 0.06 was buried. The terrain MESH samples the height field on a 2 m grid and interpolates
- * between, so the drawn surface sits up to 0.35 m above the analytic value on a convex rise
- * (measured). A lift smaller than that error hides the road for most of its length. 0.30 clears it
- * almost everywhere while staying far too small to read as floating at the camera's distance.
+ * `ROAD_WORN_HALF` is fully worn track; from there the dirt weight feathers out to
+ * `ROAD_FADE_HALF`. Wider than the old ribbon's 1.6 m half-width because a corridor written into a
+ * 2 m vertex lattice needs to catch at least two vertices across to read as a track at all.
+ * `ROAD_PERP_RANGE` is only the encoding range of the perpendicular distance in `aGround.x`; at
+ * 3.5 m it gives the fragment shader 2.7 cm of resolution, which is finer than the 16 cm rut band.
  */
-/**
- * How far a road ribbon floats above the ground, in metres.
- *
- * Two centimetres, not thirty. The material already carries a polygon offset, which is what keeps
- * the ribbon out of a z-fight; the lift only has to cover the difference between the terrain MESH
- * (sampled every 2 m) and the terrain FIELD the ribbon samples. At the round-3 value of 0.3 m a
- * road was a kerb: it stood a third of a metre proud of the grass, caught the directional light on
- * its edge, and dropped a hard shadow line down one side of every route in the world.
- */
-const ROAD_LIFT = 0.02;
+const ROAD_WORN_HALF = 1.9;
+const ROAD_FADE_HALF = 3.4;
+const ROAD_PERP_RANGE = 3.5;
 
-/** How far past the worn width the fade-out skirt reaches, as a multiple of the half-width. */
-const ROAD_SKIRT = 1.7;
+/** Bucket size for the road segment grid, in metres. One bucket covers the whole fade width. */
+const ROAD_CELL = 8;
 
-/** Rim segments on a water disc. 32 is round at the distance a pond is ever seen from. */
+/** How far a paved edge feathers into the ground around it, in metres. */
+const PAVING_FEATHER = 1.2;
+
+/** How far past a water body's radius the bank treatment reaches, in metres. */
+const WATER_BANK_METRES = 6;
+
+/** Azimuths on a water disc. 32 is round at the distance a pond is ever seen from. */
 const WATER_SEGMENTS = 32;
 
-/** How far the faded rim of a water disc sits below its centre, in metres. */
-const WATER_RIM_DROP = 0.35;
+/** Rings between the hub and the shoreline. 10 x 32 + 1 = 321 vertices, against the old 34. */
+const WATER_RINGS = 10;
 
-/** Even-ish resampling of a polyline, so road ribbons do not stretch across long segments. */
+/** Smallest shoreline radius a water body will draw, in metres. */
+const WATER_MIN_RADIUS = 2.5;
+
+/**
+ * Horizon-AO sampling: 8 azimuths at 12 / 25 / 50 m, and a floor of 0.62 at a fully blocked
+ * horizon. Three ranges rather than one because a hillside is read at three scales at once — a
+ * bank at 12 m, a spur at 25 m, a ridge at 50 m — and a single range only darkens one of them.
+ */
+const AO_AZIMUTHS = 8;
+const AO_RANGES: readonly number[] = [12, 25, 50];
+const AO_FLOOR = 0.62;
+
+/**
+ * How far a pad may carve BELOW the natural ground at its own centre, in metres.
+ *
+ * The fishing basins are authored as a depth below the region floor, and Karrowmoor's terraces
+ * climb 36 m above theirs, so the Cairn Tarn and the Far Tarn were both authored 36 m inside a
+ * hillside. See `resolveFlatTargets` for what that cost. 2.6 m is deeper than the 0.9 m the
+ * content asks for and shallow enough that the bank stays walkable without a wide collar.
+ */
+const MAX_PAD_CARVE = 2.6;
+
+/**
+ * Softening term in the inverse-distance pad weight, which sets the weight at a pad's core edge.
+ *
+ * 1e-5 puts the core-edge weight at 1e5 against about 8 for a pad halfway through its falloff, so
+ * a settlement pad outweighs anything reaching into it by roughly four orders of magnitude. That
+ * is what keeps the measured relief across the 7,238 m2 Coldbrace pad at 0.0000 m and lets a
+ * building assemble level on it. Finite, so the field stays continuous across the core boundary.
+ */
+const PAD_CORE_EPSILON = 1e-5;
+
+/** Vertical lift on a contact decal, in metres, on top of the material's polygon offset. */
+const CONTACT_DECAL_LIFT = 0.03;
+
+/** Spacing at which a stamped road polyline is resampled into segments, in metres. */
+const ROAD_SEGMENT_SPACING = 4;
+
+/** How far a road may bow away from its straight line, in metres. */
+const ROAD_MAX_SWAY = 7;
+
+/** Reused in the scatter tilt slerp. Allocating one per instance showed up in the profile. */
+const IDENTITY_QUATERNION = new THREE.Quaternion();
+
+interface HeightLattice {
+  heights: Float32Array;
+  cols: number;
+  rows: number;
+  minX: number;
+  minZ: number;
+  step: number;
+}
+
+interface ChunkRecord {
+  mesh: THREE.Mesh;
+  centreX: number;
+  centreZ: number;
+  sizeX: number;
+  sizeZ: number;
+}
+
+interface RoadSegment {
+  ax: number;
+  az: number;
+  bx: number;
+  bz: number;
+}
+
+/** The eight surface weights at one point, plus the colour they blend to. */
+interface SurfaceSample {
+  colour: THREE.Color;
+  grass: number;
+  dry: number;
+  rock: number;
+  gravel: number;
+  dirt: number;
+  mud: number;
+  cobble: number;
+  wet: number;
+  /** Signed perpendicular distance to the nearest road, remapped onto 0..1. 0.5 is no road. */
+  roadPerpendicular: number;
+  /** 1 where a road is close enough for wheel ruts to exist. */
+  roadPresence: number;
+}
+
+function emptySurface(): SurfaceSample {
+  return {
+    colour: new THREE.Color(),
+    grass: 1, dry: 0, rock: 0, gravel: 0,
+    dirt: 0, mud: 0, cobble: 0, wet: 0,
+    roadPerpendicular: 0.5, roadPresence: 0,
+  };
+}
+
+function toByte(value: number): number {
+  return Math.max(0, Math.min(255, Math.round(value * 255)));
+}
+
+/** Packs one surface sample into the three Uint8 vertex attributes the ground shader reads. */
+function writeSplat(
+  splatA: Uint8Array,
+  splatB: Uint8Array,
+  extra: Uint8Array,
+  index: number,
+  surface: SurfaceSample,
+): void {
+  splatA[index * 4] = toByte(surface.grass);
+  splatA[index * 4 + 1] = toByte(surface.dry);
+  splatA[index * 4 + 2] = toByte(surface.rock);
+  splatA[index * 4 + 3] = toByte(surface.gravel);
+  splatB[index * 4] = toByte(surface.dirt);
+  splatB[index * 4 + 1] = toByte(surface.mud);
+  splatB[index * 4 + 2] = toByte(surface.cobble);
+  splatB[index * 4 + 3] = toByte(surface.wet);
+  extra[index * 4] = toByte(surface.roadPerpendicular);
+  extra[index * 4 + 1] = toByte(surface.roadPresence);
+  extra[index * 4 + 2] = 0;
+  extra[index * 4 + 3] = 0;
+}
+
+interface GroundSwatches {
+  low: THREE.Color;
+  high: THREE.Color;
+  rock: THREE.Color;
+  gravel: THREE.Color;
+  dirt: THREE.Color;
+  mud: THREE.Color;
+  cobble: THREE.Color;
+  wet: THREE.Color;
+}
+
+/**
+ * The palette swatches the terrain blends between, as linear colours, cached per region.
+ *
+ * Hue lives in `REGION_PALETTES` and in `materials.surfaceColour`; the terrain only weights them.
+ * The cache exists because `sampleSurface` runs ~73k times and allocating eight `THREE.Color`
+ * objects per call was the largest single cost in the chunk builder.
+ */
+const SWATCH_CACHE = new Map<RegionId, GroundSwatches>();
+
+function swatchesFor(regionId: RegionId): GroundSwatches {
+  const cached = SWATCH_CACHE.get(regionId);
+  if (cached) return cached;
+  const palette = REGION_PALETTES[regionId];
+  const swatches: GroundSwatches = {
+    low: new THREE.Color(palette.groundLow),
+    high: new THREE.Color(palette.groundHigh),
+    rock: new THREE.Color(palette.rock),
+    gravel: new THREE.Color(surfaceColour(regionId, "gravel")),
+    dirt: new THREE.Color(surfaceColour(regionId, "dirt")),
+    mud: new THREE.Color(surfaceColour(regionId, "mud")),
+    cobble: new THREE.Color(surfaceColour(regionId, "cobble")),
+    wet: new THREE.Color(surfaceColour(regionId, "wet")),
+  };
+  SWATCH_CACHE.set(regionId, swatches);
+  return swatches;
+}
+
+/** The height range a region's own field produces over its rect, swept at 4 m. Costs about 6 ms. */
+function sweepFieldRange(rect: Rect, height: (x: number, z: number) => number): { min: number; max: number } {
+  let min = Infinity;
+  let max = -Infinity;
+  for (let z = rect.minZ; z <= rect.maxZ; z += 4) {
+    for (let x = rect.minX; x <= rect.maxX; x += 4) {
+      const value = height(x, z);
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max - min < 1e-3) return { min: 0, max: 1 };
+  return { min, max };
+}
+
+/** How far a pad's core reaches from its centre, in metres. Half-diagonal for a rectangle. */
+function padReach(flat: FlatSpot): number {
+  if (!flat.halfExtents) return flat.radius;
+  return Math.hypot(flat.halfExtents[0], flat.halfExtents[1]);
+}
+
+/** Distance from a point to the edge of a pad's core. Zero or negative inside it. */
+function padDistance(flat: FlatSpot, x: number, z: number): number {
+  if (!flat.halfExtents) return Math.hypot(x - flat.x, z - flat.z) - flat.radius;
+  return rectDistance(x, z, [flat.x, flat.z], flat.halfExtents, flat.rotationY ?? 0);
+}
+
+/**
+ * Signed distance from a point to a rotated rectangle: 0 on the boundary, negative inside.
+ *
+ * Inside is the negative of the distance to the nearest edge, which is what makes a rectangular
+ * pad's core weight rise toward its middle exactly the way a circular pad's does.
+ */
+function rectDistance(
+  x: number,
+  z: number,
+  centre: readonly [number, number],
+  halfExtents: readonly [number, number],
+  rotationY: number,
+): number {
+  const dx = x - centre[0];
+  const dz = z - centre[1];
+  const cos = Math.cos(-rotationY);
+  const sin = Math.sin(-rotationY);
+  const lx = Math.abs(dx * cos - dz * sin) - halfExtents[0];
+  const lz = Math.abs(dx * sin + dz * cos) - halfExtents[1];
+  const outside = Math.hypot(Math.max(lx, 0), Math.max(lz, 0));
+  const inside = Math.min(Math.max(lx, lz), 0);
+  return outside + inside;
+}
+
+function cellKey(cx: number, cz: number): number {
+  // 20 bits per axis, biased into the positive range. The world is 700 x 400 m at 8 m per cell, so
+  // this cannot collide for anything the game is able to build.
+  return ((cx + 0x40000) << 20) ^ (cz + 0x40000);
+}
+
+/**
+ * Turns a `content/regions.ts` `PavingDef.rect` into a stamp.
+ *
+ * Exported so the wiring in boot cannot get the centre/half-extent conversion wrong: the content
+ * layer authors paving as an axis-aligned min/max rect and the stamp works in centre-plus-extent,
+ * and a sign error there would put a cobbled square in the wrong half of a settlement.
+ */
+export function pavingStampFromRect(rect: {
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
+}): PavingStamp {
+  return {
+    centre: [(rect.minX + rect.maxX) / 2, (rect.minZ + rect.maxZ) / 2],
+    halfExtents: [Math.abs(rect.maxX - rect.minX) / 2, Math.abs(rect.maxZ - rect.minZ) / 2],
+  };
+}
+
+/** Chops a polyline into short segments for the road distance grid. */
+function appendRoadSegments(into: RoadSegment[], points: readonly Vec3[]): void {
+  const samples = resamplePolyline(points, ROAD_SEGMENT_SPACING);
+  for (let i = 0; i < samples.length - 1; i += 1) {
+    const a = samples[i]!;
+    const b = samples[i + 1]!;
+    into.push({ ax: a[0], az: a[2], bx: b[0], bz: b[2] });
+  }
+}
+
+/**
+ * Bends a straight authored link into a route.
+ *
+ * Roads were interpolated linearly between two location positions, so there was not one curve in
+ * the world's road network: terrain-march_road is four dead-straight gradients radiating from a
+ * point. The two interior control points are offset perpendicular to the link by up to 9% of its
+ * length and the result is resampled through a Catmull-Rom, which reads as a route that went
+ * around something without ever wandering far enough to leave the corridor that scatter is
+ * already excluded from.
+ *
+ * The route graph is unaffected. It works on node ids, and both endpoints here are untouched, so
+ * the distance ledger the Agility route flip is measured against does not move.
+ */
+export function curveRoadPolyline(points: readonly Vec3[], seed: number): Vec3[] {
+  if (points.length < 2) return points.map((point) => [point[0], point[1], point[2]] as Vec3);
+  const start = points[0]!;
+  const end = points[points.length - 1]!;
+  const dx = end[0] - start[0];
+  const dz = end[2] - start[2];
+  const length = Math.hypot(dx, dz);
+  if (length < 12) return points.map((point) => [point[0], point[1], point[2]] as Vec3);
+
+  const rng = new Rng(seed);
+  const nx = -dz / length;
+  const nz = dx / length;
+  const sway = Math.min(ROAD_MAX_SWAY, length * 0.09);
+  const control: THREE.Vector3[] = [new THREE.Vector3(start[0], 0, start[2])];
+  for (let i = 1; i <= 2; i += 1) {
+    const t = i / 3;
+    const offset = rng.float(-sway, sway);
+    control.push(new THREE.Vector3(start[0] + dx * t + nx * offset, 0, start[2] + dz * t + nz * offset));
+  }
+  control.push(new THREE.Vector3(end[0], 0, end[2]));
+
+  const curve = new THREE.CatmullRomCurve3(control, false, "catmullrom", 0.5);
+  const divisions = Math.max(4, Math.round(length / ROAD_SEGMENT_SPACING));
+  return curve.getSpacedPoints(divisions).map((point) => [point.x, 0, point.z] as Vec3);
+}
+
+/** Even-ish resampling of a polyline, so road corridors do not stretch across long segments. */
 function resamplePolyline(points: readonly Vec3[], spacing: number): Vec3[] {
   const output: Vec3[] = [];
   for (let i = 0; i < points.length - 1; i += 1) {
