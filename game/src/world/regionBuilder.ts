@@ -767,7 +767,9 @@ function buildEnemyGroup(
       },
       view: {
         assetId: group.assetId,
-        scale: group.scale,
+        // A boss should not be the same size as the things guarding it. 1.6x on top of the
+        // authored scale is the difference between "another enemy" and "the thing in the room".
+        scale: group.boss ? group.scale * 1.6 : group.scale,
         rotationY: round2(rng.float(0, Math.PI * 2)),
         materialTier: group.tier,
         labelHeight: group.boss ? 3.4 : 2.2,

@@ -1235,7 +1235,12 @@ const KARROWMOOR: RegionDef = {
         // this is the spawn and the silhouette. 1.6x on a 1.5 m skull is a 2.4 m stone thing.
         id: "ordrun", family: "quarrykeeper", name: "Ordrun the Quarrykeeper", tier: 10,
         count: 1, centre: [10, -96], radius: 0,
-        assetId: "enemy_skull", scale: 1.6,
+        // Was enemy_skull, which renders as a featureless pale egg — no silhouette, no read at
+        // any distance, and nothing that says "quarrykeeper". The asset report's recommended
+        // substitute for the missing boss mesh is a humanoid given a stone treatment and scale;
+        // the tier 10 palette does the stone, and being the only man-shaped thing in a room of
+        // crabs and skulls does the rest.
+        assetId: "outfit_male_ranger", scale: 1.35,
         level: 20, maxHealth: 200, aggroRadius: 24, behaviour: "territorial", boss: true,
       },
     ],

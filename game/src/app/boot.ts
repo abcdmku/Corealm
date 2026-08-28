@@ -473,6 +473,27 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   // Portals. Registered AFTER agility so this handler wins the `enter` verb; it hands genuine
   // obstacles back rather than teleporting past a climb the player has not earned.
+  /**
+   * Which region a world point is in, accounting for the dungeon underneath Karrowmoor.
+   *
+   * `scene.regionAt` answers from terrain XZ alone, so every point in the Gravelmaw reports
+   * "karrowmoor" — the dungeon is directly below it. That made teleporting into the arena leave the
+   * player tagged as being on the surface, and the render filter that hides dungeon entities from
+   * outside then culled the boss and the whole interior. The tier 10 encounter photographed as
+   * empty sky.
+   */
+  const regionAtPoint = (point: Vec3): RegionId => {
+    if (dungeonSpec) {
+      for (const chamber of dungeonSpec.chambers) {
+        const flat = Math.hypot(point[0] - chamber.centre[0], point[2] - chamber.centre[1]);
+        if (flat <= chamber.radius + 4 && Math.abs(point[1] - chamber.floorY) <= 6) {
+          return dungeonSpec.regionId;
+        }
+      }
+    }
+    return scene.regionAt(point[0], point[2]);
+  };
+
   const teleportPlayer = (position: Vec3, regionId: RegionId): void => {
     const snapped = nav.closestPoint(position) ?? position;
     store.get().player.position = snapped;
@@ -647,7 +668,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     teleport: (to: Vec3) => {
       const snapped = nav.closestPoint(to) ?? to;
       store.get().player.position = snapped;
-      store.get().player.regionId = scene.regionAt(snapped[0], snapped[2]);
+      store.get().player.regionId = regionAtPoint(snapped);
       movement.stop(store.get(), clock.elapsedMs, "teleport");
       scene.syncPlayer(snapped, store.get().player.facingRad, true);
       camera.update(snapped[0], snapped[1], snapped[2], true);
@@ -848,7 +869,9 @@ function buildDungeonSpec(scene: WorldScene): DungeonSpec | null {
       };
     });
 
-    return { regionId: dungeon.id, chambers, corridors, wallHeight: 7 };
+        // Tall enough to reach the terrain above. At 7 m the chamber wall stopped 5 m short of
+    // Karrowmoor's surface and the elevated camera looked straight over it into daylight.
+    return { regionId: dungeon.id, chambers, corridors, wallHeight: 13 };
   }
   return null;
 }

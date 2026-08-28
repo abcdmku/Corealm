@@ -78,7 +78,9 @@ export function buildDungeon(spec: DungeonSpec, materials: MaterialLibrary): Bui
   };
 
   for (const chamber of spec.chambers) {
-    const floorGeometry = new THREE.CircleGeometry(chamber.radius, 28);
+    // Out to the wall, not to the chamber radius. A floor that stops at the play radius leaves a
+    // 1.2 m annular gap under the wall, and the sky shows straight through it as a bright ring.
+    const floorGeometry = new THREE.CircleGeometry(chamber.radius + WALL_THICKNESS, 28);
     floorGeometry.rotateX(-Math.PI / 2);
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.position.set(chamber.centre[0], chamber.floorY, chamber.centre[1]);
@@ -166,14 +168,24 @@ function corridorDeck(corridor: CorridorSpec): THREE.BufferGeometry {
 /** A torch-lit glow per chamber, so an unlit room reads as dark rather than as unfinished. */
 export function addChamberLights(spec: DungeonSpec, group: THREE.Group): THREE.PointLight[] {
   const lights: THREE.PointLight[] = [];
+
+  // A dim ambient floor so nothing underground is a pure black silhouette. Scoped to the dungeon
+  // group, which is only visible from inside, so it never leaks onto the surface.
+  const ambient = new THREE.HemisphereLight(0x4a4038, 0x1a1614, 0.9);
+  ambient.name = "dungeon-ambient";
+  group.add(ambient);
+
   for (const chamber of spec.chambers) {
+    // Underground has no sun, so the only light is what the chamber provides. These are much
+    // brighter than a surface fill because the scene's directional light contributes nothing here,
+    // and a decay of 1.0 rather than 1.6 keeps the chamber edges readable instead of pitch black.
     const light = new THREE.PointLight(
-      chamber.lit ? 0xffc98a : 0xc65a2a,
-      chamber.lit ? 2.4 : 1.1,
-      chamber.radius * 2.6,
-      1.6,
+      chamber.lit ? 0xffc07a : 0xd07a45,
+      chamber.lit ? 90 : 55,
+      chamber.radius * 3.4,
+      1.0,
     );
-    light.position.set(chamber.centre[0], chamber.floorY + 3.2, chamber.centre[1]);
+    light.position.set(chamber.centre[0], chamber.floorY + 4.5, chamber.centre[1]);
     light.name = `dungeon-light-${chamber.id}`;
     group.add(light);
     lights.push(light);

@@ -1653,8 +1653,14 @@ If it does not work, nothing after it matters.
 
 ## Browser evidence
 
+- test-results/agent-proof.json
 - test-results/perf.json
+- test-results/play-gathering-loop.json
+- test-results/play-inventory-bank-shop.json
+- test-results/play-long-cairn-chain.json
 - test-results/play-movement-and-camera.json
+- test-results/play-vertical-slice.json
+- test-results/play-visual-checkpoints.json
 - test-results/play-world-and-entities.json
 - test-results/smoke.json
 
@@ -1669,5 +1675,36 @@ If it does not work, nothing after it matters.
 - screenshots/r1-spawn.png
 - screenshots/r1-town-center.png
 - screenshots/r1-vellenwood.png
+- screenshots/r2-bank.png
+- screenshots/r2-bracken_pit.png
+- screenshots/r2-gravelmaw_entrance.png
+- screenshots/r2-great_cairn.png
+- screenshots/r2-highcairn.png
+- screenshots/r2-hollowcut_seam.png
+- screenshots/r2-karrowmoor_terraces.png
+- screenshots/r2-march_road.png
+- screenshots/r2-marchfield_farm.png
+- screenshots/r2-palewood_copse.png
+- screenshots/r2-rootfall.png
+- screenshots/r2-spawn.png
+- screenshots/r2-sunder_ledge.png
+- screenshots/r2-town_center.png
+- screenshots/r2-town_entrance.png
+- screenshots/r2-upper_karrow_seam.png
+- screenshots/r2-vellenwood_canopy.png
+- screenshots/r3-bank.png
+- screenshots/r3-combat.png
+- screenshots/r3-depleted.png
+- screenshots/r3-fishing.png
+- screenshots/r3-mining.png
+- screenshots/r3-overlay.png
+- screenshots/r3-player.png
+- screenshots/r3-shop.png
+- screenshots/r3-ui.png
+- screenshots/r3-vertical-slice.png
+- screenshots/r4-gravelmaw-inside.png
+- screenshots/r4-gravelmaw-mouth.png
+- screenshots/r4-great-cairn.png
+- screenshots/r4-ordrun.png
 - screenshots/round0-scatter.png
 - screenshots/round0-spawn.png
