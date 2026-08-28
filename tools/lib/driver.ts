@@ -83,12 +83,18 @@ export class GameDriver {
     await this.requirePage().mouse.click(x, y, { button });
   }
 
-  async drag(x1: number, y1: number, x2: number, y2: number): Promise<void> {
+  async drag(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    button: "left" | "right" | "middle" = "left",
+  ): Promise<void> {
     const mouse = this.requirePage().mouse;
     await mouse.move(x1, y1);
-    await mouse.down();
+    await mouse.down({ button });
     await mouse.move(x2, y2, { steps: 12 });
-    await mouse.up();
+    await mouse.up({ button });
   }
 
   async moveMouse(x: number, y: number): Promise<void> {

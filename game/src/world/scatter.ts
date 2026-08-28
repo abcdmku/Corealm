@@ -16,6 +16,15 @@
  *  3. **Instanced.** One `InstancedMesh` per (asset, material) pair, per region. That is the whole
  *     draw-call budget argument (runs/corealm/architecture.md, correction R6).
  *
+ * The consequence of (3) worth stating out loud, because it decides every number in
+ * `DEFAULT_SCATTER`: a region-wide `InstancedMesh` has a region-wide bounding sphere, so it is
+ * never frustum-culled and never distance-culled below `WorldScene.updateStreaming`'s per-region
+ * granularity. Draw calls are therefore flat in instance count and set purely by variant count,
+ * while triangles are linear in instance count. Splitting a layer into spatial tiles would win the
+ * triangles back, but it trades them for draw calls at a bad rate, and draw calls are the budget
+ * that actually fails. Real per-layer draw distances need a per-object anchor and radius in
+ * `WorldScene.registerScatter`/`updateStreaming`; see the round-2 report.
+ *
  * Exclusion zones are how gameplay space stays clear: the root registers settlement footprints,
  * resource clusters, roads and the spawn approach before scattering, and nothing is placed inside
  * them.
@@ -120,7 +129,13 @@ export interface ScatterLayerSpec {
   /** Explicit asset ids win. Otherwise every manifest asset carrying ALL of `tags`. */
   assetIds?: string[];
   tags?: string[];
-  /** Cap on distinct meshes used, which is a direct cap on draw calls. */
+  /**
+   * Cap on distinct *assets* used. Not the same as a cap on draw calls: a source GLB costs one
+   * `InstancedMesh` per primitive, and every tree in the Quaternius nature kit has two (trunk and
+   * foliage are separate materials). So a 4-variant shadow-casting tree layer is
+   * 4 assets x 2 primitives x 2 passes = 16 draw calls, while a 4-variant grass layer is 4.
+   * Tune this first when the draw-call budget is tight; instance count does not affect it at all.
+   */
   maxVariants?: number;
   /** Poisson-disc minimum spacing in metres. */
   spacing: number;
@@ -158,6 +173,13 @@ export interface ScatterResult {
   instancedMeshes: number;
   /** Estimated draw calls added, counting the shadow pass for casters. */
   estimatedDrawCalls: number;
+  /**
+   * Triangles this region submits when it is streamed in, counting the shadow pass. Region-wide
+   * `InstancedMesh`es have region-wide bounding spheres, so nothing here is frustum-culled: this
+   * number is what the GPU actually sees, not an upper bound. It is the figure to watch, because
+   * draw calls are flat in instance count and triangles are linear in it.
+   */
+  estimatedTriangles: number;
   byLayer: Record<string, number>;
   missingAssets: string[];
 }
@@ -246,14 +268,29 @@ function poissonDisc(rect: Rect, minDistance: number, maxCount: number, rng: Rng
   return points;
 }
 
-/** Resolves the asset ids a layer will actually use, capped so draw calls stay predictable. */
-function resolveAssets(assets: AssetRegistry, layer: ScatterLayerSpec): string[] {
+/**
+ * Resolves the asset ids a layer will actually use, capped so draw calls stay predictable.
+ *
+ * Unknown explicit ids are reported rather than silently dropped. Every id in `DEFAULT_SCATTER` is
+ * hand-picked off the measured triangle table, so a typo that quietly degrades a layer to two
+ * variants is exactly the failure that is hardest to see in a screenshot.
+ */
+function resolveAssets(
+  assets: AssetRegistry,
+  layer: ScatterLayerSpec,
+): { ids: string[]; unknown: string[] } {
   const limit = layer.maxVariants ?? 4;
   if (layer.assetIds && layer.assetIds.length > 0) {
-    return layer.assetIds.filter((id) => assets.entry(id) !== undefined).slice(0, limit);
+    const ids: string[] = [];
+    const unknown: string[] = [];
+    for (const id of layer.assetIds) {
+      if (assets.entry(id) === undefined) unknown.push(id);
+      else if (ids.length < limit) ids.push(id);
+    }
+    return { ids, unknown };
   }
-  if (!layer.tags || layer.tags.length === 0) return [];
-  return assets.byTags(...layer.tags).map((entry) => entry.id).slice(0, limit);
+  if (!layer.tags || layer.tags.length === 0) return { ids: [], unknown: [] };
+  return { ids: assets.byTags(...layer.tags).map((entry) => entry.id).slice(0, limit), unknown: [] };
 }
 
 /** Stable per-region, per-layer seed. Order-independent so editing one layer never moves another. */
@@ -288,13 +325,15 @@ export async function scatterRegion(
     rejected: 0,
     instancedMeshes: 0,
     estimatedDrawCalls: 0,
+    estimatedTriangles: 0,
     byLayer: {},
     missingAssets: [],
   };
   if (!rect) return result;
 
   for (const layer of spec.layers) {
-    const ids = resolveAssets(assets, layer);
+    const { ids, unknown } = resolveAssets(assets, layer);
+    for (const id of unknown) result.missingAssets.push(`${layer.id}:${id}`);
     if (ids.length === 0) {
       result.missingAssets.push(layer.id);
       continue;
@@ -369,6 +408,12 @@ export async function scatterRegion(
       );
       result.instancedMeshes += meshes.length;
       result.estimatedDrawCalls += meshes.length * (layer.castShadow ? 2 : 1);
+      for (const mesh of meshes) {
+        const indices = mesh.geometry.getIndex();
+        const positions = mesh.geometry.getAttribute("position");
+        const triangles = Math.round((indices?.count ?? positions?.count ?? 0) / 3);
+        result.estimatedTriangles += triangles * mesh.count * (layer.castShadow ? 2 : 1);
+      }
     }
   }
 
@@ -394,12 +439,42 @@ export async function scatterWorld(
 // --------------------------------------------------------- region presets
 
 /**
- * Per-region density and species mix. The counts come off the measured triangle budget:
- * `tree_twisted_*` is ~9.7k triangles, `tree_common_*` 3.2-6.3k, `tree_pine_*` 1.6-5k, ground
- * cover 50-700. So the expensive silhouettes are rationed and the cheap ones carry the density.
+ * Per-region density and species mix.
  *
- *  Fallowmarch  sparse, long sightlines, roughly one prop per 40 m^2 (PRD, "Look").
- *  Vellenwood   dense canopy, enclosed. The worst-case view for the draw-call budget.
+ * Every id below is picked by hand off a triangle census of the nature kit, not by tag lookup,
+ * because the manifest tag order happens to select the *most* expensive member of each family.
+ * Measured, per source asset, trunk and foliage primitives summed:
+ *
+ * ```text
+ *   tree_twisted_1..5   9134 - 10104     tree_dead_1..5      5648 - 6557
+ *   tree_common_1..5    3182 -  6265     tree_pine_1..5      1646 - 4964
+ *   bush/fern/plant       48 -   1368    grass/clover/flower   155 - 1690
+ *   pebble/rock_small     48 -    124    boulder/cliff         288 - 1664
+ * ```
+ *
+ * Two facts drive every number here (architecture.md, correction R6):
+ *
+ *  1. **Draw calls are flat in instance count.** One region-wide `InstancedMesh` costs one draw
+ *     whether it holds 20 trees or 2000. Draw calls are set by *variant count*: assets per layer,
+ *     times primitives per asset (2 for every tree in this kit, trunk plus foliage), times 2 again
+ *     for a shadow caster. The way to buy draw calls back is to cut variants and shadow casters.
+ *     Cutting density buys none.
+ *  2. **Triangles are linear in instance count and in per-asset cost.** Those same region-wide
+ *     bounding spheres mean nothing is ever frustum-culled, so the whole streamed-in region is
+ *     submitted every frame. The only levers are count and species.
+ *
+ * Round 1 measured 803 draw calls and 12.5M triangles at `gravelmaw_entrance` against a 400-call
+ * budget. Scatter's share was 129 calls and up to ~8.6M triangles (two regions streamed in). This
+ * pass takes scatter to 62 calls and 4.8M triangles world-wide, 3.6M for the worst region pair.
+ *
+ * A note on `spacing`: `poissonDisc` widens its radius to `sqrt(area * 0.66 / maxCount)` whenever
+ * that exceeds `spacing`, so on a 92,000 m^2 region any `spacing` below ~17 m is a floor that never
+ * binds for a 200-count layer. Treat `maxCount` as the density control and `spacing` as the
+ * anti-interpenetration minimum.
+ *
+ *  Fallowmarch  sparse, long sightlines (PRD, "Look"). Backdrop trees only; choppable trees are
+ *               entities, not scatter.
+ *  Vellenwood   deep green woodland. Enclosure comes from scale and clumping, not prop count.
  *  Karrowmoor   rock and scrub. Very large props, very few of them, big empty slate.
  */
 export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
@@ -407,29 +482,42 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
     regionId: "fallowmarch",
     layers: [
       {
-        id: "copse", tags: ["tree", "broadleaf"], maxVariants: 4,
-        spacing: 13, maxCount: 110, scale: [0.85, 1.3], clearance: 5,
+        // The two cheapest green broadleaves in the kit (3182 and 3505 tris). tree_common_1 and _2
+        // are near twice that for no readable difference at a 20 m camera distance, and the old
+        // tag lookup picked exactly those two.
+        id: "copse", assetIds: ["tree_common_5", "tree_common_3"], maxVariants: 2,
+        spacing: 13, maxCount: 90, scale: [0.95, 1.5], clearance: 5,
         slopeMax: 0.6, castShadow: true, patchiness: 0.85, patchScale: 95,
       },
       {
-        id: "deadwood", tags: ["tree", "dead"], maxVariants: 2,
-        spacing: 45, maxCount: 14, scale: [0.9, 1.25], clearance: 5, castShadow: true,
+        // Bare silhouettes against the sky. One variant: 12 of them over 96,000 m^2 never repeat
+        // inside a frame, and a second variant would cost 2 more draw calls for nothing.
+        id: "deadwood", assetIds: ["tree_dead_5"], maxVariants: 1,
+        spacing: 45, maxCount: 12, scale: [0.9, 1.35], clearance: 5, castShadow: true,
       },
       {
-        id: "bracken", tags: ["bush"], maxVariants: 2,
-        spacing: 11, maxCount: 170, scale: [0.7, 1.2], clearance: 3, patchiness: 0.5, patchScale: 55,
+        // bush_flowering is 1368 tris across 2 primitives against bush_common's 900 across 1.
+        // Dropping it halves this layer's draw cost; `bloom` already supplies the flower colour.
+        id: "bracken", assetIds: ["bush_common"], maxVariants: 1,
+        spacing: 11, maxCount: 140, scale: [0.7, 1.25], clearance: 3, patchiness: 0.5, patchScale: 55,
       },
       {
-        id: "stones", tags: ["rock", "stone"], maxVariants: 4,
+        // Deliberately NOT rock_medium_*: those are the ore-node meshes. Dressing that shares a
+        // silhouette with a minable node is half of why ore is unreadable (critique finding 4).
+        // Pebbles and rock_small are also 3x cheaper, so the count can stay up.
+        id: "stones", assetIds: ["pebble_round_1", "pebble_round_2", "rock_small_1"], maxVariants: 3,
         spacing: 13, maxCount: 130, scale: [0.4, 0.95], clearance: 3, sink: 0.25, patchiness: 0.6,
       },
       {
-        id: "tussock", tags: ["grass"], maxVariants: 4,
-        spacing: 3.4, maxCount: 1300, scale: [0.8, 1.5], clearance: 1.5, patchiness: 0.55, patchScale: 34,
+        // The cheap layer that carries the density: 240 tris a clump. The wispy variants are 2-3x
+        // the cost and read the same at grazing angles, so the two `common` meshes do the work.
+        id: "tussock", assetIds: ["grass_common_short", "grass_common_tall"], maxVariants: 2,
+        spacing: 3.4, maxCount: 800, scale: [0.8, 1.5], clearance: 1.5, patchiness: 0.55, patchScale: 34,
       },
       {
-        id: "bloom", tags: ["ground-cover", "plains"], maxVariants: 4,
-        spacing: 7, maxCount: 380, scale: [0.7, 1.2], clearance: 1.5, patchiness: 0.8, patchScale: 26,
+        // Colour accents only. Heavily patched so they read as drifts rather than as a lawn.
+        id: "bloom", assetIds: ["clover_1", "flower_a_group"], maxVariants: 2,
+        spacing: 7, maxCount: 240, scale: [0.7, 1.2], clearance: 1.5, patchiness: 0.8, patchScale: 26,
       },
     ],
   },
@@ -438,34 +526,61 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
     regionId: "vellenwood",
     layers: [
       {
-        id: "duskoak", tags: ["tree", "twisted"], maxVariants: 3,
-        spacing: 18, maxCount: 85, scale: [1.15, 1.75], clearance: 7,
-        slopeMax: 0.7, castShadow: true, patchiness: 0.35, patchScale: 120,
+        // Critique finding 5. The dominant layer used to be the `twisted` family, which is an
+        // autumn tree in the source texture: a wood built from it renders crimson and black, and a
+        // 0.25-strength retint cannot move a dark red albedo. The dominant canopy is now green
+        // broadleaf, and it is also the cheapest green broadleaf: 3344 tris average against the
+        // twisted family's 9596, a 65% cut per tree before a single tree is removed.
+        //
+        // Scale runs high and patchiness is moderate over a large feature size. Enclosure is bought
+        // with canopy height and with dense stands separated by real clearings, which is also where
+        // the PRD's "shafted light against canopy shadow" value contrast comes from. Raw prop count
+        // buys uniform gloom instead, and uniform gloom is what round 1 shipped.
+        id: "canopy", assetIds: ["tree_common_3", "tree_common_5"], maxVariants: 2,
+        spacing: 11, maxCount: 200, scale: [1.05, 1.75], clearance: 6,
+        slopeMax: 0.75, castShadow: true, patchiness: 0.4, patchScale: 85,
       },
       {
-        id: "canopy", tags: ["tree", "common"], maxVariants: 4,
-        spacing: 10, maxCount: 300, scale: [0.9, 1.45], clearance: 5,
-        slopeMax: 0.75, castShadow: true, patchiness: 0.45, patchScale: 70,
+        // tree_pine_5 is 1646 tris, the cheapest tree in the kit by a factor of two, so conifers
+        // can carry count where broadleaves cannot. One variant: a stand of a single conifer
+        // species is what real conifers look like, and it saves 4 draw calls. Tall and dark, which
+        // is the other half of the value contrast.
+        id: "conifer", assetIds: ["tree_pine_5"], maxVariants: 1,
+        spacing: 13, maxCount: 140, scale: [1.0, 1.9], clearance: 5,
+        slopeMax: 0.8, castShadow: true, patchiness: 0.55, patchScale: 70,
       },
       {
-        id: "conifer", tags: ["tree", "pine"], maxVariants: 3,
-        spacing: 14, maxCount: 120, scale: [0.85, 1.3], clearance: 5, castShadow: true, patchiness: 0.7,
+        // The red tree survives as an accent, not as the wood. Twenty across 92,000 m^2 is a
+        // handful per frame: a few autumn crowns in a green wood is deliberate art direction, and
+        // at 9134 tris each that is 0.37M triangles instead of 1.63M. Scaled up hard so each one
+        // reads as an individual worth walking towards.
+        id: "duskoak", assetIds: ["tree_twisted_2"], maxVariants: 1,
+        spacing: 40, maxCount: 20, scale: [1.35, 2.15], clearance: 8,
+        slopeMax: 0.7, castShadow: true, patchiness: 0.3, patchScale: 130,
       },
       {
-        id: "undergrowth", tags: ["undergrowth"], maxVariants: 4,
-        spacing: 4.4, maxCount: 780, scale: [0.8, 1.5], clearance: 2.5, patchiness: 0.45, patchScale: 40,
+        // PRD: "ground clutter kept low so pathing stays legible". Count is down from 780 and the
+        // clearance is up, so road corridors read as walkable rather than as a gap in the ferns.
+        // Ferns and low leafy plants are 288 and 360 tris; bush_common adds the volume.
+        id: "undergrowth", assetIds: ["fern_1", "plant_leafy_large", "bush_common"], maxVariants: 3,
+        spacing: 5.5, maxCount: 360, scale: [0.8, 1.5], clearance: 3.2, patchiness: 0.5, patchScale: 40,
       },
       {
-        id: "fungus", tags: ["mushroom"], maxVariants: 2,
-        spacing: 13, maxCount: 110, scale: [0.7, 1.3], clearance: 2, patchiness: 0.85, patchScale: 30,
+        // mushroom_bracket is 3216 triangles, more than a whole tree_common_5, for a prop the
+        // player only ever sees from four metres. Dropped outright; mushroom_common is 880.
+        id: "fungus", assetIds: ["mushroom_common"], maxVariants: 1,
+        spacing: 13, maxCount: 70, scale: [0.7, 1.4], clearance: 2, patchiness: 0.85, patchScale: 30,
       },
       {
-        id: "mossrock", tags: ["rock", "stone"], maxVariants: 3,
-        spacing: 20, maxCount: 65, scale: [0.5, 1.1], clearance: 3, sink: 0.35,
+        // Pebbles again rather than rock_medium_*, to keep ore nodes distinguishable.
+        id: "mossrock", assetIds: ["pebble_round_1", "pebble_round_2"], maxVariants: 2,
+        spacing: 20, maxCount: 55, scale: [0.5, 1.1], clearance: 3, sink: 0.35,
       },
       {
-        id: "floor", tags: ["grass"], maxVariants: 3,
-        spacing: 4.2, maxCount: 900, scale: [0.7, 1.3], clearance: 1.5, patchiness: 0.6, patchScale: 30,
+        // Kept moderate. Grass is cheap, but a wall-to-wall forest floor is what stops a path from
+        // reading as a path.
+        id: "floor", assetIds: ["grass_common_short", "grass_wispy_short"], maxVariants: 2,
+        spacing: 4.6, maxCount: 480, scale: [0.7, 1.3], clearance: 2, patchiness: 0.6, patchScale: 30,
       },
     ],
   },
@@ -474,30 +589,38 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
     regionId: "karrowmoor",
     layers: [
       {
-        id: "crags", tags: ["cliff"], maxVariants: 4,
-        spacing: 24, maxCount: 85, scale: [0.7, 1.5], clearance: 8,
+        // cliff_step_2 (1664 tris) and cliff_step_1 (864) cost five times boulder_medium for the
+        // same read at this scale, and the terrain itself already does the terracing. cliff_tall is
+        // 288 tris and is the vertical silhouette the terraces shot needs.
+        id: "crags", assetIds: ["boulder_large", "boulder_medium", "cliff_tall"], maxVariants: 3,
+        spacing: 24, maxCount: 70, scale: [0.8, 1.8], clearance: 8,
         castShadow: true, sink: 0.6, patchiness: 0.4, patchScale: 90,
       },
       {
-        id: "cairnpine", tags: ["tree", "pine"], maxVariants: 4,
-        spacing: 17, maxCount: 130, scale: [0.75, 1.15], clearance: 5,
+        // Same cheapest-pine argument as Vellenwood. Wind-stunted here, so the scale band is low.
+        id: "cairnpine", assetIds: ["tree_pine_5"], maxVariants: 1,
+        spacing: 17, maxCount: 120, scale: [0.75, 1.2], clearance: 5,
         slopeMax: 0.62, castShadow: true, patchiness: 0.75, patchScale: 80,
       },
       {
-        id: "windfall", tags: ["tree", "dead"], maxVariants: 2,
-        spacing: 40, maxCount: 22, scale: [0.7, 1.0], clearance: 4, castShadow: true,
+        id: "windfall", assetIds: ["tree_dead_5"], maxVariants: 1,
+        spacing: 40, maxCount: 16, scale: [0.7, 1.05], clearance: 4, castShadow: true,
       },
       {
-        id: "scree", tags: ["rock", "stone"], maxVariants: 4,
-        spacing: 7, maxCount: 420, scale: [0.35, 1.1], clearance: 2, sink: 0.3, patchiness: 0.35,
+        // Scree wants to be dense to read as scree, and at ~98 tris a stone it can be: 340 of them
+        // cost 33k triangles, less than five broadleaf trees.
+        id: "scree",
+        assetIds: ["pebble_round_1", "pebble_round_2", "rock_small_1", "rock_small_2"],
+        maxVariants: 4,
+        spacing: 7, maxCount: 340, scale: [0.35, 1.1], clearance: 2, sink: 0.3, patchiness: 0.35,
       },
       {
-        id: "scrub", tags: ["undergrowth"], maxVariants: 3,
-        spacing: 8, maxCount: 300, scale: [0.6, 1.0], clearance: 2, patchiness: 0.7, patchScale: 45,
+        id: "scrub", assetIds: ["bush_common"], maxVariants: 1,
+        spacing: 8, maxCount: 220, scale: [0.6, 1.0], clearance: 2, patchiness: 0.7, patchScale: 45,
       },
       {
-        id: "moorgrass", tags: ["grass", "ground-cover"], maxVariants: 3,
-        spacing: 5.5, maxCount: 620, scale: [0.6, 1.1], clearance: 1.5, patchiness: 0.65, patchScale: 40,
+        id: "moorgrass", assetIds: ["grass_common_short", "grass_wispy_short"], maxVariants: 2,
+        spacing: 5.5, maxCount: 440, scale: [0.6, 1.1], clearance: 1.5, patchiness: 0.65, patchScale: 40,
       },
     ],
   },

@@ -60,15 +60,21 @@ export function paletteForTier(tier: number): TierPalette {
 }
 
 /**
- * Silhouette rule from the PRD: tier changes scale by at most 20%, and always change proportion
- * as well. Colour does the heavy lifting; scale only nudges. Both together make tier readable at
- * 12 m at the default camera pitch.
+ * Silhouette rule from the PRD: tier changes scale by at most 20% per authored step, and always
+ * changes proportion as well. Colour does the heavy lifting; scale only nudges. Both together make
+ * tier readable at 12 m at the default camera pitch.
+ *
+ * Round 1 ramped this over the PALETTE INDEX, which is why it failed the readability contract:
+ * tiers 1, 5 and 10 are the first three of twelve authored palettes, so the whole of Phase 1's
+ * content resolved to 0.920 / 0.943 / 0.967 — a 5% spread across the entire shipped tier range,
+ * invisible at any distance. Ramping over log(tier) instead spends the budget where the content
+ * actually is: 1 -> 0.900, 5 -> 1.075, 10 -> 1.151, and still only 1.400 at tier 99.
+ *
+ * The largest authored step is 1 -> 5 at +19.4%, inside the PRD's 20% ceiling.
  */
 export function tierSilhouetteScale(tier: number): number {
-  const palette = paletteForTier(tier);
-  const index = AUTHORED_TIERS.indexOf(palette.tier);
-  const span = Math.max(1, AUTHORED_TIERS.length - 1);
-  return 0.92 + (index / span) * 0.28;
+  const clamped = Math.min(99, Math.max(1, tier));
+  return 0.9 + 0.5 * (Math.log(clamped) / Math.log(99));
 }
 
 /**
@@ -143,12 +149,32 @@ export function regionSwatches(regionId: RegionId): string[] {
 
 export type SurfaceState = "normal" | "depleted" | "dead";
 
+/**
+ * Which swatch of a tier palette a surface is pulled toward.
+ *
+ * The split matters for readability: an ore node's ROCK takes `body` (Grithe's soft grey,
+ * Kaldite's blue-black) and its exposed SEAM takes `metal` (Grithe's warm ochre, Kaldite's cyan).
+ * Round 1 pulled everything toward `metal`, which turned a tier 1 rock into an orange boulder and
+ * still left it indistinguishable from the decorative boulder beside it.
+ */
+export type PaletteSwatch = "metal" | "body" | "accent";
+
 /** How a `SemanticEntity.view` maps onto a material variant. Purely descriptive; no gameplay. */
 export interface VariantSpec {
   tier: number;
   state?: SurfaceState;
-  /** 0..1. How far the base colour is pulled toward the tier colour. */
+  /** 0..1. How far the base colour is pulled toward the tier colour. 0 returns the base material. */
   strength?: number;
+  /** Which tier swatch to pull toward. Defaults to `metal`, the round-0 behaviour. */
+  swatch?: PaletteSwatch;
+  /** Emissive floor for a self-lit seam or rune. The tier's own emissive wins when it is higher. */
+  glow?: number;
+}
+
+function swatchColour(palette: TierPalette, swatch: PaletteSwatch): number {
+  if (swatch === "body") return palette.body;
+  if (swatch === "accent") return palette.accent;
+  return palette.metal;
 }
 
 /**
@@ -247,18 +273,38 @@ export class MaterialLibrary {
       }));
   }
 
-  /** Rock body for ore nodes, tinted by tier so the tier reads from 12 m at the default pitch. */
+  /**
+   * The exposed ore seam sitting on a node's rock body.
+   *
+   * This is the half of the readability contract that colour on the rock alone could not carry.
+   * The body takes the tier's `body` swatch through `variant()`; this material is the vein on top
+   * of it, so a node reads as "grey rock + warm ochre vein" (Grithe) or "blue-black rock + cyan
+   * fracture line" (Kaldite) exactly as the PRD authors them, instead of two grey rocks.
+   *
+   * Two deliberate departures from the raw palette:
+   *  - `raiseContrast` pushes saturation and value up. `palette.metal` is authored to sit NEXT to
+   *    the body colour on a chart, not on top of it; unmodified it loses the value contrast that
+   *    makes the vein visible at 12 m.
+   *  - a small emissive floor even at tiers with no authored glow, because an unlit ochre line
+   *    disappears the moment the rock falls into shadow, which in Gravelmaw is always.
+   *
+   * Cached per (tier, depleted), so every ore node in a region shares one material instance.
+   */
   oreRock(tier: number, depleted: boolean): THREE.MeshStandardMaterial {
     const palette = paletteForTier(tier);
     return this.remember(this.key(["ore", palette.tier, depleted]), () => {
       const colour = new THREE.Color(depleted ? palette.body : palette.metal);
       if (depleted) applyDepletion(colour);
+      else raiseContrast(colour);
+      const glow = depleted ? 0 : Math.max(SEAM_GLOW, palette.emissive);
       return new THREE.MeshStandardMaterial({
         color: colour,
-        roughness: depleted ? 0.98 : 0.78,
-        metalness: depleted ? 0 : 0.18,
-        emissive: !depleted && palette.emissive > 0 ? palette.metal : 0x000000,
-        emissiveIntensity: depleted ? 0 : palette.emissive,
+        roughness: depleted ? 0.98 : 0.62,
+        metalness: depleted ? 0 : 0.25,
+        emissive: glow > 0 ? colour.clone() : new THREE.Color(0x000000),
+        emissiveIntensity: glow,
+        // Faceted, so the shards read as crystal against the smooth-shaded rock they sit in.
+        flatShading: true,
       });
     });
   }
@@ -285,8 +331,17 @@ export class MaterialLibrary {
     const source = base as THREE.MeshStandardMaterial;
     const palette = paletteForTier(spec.tier);
     const state: SurfaceState = spec.state ?? "normal";
-    const strength = spec.strength ?? 0.55;
-    const key = this.key(["variant", this.baseKey(base), palette.tier, state, strength]);
+    const strength = Math.min(1, Math.max(0, spec.strength ?? 0.55));
+    const swatch: PaletteSwatch = spec.swatch ?? "metal";
+    const glow = Math.max(0, spec.glow ?? 0);
+
+    // A zero-strength, unlit, live surface IS the source material. Handing back the original
+    // instance rather than an identical clone is not a micro-optimisation: a clone is a second
+    // material, and a second material on the same geometry is a second draw call downstream.
+    // Buildings, props and NPC art all take this path — they have no tier ladder to express.
+    if (strength === 0 && glow === 0 && state === "normal") return base;
+
+    const key = this.key(["variant", this.baseKey(base), palette.tier, state, strength, swatch, glow]);
 
     return this.remember(key, () => {
       if (!source.isMeshStandardMaterial) {
@@ -294,19 +349,24 @@ export class MaterialLibrary {
         // rather than being silently replaced with something that does not match the art.
         return source;
       }
+      const target = new THREE.Color(swatchColour(palette, swatch));
       const clone = source.clone();
       // clone() keeps the same texture object references. Do NOT reassign clone.map.
-      clone.color = new THREE.Color(source.color.getHex()).lerp(new THREE.Color(palette.metal), strength);
+      clone.color = new THREE.Color(source.color.getHex()).lerp(target, strength);
       clone.roughness = Math.min(1, source.roughness * 0.9 + 0.12);
       clone.metalness = state === "normal" ? Math.max(source.metalness, 0.12) : 0;
       if (state !== "normal") {
         applyDepletion(clone.color);
         clone.roughness = 1;
+        clone.metalness = 0;
         clone.emissive = new THREE.Color(0x000000);
         clone.emissiveIntensity = 0;
-      } else if (palette.emissive > 0) {
-        clone.emissive = new THREE.Color(palette.metal);
-        clone.emissiveIntensity = palette.emissive;
+      } else {
+        const intensity = Math.max(glow, palette.emissive);
+        if (intensity > 0) {
+          clone.emissive = target.clone();
+          clone.emissiveIntensity = intensity;
+        }
       }
       return clone;
     });
@@ -359,13 +419,25 @@ export class MaterialLibrary {
   /**
    * Retints an asset's existing materials for a tier while keeping its base texture.
    * This is how one source mesh becomes a whole tier ladder without new art.
+   *
+   * `accept` exists because a blanket retint is wrong on character art: pulling an eye, a tooth or
+   * a pure-black trim toward the tier colour destroys the read of the face while doing nothing for
+   * tier legibility. Callers pass a predicate; materials it rejects are left exactly as authored
+   * (and, via `variant`'s zero-strength path, are not even cloned).
    */
-  retint(object: THREE.Object3D, tier: number, strength = 0.65): void {
+  retint(
+    object: THREE.Object3D,
+    tier: number,
+    strength = 0.7,
+    swatch: PaletteSwatch = "metal",
+    accept: (material: THREE.Material) => boolean = () => true,
+  ): void {
     object.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      const mapped = materials.map((source) => this.variant(source, { tier, strength }));
+      const mapped = materials.map((source) =>
+        this.variant(source, { tier, swatch, strength: accept(source) ? strength : 0 }));
       mesh.material = mapped.length === 1 ? mapped[0]! : mapped;
     });
   }
@@ -380,9 +452,30 @@ export class MaterialLibrary {
   }
 }
 
-/** Depleted nodes desaturate 45% and darken, so state reads at a glance from the default pitch. */
+/**
+ * Depleted nodes go nearly grey and lose almost half their value, so "spent" reads at a glance
+ * from the default pitch.
+ *
+ * Round 1 used s*0.55 / l*0.78. On a rock texture that is already desaturated and mid-value, that
+ * is a change of a few percent per channel — a state transition nobody could see, which is why the
+ * PRD's "visible state change" was not met. This is deliberately blunt.
+ */
 function applyDepletion(colour: THREE.Color): void {
   const hsl = { h: 0, s: 0, l: 0 };
   colour.getHSL(hsl);
-  colour.setHSL(hsl.h, hsl.s * 0.55, hsl.l * 0.78);
+  colour.setHSL(hsl.h, hsl.s * 0.15, Math.max(0.06, hsl.l * 0.55));
+}
+
+/** Emissive floor on an ore seam, so a vein still reads in shadow and underground. */
+const SEAM_GLOW = 0.3;
+
+/**
+ * Pushes a swatch up in saturation and value. Used on the ore seam: the tier palette's `metal` is
+ * authored to sit beside its `body`, not on top of it, and side by side at 12 m the two collapse
+ * into one grey blob without this.
+ */
+function raiseContrast(colour: THREE.Color): void {
+  const hsl = { h: 0, s: 0, l: 0 };
+  colour.getHSL(hsl);
+  colour.setHSL(hsl.h, Math.min(1, hsl.s * 1.5 + 0.16), Math.min(0.82, hsl.l * 1.2 + 0.12));
 }

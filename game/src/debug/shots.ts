@@ -1,0 +1,133 @@
+/**
+ * Named, repeatable camera poses for screenshots and the performance budget.
+ *
+ * Round 1's screenshots were all taken at one hardcoded yaw, which is why the "dungeon mouth" shot
+ * and the "terraces" shot were the same two fence posts from different distances, and why the
+ * Highcairn crane never appeared in the Highcairn shot. A pose has to say where the camera looks,
+ * not only where the player stands, or the image cannot prove anything about composition.
+ *
+ * These same ids drive `npm run perf`, so the draw-call budget is measured at the dense poses
+ * rather than only at the empty spawn view.
+ *
+ * FROZEN. Only the root edits this file.
+ */
+import type { RegionId } from "../contracts.js";
+
+export interface CameraShot {
+  id: string;
+  /** Route-node id to stand at. Resolved through the navmesh so the pose lands on walkable ground. */
+  locationId: string;
+  regionId: RegionId;
+  /** Camera yaw in radians. 0 looks toward +z; increases clockwise seen from above. */
+  yaw: number;
+  pitch: number;
+  distance: number;
+  /** What this shot is supposed to show. Read this when judging whether the image succeeded. */
+  intent: string;
+}
+
+const NORTH = 0;
+const EAST = Math.PI * 0.5;
+const SOUTH = Math.PI;
+const WEST = Math.PI * 1.5;
+
+export const SHOTS: readonly CameraShot[] = [
+  {
+    id: "spawn", locationId: "spawn", regionId: "fallowmarch",
+    yaw: SOUTH, pitch: 0.5, distance: 20,
+    intent: "The first frame. Coldbrace's south gate and the vault tower must be visible ahead.",
+  },
+  {
+    id: "town_entrance", locationId: "town_entrance", regionId: "fallowmarch",
+    yaw: SOUTH, pitch: 0.46, distance: 22,
+    intent: "The gatehouse read: a walled town, not props on grass.",
+  },
+  {
+    id: "town_center", locationId: "town_center", regionId: "fallowmarch",
+    yaw: SOUTH + 0.6, pitch: 0.62, distance: 26,
+    intent: "Coldbrace square with assembled buildings, the bank, and the road through it.",
+  },
+  {
+    id: "bank", locationId: "bank_interior", regionId: "fallowmarch",
+    yaw: WEST, pitch: 0.55, distance: 14,
+    intent: "The bank as a recognisable destination a player can navigate back to.",
+  },
+  {
+    id: "bracken_pit", locationId: "bracken_pit", regionId: "fallowmarch",
+    yaw: NORTH + 0.4, pitch: 0.62, distance: 18,
+    intent: "Tier 1 Grithe seams. Ore must read as ore, and as tier 1, from this distance.",
+  },
+  {
+    id: "palewood_copse", locationId: "palewood_copse", regionId: "fallowmarch",
+    yaw: EAST, pitch: 0.58, distance: 18,
+    intent: "Tier 1 woodcutting. Choppable trees distinguishable from scatter.",
+  },
+  {
+    id: "redsill_shallows", locationId: "redsill_shallows", regionId: "fallowmarch",
+    yaw: NORTH, pitch: 0.5, distance: 18,
+    intent: "Fishing spots on real water.",
+  },
+  {
+    id: "marchfield_farm", locationId: "marchfield_farm", regionId: "fallowmarch",
+    yaw: WEST, pitch: 0.6, distance: 22,
+    intent: "The farm: plots, fence, and a building that reads as a farmstead.",
+  },
+  {
+    id: "rootfall", locationId: "rootfall_hamlet", regionId: "vellenwood",
+    yaw: SOUTH, pitch: 0.55, distance: 24,
+    intent: "The Vellenwood settlement. Should feel enclosed by canopy, not buried in it.",
+  },
+  {
+    id: "vellenwood_canopy", locationId: "vellenwood_canopy", regionId: "vellenwood",
+    yaw: EAST, pitch: 0.42, distance: 20,
+    intent: "Deep woodland. Green, with shafted light and a legible ground path. The density worst case.",
+  },
+  {
+    id: "hollowcut_seam", locationId: "hollowcut_seam", regionId: "vellenwood",
+    yaw: NORTH, pitch: 0.6, distance: 18,
+    intent: "Tier 5 ore, and the short bank route that makes it out-earn tier 10 before Agility 10.",
+  },
+  {
+    id: "karrowmoor_terraces", locationId: "karrowmoor_terraces", regionId: "karrowmoor",
+    yaw: SOUTH, pitch: 0.38, distance: 34,
+    intent: "The verticality read. Four terraces stacked, with the ramps between them visible.",
+  },
+  {
+    id: "highcairn", locationId: "highcairn_outpost", regionId: "karrowmoor",
+    yaw: SOUTH, pitch: 0.5, distance: 26,
+    intent: "The tier 10 outpost as a working quarry camp.",
+  },
+  {
+    id: "upper_karrow_seam", locationId: "upper_karrow_seam", regionId: "karrowmoor",
+    yaw: WEST, pitch: 0.55, distance: 20,
+    intent: "Tier 10 Kaldite. Must read as a different, higher tier than the Grithe shot.",
+  },
+  {
+    id: "sunder_ledge", locationId: "karrow_ramp_two", regionId: "karrowmoor",
+    yaw: NORTH, pitch: 0.45, distance: 22,
+    intent: "The Agility shortcut that flips the route maths. It must look climbable.",
+  },
+  {
+    id: "gravelmaw_entrance", locationId: "gravelmaw_entrance", regionId: "karrowmoor",
+    yaw: SOUTH, pitch: 0.34, distance: 24,
+    intent: "A dark opening in a rock face, readable as a dungeon mouth from across the terrace.",
+  },
+  {
+    id: "great_cairn", locationId: "great_cairn", regionId: "karrowmoor",
+    yaw: WEST, pitch: 0.4, distance: 30,
+    intent: "Karrowmoor's navigation landmark, visible against the sky.",
+  },
+  {
+    id: "march_road", locationId: "north_milestone", regionId: "fallowmarch",
+    yaw: SOUTH, pitch: 0.44, distance: 24,
+    intent: "The road as a travel affordance: it should be obvious which way leads to town.",
+  },
+];
+
+export function shotIds(): string[] {
+  return SHOTS.map((shot) => shot.id);
+}
+
+export function findShot(id: string): CameraShot | undefined {
+  return SHOTS.find((shot) => shot.id === id);
+}

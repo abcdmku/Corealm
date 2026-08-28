@@ -49,6 +49,7 @@ export interface PerfReport {
   usedRealGpu: boolean;
   viewport: { width: number; height: number };
   targetFps: number;
+  maxDrawCalls: number;
   shots: ShotPerf[];
   passed: boolean;
   errors: string[];
@@ -56,6 +57,16 @@ export interface PerfReport {
 
 const TARGET_FPS = 60;
 const BUDGET_MS = 1000 / TARGET_FPS;
+
+/**
+ * Draw-call ceiling from runs/corealm/architecture.md correction R6.
+ *
+ * This is checked per pose, not once. The first version of this tool measured only the default
+ * spawn view — the emptiest frame in the game — and passed itself while the Karrowmoor pose was
+ * running 559 draw calls, 40% over budget. A budget that only ever samples the cheap pose is worse
+ * than no budget, because it reports green.
+ */
+const MAX_DRAW_CALLS = 400;
 
 /**
  * Frame sampler, built as page source text with the duration baked in.
@@ -95,6 +106,7 @@ export async function runPerfTest(
     usedRealGpu: false,
     viewport: { width: 1920, height: 1080 },
     targetFps: TARGET_FPS,
+    maxDrawCalls: MAX_DRAW_CALLS,
     shots: [],
     passed: false,
     errors: [],
@@ -128,6 +140,12 @@ export async function runPerfTest(
       return typeof api?.listShots === "function" ? api.listShots() : [];
     })) as string[];
     const requested = shots.length > 0 ? shots : available.length > 0 ? available : ["default"];
+    if (requested.length === 1 && requested[0] === "default") {
+      report.errors.push(
+        "Only the default pose was measured. The game exposes no __gameDebug.listShots(), so this "
+        + "run cannot prove the budget holds at the dense poses. Add named camera poses.",
+      );
+    }
 
     for (const shot of requested) {
       if (shot !== "default" && available.includes(shot)) {
@@ -163,8 +181,11 @@ export async function runPerfTest(
         triangles: metrics.triangles ?? 0,
         programs: metrics.programs ?? 0,
         heapMB: metrics.heapMB ?? 0,
-        meetsBudget: median > 0 && median <= BUDGET_MS,
+        meetsBudget: median > 0 && median <= BUDGET_MS && (metrics.drawCalls ?? 0) <= MAX_DRAW_CALLS,
       };
+      if ((metrics.drawCalls ?? 0) > MAX_DRAW_CALLS) {
+        report.errors.push(`${shot}: ${metrics.drawCalls} draw calls exceeds the ${MAX_DRAW_CALLS} budget`);
+      }
       report.shots.push(entry);
     }
 

@@ -10,7 +10,7 @@ type MouseButton = "left" | "right" | "middle";
 type PlayAction =
   | { key: string; holdMs?: number; label?: string }
   | { click: [number, number]; button?: MouseButton; label?: string }
-  | { drag: [number, number, number, number]; label?: string }
+  | { drag: [number, number, number, number]; button?: MouseButton; label?: string }
   | { mouse: [number, number]; label?: string }
   | { waitMs: number; label?: string }
   | { debug: string; args?: unknown[]; label?: string }
@@ -78,7 +78,7 @@ export async function runPlayScenario(runCandidate: string, scenarioCandidate: s
       try {
         if ("key" in action) await driver.press(action.key, boundedWait(action.holdMs ?? 0));
         else if ("click" in action) await driver.click(...action.click, action.button);
-        else if ("drag" in action) await driver.drag(...action.drag);
+        else if ("drag" in action) await driver.drag(...action.drag, action.button);
         else if ("mouse" in action) await driver.moveMouse(...action.mouse);
         else if ("waitMs" in action) await driver.wait(boundedWait(action.waitMs));
         else if ("debug" in action) step.result = await driver.callDebug(action.debug, action.args ?? []);

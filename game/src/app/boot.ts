@@ -33,6 +33,7 @@ import { EntityStore, straightLineDistance } from "../world/entities.js";
 import { InteractionDispatcher } from "../world/interactions.js";
 import { REGIONS, validateRegions } from "../content/regions.js";
 import { scatterWorld, worldExclusions } from "../world/scatter.js";
+import { findShot, shotIds } from "../debug/shots.js";
 
 export interface BootResult {
   loop: GameLoop;
@@ -198,7 +199,15 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   const loop = new GameLoop({
     store, events, clock, rng, renderer, camera, scene, physics, nav, movement, api, saves, input,
   });
-  loop.setEntityViews(entityViews, () => entityStore.all());
+  // The Gravelmaw chambers are authored a few metres below the surface, right beside the entrance,
+  // so rendering every entity unconditionally drew the whole dungeon population on top of the
+  // terrace. That single pose measured 803 draw calls against a 400 budget. The dungeon is only
+  // visible from inside it.
+  const playerInDungeon = (): boolean => store.get().player.regionId === "gravelmaw";
+  loop.setEntityViews(entityViews, () => {
+    const inside = playerInDungeon();
+    return entityStore.all().filter((entity) => (entity.regionId === "gravelmaw") === inside);
+  });
 
   const resetWorld = (seed?: number, keepSave = false): void => {
     if (!keepSave) saves.clear();
@@ -248,8 +257,25 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
         errors.push({ atMs: clock.elapsedMs, source: "debug.loadSaveBlob", message: describeError(cause) });
       }
     },
-    focusCamera: () => false,
-    listShots: () => [],
+    /**
+     * Moves the camera to a named repeatable pose. Screenshots and the perf budget both use these,
+     * so a shot points at the thing it is named after rather than at a fixed compass bearing.
+     */
+    focusCamera: (shotId: string) => {
+      const shot = findShot(shotId);
+      if (!shot) return false;
+      const node = nav.routeNode(shot.locationId);
+      if (!node) return false;
+      const landed = nav.closestPoint(node.position) ?? node.position;
+      store.get().player.position = landed;
+      store.get().player.regionId = scene.regionAt(landed[0], landed[2]);
+      movement.stop(store.get(), clock.elapsedMs, "focus-camera");
+      scene.syncPlayer(landed, shot.yaw + Math.PI, true);
+      camera.setPose(shot.yaw, shot.pitch, shot.distance);
+      camera.update(landed[0], landed[1], landed[2], true);
+      return true;
+    },
+    listShots: () => shotIds(),
     callTool: () => Promise.reject(new Error("Agent tools arrive in round 6")),
   });
 
