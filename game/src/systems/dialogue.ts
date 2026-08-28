@@ -107,6 +107,11 @@ export class DialogueSystem {
     const node = dialogueNode(nodeId);
     if (!node) return err("NO_DIALOGUE", `No dialogue node "${nodeId}"`, npcId);
 
+    // Note and evaluate before building the view, so an NPC never greets you with the line for a
+    // stage that this very conversation has already finished.
+    this.deps.quests.noteDialogueNode(npcId, node.id);
+    this.deps.quests.evaluateNow();
+
     const view = this.buildView(npcId, node);
     this.writeState(npcId, node.id, view);
     this.deps.events.emit(
@@ -115,8 +120,6 @@ export class DialogueSystem {
       npcId,
       this.deps.clock.elapsedMs,
     );
-    this.deps.quests.noteDialogueNode(npcId, node.id);
-    this.deps.quests.evaluateNow();
     this.deps.store.markDirty();
     return ok(view);
   }
@@ -318,6 +321,9 @@ export class DialogueSystem {
       case "item":
         return this.deps.inventory.countItem(condition.itemId) >= condition.quantity;
 
+      case "lacksItem":
+        return this.deps.inventory.countItem(condition.itemId) < condition.quantity;
+
       case "currency":
         return this.deps.store.get().currency >= condition.amount;
 
@@ -355,6 +361,8 @@ export class DialogueSystem {
         return `Requires ${condition.skill} level ${condition.level}.`;
       case "item":
         return `Requires ${condition.quantity} x ${condition.itemId} in your inventory.`;
+      case "lacksItem":
+        return `Only available while you are carrying fewer than ${condition.quantity} x ${condition.itemId}.`;
       case "currency":
         return `Requires ${condition.amount} marks.`;
       default:

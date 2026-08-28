@@ -535,20 +535,29 @@ export class QuestSystem implements TickSystem {
       case "deplete": {
         const key = counterKey(predicate);
         if (!key) return false;
-        const target = predicate.kind === "kill"
-          ? predicate.count
-          : predicate.kind === "gather" || predicate.kind === "deplete"
-            ? predicate.count
-            : predicate.count;
         const base = record.counters[`${BASE_PREFIX}${key}`] ?? 0;
-        return (record.counters[key] ?? 0) - base >= target;
+        return (record.counters[key] ?? 0) - base >= predicate.count;
       }
 
       case "reach": {
+        const radius = predicate.radius ?? REACH_RADIUS;
+
+        // Dungeon chambers sit under Karrowmoor's terraces, so an XZ-only test would let a player
+        // standing on the moor 24 m above chamber 2 satisfy "reach The Collapse". Every chamber has
+        // a brazier marker entity at `<chamberId>_marker`, and measuring to that in three
+        // dimensions is the difference between being in the room and being over it.
+        const marker = this.deps.entities.get(`${predicate.locationId}_marker`);
+        if (marker) {
+          const from = state.player.position;
+          const dx = from[0] - marker.position[0];
+          const dy = from[1] - marker.position[1];
+          const dz = from[2] - marker.position[2];
+          return Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius;
+        }
+
         const entry = findLocation(predicate.locationId);
         if (!entry) return false;
         const [x, z] = entry.location.position;
-        const radius = predicate.radius ?? REACH_RADIUS;
         return horizontalDistance(state.player.position, x, z) <= radius;
       }
 

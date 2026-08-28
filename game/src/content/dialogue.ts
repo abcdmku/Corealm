@@ -38,6 +38,8 @@ export type DialogueCondition =
   | { kind: "questOffer"; questId: QuestId; reason: string }
   | { kind: "skill"; skill: SkillId; level: number; reason: string }
   | { kind: "item"; itemId: ItemId; quantity: number; reason: string }
+  /** Holds when the player is carrying FEWER than `quantity`. The replacement-item safety net. */
+  | { kind: "lacksItem"; itemId: ItemId; quantity: number; reason: string }
   | { kind: "currency"; amount: number; reason: string };
 
 export type DialogueEffect =
@@ -931,6 +933,13 @@ const JUNO: DialogueNodeDef[] = [
         showIf: [{ kind: "questStatus", questId: "knots_and_names", status: "active", reason: "" }],
         requires: [
           {
+            // Without this gate a player who arrives holding everything could hand it all over in
+            // the same tick the first two stages were still checking for it, and hand themselves a
+            // dead quest. The stage gate makes the order deterministic.
+            kind: "questStage", questId: "knots_and_names", min: 2,
+            reason: "Make the four shafts and the five shards first; Juno counts them in that order.",
+          },
+          {
             kind: "item", itemId: "palewood_shaft", quantity: 4,
             reason: "You need 4 Palewood shafts. Fletch them from Palewood logs at entity coldbrace_fletching.",
           },
@@ -1483,6 +1492,29 @@ const ODE: DialogueNodeDef[] = [
         ],
         next: "ode_long_cairn_stone_given",
       },
+      {
+        // The safety net. Stage 7 checks that the garnet is still in your bag, and a player who
+        // sells it would otherwise have a dead chain. `lacksItem` keeps this hidden while you are
+        // carrying one, and the counter caps it at three so it is a rescue, not a gem mine.
+        id: "ode_root#restone",
+        text: "I no longer have the keeping-stone.",
+        showIf: [
+          { kind: "questStatus", questId: "long_cairn", status: "active", reason: "" },
+          { kind: "questStage", questId: "long_cairn", min: 6, max: 6, reason: "" },
+          { kind: "lacksItem", itemId: "cairn_garnet", quantity: 1, reason: "" },
+        ],
+        requires: [
+          {
+            kind: "questCounter", questId: "long_cairn", counter: "stones_given", max: 2,
+            reason: "Ode has cut you three keeping-stones already. She will not cut a fourth, and she is right not to.",
+          },
+        ],
+        effects: [
+          { kind: "bumpCounter", questId: "long_cairn", counter: "stones_given" },
+          { kind: "giveItem", itemId: "cairn_garnet", quantity: 1 },
+        ],
+        next: "ode_replacement_stone",
+      },
       { id: "ode_root#cairns", text: "What is a cairn for?", next: "ode_cairns" },
       {
         id: "ode_root#under",
@@ -1649,6 +1681,17 @@ const ODE: DialogueNodeDef[] = [
     options: [
       { id: "ode_long_cairn_stone_given#back", text: "Top course. Understood.", next: "ode_root" },
       LEAVE("ode_long_cairn_stone_given#bye"),
+    ],
+  },
+  {
+    id: "ode_replacement_stone",
+    text:
+      "Then here is another, and I will not ask. Garnet is common on this moor and patience is "
+      + "not, so I have a great deal of one and I am spending the other. Top course of the cairn "
+      + "in the hall, item cairn_garnet, locationId gravelmaw_chamber3.",
+    options: [
+      { id: "ode_replacement_stone#back", text: "It will get there this time.", next: "ode_root" },
+      LEAVE("ode_replacement_stone#bye"),
     ],
   },
   {

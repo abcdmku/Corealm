@@ -1,0 +1,188 @@
+{
+  "name": "vertical-slice",
+  "actions": [
+    {
+      "debug": "clearInventory"
+    },
+    {
+      "debug": "setSkillLevel",
+      "args": [
+        "mining",
+        1
+      ]
+    },
+    {
+      "debug": "setSkillLevel",
+      "args": [
+        "smithing",
+        1
+      ]
+    },
+    {
+      "debug": "setSkillLevel",
+      "args": [
+        "melee",
+        1
+      ]
+    },
+    {
+      "inspect": "getState",
+      "label": "PROOF START: everything at level 1"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "locationId": "bracken_pit"
+        }
+      ],
+      "label": "Travel to the tier 1 mine"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_interact",
+        {
+          "entityId": "bracken_pit_grithe_1",
+          "interaction": "mine"
+        }
+      ],
+      "label": "PROOF 2: begin mining"
+    },
+    {
+      "waitMs": 9000
+    },
+    {
+      "inspect": "getState",
+      "label": "Ore gathered, Mining XP gained"
+    },
+    {
+      "debug": "giveItem",
+      "args": [
+        "march_stone",
+        4
+      ],
+      "label": "Stone for the smelt"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "entityId": "coldbrace_furnace"
+        }
+      ],
+      "label": "Travel to the furnace"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_produce",
+        {
+          "recipeId": "smelt_grithe_bar",
+          "quantity": 2
+        }
+      ],
+      "label": "PROOF 3: smelt bars"
+    },
+    {
+      "waitMs": 7000
+    },
+    {
+      "inspect": "getState",
+      "label": "Bars made, Smithing XP gained"
+    },
+    {
+      "debug": "giveItem",
+      "args": [
+        "palewood_shaft",
+        2
+      ],
+      "label": "Shafts from Fletching"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "entityId": "coldbrace_anvil"
+        }
+      ],
+      "label": "Travel to the anvil"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_produce",
+        {
+          "recipeId": "smith_grithe_dagger",
+          "quantity": 1
+        }
+      ],
+      "label": "Forge a dagger"
+    },
+    {
+      "waitMs": 5000
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_equip",
+        {
+          "itemId": "grithe_dagger"
+        }
+      ],
+      "label": "PROOF 4: equip it"
+    },
+    {
+      "inspect": "getState",
+      "label": "Dagger equipped"
+    },
+    {
+      "debug": "teleport",
+      "args": [
+        {
+          "entityId": "rill_skitterlings_1"
+        }
+      ],
+      "label": "Find an enemy"
+    },
+    {
+      "waitMs": 400
+    },
+    {
+      "debug": "callTool",
+      "args": [
+        "corealm_attack",
+        {
+          "entityId": "rill_skitterlings_1"
+        }
+      ],
+      "label": "Attack"
+    },
+    {
+      "waitMs": 9500
+    },
+    {
+      "inspect": "getState",
+      "label": "PROOF COMPLETE: combat resolved, Melee XP gained"
+    },
+    {
+      "debug": "getEvents",
+      "args": [
+        0
+      ],
+      "label": "Every event the loop produced"
+    },
+    {
+      "screenshot": "r3-vertical-slice"
+    }
+  ]
+}
