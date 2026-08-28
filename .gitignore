@@ -9,3 +9,6 @@ runs/local-*/
 
 .asset-cache/
 .stack-probe/
+
+# Throwaway measurement scripts from build rounds.
+_*.mjs
