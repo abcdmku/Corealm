@@ -389,8 +389,18 @@ export function installRovingGrid(container: HTMLElement, columns: number): void
       case "End": next = list.length - 1; break;
       default: return;
     }
-    if (next < 0 || next >= list.length) return;
+
+    // The grid owns this key from here, whether or not the move lands.
+    //
+    // `KeyboardController` listens on `window` and treats the arrows as movement, and a slot is a
+    // <button>, which `isTextEntry` deliberately does not count as text entry — so arrow-navigating
+    // your pack also walked you across the map, about four metres a second. Stopping propagation is
+    // what keeps the two apart, and it has to happen BEFORE the bounds check below: an arrow at the
+    // edge of the grid moves nothing, and used to leak to the world for exactly that reason.
     event.preventDefault();
+    event.stopPropagation();
+
+    if (next < 0 || next >= list.length) return;
     const target = list[next];
     if (!target) return;
     for (const cell of list) cell.tabIndex = cell === target ? 0 : -1;

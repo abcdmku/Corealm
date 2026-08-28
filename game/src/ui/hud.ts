@@ -17,6 +17,8 @@
 import type { GameEvent, ObservedEntity, SkillId, Vec3 } from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
 import { SKILLS } from "../content/skills.js";
+import { RECOVERY_CACHE_ID } from "../systems/death.js";
+import { reportResult } from "./contextMenu.js";
 import type { NoticeTone } from "./contextMenu.js";
 import type { UiContext, UiOptions } from "./panels.js";
 import { formatQuantity } from "./panels.js";
@@ -62,6 +64,8 @@ export class Hud {
   private readonly compass: HTMLElement;
   private readonly compassTape: HTMLElement;
   private readonly compassTarget: HTMLElement;
+  private readonly cacheBanner: HTMLElement;
+  private readonly cacheDetail: HTMLElement;
 
   private healthSig = "";
   private activitySig = "";
@@ -82,6 +86,8 @@ export class Hud {
     const root = document.createElement("div");
     // is-passive keeps the HUD out of the way of world clicks: #ui-root's rule opts it back out of
     // pointer events. Nothing in the HUD is clickable, so this is free.
+    // The cache banner is the one clickable thing in here, so it opts back into pointer events
+    // itself; everything else stays passive so world clicks pass straight through.
     root.className = "hud is-passive";
 
     // ---- vitals, top left
@@ -115,7 +121,34 @@ export class Hud {
     activityBar.appendChild(activityFill);
     activity.append(activityHead, activityBar);
 
-    vitals.append(health, activity);
+    // ---- recovery cache, under the vitals
+    //
+    // `systems/death.ts` has said since round 3 that "the HUD is supposed to show a countdown
+    // banner while one is out", and nothing showed one. The death report explains the loss once and
+    // is dismissed for good — it has no key and no frame — so without this a player who clicks
+    // Dismiss has no way left to find out where their pack is or how long they have. Dying with a
+    // live cache destroys the old one, which is what makes the second death the expensive one and
+    // this banner worth its space.
+    const cache = document.createElement("button");
+    cache.type = "button";
+    cache.className = "hud__cache";
+    cache.hidden = true;
+    cache.title = "Walk back to your recovery cache";
+    const cacheLabel = document.createElement("span");
+    cacheLabel.className = "hud__cache-label u-caps";
+    cacheLabel.textContent = "Cache";
+    const cacheDetail = document.createElement("span");
+    cacheDetail.className = "hud__cache-detail u-numeric";
+    cache.append(cacheLabel, cacheDetail);
+    cache.addEventListener("pointerdown", (event) => event.stopPropagation());
+    cache.addEventListener("click", () => {
+      // `interact` walks into range and then loots on arrival, so one click recovers the pack.
+      reportResult(this.ctx.api.interact(RECOVERY_CACHE_ID, "loot"));
+    });
+
+    vitals.append(health, activity, cache);
+    this.cacheBanner = cache;
+    this.cacheDetail = cacheDetail;
 
     // ---- compass, top centre
     const compass = document.createElement("div");
@@ -209,6 +242,7 @@ export class Hud {
     this.updateActivity();
     this.updateCurrency(api.getCurrency());
     this.updateXpFeed();
+    this.updateCache();
 
     if (nowMs - this.lastCompassMs >= COMPASS_INTERVAL_MS) {
       this.lastCompassMs = nowMs;
@@ -218,6 +252,46 @@ export class Hud {
       this.lastEventMs = nowMs;
       this.pollEvents();
     }
+  }
+
+  /**
+   * The recovery-cache banner: how far, and how long.
+   *
+   * Both numbers come off the same two calls an agent would make — `inspect` for the cache's own
+   * `expiresAtMs` and `observe` for path distance — and the deadline is compared against
+   * `getTime().simMs`, never against wall time. Sim time is what every `*AtMs` field in the game is
+   * stamped in, and it stops when the clock stops.
+   */
+  private updateCache(): void {
+    const banner = this.cacheBanner;
+    const detail = this.cacheDetail;
+    if (!banner || !detail) return;
+
+    const found = this.ctx.api.inspect(RECOVERY_CACHE_ID);
+    if (!found.ok || found.value.state !== "available") {
+      if (!banner.hidden) banner.hidden = true;
+      return;
+    }
+
+    const expiresAtMs = Number(found.value.meta?.["expiresAtMs"] ?? 0);
+    const remainingMs = Math.max(0, expiresAtMs - this.ctx.api.getTime().simMs);
+
+    // Straight line from the cache's own position, not `observe` path distance: `observe` caps at
+    // 140 m and a cache is routinely 340 m behind you, so the honest number is the one that is
+    // always available. `scope: "known"` is no help either — it answers with route-graph places,
+    // and a cache is not one.
+    const player = this.ctx.api.getPlayer().position;
+    const at = found.value.position;
+    const metres = Math.hypot(at[0] - player[0], at[2] - player[2]);
+
+    const minutes = Math.floor(remainingMs / 60_000);
+    const seconds = Math.floor((remainingMs % 60_000) / 1000);
+    const clock = `${minutes}:${String(seconds).padStart(2, "0")}`;
+    const text = `${Math.round(metres)} m · ${clock}`;
+
+    if (detail.textContent !== text) detail.textContent = text;
+    banner.classList.toggle("is-urgent", remainingMs < 120_000);
+    if (banner.hidden) banner.hidden = false;
   }
 
   dispose(): void {

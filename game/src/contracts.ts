@@ -299,6 +299,28 @@ export interface DialogueView {
   options: { id: string; text: string; enabled: boolean; disabledReason?: string }[];
 }
 
+/**
+ * The sim clock, as a value.
+ *
+ * Every deadline the game hands out — a recovery cache's expiry, a crop's growth, a respawn — is
+ * stamped in SIM milliseconds, and until this existed there was no way to read the sim clock
+ * through the API at all. A caller holding `expiresAtMs` could only guess at "how long is left" by
+ * anchoring off `GameEvent.atMs` and coasting at wall rate between events, which is wrong whenever
+ * the clock is paused or rescaled and silently wrong in a world that happens to be quiet.
+ *
+ * `paused` and `timeScale` are here because a countdown that ignores them is a countdown that
+ * lies, and both the death report and an agent planning around a deadline need to know.
+ */
+export interface TimeView {
+  /** Sim milliseconds since boot. The frame every `*AtMs` field in the game is expressed in. */
+  simMs: number;
+  /** Whole sim ticks elapsed. `simMs / SIM_TICK_MS`, without the rounding question. */
+  tick: number;
+  /** Sim milliseconds per real millisecond. 1 in normal play. */
+  timeScale: number;
+  paused: boolean;
+}
+
 export interface BankView { slots: ItemStack[]; usedSlots: number; capacity: number }
 
 export interface ShopView {
@@ -343,6 +365,8 @@ export interface GameApi {
   getActivity(): ActivitySummary | null;
   getQuests(): QuestSummary[];
   getCurrency(): number;
+  /** The sim clock. Compare any `*AtMs` deadline against `simMs`, never against wall time. */
+  getTime(): TimeView;
 
   // observation
   observe(filter: ObserveFilter): ObservedEntity[];

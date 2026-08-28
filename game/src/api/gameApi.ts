@@ -12,7 +12,7 @@
 import type {
   ActivitySummary, BankView, DialogueView, DocHit, EntityId, EquipSlot, EquipmentBonuses,
   GameApi as GameApiContract, GameEvent, GameEventType, InteractionId, InventorySlot, ItemId,
-  ItemStack, MoveTarget, ObserveFilter, ObservedEntity, PlayerView, QuestSummary, RecipeId,
+  ItemStack, MoveTarget, ObserveFilter, ObservedEntity, PlayerView, QuestSummary, RecipeId, TimeView,
   Result, SemanticEntity, SkillId, SkillView, SpellId, Vec3, OverlaySpec,
 } from "../contracts.js";
 import { EQUIP_SLOTS, SKILL_IDS, err, ok } from "../contracts.js";
@@ -117,6 +117,15 @@ export class CorealmGameApi implements GameApiContract {
         1,
         Math.floor((state.skills.melee.level + state.skills.magic.level) / 2),
       ),
+    };
+  }
+
+  getTime(): TimeView {
+    return {
+      simMs: this.clock.elapsedMs,
+      tick: this.clock.tick,
+      timeScale: this.clock.timeScale,
+      paused: this.clock.paused,
     };
   }
 

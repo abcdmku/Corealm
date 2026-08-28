@@ -276,7 +276,7 @@ export class KeyboardController {
     this.disposers.push(this.registry.register({
       id: "input.interact",
       keys: ["space"],
-      label: "Interact with the hovered target",
+      label: "Use the thing under the cursor",
       group: "General",
       priority: 200,
       onDown: (event) => {

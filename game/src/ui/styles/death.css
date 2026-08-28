@@ -1,1 +1,164 @@
 /* death — owned by the death worker. Nothing else writes to this file. */
+
+/*
+ * The death report. A card over the running game, not a curtain in front of it.
+ *
+ * Two rules here are load-bearing for the whole app, not just this component:
+ *
+ *   1. `.death[hidden] { display: none }` MUST outlive any edit to the display rule below.
+ *      `#ui-root > *` sets `pointer-events: auto`, and a full-screen element that keeps
+ *      `display: flex` while hidden is an invisible sheet over the world: every click in the game
+ *      stops working and nothing on screen says why. The UA's `[hidden]` rule does not win against
+ *      a `display` declaration of our own, so it is restated explicitly.
+ *   2. The backdrop is `pointer-events: none` and only the card opts back in. Respawn already
+ *      happened; the player is standing in the world behind this and is allowed to click it.
+ *
+ * Colour comes entirely from the :root tokens in ../styles.css. --danger carries the two places
+ * where something has actually been lost, and nothing else is tinted.
+ */
+
+.death {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  /* Panels raise themselves to 20 + an unbounded counter, so a mid-list token is not safe here.
+     The title screen mounts after this one and wins on DOM order at the same layer. */
+  z-index: var(--z-boot);
+  /* A vignette rather than a flat scrim: the world behind stays legible, the card does not float. */
+  background: radial-gradient(ellipse at center, rgba(10, 8, 7, 0.42) 0%, rgba(10, 8, 7, 0.78) 100%);
+}
+
+.death[hidden] { display: none; }
+
+/* Written against #ui-root because `#ui-root > *` sets pointer-events: auto and an id beats a
+   class. Same shape as the `#ui-root > .tooltip` rule in ../styles.css, and the same reason. */
+#ui-root > .death { pointer-events: none; }
+
+.death__card {
+  /* .panel is absolute; inside the centring flex box it has to be in flow. */
+  position: relative;
+  pointer-events: auto;
+  width: min(480px, 100%);
+  max-height: 100%;
+  border-color: var(--panel-edge-bright);
+  box-shadow: var(--shadow-panel), 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- head */
+
+.death__head {
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  background: linear-gradient(180deg, #2e2823, #211d19);
+  border-bottom: var(--border);
+  /* The one red mark on the card. Reads as a wound in the leather at a glance. */
+  border-top: 3px solid var(--danger-dim);
+}
+
+.death__title {
+  margin: 0;
+  font-size: var(--size-xl);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.death__where {
+  margin: var(--space-1) 0 0;
+}
+
+/* ---- body */
+
+.death__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow: auto;
+}
+
+.death__lead {
+  margin: 0;
+  font-size: var(--size-md);
+  line-height: 1.5;
+}
+
+.death__kept {
+  margin: 0;
+  font-size: var(--size-sm);
+  line-height: 1.45;
+}
+
+/* ---- the two numbers that move */
+
+.death__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.death__fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--panel-sunken);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--inset-well);
+}
+
+.death__fact dt { margin: 0; }
+
+.death__fact-value {
+  margin: 0;
+  font-size: var(--size-lg);
+  color: var(--ink);
+  line-height: 1.2;
+  /* The distance line is prose-length; the countdown is not. Neither may reflow the card. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.death__fact.is-lost { border-color: var(--danger-dim); }
+.death__fact.is-lost .death__fact-value { color: var(--danger); }
+
+.death__note {
+  margin: 0;
+  font-size: var(--size-sm);
+  color: var(--ink-faint);
+  border-left: 2px solid var(--panel-edge-bright);
+  padding-left: var(--space-2);
+}
+
+.death__note.is-lost {
+  color: var(--danger);
+  border-left-color: var(--danger-dim);
+}
+
+/* ---- actions */
+
+.death__actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-top: var(--border);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.death__walk { flex: 1 1 auto; }
+
+/* Short viewports: 1280x720 with the browser chrome gone still leaves this comfortable, but the
+   card must never grow taller than the screen or the buttons walk off the bottom edge. */
+@media (max-height: 620px) {
+  .death { padding: var(--space-3); }
+  .death__head { padding: var(--space-3) var(--space-3) var(--space-2); }
+  .death__title { font-size: var(--size-lg); }
+  .death__body { gap: var(--space-2); padding: var(--space-3); }
+  .death__actions { padding: var(--space-2) var(--space-3); }
+}

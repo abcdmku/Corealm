@@ -419,6 +419,12 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     activity: activitySystem,
     movement,
     snapToGround: (point) => nav.closestPoint(point),
+    // Without this the recovery cache has no `view`, and `entityViews.sync` skips any entity that
+    // has none — so everything the player was carrying sat on a patch of grass with nothing drawn
+    // over it and nothing to right-click. The agent path never noticed, because an agent finds it
+    // through `observe` and loots it by id; a human had no way to see that it was there at all.
+    // That asymmetry is the exact thing this project's parity rule exists to catch.
+    cacheView: { assetId: "crate_wood", scale: 1.1, labelHeight: 1.4 },
   });
   const productionSystem = new ProductionSystem({
     store, events, rng,
@@ -654,7 +660,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   keybindings.register({
     id: "ui.menu",
     keys: ["escape"],
-    label: "Menu",
+    label: "Pause menu",
     group: "General",
     priority: 950,
     onDown: () => {
@@ -1068,6 +1074,13 @@ function registerExclusions(scene: WorldScene): void {
 }
 
 /** Loads every GLB the world's entities name, so the first sync does not pop meshes in late. */
+/**
+ * Assets for entities the world creates while it is running rather than at build time.
+ *
+ * Today that is one thing: the recovery cache dropped where the player died.
+ */
+const SPAWNED_LATER_ASSET_IDS: readonly string[] = ["crate_wood"];
+
 async function preloadEntityAssets(
   assets: AssetRegistry,
   entityStore: EntityStore,
@@ -1079,6 +1092,10 @@ async function preloadEntityAssets(
     if (entity.view?.assetId) ids.add(entity.view.assetId);
     if (entity.view?.depletedAssetId) ids.add(entity.view.depletedAssetId);
   }
+  // Entities that do not exist yet but will. `EntityViews.syncOne` returns early when an asset is
+  // not loaded and nothing ever retries, so anything spawned mid-session has to be in memory now
+  // or it will never be drawn at all.
+  for (const id of SPAWNED_LATER_ASSET_IDS) ids.add(id);
   const ordered = [...ids];
   const results = await Promise.allSettled(ordered.map((id) => assets.load(id)));
   for (const [index, result] of results.entries()) {

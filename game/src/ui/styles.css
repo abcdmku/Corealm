@@ -1151,3 +1151,31 @@ html, body {
   .shop-list { max-height: 44vh; }
   .panel--float { max-height: calc(100vh - 72px); }
 }
+
+/* ---- recovery cache banner. The one clickable thing in the HUD, so it opts back in. */
+.hud__cache {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 4px var(--space-2);
+  background: rgba(16, 14, 12, 0.78);
+  border: var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.hud__cache[hidden] { display: none; }
+.hud__cache:hover { background: rgba(30, 26, 21, 0.9); border-color: var(--accent-dim); }
+.hud__cache:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hud__cache-label { color: var(--accent); }
+.hud__cache-detail { font-size: var(--size-sm); }
+
+/* Under two minutes the cache is about to take everything in it with it. */
+.hud__cache.is-urgent { border-left-color: var(--danger); }
+.hud__cache.is-urgent .hud__cache-label { color: var(--danger); }

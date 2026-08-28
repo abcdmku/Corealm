@@ -57,9 +57,11 @@ export function createTools(api: GameApi): ToolDef[] {
       name: "corealm_player",
       description:
         "Read the player's current state: position, region, health, whether they are in combat, "
-        + "moving, dead, and what activity is running. Cheap. Call this before deciding anything.",
+        + "moving, dead, and what activity is running, plus the sim clock. Cheap. Call this before "
+        + "deciding anything. Every deadline the game reports — a recovery cache's expiry, a crop's "
+        + "growth — is stamped in the same sim milliseconds as `time.simMs`, never in wall time.",
       inputSchema: obj({}),
-      execute: () => api.getPlayer(),
+      execute: () => ({ ...api.getPlayer(), time: api.getTime() }),
     },
     {
       name: "corealm_skills",

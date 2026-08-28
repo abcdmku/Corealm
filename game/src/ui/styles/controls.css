@@ -1,1 +1,217 @@
 /* controls — owned by the controls worker. Nothing else writes to this file. */
+
+/*
+ * The controls panel: a key column and a plain-English column, in sections.
+ *
+ * The keys are drawn as key caps rather than as text, following `.dock__key` in styles.css, which
+ * is the precedent this game already set for "this is a thing you press". Same recipe — sunken
+ * plate, panel edge, numeric font — scaled up from the dock's 9 px to something you can read
+ * sitting back from the screen, and given the top highlight and bottom lip that make a cap look
+ * pressable at this size.
+ *
+ * Everything here uses the :root tokens. No new colours.
+ */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* The panel body scrolls; nothing in here may push the panel itself wider than its placement. */
+  min-width: 0;
+}
+
+/*
+ * The body still scrolls if enough transient bindings pile up, and Chromium's overlay scrollbar
+ * only appears once you are already scrolling — so give it a track that is always there. Scoped to
+ * the controls panel by id, so no other panel inherits a scrollbar it did not ask for.
+ */
+#panel-controls .panel__body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-edge-bright) var(--panel-sunken);
+}
+
+#panel-controls .panel__body::-webkit-scrollbar { width: 8px; }
+#panel-controls .panel__body::-webkit-scrollbar-track { background: var(--panel-sunken); }
+
+#panel-controls .panel__body::-webkit-scrollbar-thumb {
+  background: var(--panel-edge-bright);
+  border: 2px solid var(--panel-sunken);
+  border-radius: 999px;
+}
+
+#panel-controls .panel__body::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+
+/* ------------------------------------------------------------------ how to play */
+
+/*
+ * There is no tutorial anywhere in the game, so these two sentences are the whole of onboarding.
+ * They get the brass left edge that the journal uses for "this is the live one" — the eye should
+ * land here first, once, and never need to again.
+ */
+.controls__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(201, 162, 39, 0.06);
+  border: var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.controls__lede {
+  margin: 0;
+  font-size: var(--size-sm);
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------- sections */
+
+/*
+ * Two columns: the hand-written mouse and movement half, and the registry's half. A single column
+ * of this content is about 880 px tall, which does not fit a 720p screen; side by side, the whole
+ * reference is on screen at once, which is the difference between a controls panel and a list you
+ * have to go looking through.
+ */
+.controls__columns {
+  display: grid;
+  /* Uneven on purpose: the left column explains, the right column is one word per row. */
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.controls__column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* A ruled gutter, so the eye reads two lists rather than one wrapped one. */
+.controls__dynamic {
+  padding-left: var(--space-4);
+  border-left: var(--border);
+}
+
+.controls__section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.controls__heading {
+  margin: 0 0 var(--space-1);
+  padding-bottom: 3px;
+  font-weight: 700;
+  border-bottom: var(--border);
+}
+
+/* ------------------------------------------------------------------------- rows */
+
+/*
+ * A fixed key column is the point: the caps line up down each list, so the player scans one edge
+ * instead of reading every line. 92px is the widest single cap ("Middle drag") plus room for a
+ * "Shift + K" chord to sit on one line.
+ */
+.controls__row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.controls__row + .controls__row {
+  border-top: 1px solid rgba(255, 255, 255, 0.035);
+}
+
+.controls__keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  /* Caps hug the label rather than the panel edge, so the two columns read as one row. */
+  justify-content: flex-end;
+}
+
+.controls__label {
+  font-size: var(--size-sm);
+  line-height: 1.45;
+  color: var(--ink-dim);
+  min-width: 0;
+}
+
+/* The separator between alternatives ("W / ↑") and inside a chord ("Shift + K"). */
+.controls__sep {
+  color: var(--ink-faint);
+  font-size: var(--size-xs);
+  line-height: 1;
+}
+
+.controls__note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--size-xs);
+  line-height: 1.45;
+  color: var(--ink-faint);
+}
+
+/* -------------------------------------------------------------------- key caps */
+
+.controls__cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 1px 5px 2px;
+  background: linear-gradient(180deg, #2a2521, var(--panel-sunken));
+  border: 1px solid var(--panel-edge);
+  border-bottom-width: 2px;
+  border-bottom-color: #100e0c;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  font-family: var(--font-numeric);
+  font-size: var(--size-sm);
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* Word caps — Esc, Space, Left click — are text on a plate, so they get the panel's own face. */
+.controls__cap--wide {
+  padding: 1px 6px 2px;
+  font-family: var(--font);
+  font-size: var(--size-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-dim);
+}
+
+/* --------------------------------------------------------- smaller screens */
+
+/*
+ * 1280x720 is the floor, and at 720 the whole panel is about 80 px taller than the screen allows.
+ * Squeezing the gaps rather than the type buys those 80 px back: nothing here changes a font size,
+ * so the panel reads the same, it just stops leaking off the bottom.
+ */
+@media (max-height: 800px) {
+  .controls { gap: var(--space-2); }
+  .controls__column { gap: var(--space-2); }
+  .controls__columns { gap: var(--space-3); }
+  .controls__intro { padding: 6px var(--space-2); gap: var(--space-1); }
+  .controls__lede { line-height: 1.4; }
+  .controls__heading { margin-bottom: 1px; padding-bottom: 2px; }
+  .controls__section { gap: 1px; }
+  /* The caps are 21 px tall on their own, so the rows still have air without the padding. */
+  .controls__row { padding: 0; }
+  .controls__label { line-height: 1.35; }
+  .controls__note { margin-top: var(--space-1); }
+}
+
+/* Below the 1280 floor there is no room for two columns; they stack and the body scrolls. */
+@media (max-width: 1180px) {
+  .controls__columns { grid-template-columns: 1fr; }
+  .controls__dynamic { padding-left: 0; border-left: none; }
+}
