@@ -28,7 +28,7 @@ import { installBootPlaceholder, installGameDebug, type RecordedError } from "..
 import { GameLoop } from "./loop.js";
 import { InputController } from "../input/mouse.js";
 import { KeyboardController } from "../input/keyboard.js";
-import { buildWorldTerrainSpec, startingSpawn } from "./worldSpec.js";
+import { WATER_BASIN_DEPTH, buildWorldTerrainSpec, startingSpawn } from "./worldSpec.js";
 import { CAMERA } from "./config.js";
 import { buildWorld, type BuildingBox } from "../world/regionBuilder.js";
 import { EntityStore, straightLineDistance } from "../world/entities.js";
@@ -120,6 +120,11 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   //     and draped onto the finished terrain. Without these the ground is one flat colour and
   //     nothing tells a new player which direction leads to content.
   buildRoads(scene);
+
+  // 7c. Water. Fishing spots were authored as interaction markers with a note that the water itself
+  //     is the render layer's job — and nothing was building it, so every fishing spot sat on dry
+  //     grass. Each `kind: "water"` location gets a surface sunk just below the local ground.
+  buildWaterBodies(scene);
 
   // 8. Semantic world. Data in, entities out, deterministic from the seed.
   setStatus("populating the frontier…");
@@ -397,6 +402,39 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   document.getElementById("boot-screen")?.remove();
   loop.start();
   return { loop, api };
+}
+
+/**
+ * Puts water under every location authored as water.
+ *
+ * The surface is set slightly BELOW the sampled ground height at the centre, so the shoreline is
+ * where the terrain rises through the plane rather than a hard rectangle edge floating on a field.
+ */
+function buildWaterBodies(scene: WorldScene): number {
+  let built = 0;
+  for (const region of REGIONS) {
+    // Water exists for a gameplay reason, so it is sized and centred on the fishing cluster rather
+    // than on the scenic location marker. Centring on the marker put every fishing spot on dry
+    // grass beside a pond, which reads as a bug even though both were where they were authored.
+    const clusters = region.clusters.filter((cluster) => cluster.archetype === "fishing_spot");
+    for (const cluster of clusters) {
+      const [x, z] = cluster.centre;
+      const half = cluster.radius + 14;
+
+      // worldSpec carved a basin here before the terrain mesh was built, so the floor is
+      // WATER_BASIN_DEPTH below the region floor. Filling most of that depth puts the waterline on
+      // the sloping bank, which is what makes the shoreline follow the terrain instead of ending
+      // in a rectangle.
+      const floor = scene.heightAt(region.id, x, z);
+      scene.buildWater(
+        { minX: x - half, maxX: x + half, minZ: z - half, maxZ: z + half },
+        floor + WATER_BASIN_DEPTH * 0.55,
+        region.id,
+      );
+      built += 1;
+    }
+  }
+  return built;
 }
 
 /**

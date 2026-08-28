@@ -173,9 +173,7 @@ export class ShopPanel implements ManagedPanel {
     const seen = new Set<ItemId>();
     for (const line of view.stock) {
       seen.add(line.itemId);
-      const row = this.ensureRow(this.stockRows, this.stockList, line.itemId, "Buy", (quantity) => {
-        this.buy(line.itemId, quantity);
-      }, () => Math.max(1, line.quantity));
+      const row = this.ensureRow(this.stockRows, this.stockList, line.itemId, "Buy");
 
       row.name.textContent = line.name || itemName(line.itemId);
       row.detail.textContent = line.quantity > 0 ? `${formatQuantity(line.quantity)} in stock` : "out of stock";
@@ -214,9 +212,7 @@ export class ShopPanel implements ManagedPanel {
     const seen = new Set<ItemId>();
     for (const [itemId, quantity] of entries) {
       seen.add(itemId);
-      const row = this.ensureRow(this.sellRows, this.sellList, itemId, "Sell", (amount) => {
-        this.sell(itemId, amount);
-      }, () => quantity);
+      const row = this.ensureRow(this.sellRows, this.sellList, itemId, "Sell");
 
       row.name.textContent = itemName(itemId);
       row.detail.textContent = `${formatQuantity(quantity)} carried`;
@@ -237,16 +233,25 @@ export class ShopPanel implements ManagedPanel {
 
   // -------------------------------------------------------------- plumbing
 
+  /**
+   * Rows are created once per item and then updated in place, so a purchase does not rebuild the
+   * list. The amount a click acts on is read live rather than captured, or "All" would spend a
+   * stock count from before the last transaction.
+   */
   private ensureRow(
     rows: Map<ItemId, ShopRow>,
     list: HTMLElement,
     itemId: ItemId,
-    verb: string,
-    act: (quantity: number) => void,
-    available: () => number,
+    verb: "Buy" | "Sell",
   ): ShopRow {
     const existing = rows.get(itemId);
     if (existing) return existing;
+
+    const act = (quantity: number): void => {
+      if (verb === "Buy") this.buy(itemId, quantity);
+      else this.sell(itemId, quantity);
+    };
+    const available = (): number => (verb === "Buy" ? this.buyableCount(itemId) : this.carriedCount(itemId));
 
     const root = document.createElement("div");
     root.className = "shop-row";
@@ -298,6 +303,24 @@ export class ShopPanel implements ManagedPanel {
 
   private buyPriceFor(itemId: ItemId): number {
     return this.view?.stock.find((row) => row.itemId === itemId)?.buyPrice ?? itemDef(itemId)?.value ?? 0;
+  }
+
+  /** "All" when buying means all you can afford, not all the shop has and a rejected purchase. */
+  private buyableCount(itemId: ItemId): number {
+    const line = this.view?.stock.find((row) => row.itemId === itemId);
+    const stock = line?.quantity ?? 1;
+    const price = line?.buyPrice ?? 0;
+    const currency = this.view?.currency ?? this.ctx.api.getCurrency();
+    const affordable = price > 0 ? Math.floor(currency / price) : stock;
+    return Math.max(1, Math.min(stock, affordable));
+  }
+
+  private carriedCount(itemId: ItemId): number {
+    let total = 0;
+    for (const slot of this.ctx.api.getInventory().slots) {
+      if (slot?.itemId === itemId) total += slot.quantity;
+    }
+    return Math.max(1, total);
   }
 
   private setRowState(row: ShopRow, reason: string | null): void {

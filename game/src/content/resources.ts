@@ -16,6 +16,7 @@
  * nothing tier-specific belongs in this file beyond the tier number.
  */
 import type { ResourceDef } from "./index.js";
+import { gatherXp } from "./index.js";
 
 /**
  * One row per node archetype: twelve of them across the three regions.
@@ -144,16 +145,16 @@ export const RAKE_DURATION_MS = 1800;
 export const CROPS: readonly CropDef[] = [
   {
     seedItemId: "bittergrain_seed", cropItemId: "bittergrain", tier: 1, reqLevel: 1,
-    stages: 4, secondsPerStage: 60, yieldRange: [3, 6], harvestXp: 10, plantXp: 2,
+    stages: 4, secondsPerStage: 60, yieldRange: [3, 6], harvestXp: gatherXp(1), plantXp: 2,
   },
   {
     // PRD 2.9 authors Duskberry, but regions.ts places farm plots only in Fallowmarch and
     // Karrowmoor, so nothing grows it in Phase 1. Kept so the seed the shops sell has a crop.
     seedItemId: "duskberry_seed", cropItemId: "duskberry", tier: 5, reqLevel: 5,
-    stages: 5, secondsPerStage: 120, yieldRange: [3, 6], harvestXp: 24, plantXp: 5,
+    stages: 5, secondsPerStage: 120, yieldRange: [3, 6], harvestXp: gatherXp(5), plantXp: 5,
   },
   {
     seedItemId: "cairnleaf_seed", cropItemId: "cairnleaf", tier: 10, reqLevel: 10,
-    stages: 5, secondsPerStage: 180, yieldRange: [2, 5], harvestXp: 35, plantXp: 7,
+    stages: 5, secondsPerStage: 180, yieldRange: [2, 5], harvestXp: gatherXp(10), plantXp: 7,
   },
 ];

@@ -34,8 +34,22 @@ function characterOf(regionId: RegionId): RegionTerrainSpec["character"] {
 }
 
 /**
+ * How far below the surrounding ground a fishing basin is carved, in metres.
+ *
+ * Deliberately shallow. A 2.2 m basin filled to three quarters put the waterline above the
+ * player's head — they stood on the basin floor and the surface was over them. These are shallows
+ * and brooks, not lakes: a fisher stands shin-deep at the edge, which is both what the places are
+ * named for and the only way the fishing-spot markers stay visible.
+ */
+export const WATER_BASIN_DEPTH = 0.9;
+
+/**
  * Settlements, banks, and stations need buildable ground. Noise does not provide it, so every
  * settlement centre and every named location gets a flattened pad.
+ *
+ * Fishing clusters get the opposite: a pad sunk BELOW the surrounding ground, which carves the
+ * basin the water plane then fills. Without it there is nowhere for water to sit — the plains are
+ * rolling, not channelled — so a water plane either floats on grass or buries itself.
  */
 function flatSpotsFor(region: RegionDef): FlatSpot[] {
   const flats: FlatSpot[] = [];
@@ -49,6 +63,19 @@ function flatSpotsFor(region: RegionDef): FlatSpot[] {
   // an interaction from happening on a slope steep enough to look broken.
   for (const location of region.locations) {
     flats.push({ x: location.position[0], z: location.position[1], radius: 7, blend: 9 });
+  }
+
+  for (const cluster of region.clusters) {
+    if (cluster.archetype !== "fishing_spot") continue;
+    flats.push({
+      x: cluster.centre[0],
+      z: cluster.centre[1],
+      radius: cluster.radius + 4,
+      // A wide falloff, so the bank slopes into the water instead of dropping as a cliff the
+      // navmesh would refuse to walk down.
+      blend: cluster.radius + 16,
+      height: -WATER_BASIN_DEPTH,
+    });
   }
 
   return flats;
@@ -72,7 +99,13 @@ export function buildWorldTerrainSpec(): WorldTerrainSpec {
     return spec;
   });
 
-  const flats = REGIONS.flatMap(flatSpotsFor);
+  const flats = REGIONS.flatMap((region) => flatSpotsFor(region).map((flat) => (
+    // A negative authored height means "this far below the region floor", which is how basins are
+    // expressed. Everything else keeps its absolute height, or none at all.
+    flat.height !== undefined && flat.height < 0
+      ? { ...flat, height: region.baseHeight + flat.height }
+      : flat
+  )));
 
   const minX = Math.min(...regions.map((region) => region.rect.minX));
   const maxX = Math.max(...regions.map((region) => region.rect.maxX));

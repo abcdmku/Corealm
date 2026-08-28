@@ -626,3 +626,379 @@ html, body {
 .vfx-level       { color: var(--accent, #c9a227); font-size: 20px; letter-spacing: 0.08em; }
 .vfx-warning     { color: #ff8a72; font-size: 16px; }
 .vfx-muted       { color: #9a9284; font-size: 13px; font-weight: 600; }
+
+/* ==========================================================================
+ * Round 2 — HUD and panels. APPEND ONLY, per the rule at the top of this file.
+ *
+ * Nothing below reorders or rewrites what came before it. The three load-bearing
+ * behaviours are untouched: #boot-screen, the #ui-root pointer-events opt-in, and #viewport.
+ * Two additions defend that opt-in rather than weakening it:
+ *   - `#ui-root > .tooltip` opts the shared tooltip back OUT (it sits under the cursor).
+ *   - the HUD carries `.is-passive`, which the existing rule already handles.
+ * ========================================================================== */
+
+/* A hidden panel is a display:none panel. `.panel { display: flex }` would otherwise beat the
+ * user-agent [hidden] rule and every panel would be open at boot. */
+.panel[hidden] { display: none; }
+
+/* Decorative overlays must not eat world clicks. `#ui-root > *` sets pointer-events: auto, and an
+ * id selector beats a class, so undoing it needs the id too. */
+#ui-root > .tooltip { pointer-events: none; }
+
+.tooltip[hidden] { display: none; }
+
+.panel--float { min-width: 200px; }
+.panel__titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.panel__body { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Slots are buttons now, and a button inherits neither font nor colour. */
+.slot { font: inherit; color: var(--ink); padding: 0; }
+
+.slot__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 78%;
+  height: 78%;
+  border-radius: 3px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--glyph-colour, #4a4238) 82%, #fff), var(--glyph-colour, #4a4238));
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  font-family: var(--font);
+  font-size: var(--size-sm);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f6f1e6;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+}
+
+.empty-state {
+  margin: 0;
+  padding: var(--space-3) 0;
+  color: var(--ink-dim);
+  font-size: var(--size-sm);
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------------------ the HUD */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  display: block;
+  z-index: var(--z-hud);
+}
+
+/* Every HUD cluster hugs an edge. The middle of the screen is where the game is. */
+.hud__vitals {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hud__health { width: 100%; }
+.bar--health.is-combat { border-color: var(--danger-dim); }
+
+.hud__activity {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-2);
+  background: rgba(16, 14, 12, 0.72);
+  border: var(--border);
+  border-radius: var(--radius);
+}
+
+.hud__activity[hidden] { display: none; }
+.hud__activity-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.hud__activity-label { font-size: var(--size-sm); font-weight: 600; letter-spacing: 0.02em; }
+.hud__activity.has-skill .hud__activity-label { color: var(--skill-colour, var(--ink)); }
+.hud__activity.has-skill .bar__fill {
+  background: linear-gradient(180deg, var(--skill-colour), color-mix(in srgb, var(--skill-colour) 60%, #000));
+}
+.hud__activity-count { font-size: var(--size-xs); }
+
+.hud__right {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.hud__currency {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 4px var(--space-3);
+  background: rgba(16, 14, 12, 0.72);
+  border: var(--border);
+  border-radius: var(--radius);
+}
+
+.hud__currency-mark { color: var(--accent); font-size: var(--size-md); }
+.hud__currency-value { font-size: var(--size-lg); font-weight: 700; }
+
+.hud__xp-feed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-height: 1px;
+}
+
+/* The XP number is the skill colour from content/skills.ts, the same colour its panel row uses. */
+.xp-drop {
+  padding: 2px var(--space-2);
+  font-size: var(--size-sm);
+  font-weight: 700;
+  color: var(--skill-colour, var(--accent));
+  text-shadow: 0 1px 3px #000, 0 0 6px rgba(0, 0, 0, 0.8);
+  animation: xp-float 2200ms ease-out forwards;
+}
+
+@keyframes xp-float {
+  0% { opacity: 0; transform: translateY(6px); }
+  12% { opacity: 1; transform: translateY(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+
+/* ---- compass. A tape, not a dial: north slides past as the view turns. */
+.hud__compass {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 340px;
+  padding: 3px var(--space-2) 4px;
+  background: rgba(16, 14, 12, 0.7);
+  border: var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.compass__tape {
+  position: relative;
+  height: 16px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+.compass__tick {
+  position: absolute;
+  top: 1px;
+  transform: translateX(-50%);
+  font-size: var(--size-xs);
+  color: var(--ink-faint);
+  letter-spacing: var(--tracking-wide);
+}
+
+.compass__tick--major { color: var(--ink); font-weight: 700; font-size: var(--size-sm); }
+.compass__tick[hidden] { display: none; }
+
+.compass__pip {
+  position: absolute;
+  top: 3px;
+  width: 7px;
+  height: 7px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+.compass__pip[hidden] { display: none; }
+
+.compass__needle {
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 1px;
+  height: 16px;
+  background: var(--accent);
+  transform: translateX(-50%);
+  opacity: 0.75;
+}
+
+.compass__target {
+  font-size: var(--size-xs);
+  color: var(--ink-dim);
+  letter-spacing: 0.02em;
+}
+
+/* ------------------------------------------------------------- shared bits */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.field {
+  min-width: 0;
+  flex: 1 1 140px;
+  padding: 5px var(--space-2);
+  background: var(--panel-sunken);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--inset-well);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--size-sm);
+}
+
+.field::placeholder { color: var(--ink-faint); }
+.field:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.field--qty { flex: 0 0 72px; }
+
+.qty { display: flex; align-items: center; gap: var(--space-2); }
+.qty__group { display: flex; gap: 2px; }
+.qty__btn { min-width: 32px; min-height: 24px; padding: 2px 6px; }
+.qty__btn.is-active {
+  color: var(--accent-ink);
+  background: linear-gradient(180deg, #e0bb42, #b48c1c);
+  border-color: #f0d475;
+}
+
+.pager { display: flex; align-items: center; justify-content: center; gap: var(--space-3); }
+.pager[hidden] { display: none; }
+
+/* ------------------------------------------------------------------ skills */
+
+.skills__group { display: flex; flex-direction: column; gap: 2px; }
+.skills__group-title { margin: var(--space-2) 0 var(--space-1); }
+
+.skill-row {
+  display: grid;
+  grid-template-columns: 10px 1fr 26px;
+  grid-template-areas: "dot name level" "bar bar bar" "detail detail detail";
+  align-items: center;
+  gap: 2px var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.skill-row:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--panel-edge); }
+.skill-row .skill-dot { grid-area: dot; }
+.skill-row__name { grid-area: name; font-size: var(--size-sm); font-weight: 600; }
+.skill-row__level { grid-area: level; text-align: right; font-weight: 700; color: var(--skill-colour, var(--ink)); }
+.skill-row__bar { grid-area: bar; display: block; height: 8px; }
+.skill-row__detail { grid-area: detail; font-size: var(--size-xs); }
+
+/* --------------------------------------------------------------- equipment */
+
+.equip-figure { position: relative; display: flex; justify-content: center; }
+
+/* A hint of a body behind the slots, so the layout reads as worn gear, not a second bag. */
+.equip-silhouette {
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  width: 74px;
+  height: 88%;
+  transform: translateX(-50%);
+  border-radius: 40px 40px 18px 18px;
+  background: radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 40%, transparent 70%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+.equip-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(4, 56px);
+  gap: var(--space-2);
+}
+
+.slot--equip { min-width: 0; }
+.slot--equip.is-empty .slot__label { font-size: 10px; }
+
+.equip-totals {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--panel-sunken);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--inset-well);
+  font-size: var(--size-sm);
+}
+
+.equip-totals dt { color: var(--ink-dim); }
+.equip-totals dd { margin: 0; text-align: right; font-weight: 700; }
+.equip-totals dd.is-zero { color: var(--ink-faint); font-weight: 400; }
+
+/* -------------------------------------------------------------------- bank */
+
+.bank-columns { display: flex; gap: var(--space-4); align-items: flex-start; }
+.bank-column { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bank-column--bank { flex: 1 1 auto; }
+.bank-column--inventory { flex: 0 0 236px; }
+.bank-column h3 { margin: 0; }
+.bank-grid { max-height: 46vh; overflow: auto; align-content: start; }
+.bank-status:empty { display: none; }
+
+/* -------------------------------------------------------------------- shop */
+
+.shop-columns { display: flex; gap: var(--space-4); align-items: flex-start; }
+.shop-column { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.shop-column h3 { margin: 0; }
+.shop-list { display: flex; flex-direction: column; gap: 2px; max-height: 52vh; overflow: auto; }
+.shop__marks { margin-left: auto; font-size: var(--size-md); font-weight: 700; color: var(--accent); }
+
+.shop-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+}
+
+.shop-row:hover { background: rgba(255, 255, 255, 0.04); border-color: var(--panel-edge); }
+.shop-row__glyph { width: 26px; height: 26px; }
+.shop-row__text { min-width: 0; }
+.shop-row__name { font-size: var(--size-sm); font-weight: 600; }
+.shop-row__detail { font-size: var(--size-xs); }
+.shop-row__price { color: var(--accent); font-weight: 700; }
+.shop-row__action { min-width: 56px; }
+/* A blocked row stays readable and keeps its price. Same rule as a greyed context menu entry. */
+.shop-row.is-blocked { opacity: 0.72; }
+.shop-row.is-blocked .shop-row__action { border-color: var(--panel-edge); color: var(--ink-faint); cursor: default; }
+
+.tooltip__count { color: var(--ink-dim); font-weight: 400; }
+
+/* --------------------------------------------------------- smaller screens */
+
+/* 1280x720 is the floor. Panels shrink rather than overlap the vitals cluster. */
+@media (max-width: 1440px) {
+  .hud__compass { width: 280px; }
+  .bank-column--inventory { flex-basis: 200px; }
+  .equip-grid { grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(4, 50px); }
+}
+
+@media (max-height: 800px) {
+  .bank-grid { max-height: 38vh; }
+  .shop-list { max-height: 44vh; }
+  .panel--float { max-height: calc(100vh - 72px); }
+}
