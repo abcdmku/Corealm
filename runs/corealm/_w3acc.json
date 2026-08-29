@@ -1,0 +1,4840 @@
+{
+ "reachability": [
+  {
+   "target": "npc_cairnkeeper_ode",
+   "kind": "entity",
+   "found": true,
+   "points": 0,
+   "walkable": false
+  },
+  {
+   "target": "npc_watcher_hale",
+   "kind": "entity",
+   "found": true,
+   "points": 0,
+   "walkable": false
+  },
+  {
+   "target": "npc_smith_harrow",
+   "kind": "entity",
+   "found": true,
+   "points": 0,
+   "walkable": false
+  },
+  {
+   "target": "gravelmaw_mouth_portal",
+   "kind": "entity",
+   "found": true,
+   "points": 0,
+   "walkable": false
+  },
+  {
+   "target": "spawn",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn"
+    ],
+    "cost": 0,
+    "edges": [],
+    "legs": []
+   }
+  },
+  {
+   "target": "town_center",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center"
+    ],
+    "cost": 9.05,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     }
+    ]
+   }
+  },
+  {
+   "target": "bracken_pit",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit"
+    ],
+    "cost": 52.02,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     }
+    ]
+   }
+  },
+  {
+   "target": "palewood_copse",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "west_track",
+     "palewood_copse"
+    ],
+    "cost": 51.16,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "west_track",
+      "cost": 17.33,
+      "kind": "walk"
+     },
+     {
+      "from": "west_track",
+      "to": "palewood_copse",
+      "cost": 24.78,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -230,
+       0.22,
+       -60
+      ],
+      "fromId": "town_center",
+      "toId": "west_track",
+      "cost": 17.33
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -230,
+       0.22,
+       -60
+      ],
+      "to": [
+       -334,
+       -0.81,
+       -64
+      ],
+      "fromId": "west_track",
+      "toId": "palewood_copse",
+      "cost": 24.78
+     }
+    ]
+   }
+  },
+  {
+   "target": "redsill_shallows",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "redsill_shallows"
+    ],
+    "cost": 46.510000000000005,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "redsill_shallows",
+      "cost": 35.56,
+      "kind": "shortcut",
+      "obstacleId": "brookvault_planks",
+      "reqLevel": 1
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -40,
+       -0.77,
+       -60
+      ],
+      "fromId": "redsill_shallows:entrance",
+      "toId": "redsill_shallows",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "brookvault_planks",
+      "reqLevel": 1
+     }
+    ]
+   }
+  },
+  {
+   "target": "marchfield_farm",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "coldbrace_east_gate",
+     "marchfield_farm"
+    ],
+    "cost": 31.76,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "coldbrace_east_gate",
+      "cost": 6.19,
+      "kind": "walk"
+     },
+     {
+      "from": "coldbrace_east_gate",
+      "to": "marchfield_farm",
+      "cost": 16.52,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -134,
+       0.89,
+       -80
+      ],
+      "fromId": "town_center",
+      "toId": "coldbrace_east_gate",
+      "cost": 6.19
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -134,
+       0.89,
+       -80
+      ],
+      "to": [
+       -96,
+       -1.94,
+       -22
+      ],
+      "fromId": "coldbrace_east_gate",
+      "toId": "marchfield_farm",
+      "cost": 16.52
+     }
+    ]
+   }
+  },
+  {
+   "target": "rootfall_hamlet",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet"
+    ],
+    "cost": 105.82000000000001,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     }
+    ]
+   }
+  },
+  {
+   "target": "hollowcut_seam",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet",
+     "rootfall_bank",
+     "hollowcut_seam"
+    ],
+    "cost": 116.80000000000001,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_hamlet",
+      "to": "rootfall_bank",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_bank",
+      "to": "hollowcut_seam",
+      "cost": 9.08,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       60,
+       8.29,
+       120
+      ],
+      "to": [
+       60,
+       8.29,
+       128
+      ],
+      "fromId": "rootfall_hamlet",
+      "toId": "rootfall_bank",
+      "cost": 1.9
+     },
+     {
+      "kind": "walk",
+      "from": [
+       60,
+       8.29,
+       128
+      ],
+      "to": [
+       94,
+       5.5,
+       145
+      ],
+      "fromId": "rootfall_bank",
+      "toId": "hollowcut_seam",
+      "cost": 9.08
+     }
+    ]
+   }
+  },
+  {
+   "target": "vellenwood_canopy",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet",
+     "vellenwood_canopy"
+    ],
+    "cost": 119,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_hamlet",
+      "to": "vellenwood_canopy",
+      "cost": 13.18,
+      "kind": "shortcut",
+      "obstacleId": "canopy_walk",
+      "reqLevel": 6
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       60,
+       8.29,
+       120
+      ],
+      "to": [
+       14,
+       3.71,
+       166
+      ],
+      "fromId": "vellenwood_canopy:entrance",
+      "toId": "vellenwood_canopy",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "canopy_walk",
+      "reqLevel": 6
+     }
+    ]
+   }
+  },
+  {
+   "target": "karrowmoor_terraces",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet",
+     "thornline_camp",
+     "vellenwood_east_gate",
+     "karrowmoor_north_gate",
+     "moor_road_bend",
+     "karrowmoor_terraces"
+    ],
+    "cost": 201.79000000000002,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_hamlet",
+      "to": "thornline_camp",
+      "cost": 10.53,
+      "kind": "shortcut",
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "from": "thornline_camp",
+      "to": "vellenwood_east_gate",
+      "cost": 33.08,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_east_gate",
+      "to": "karrowmoor_north_gate",
+      "cost": 5.43,
+      "kind": "walk"
+     },
+     {
+      "from": "karrowmoor_north_gate",
+      "to": "moor_road_bend",
+      "cost": 20.62,
+      "kind": "walk"
+     },
+     {
+      "from": "moor_road_bend",
+      "to": "karrowmoor_terraces",
+      "cost": 26.31,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       60,
+       8.29,
+       120
+      ],
+      "to": [
+       196,
+       7.83,
+       152
+      ],
+      "fromId": "thornline_camp:entrance",
+      "toId": "thornline_camp",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "kind": "walk",
+      "from": [
+       196,
+       7.83,
+       152
+      ],
+      "to": [
+       250,
+       6.01,
+       24
+      ],
+      "fromId": "thornline_camp",
+      "toId": "vellenwood_east_gate",
+      "cost": 33.08
+     },
+     {
+      "kind": "walk",
+      "from": [
+       250,
+       6.01,
+       24
+      ],
+      "to": [
+       256,
+       10.32,
+       4
+      ],
+      "fromId": "vellenwood_east_gate",
+      "toId": "karrowmoor_north_gate",
+      "cost": 5.43
+     },
+     {
+      "kind": "walk",
+      "from": [
+       256,
+       10.32,
+       4
+      ],
+      "to": [
+       170,
+       11.46,
+       -6
+      ],
+      "fromId": "karrowmoor_north_gate",
+      "toId": "moor_road_bend",
+      "cost": 20.62
+     },
+     {
+      "kind": "walk",
+      "from": [
+       170,
+       11.46,
+       -6
+      ],
+      "to": [
+       60,
+       14.93,
+       -16
+      ],
+      "fromId": "moor_road_bend",
+      "toId": "karrowmoor_terraces",
+      "cost": 26.31
+     }
+    ]
+   }
+  },
+  {
+   "target": "highcairn_outpost",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet",
+     "thornline_camp",
+     "vellenwood_east_gate",
+     "karrowmoor_north_gate",
+     "moor_road_bend",
+     "highcairn_outpost"
+    ],
+    "cost": 191.49,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_hamlet",
+      "to": "thornline_camp",
+      "cost": 10.53,
+      "kind": "shortcut",
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "from": "thornline_camp",
+      "to": "vellenwood_east_gate",
+      "cost": 33.08,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_east_gate",
+      "to": "karrowmoor_north_gate",
+      "cost": 5.43,
+      "kind": "walk"
+     },
+     {
+      "from": "karrowmoor_north_gate",
+      "to": "moor_road_bend",
+      "cost": 20.62,
+      "kind": "walk"
+     },
+     {
+      "from": "moor_road_bend",
+      "to": "highcairn_outpost",
+      "cost": 16.01,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       60,
+       8.29,
+       120
+      ],
+      "to": [
+       196,
+       7.83,
+       152
+      ],
+      "fromId": "thornline_camp:entrance",
+      "toId": "thornline_camp",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "kind": "walk",
+      "from": [
+       196,
+       7.83,
+       152
+      ],
+      "to": [
+       250,
+       6.01,
+       24
+      ],
+      "fromId": "thornline_camp",
+      "toId": "vellenwood_east_gate",
+      "cost": 33.08
+     },
+     {
+      "kind": "walk",
+      "from": [
+       250,
+       6.01,
+       24
+      ],
+      "to": [
+       256,
+       10.32,
+       4
+      ],
+      "fromId": "vellenwood_east_gate",
+      "toId": "karrowmoor_north_gate",
+      "cost": 5.43
+     },
+     {
+      "kind": "walk",
+      "from": [
+       256,
+       10.32,
+       4
+      ],
+      "to": [
+       170,
+       11.46,
+       -6
+      ],
+      "fromId": "karrowmoor_north_gate",
+      "toId": "moor_road_bend",
+      "cost": 20.62
+     },
+     {
+      "kind": "walk",
+      "from": [
+       170,
+       11.46,
+       -6
+      ],
+      "to": [
+       144,
+       27.08,
+       -66
+      ],
+      "fromId": "moor_road_bend",
+      "toId": "highcairn_outpost",
+      "cost": 16.01
+     }
+    ]
+   }
+  },
+  {
+   "target": "upper_karrow_seam",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet",
+     "thornline_camp",
+     "vellenwood_east_gate",
+     "karrowmoor_north_gate",
+     "moor_road_bend",
+     "highcairn_outpost",
+     "highcairn_bank",
+     "upper_karrow_seam"
+    ],
+    "cost": 210.13,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_hamlet",
+      "to": "thornline_camp",
+      "cost": 10.53,
+      "kind": "shortcut",
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "from": "thornline_camp",
+      "to": "vellenwood_east_gate",
+      "cost": 33.08,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_east_gate",
+      "to": "karrowmoor_north_gate",
+      "cost": 5.43,
+      "kind": "walk"
+     },
+     {
+      "from": "karrowmoor_north_gate",
+      "to": "moor_road_bend",
+      "cost": 20.62,
+      "kind": "walk"
+     },
+     {
+      "from": "moor_road_bend",
+      "to": "highcairn_outpost",
+      "cost": 16.01,
+      "kind": "walk"
+     },
+     {
+      "from": "highcairn_outpost",
+      "to": "highcairn_bank",
+      "cost": 1.72,
+      "kind": "walk"
+     },
+     {
+      "from": "highcairn_bank",
+      "to": "upper_karrow_seam",
+      "cost": 16.92,
+      "kind": "shortcut",
+      "obstacleId": "sunder_ledge",
+      "reqLevel": 10
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       60,
+       8.29,
+       120
+      ],
+      "to": [
+       196,
+       7.83,
+       152
+      ],
+      "fromId": "thornline_camp:entrance",
+      "toId": "thornline_camp",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "kind": "walk",
+      "from": [
+       196,
+       7.83,
+       152
+      ],
+      "to": [
+       250,
+       6.01,
+       24
+      ],
+      "fromId": "thornline_camp",
+      "toId": "vellenwood_east_gate",
+      "cost": 33.08
+     },
+     {
+      "kind": "walk",
+      "from": [
+       250,
+       6.01,
+       24
+      ],
+      "to": [
+       256,
+       10.32,
+       4
+      ],
+      "fromId": "vellenwood_east_gate",
+      "toId": "karrowmoor_north_gate",
+      "cost": 5.43
+     },
+     {
+      "kind": "walk",
+      "from": [
+       256,
+       10.32,
+       4
+      ],
+      "to": [
+       170,
+       11.46,
+       -6
+      ],
+      "fromId": "karrowmoor_north_gate",
+      "toId": "moor_road_bend",
+      "cost": 20.62
+     },
+     {
+      "kind": "walk",
+      "from": [
+       170,
+       11.46,
+       -6
+      ],
+      "to": [
+       144,
+       27.08,
+       -66
+      ],
+      "fromId": "moor_road_bend",
+      "toId": "highcairn_outpost",
+      "cost": 16.01
+     },
+     {
+      "kind": "walk",
+      "from": [
+       144,
+       27.08,
+       -66
+      ],
+      "to": [
+       150,
+       27.08,
+       -70
+      ],
+      "fromId": "highcairn_outpost",
+      "toId": "highcairn_bank",
+      "cost": 1.72
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       150,
+       27.08,
+       -70
+      ],
+      "to": [
+       194,
+       48.72,
+       -132
+      ],
+      "fromId": "upper_karrow_seam:entrance",
+      "toId": "upper_karrow_seam",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "sunder_ledge",
+      "reqLevel": 10
+     }
+    ]
+   }
+  },
+  {
+   "target": "karrow_ramp_two",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet",
+     "thornline_camp",
+     "vellenwood_east_gate",
+     "karrowmoor_north_gate",
+     "moor_road_bend",
+     "highcairn_outpost",
+     "highcairn_bank",
+     "karrow_ramp_two"
+    ],
+    "cost": 205.42000000000002,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_hamlet",
+      "to": "thornline_camp",
+      "cost": 10.53,
+      "kind": "shortcut",
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "from": "thornline_camp",
+      "to": "vellenwood_east_gate",
+      "cost": 33.08,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_east_gate",
+      "to": "karrowmoor_north_gate",
+      "cost": 5.43,
+      "kind": "walk"
+     },
+     {
+      "from": "karrowmoor_north_gate",
+      "to": "moor_road_bend",
+      "cost": 20.62,
+      "kind": "walk"
+     },
+     {
+      "from": "moor_road_bend",
+      "to": "highcairn_outpost",
+      "cost": 16.01,
+      "kind": "walk"
+     },
+     {
+      "from": "highcairn_outpost",
+      "to": "highcairn_bank",
+      "cost": 1.72,
+      "kind": "walk"
+     },
+     {
+      "from": "highcairn_bank",
+      "to": "karrow_ramp_two",
+      "cost": 12.21,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       60,
+       8.29,
+       120
+      ],
+      "to": [
+       196,
+       7.83,
+       152
+      ],
+      "fromId": "thornline_camp:entrance",
+      "toId": "thornline_camp",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "kind": "walk",
+      "from": [
+       196,
+       7.83,
+       152
+      ],
+      "to": [
+       250,
+       6.01,
+       24
+      ],
+      "fromId": "thornline_camp",
+      "toId": "vellenwood_east_gate",
+      "cost": 33.08
+     },
+     {
+      "kind": "walk",
+      "from": [
+       250,
+       6.01,
+       24
+      ],
+      "to": [
+       256,
+       10.32,
+       4
+      ],
+      "fromId": "vellenwood_east_gate",
+      "toId": "karrowmoor_north_gate",
+      "cost": 5.43
+     },
+     {
+      "kind": "walk",
+      "from": [
+       256,
+       10.32,
+       4
+      ],
+      "to": [
+       170,
+       11.46,
+       -6
+      ],
+      "fromId": "karrowmoor_north_gate",
+      "toId": "moor_road_bend",
+      "cost": 20.62
+     },
+     {
+      "kind": "walk",
+      "from": [
+       170,
+       11.46,
+       -6
+      ],
+      "to": [
+       144,
+       27.08,
+       -66
+      ],
+      "fromId": "moor_road_bend",
+      "toId": "highcairn_outpost",
+      "cost": 16.01
+     },
+     {
+      "kind": "walk",
+      "from": [
+       144,
+       27.08,
+       -66
+      ],
+      "to": [
+       150,
+       27.08,
+       -70
+      ],
+      "fromId": "highcairn_outpost",
+      "toId": "highcairn_bank",
+      "cost": 1.72
+     },
+     {
+      "kind": "walk",
+      "from": [
+       150,
+       27.08,
+       -70
+      ],
+      "to": [
+       100,
+       32.44,
+       -80
+      ],
+      "fromId": "highcairn_bank",
+      "toId": "karrow_ramp_two",
+      "cost": 12.21
+     }
+    ]
+   }
+  },
+  {
+   "target": "gravelmaw_entrance",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet",
+     "thornline_camp",
+     "vellenwood_east_gate",
+     "karrowmoor_north_gate",
+     "moor_road_bend",
+     "karrowmoor_terraces",
+     "gravelmaw_entrance"
+    ],
+    "cost": 205.73000000000002,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_hamlet",
+      "to": "thornline_camp",
+      "cost": 10.53,
+      "kind": "shortcut",
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "from": "thornline_camp",
+      "to": "vellenwood_east_gate",
+      "cost": 33.08,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_east_gate",
+      "to": "karrowmoor_north_gate",
+      "cost": 5.43,
+      "kind": "walk"
+     },
+     {
+      "from": "karrowmoor_north_gate",
+      "to": "moor_road_bend",
+      "cost": 20.62,
+      "kind": "walk"
+     },
+     {
+      "from": "moor_road_bend",
+      "to": "karrowmoor_terraces",
+      "cost": 26.31,
+      "kind": "walk"
+     },
+     {
+      "from": "karrowmoor_terraces",
+      "to": "gravelmaw_entrance",
+      "cost": 3.94,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       60,
+       8.29,
+       120
+      ],
+      "to": [
+       196,
+       7.83,
+       152
+      ],
+      "fromId": "thornline_camp:entrance",
+      "toId": "thornline_camp",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "kind": "walk",
+      "from": [
+       196,
+       7.83,
+       152
+      ],
+      "to": [
+       250,
+       6.01,
+       24
+      ],
+      "fromId": "thornline_camp",
+      "toId": "vellenwood_east_gate",
+      "cost": 33.08
+     },
+     {
+      "kind": "walk",
+      "from": [
+       250,
+       6.01,
+       24
+      ],
+      "to": [
+       256,
+       10.32,
+       4
+      ],
+      "fromId": "vellenwood_east_gate",
+      "toId": "karrowmoor_north_gate",
+      "cost": 5.43
+     },
+     {
+      "kind": "walk",
+      "from": [
+       256,
+       10.32,
+       4
+      ],
+      "to": [
+       170,
+       11.46,
+       -6
+      ],
+      "fromId": "karrowmoor_north_gate",
+      "toId": "moor_road_bend",
+      "cost": 20.62
+     },
+     {
+      "kind": "walk",
+      "from": [
+       170,
+       11.46,
+       -6
+      ],
+      "to": [
+       60,
+       14.93,
+       -16
+      ],
+      "fromId": "moor_road_bend",
+      "toId": "karrowmoor_terraces",
+      "cost": 26.31
+     },
+     {
+      "kind": "walk",
+      "from": [
+       60,
+       14.93,
+       -16
+      ],
+      "to": [
+       46,
+       18.61,
+       -24
+      ],
+      "fromId": "karrowmoor_terraces",
+      "toId": "gravelmaw_entrance",
+      "cost": 3.94
+     }
+    ]
+   }
+  },
+  {
+   "target": "great_cairn",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "bank_interior",
+     "bracken_pit",
+     "fallowmarch_north_gate",
+     "vellenwood_marchgate",
+     "rootfall_hamlet",
+     "thornline_camp",
+     "vellenwood_east_gate",
+     "karrowmoor_north_gate",
+     "moor_road_bend",
+     "highcairn_outpost",
+     "highcairn_bank",
+     "karrow_ramp_two",
+     "karrow_ramp_three",
+     "great_cairn"
+    ],
+    "cost": 231.02,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "bank_interior",
+      "cost": 1.9,
+      "kind": "walk"
+     },
+     {
+      "from": "bank_interior",
+      "to": "bracken_pit",
+      "cost": 41.07,
+      "kind": "shortcut",
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "from": "bracken_pit",
+      "to": "fallowmarch_north_gate",
+      "cost": 33.16,
+      "kind": "walk"
+     },
+     {
+      "from": "fallowmarch_north_gate",
+      "to": "vellenwood_marchgate",
+      "cost": 3.48,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_marchgate",
+      "to": "rootfall_hamlet",
+      "cost": 17.16,
+      "kind": "walk"
+     },
+     {
+      "from": "rootfall_hamlet",
+      "to": "thornline_camp",
+      "cost": 10.53,
+      "kind": "shortcut",
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "from": "thornline_camp",
+      "to": "vellenwood_east_gate",
+      "cost": 33.08,
+      "kind": "walk"
+     },
+     {
+      "from": "vellenwood_east_gate",
+      "to": "karrowmoor_north_gate",
+      "cost": 5.43,
+      "kind": "walk"
+     },
+     {
+      "from": "karrowmoor_north_gate",
+      "to": "moor_road_bend",
+      "cost": 20.62,
+      "kind": "walk"
+     },
+     {
+      "from": "moor_road_bend",
+      "to": "highcairn_outpost",
+      "cost": 16.01,
+      "kind": "walk"
+     },
+     {
+      "from": "highcairn_outpost",
+      "to": "highcairn_bank",
+      "cost": 1.72,
+      "kind": "walk"
+     },
+     {
+      "from": "highcairn_bank",
+      "to": "karrow_ramp_two",
+      "cost": 12.21,
+      "kind": "walk"
+     },
+     {
+      "from": "karrow_ramp_two",
+      "to": "karrow_ramp_three",
+      "cost": 14.89,
+      "kind": "walk"
+     },
+     {
+      "from": "karrow_ramp_three",
+      "to": "great_cairn",
+      "cost": 10.71,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -160,
+       0.89,
+       -88
+      ],
+      "fromId": "town_center",
+      "toId": "bank_interior",
+      "cost": 1.9
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       -160,
+       0.89,
+       -88
+      ],
+      "to": [
+       -160,
+       2.7,
+       80
+      ],
+      "fromId": "bracken_pit:entrance",
+      "toId": "bracken_pit",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "wall_vault",
+      "reqLevel": 3
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       2.7,
+       80
+      ],
+      "to": [
+       -26,
+       3.45,
+       118
+      ],
+      "fromId": "bracken_pit",
+      "toId": "fallowmarch_north_gate",
+      "cost": 33.16
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -26,
+       3.45,
+       118
+      ],
+      "to": [
+       -12,
+       5.68,
+       122
+      ],
+      "fromId": "fallowmarch_north_gate",
+      "toId": "vellenwood_marchgate",
+      "cost": 3.48
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -12,
+       5.68,
+       122
+      ],
+      "to": [
+       60,
+       8.29,
+       120
+      ],
+      "fromId": "vellenwood_marchgate",
+      "toId": "rootfall_hamlet",
+      "cost": 17.16
+     },
+     {
+      "kind": "shortcut",
+      "from": [
+       60,
+       8.29,
+       120
+      ],
+      "to": [
+       196,
+       7.83,
+       152
+      ],
+      "fromId": "thornline_camp:entrance",
+      "toId": "thornline_camp",
+      "cost": 0,
+      "durationMs": 0,
+      "obstacleId": "root_tunnel",
+      "reqLevel": 8
+     },
+     {
+      "kind": "walk",
+      "from": [
+       196,
+       7.83,
+       152
+      ],
+      "to": [
+       250,
+       6.01,
+       24
+      ],
+      "fromId": "thornline_camp",
+      "toId": "vellenwood_east_gate",
+      "cost": 33.08
+     },
+     {
+      "kind": "walk",
+      "from": [
+       250,
+       6.01,
+       24
+      ],
+      "to": [
+       256,
+       10.32,
+       4
+      ],
+      "fromId": "vellenwood_east_gate",
+      "toId": "karrowmoor_north_gate",
+      "cost": 5.43
+     },
+     {
+      "kind": "walk",
+      "from": [
+       256,
+       10.32,
+       4
+      ],
+      "to": [
+       170,
+       11.46,
+       -6
+      ],
+      "fromId": "karrowmoor_north_gate",
+      "toId": "moor_road_bend",
+      "cost": 20.62
+     },
+     {
+      "kind": "walk",
+      "from": [
+       170,
+       11.46,
+       -6
+      ],
+      "to": [
+       144,
+       27.08,
+       -66
+      ],
+      "fromId": "moor_road_bend",
+      "toId": "highcairn_outpost",
+      "cost": 16.01
+     },
+     {
+      "kind": "walk",
+      "from": [
+       144,
+       27.08,
+       -66
+      ],
+      "to": [
+       150,
+       27.08,
+       -70
+      ],
+      "fromId": "highcairn_outpost",
+      "toId": "highcairn_bank",
+      "cost": 1.72
+     },
+     {
+      "kind": "walk",
+      "from": [
+       150,
+       27.08,
+       -70
+      ],
+      "to": [
+       100,
+       32.44,
+       -80
+      ],
+      "fromId": "highcairn_bank",
+      "toId": "karrow_ramp_two",
+      "cost": 12.21
+     },
+     {
+      "kind": "walk",
+      "from": [
+       100,
+       32.44,
+       -80
+      ],
+      "to": [
+       118,
+       47.45,
+       -138
+      ],
+      "fromId": "karrow_ramp_two",
+      "toId": "karrow_ramp_three",
+      "cost": 14.89
+     },
+     {
+      "kind": "walk",
+      "from": [
+       118,
+       47.45,
+       -138
+      ],
+      "to": [
+       140,
+       57.31,
+       -176
+      ],
+      "fromId": "karrow_ramp_three",
+      "toId": "great_cairn",
+      "cost": 10.71
+     }
+    ]
+   }
+  },
+  {
+   "target": "north_milestone",
+   "kind": "location",
+   "route": {
+    "path": [
+     "spawn",
+     "town_entrance",
+     "town_center",
+     "coldbrace_east_gate",
+     "north_milestone"
+    ],
+    "cost": 33.47,
+    "edges": [
+     {
+      "from": "spawn",
+      "to": "town_entrance",
+      "cost": 2.38,
+      "kind": "walk"
+     },
+     {
+      "from": "town_entrance",
+      "to": "town_center",
+      "cost": 6.67,
+      "kind": "walk"
+     },
+     {
+      "from": "town_center",
+      "to": "coldbrace_east_gate",
+      "cost": 6.19,
+      "kind": "walk"
+     },
+     {
+      "from": "coldbrace_east_gate",
+      "to": "north_milestone",
+      "cost": 18.23,
+      "kind": "walk"
+     }
+    ],
+    "legs": [
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -118
+      ],
+      "to": [
+       -160,
+       0.89,
+       -108
+      ],
+      "fromId": "spawn",
+      "toId": "town_entrance",
+      "cost": 2.38
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -108
+      ],
+      "to": [
+       -160,
+       0.89,
+       -80
+      ],
+      "fromId": "town_entrance",
+      "toId": "town_center",
+      "cost": 6.67
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -160,
+       0.89,
+       -80
+      ],
+      "to": [
+       -134,
+       0.89,
+       -80
+      ],
+      "fromId": "town_center",
+      "toId": "coldbrace_east_gate",
+      "cost": 6.19
+     },
+     {
+      "kind": "walk",
+      "from": [
+       -134,
+       0.89,
+       -80
+      ],
+      "to": [
+       -108,
+       -0.68,
+       -8
+      ],
+      "fromId": "coldbrace_east_gate",
+      "toId": "north_milestone",
+      "cost": 18.23
+     }
+    ]
+   }
+  }
+ ],
+ "grounding": {
+  "considered": 169,
+  "measured": 153,
+  "notDrawn": 16,
+  "worst": 1,
+  "overTolerance": 31,
+  "entries": [
+   {
+    "id": "lower_quarry_kaldite_1",
+    "archetype": "ore",
+    "assetId": "rock_medium_3",
+    "drawnMinY": 14.365,
+    "groundY": 15.365,
+    "gap": -1
+   },
+   {
+    "id": "lower_quarry_kaldite_3",
+    "archetype": "ore",
+    "assetId": "rock_medium_3",
+    "drawnMinY": 16.122,
+    "groundY": 16.958,
+    "gap": -0.836
+   },
+   {
+    "id": "upper_karrow_kaldite_3",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 49.269,
+    "groundY": 49.887,
+    "gap": -0.617
+   },
+   {
+    "id": "upper_karrow_kaldite_1",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 47.692,
+    "groundY": 48.291,
+    "gap": -0.599
+   },
+   {
+    "id": "lower_quarry_kaldite_5",
+    "archetype": "ore",
+    "assetId": "rock_medium_3",
+    "drawnMinY": 16.452,
+    "groundY": 17.013,
+    "gap": -0.561
+   },
+   {
+    "id": "fallen_duskoak",
+    "archetype": "obstacle",
+    "assetId": "roof_log",
+    "drawnMinY": 1.795,
+    "groundY": 2.25,
+    "gap": -0.454
+   },
+   {
+    "id": "lower_quarry_kaldite_4",
+    "archetype": "ore",
+    "assetId": "rock_medium_3",
+    "drawnMinY": 13.009,
+    "groundY": 13.455,
+    "gap": -0.445
+   },
+   {
+    "id": "upper_karrow_kaldite_2",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 48.05,
+    "groundY": 48.475,
+    "gap": -0.425
+   },
+   {
+    "id": "sunder_ledge",
+    "archetype": "obstacle",
+    "assetId": "cliff_step_2",
+    "drawnMinY": 27.377,
+    "groundY": 27.74,
+    "gap": -0.363
+   },
+   {
+    "id": "bracken_pit_grithe_6",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 2.704,
+    "groundY": 3.047,
+    "gap": -0.343
+   },
+   {
+    "id": "lower_quarry_kaldite_2",
+    "archetype": "ore",
+    "assetId": "rock_medium_3",
+    "drawnMinY": 14.444,
+    "groundY": 14.78,
+    "gap": -0.336
+   },
+   {
+    "id": "hollowcut_corven_5",
+    "archetype": "ore",
+    "assetId": "rock_medium_2",
+    "drawnMinY": 5.748,
+    "groundY": 6.083,
+    "gap": -0.335
+   },
+   {
+    "id": "cairn_tarn_spots_2",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 34.244,
+    "groundY": 34.429,
+    "gap": -0.185
+   },
+   {
+    "id": "bracken_pit_stone_2",
+    "archetype": "ore",
+    "assetId": "rock_medium_3",
+    "drawnMinY": 2.208,
+    "groundY": 2.371,
+    "gap": -0.163
+   },
+   {
+    "id": "blackwater_spots_2",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 4.838,
+    "groundY": 4.987,
+    "gap": -0.149
+   },
+   {
+    "id": "bracken_pit_stone_1",
+    "archetype": "ore",
+    "assetId": "rock_medium_3",
+    "drawnMinY": 2.436,
+    "groundY": 2.568,
+    "gap": -0.132
+   },
+   {
+    "id": "scree_slide",
+    "archetype": "obstacle",
+    "assetId": "cliff_step_3",
+    "drawnMinY": 59.494,
+    "groundY": 59.592,
+    "gap": -0.098
+   },
+   {
+    "id": "duskoak_stand_trees_5",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 5.848,
+    "groundY": 5.941,
+    "gap": -0.093
+   },
+   {
+    "id": "ridge_pines_trees_7",
+    "archetype": "tree",
+    "assetId": "tree_pine_2",
+    "drawnMinY": 37.797,
+    "groundY": 37.889,
+    "gap": -0.092
+   },
+   {
+    "id": "duskoak_stand_trees_10",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 4.644,
+    "groundY": 4.733,
+    "gap": -0.089
+   },
+   {
+    "id": "duskoak_stand_trees_7",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 2.013,
+    "groundY": 2.096,
+    "gap": -0.083
+   },
+   {
+    "id": "duskoak_stand_trees_6",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 5.227,
+    "groundY": 5.31,
+    "gap": -0.082
+   },
+   {
+    "id": "ridge_pines_trees_6",
+    "archetype": "tree",
+    "assetId": "tree_pine_2",
+    "drawnMinY": 42.272,
+    "groundY": 42.353,
+    "gap": -0.081
+   },
+   {
+    "id": "ridge_pines_trees_4",
+    "archetype": "tree",
+    "assetId": "tree_pine_2",
+    "drawnMinY": 40.697,
+    "groundY": 40.778,
+    "gap": -0.08
+   },
+   {
+    "id": "far_tarn_spots_2",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 40.571,
+    "groundY": 40.651,
+    "gap": -0.079
+   },
+   {
+    "id": "ridge_pines_trees_1",
+    "archetype": "tree",
+    "assetId": "tree_pine_2",
+    "drawnMinY": 42.649,
+    "groundY": 42.719,
+    "gap": -0.071
+   },
+   {
+    "id": "hollowcut_corven_3",
+    "archetype": "ore",
+    "assetId": "rock_medium_2",
+    "drawnMinY": 5.432,
+    "groundY": 5.491,
+    "gap": -0.06
+   },
+   {
+    "id": "cairn_leap",
+    "archetype": "obstacle",
+    "assetId": "boulder_medium",
+    "drawnMinY": 43,
+    "groundY": 43.056,
+    "gap": -0.056
+   },
+   {
+    "id": "thornbound_elders_ridge_1",
+    "archetype": "enemy",
+    "assetId": "enemy_bee",
+    "drawnMinY": 52.577,
+    "groundY": 52.524,
+    "gap": 0.053
+   },
+   {
+    "id": "duskoak_stand_trees_4",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 3.803,
+    "groundY": 3.855,
+    "gap": -0.052
+   },
+   {
+    "id": "duskoak_stand_trees_8",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 4.142,
+    "groundY": 4.194,
+    "gap": -0.052
+   },
+   {
+    "id": "ridge_pines_trees_5",
+    "archetype": "tree",
+    "assetId": "tree_pine_2",
+    "drawnMinY": 40.278,
+    "groundY": 40.327,
+    "gap": -0.049
+   },
+   {
+    "id": "thornbound_elders_ridge_2",
+    "archetype": "enemy",
+    "assetId": "enemy_bee",
+    "drawnMinY": 46.557,
+    "groundY": 46.509,
+    "gap": 0.049
+   },
+   {
+    "id": "thornbound_husks_3",
+    "archetype": "enemy",
+    "assetId": "enemy_bee",
+    "drawnMinY": 6.58,
+    "groundY": 6.532,
+    "gap": 0.048
+   },
+   {
+    "id": "cairn_tarn_spots_1",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 34.68,
+    "groundY": 34.728,
+    "gap": -0.048
+   },
+   {
+    "id": "thornbound_elders_ridge_3",
+    "archetype": "enemy",
+    "assetId": "enemy_bee",
+    "drawnMinY": 59.417,
+    "groundY": 59.369,
+    "gap": 0.048
+   },
+   {
+    "id": "thornbound_husks_2",
+    "archetype": "enemy",
+    "assetId": "enemy_bee",
+    "drawnMinY": 7.74,
+    "groundY": 7.693,
+    "gap": 0.047
+   },
+   {
+    "id": "brookvault_planks",
+    "archetype": "obstacle",
+    "assetId": "floor_wood",
+    "drawnMinY": -3.404,
+    "groundY": -3.358,
+    "gap": -0.046
+   },
+   {
+    "id": "thornbound_husks_5",
+    "archetype": "enemy",
+    "assetId": "enemy_bee",
+    "drawnMinY": 7.71,
+    "groundY": 7.664,
+    "gap": 0.045
+   },
+   {
+    "id": "thornbound_husks_4",
+    "archetype": "enemy",
+    "assetId": "enemy_bee",
+    "drawnMinY": 6.4,
+    "groundY": 6.357,
+    "gap": 0.043
+   },
+   {
+    "id": "thornbound_husks_1",
+    "archetype": "enemy",
+    "assetId": "enemy_bee",
+    "drawnMinY": 7.9,
+    "groundY": 7.859,
+    "gap": 0.041
+   },
+   {
+    "id": "duskoak_stand_trees_9",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 3.569,
+    "groundY": 3.602,
+    "gap": -0.033
+   },
+   {
+    "id": "ridge_pines_trees_2",
+    "archetype": "tree",
+    "assetId": "tree_pine_2",
+    "drawnMinY": 41.942,
+    "groundY": 41.974,
+    "gap": -0.032
+   },
+   {
+    "id": "far_tarn_spots_1",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 40.843,
+    "groundY": 40.875,
+    "gap": -0.032
+   },
+   {
+    "id": "blackwater_spots_1",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 5.291,
+    "groundY": 5.322,
+    "gap": -0.031
+   },
+   {
+    "id": "palewood_copse_trees_5",
+    "archetype": "tree",
+    "assetId": "tree_common_1",
+    "drawnMinY": -1.167,
+    "groundY": -1.141,
+    "gap": -0.026
+   },
+   {
+    "id": "palewood_copse_trees_6",
+    "archetype": "tree",
+    "assetId": "tree_common_1",
+    "drawnMinY": -0.496,
+    "groundY": -0.476,
+    "gap": -0.02
+   },
+   {
+    "id": "cairnwights_fields_3",
+    "archetype": "enemy",
+    "assetId": "enemy_skull",
+    "drawnMinY": 43.614,
+    "groundY": 43.595,
+    "gap": 0.019
+   },
+   {
+    "id": "cairnwights_fields_1",
+    "archetype": "enemy",
+    "assetId": "enemy_skull",
+    "drawnMinY": 40.554,
+    "groundY": 40.536,
+    "gap": 0.018
+   },
+   {
+    "id": "duskoak_stand_trees_3",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 3.572,
+    "groundY": 3.589,
+    "gap": -0.017
+   },
+   {
+    "id": "cairnwights_fields_5",
+    "archetype": "enemy",
+    "assetId": "enemy_skull",
+    "drawnMinY": 41.534,
+    "groundY": 41.517,
+    "gap": 0.017
+   },
+   {
+    "id": "palewood_copse_trees_8",
+    "archetype": "tree",
+    "assetId": "tree_common_1",
+    "drawnMinY": -1.154,
+    "groundY": -1.139,
+    "gap": -0.015
+   },
+   {
+    "id": "cairnwights_fields_4",
+    "archetype": "enemy",
+    "assetId": "enemy_skull",
+    "drawnMinY": 37.284,
+    "groundY": 37.269,
+    "gap": 0.015
+   },
+   {
+    "id": "ridge_pines_trees_3",
+    "archetype": "tree",
+    "assetId": "tree_pine_2",
+    "drawnMinY": 43.025,
+    "groundY": 43.037,
+    "gap": -0.013
+   },
+   {
+    "id": "cairnwights_fields_2",
+    "archetype": "enemy",
+    "assetId": "enemy_skull",
+    "drawnMinY": 41.974,
+    "groundY": 41.961,
+    "gap": 0.013
+   },
+   {
+    "id": "redsill_spots_3",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": -0.846,
+    "groundY": -0.834,
+    "gap": -0.012
+   },
+   {
+    "id": "palewood_copse_trees_7",
+    "archetype": "tree",
+    "assetId": "tree_common_1",
+    "drawnMinY": -0.892,
+    "groundY": -0.883,
+    "gap": -0.008
+   },
+   {
+    "id": "npc_woodward_ansel",
+    "archetype": "npc",
+    "assetId": "base_male",
+    "drawnMinY": 8.296,
+    "groundY": 8.288,
+    "gap": 0.008
+   },
+   {
+    "id": "npc_trapper_mott",
+    "archetype": "npc",
+    "assetId": "base_male",
+    "drawnMinY": 8.296,
+    "groundY": 8.288,
+    "gap": 0.008
+   },
+   {
+    "id": "npc_foreman_arden",
+    "archetype": "npc",
+    "assetId": "base_male",
+    "drawnMinY": 27.086,
+    "groundY": 27.079,
+    "gap": 0.007
+   },
+   {
+    "id": "npc_quarrier_vess",
+    "archetype": "npc",
+    "assetId": "base_female",
+    "drawnMinY": 27.086,
+    "groundY": 27.079,
+    "gap": 0.007
+   },
+   {
+    "id": "npc_watcher_hale",
+    "archetype": "npc",
+    "assetId": "base_male",
+    "drawnMinY": 27.086,
+    "groundY": 27.079,
+    "gap": 0.007
+   },
+   {
+    "id": "npc_seamer_juno",
+    "archetype": "npc",
+    "assetId": "base_female",
+    "drawnMinY": 8.294,
+    "groundY": 8.288,
+    "gap": 0.006
+   },
+   {
+    "id": "palewood_copse_trees_1",
+    "archetype": "tree",
+    "assetId": "tree_common_1",
+    "drawnMinY": -0.817,
+    "groundY": -0.812,
+    "gap": -0.005
+   },
+   {
+    "id": "palewood_copse_trees_2",
+    "archetype": "tree",
+    "assetId": "tree_common_1",
+    "drawnMinY": -0.817,
+    "groundY": -0.812,
+    "gap": -0.005
+   },
+   {
+    "id": "palewood_copse_trees_3",
+    "archetype": "tree",
+    "assetId": "tree_common_1",
+    "drawnMinY": -0.807,
+    "groundY": -0.812,
+    "gap": 0.005
+   },
+   {
+    "id": "marchwolf_pups_2",
+    "archetype": "enemy",
+    "assetId": "enemy_blob",
+    "drawnMinY": -0.067,
+    "groundY": -0.072,
+    "gap": 0.005
+   },
+   {
+    "id": "rootfall_anvil",
+    "archetype": "station",
+    "assetId": "anvil",
+    "drawnMinY": 8.284,
+    "groundY": 8.288,
+    "gap": -0.005
+   },
+   {
+    "id": "canopy_walk",
+    "archetype": "obstacle",
+    "assetId": "balcony_straight",
+    "drawnMinY": 8.293,
+    "groundY": 8.288,
+    "gap": 0.005
+   },
+   {
+    "id": "bramble_skitterlings_1",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 3.213,
+    "groundY": 3.208,
+    "gap": 0.005
+   },
+   {
+    "id": "bramble_skitterlings_4",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 4.383,
+    "groundY": 4.378,
+    "gap": 0.005
+   },
+   {
+    "id": "vellenwood_east_gate",
+    "archetype": "portal",
+    "assetId": "wall_arch",
+    "drawnMinY": 6.01,
+    "groundY": 6.005,
+    "gap": 0.005
+   },
+   {
+    "id": "npc_cairnkeeper_ode",
+    "archetype": "npc",
+    "assetId": "base_female",
+    "drawnMinY": 27.084,
+    "groundY": 27.079,
+    "gap": 0.005
+   },
+   {
+    "id": "scree_skitterlings_4",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 54.762,
+    "groundY": 54.757,
+    "gap": 0.005
+   },
+   {
+    "id": "karrowmoor_north_gate",
+    "archetype": "portal",
+    "assetId": "wall_arch",
+    "drawnMinY": 10.32,
+    "groundY": 10.315,
+    "gap": 0.005
+   },
+   {
+    "id": "bracken_pit_grithe_5",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 2.716,
+    "groundY": 2.712,
+    "gap": 0.004
+   },
+   {
+    "id": "redsill_spots_2",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": -0.809,
+    "groundY": -0.813,
+    "gap": 0.004
+   },
+   {
+    "id": "coldbrace_bank",
+    "archetype": "bank",
+    "assetId": "chest_wood",
+    "drawnMinY": 0.897,
+    "groundY": 0.894,
+    "gap": 0.004
+   },
+   {
+    "id": "wall_vault",
+    "archetype": "obstacle",
+    "assetId": "wall_plaster_straight",
+    "drawnMinY": 0.898,
+    "groundY": 0.894,
+    "gap": 0.004
+   },
+   {
+    "id": "rill_skitterlings_1",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": -1.436,
+    "groundY": -1.432,
+    "gap": -0.004
+   },
+   {
+    "id": "rill_skitterlings_3",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": -1.616,
+    "groundY": -1.62,
+    "gap": 0.004
+   },
+   {
+    "id": "rootfall_fletching",
+    "archetype": "station",
+    "assetId": "workbench_drawers",
+    "drawnMinY": 8.285,
+    "groundY": 8.288,
+    "gap": -0.004
+   },
+   {
+    "id": "marchwolves_deepwood_1",
+    "archetype": "enemy",
+    "assetId": "enemy_blob",
+    "drawnMinY": 5.108,
+    "groundY": 5.104,
+    "gap": 0.004
+   },
+   {
+    "id": "highcairn_general",
+    "archetype": "shop",
+    "assetId": "market_stall",
+    "drawnMinY": 27.075,
+    "groundY": 27.079,
+    "gap": -0.004
+   },
+   {
+    "id": "highcairn_anvil",
+    "archetype": "station",
+    "assetId": "anvil",
+    "drawnMinY": 27.083,
+    "groundY": 27.079,
+    "gap": 0.004
+   },
+   {
+    "id": "gravelmaw_mouth_portal",
+    "archetype": "portal",
+    "assetId": "wall_arch",
+    "drawnMinY": 18.61,
+    "groundY": 18.606,
+    "gap": 0.004
+   },
+   {
+    "id": "palewood_copse_trees_4",
+    "archetype": "tree",
+    "assetId": "tree_common_1",
+    "drawnMinY": -0.787,
+    "groundY": -0.784,
+    "gap": -0.003
+   },
+   {
+    "id": "coldbrace_range",
+    "archetype": "station",
+    "assetId": "cooking_pot",
+    "drawnMinY": 0.89,
+    "groundY": 0.894,
+    "gap": -0.003
+   },
+   {
+    "id": "coldbrace_crafting",
+    "archetype": "station",
+    "assetId": "workbench",
+    "drawnMinY": 0.89,
+    "groundY": 0.894,
+    "gap": -0.003
+   },
+   {
+    "id": "npc_pitmaster_dorn",
+    "archetype": "npc",
+    "assetId": "base_male",
+    "drawnMinY": 0.896,
+    "groundY": 0.894,
+    "gap": 0.003
+   },
+   {
+    "id": "npc_smith_harrow",
+    "archetype": "npc",
+    "assetId": "base_male",
+    "drawnMinY": 0.896,
+    "groundY": 0.894,
+    "gap": 0.003
+   },
+   {
+    "id": "npc_ranger_syb",
+    "archetype": "npc",
+    "assetId": "base_female",
+    "drawnMinY": 0.896,
+    "groundY": 0.894,
+    "gap": 0.003
+   },
+   {
+    "id": "npc_carter_bel",
+    "archetype": "npc",
+    "assetId": "base_male",
+    "drawnMinY": 0.896,
+    "groundY": 0.894,
+    "gap": 0.003
+   },
+   {
+    "id": "rill_skitterlings_4",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": -1.516,
+    "groundY": -1.513,
+    "gap": -0.003
+   },
+   {
+    "id": "rill_skitterlings_5",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": -0.306,
+    "groundY": -0.309,
+    "gap": 0.003
+   },
+   {
+    "id": "marchwolf_pups_1",
+    "archetype": "enemy",
+    "assetId": "enemy_blob",
+    "drawnMinY": -0.347,
+    "groundY": -0.35,
+    "gap": 0.003
+   },
+   {
+    "id": "hollowcut_corven_1",
+    "archetype": "ore",
+    "assetId": "rock_medium_2",
+    "drawnMinY": 5.485,
+    "groundY": 5.482,
+    "gap": 0.003
+   },
+   {
+    "id": "rootfall_general",
+    "archetype": "shop",
+    "assetId": "market_stall",
+    "drawnMinY": 8.285,
+    "groundY": 8.288,
+    "gap": -0.003
+   },
+   {
+    "id": "bramble_skitterlings_3",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 2.013,
+    "groundY": 2.016,
+    "gap": -0.003
+   },
+   {
+    "id": "bramble_skitterlings_5",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 1.303,
+    "groundY": 1.305,
+    "gap": -0.003
+   },
+   {
+    "id": "marchwolves_deepwood_3",
+    "archetype": "enemy",
+    "assetId": "enemy_blob",
+    "drawnMinY": 8.288,
+    "groundY": 8.285,
+    "gap": 0.003
+   },
+   {
+    "id": "marchwolves_deepwood_4",
+    "archetype": "enemy",
+    "assetId": "enemy_blob",
+    "drawnMinY": 2.848,
+    "groundY": 2.851,
+    "gap": -0.003
+   },
+   {
+    "id": "vellenwood_marchgate",
+    "archetype": "portal",
+    "assetId": "wall_arch",
+    "drawnMinY": 5.68,
+    "groundY": 5.677,
+    "gap": 0.003
+   },
+   {
+    "id": "ridge_pines_trees_8",
+    "archetype": "tree",
+    "assetId": "tree_pine_2",
+    "drawnMinY": 42.856,
+    "groundY": 42.859,
+    "gap": -0.003
+   },
+   {
+    "id": "highcairn_plot_beds_1",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": 27.076,
+    "groundY": 27.079,
+    "gap": -0.003
+   },
+   {
+    "id": "highcairn_plot_beds_2",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": 27.076,
+    "groundY": 27.079,
+    "gap": -0.003
+   },
+   {
+    "id": "highcairn_plot_beds_3",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": 27.076,
+    "groundY": 27.079,
+    "gap": -0.003
+   },
+   {
+    "id": "highcairn_plot_beds_4",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": 27.076,
+    "groundY": 27.079,
+    "gap": -0.003
+   },
+   {
+    "id": "highcairn_smith",
+    "archetype": "shop",
+    "assetId": "market_stall_cart",
+    "drawnMinY": 27.076,
+    "groundY": 27.079,
+    "gap": -0.003
+   },
+   {
+    "id": "scree_skitterlings_1",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 57.972,
+    "groundY": 57.975,
+    "gap": -0.003
+   },
+   {
+    "id": "scree_skitterlings_2",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 57.612,
+    "groundY": 57.609,
+    "gap": 0.003
+   },
+   {
+    "id": "marchfield_plots_1",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": -1.934,
+    "groundY": -1.936,
+    "gap": 0.002
+   },
+   {
+    "id": "marchfield_plots_2",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": -1.934,
+    "groundY": -1.936,
+    "gap": 0.002
+   },
+   {
+    "id": "marchfield_plots_3",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": -1.934,
+    "groundY": -1.936,
+    "gap": 0.002
+   },
+   {
+    "id": "marchfield_plots_4",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": -1.934,
+    "groundY": -1.936,
+    "gap": 0.002
+   },
+   {
+    "id": "marchfield_plots_5",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": -1.934,
+    "groundY": -1.936,
+    "gap": 0.002
+   },
+   {
+    "id": "marchfield_plots_6",
+    "archetype": "farm_plot",
+    "assetId": "crop_carrot",
+    "drawnMinY": -1.934,
+    "groundY": -1.936,
+    "gap": 0.002
+   },
+   {
+    "id": "coldbrace_general",
+    "archetype": "shop",
+    "assetId": "market_stall",
+    "drawnMinY": 0.895,
+    "groundY": 0.894,
+    "gap": 0.002
+   },
+   {
+    "id": "coldbrace_smith",
+    "archetype": "shop",
+    "assetId": "market_stall_cart",
+    "drawnMinY": 0.896,
+    "groundY": 0.894,
+    "gap": 0.002
+   },
+   {
+    "id": "coldbrace_furnace",
+    "archetype": "station",
+    "assetId": "cauldron",
+    "drawnMinY": 0.895,
+    "groundY": 0.894,
+    "gap": 0.002
+   },
+   {
+    "id": "coldbrace_fletching",
+    "archetype": "station",
+    "assetId": "weapon_rack",
+    "drawnMinY": 0.896,
+    "groundY": 0.894,
+    "gap": 0.002
+   },
+   {
+    "id": "rill_skitterlings_6",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": -1.376,
+    "groundY": -1.378,
+    "gap": 0.002
+   },
+   {
+    "id": "hollowcut_corven_4",
+    "archetype": "ore",
+    "assetId": "rock_medium_2",
+    "drawnMinY": 5.425,
+    "groundY": 5.427,
+    "gap": -0.002
+   },
+   {
+    "id": "duskoak_stand_trees_2",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 3.67,
+    "groundY": 3.671,
+    "gap": -0.002
+   },
+   {
+    "id": "rootfall_range",
+    "archetype": "station",
+    "assetId": "cooking_pot",
+    "drawnMinY": 8.29,
+    "groundY": 8.288,
+    "gap": 0.002
+   },
+   {
+    "id": "rootfall_crafting",
+    "archetype": "station",
+    "assetId": "workbench",
+    "drawnMinY": 8.29,
+    "groundY": 8.288,
+    "gap": 0.002
+   },
+   {
+    "id": "root_tunnel",
+    "archetype": "obstacle",
+    "assetId": "wall_arch",
+    "drawnMinY": 8.29,
+    "groundY": 8.288,
+    "gap": 0.002
+   },
+   {
+    "id": "highcairn_bank_counter",
+    "archetype": "bank",
+    "assetId": "chest_wood",
+    "drawnMinY": 27.077,
+    "groundY": 27.079,
+    "gap": -0.002
+   },
+   {
+    "id": "highcairn_furnace",
+    "archetype": "station",
+    "assetId": "cauldron",
+    "drawnMinY": 27.077,
+    "groundY": 27.079,
+    "gap": -0.002
+   },
+   {
+    "id": "bracken_pit_grithe_1",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 2.696,
+    "groundY": 2.695,
+    "gap": 0.001
+   },
+   {
+    "id": "bracken_pit_grithe_2",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 2.696,
+    "groundY": 2.695,
+    "gap": 0.001
+   },
+   {
+    "id": "bracken_pit_grithe_3",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 2.696,
+    "groundY": 2.695,
+    "gap": 0.001
+   },
+   {
+    "id": "bracken_pit_grithe_4",
+    "archetype": "ore",
+    "assetId": "rock_medium_1",
+    "drawnMinY": 2.696,
+    "groundY": 2.695,
+    "gap": 0.001
+   },
+   {
+    "id": "redsill_spots_1",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": -0.789,
+    "groundY": -0.79,
+    "gap": 0.001
+   },
+   {
+    "id": "redsill_spots_4",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": -0.899,
+    "groundY": -0.9,
+    "gap": 0.001
+   },
+   {
+    "id": "marchwolf_pups_3",
+    "archetype": "enemy",
+    "assetId": "enemy_blob",
+    "drawnMinY": 1.113,
+    "groundY": 1.112,
+    "gap": 0.001
+   },
+   {
+    "id": "marchwolf_pups_4",
+    "archetype": "enemy",
+    "assetId": "enemy_blob",
+    "drawnMinY": 0.233,
+    "groundY": 0.234,
+    "gap": -0.001
+   },
+   {
+    "id": "hollowcut_corven_2",
+    "archetype": "ore",
+    "assetId": "rock_medium_2",
+    "drawnMinY": 5.475,
+    "groundY": 5.474,
+    "gap": 0.001
+   },
+   {
+    "id": "duskoak_stand_trees_1",
+    "archetype": "tree",
+    "assetId": "tree_common_2",
+    "drawnMinY": 3.75,
+    "groundY": 3.749,
+    "gap": 0.001
+   },
+   {
+    "id": "blackwater_spots_3",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 4.655,
+    "groundY": 4.654,
+    "gap": 0.001
+   },
+   {
+    "id": "blackwater_spots_4",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 4.655,
+    "groundY": 4.654,
+    "gap": 0.001
+   },
+   {
+    "id": "blackwater_spots_5",
+    "archetype": "fishing_spot",
+    "assetId": "rope_coil",
+    "drawnMinY": 4.655,
+    "groundY": 4.654,
+    "gap": 0.001
+   },
+   {
+    "id": "rootfall_bank_chest",
+    "archetype": "bank",
+    "assetId": "chest_wood",
+    "drawnMinY": 8.287,
+    "groundY": 8.288,
+    "gap": -0.001
+   },
+   {
+    "id": "highcairn_range",
+    "archetype": "station",
+    "assetId": "cooking_pot",
+    "drawnMinY": 27.08,
+    "groundY": 27.079,
+    "gap": 0.001
+   },
+   {
+    "id": "scree_skitterlings_6",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 58.712,
+    "groundY": 58.713,
+    "gap": -0.001
+   },
+   {
+    "id": "coldbrace_anvil",
+    "archetype": "station",
+    "assetId": "anvil",
+    "drawnMinY": 0.894,
+    "groundY": 0.894,
+    "gap": 0
+   },
+   {
+    "id": "npc_warden_ilse",
+    "archetype": "npc",
+    "assetId": "base_female",
+    "drawnMinY": 0.894,
+    "groundY": 0.894,
+    "gap": 0
+   },
+   {
+    "id": "rill_skitterlings_2",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": -0.686,
+    "groundY": -0.686,
+    "gap": 0
+   },
+   {
+    "id": "fallowmarch_north_gate",
+    "archetype": "portal",
+    "assetId": "wall_arch",
+    "drawnMinY": 3.45,
+    "groundY": 3.45,
+    "gap": 0
+   },
+   {
+    "id": "bramble_skitterlings_2",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 3.473,
+    "groundY": 3.472,
+    "gap": 0
+   },
+   {
+    "id": "marchwolves_deepwood_2",
+    "archetype": "enemy",
+    "assetId": "enemy_blob",
+    "drawnMinY": 3.408,
+    "groundY": 3.408,
+    "gap": 0
+   },
+   {
+    "id": "scree_skitterlings_3",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 59.122,
+    "groundY": 59.122,
+    "gap": 0
+   },
+   {
+    "id": "scree_skitterlings_5",
+    "archetype": "enemy",
+    "assetId": "enemy_crab",
+    "drawnMinY": 58.012,
+    "groundY": 58.011,
+    "gap": 0
+   }
+  ]
+ },
+ "entityViewStats": {
+  "entities": 3463,
+  "groups": 255,
+  "instancedMeshes": 490,
+  "drawnInstancedMeshes": 479,
+  "uniqueViews": 1,
+  "riggedViews": 1,
+  "animatedLastFrame": 1,
+  "bakedPoses": 17,
+  "highlights": 0,
+  "batches": 263,
+  "drawnBatches": 219,
+  "estimatedDrawCalls": 450,
+  "uniqueDrawCalls": 12,
+  "namedDrawCalls": 12,
+  "otherDrawCalls": 0,
+  "dressedCharacters": 1,
+  "dressedGroups": 6,
+  "movingViews": 0,
+  "triangles": 1938933,
+  "missingAssets": []
+ },
+ "buildingFooting": [
+  {
+   "id": "coldbrace_gate_south",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_gate_east",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_gate_west",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_vault",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_bank_porch",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_hall",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_forge_shed",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_workshed",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_cookhouse",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_market",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_well",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_house_1",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_house_2",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_house_3",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_house_4",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_house_5",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_house_6",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_house_7",
+   "worst": 0
+  },
+  {
+   "id": "coldbrace_house_8",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_house_1",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_house_2",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_house_3",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_house_4",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_house_5",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_house_6",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_house_7",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_house_8",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_shed",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_forge",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_sawpit",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_counter",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_cookhouse",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_gate_west",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_gate_east",
+   "worst": 0
+  },
+  {
+   "id": "rootfall_gate_north",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_hut_1",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_hut_3",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_hut_4",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_hut_6",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_hut_5",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_forge",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_bank_porch",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_hut_2",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_market",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_gate",
+   "worst": 0
+  },
+  {
+   "id": "highcairn_postern",
+   "worst": 0
+  }
+ ],
+ "poses": [
+  {
+   "shot": "spawn",
+   "ok": true,
+   "drawCalls": 241,
+   "triangles": 5973586,
+   "fps": 1
+  },
+  {
+   "shot": "town_entrance",
+   "ok": true,
+   "drawCalls": 253,
+   "triangles": 6075514,
+   "fps": 1
+  },
+  {
+   "shot": "town_center",
+   "ok": true,
+   "drawCalls": 233,
+   "triangles": 7322331,
+   "fps": 1
+  },
+  {
+   "shot": "bank",
+   "ok": true,
+   "drawCalls": 226,
+   "triangles": 6833226,
+   "fps": 1
+  },
+  {
+   "shot": "bracken_pit",
+   "ok": true,
+   "drawCalls": 97,
+   "triangles": 3679738,
+   "fps": 1
+  },
+  {
+   "shot": "palewood_copse",
+   "ok": true,
+   "drawCalls": 37,
+   "triangles": 1487078,
+   "fps": 1
+  },
+  {
+   "shot": "redsill_shallows",
+   "ok": true,
+   "drawCalls": 94,
+   "triangles": 3336124,
+   "fps": 1
+  },
+  {
+   "shot": "marchfield_farm",
+   "ok": true,
+   "drawCalls": 199,
+   "triangles": 7179544,
+   "fps": 1
+  },
+  {
+   "shot": "rootfall",
+   "ok": true,
+   "drawCalls": 238,
+   "triangles": 4483724,
+   "fps": 1
+  },
+  {
+   "shot": "vellenwood_canopy",
+   "ok": true,
+   "drawCalls": 204,
+   "triangles": 4972303,
+   "fps": 1
+  },
+  {
+   "shot": "hollowcut_seam",
+   "ok": true,
+   "drawCalls": 284,
+   "triangles": 6822495,
+   "fps": 1
+  },
+  {
+   "shot": "karrowmoor_terraces",
+   "ok": true,
+   "drawCalls": 289,
+   "triangles": 6720615,
+   "fps": 1
+  },
+  {
+   "shot": "highcairn",
+   "ok": true,
+   "drawCalls": 287,
+   "triangles": 8026662,
+   "fps": 1
+  },
+  {
+   "shot": "upper_karrow_seam",
+   "ok": true,
+   "drawCalls": 145,
+   "triangles": 3236447,
+   "fps": 1
+  },
+  {
+   "shot": "sunder_ledge",
+   "ok": true,
+   "drawCalls": 139,
+   "triangles": 4397702,
+   "fps": 1
+  },
+  {
+   "shot": "gravelmaw_entrance",
+   "ok": true,
+   "drawCalls": 276,
+   "triangles": 6481612,
+   "fps": 1
+  },
+  {
+   "shot": "great_cairn",
+   "ok": true,
+   "drawCalls": 120,
+   "triangles": 3340434,
+   "fps": 1
+  },
+  {
+   "shot": "march_road",
+   "ok": true,
+   "drawCalls": 176,
+   "triangles": 4897549,
+   "fps": 1
+  }
+ ],
+ "errors": []
+}

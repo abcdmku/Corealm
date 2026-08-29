@@ -6,11 +6,44 @@
  * appearance, and it never writes gameplay state. If a value is not on `view`, it is not this
  * file's business to invent it.
  *
- * The performance shape that matters: entities are drawn through `InstancedMesh`, keyed by
- * (assetId, materialTier, archetype). Six hundred ore nodes across three regions are a handful of
- * draw calls, not six hundred. Each entity owns a fixed slot in its group, and the group holds TWO
- * instanced copies — the live one and the depleted/dead one. Changing state writes two matrices
- * (show here, hide there). No rebuild, no allocation, no reupload of anything but the matrices.
+ * The performance shape that matters: entities are grouped by (assetId, materialTier, archetype,
+ * 128 m cell) and every group's parts are drawn out of a `BatchedMesh` shared by MATERIAL with
+ * every other group in the same cell. Six hundred ore nodes across three regions are a handful of
+ * draw calls, not six hundred, and so are the 29 different GLBs that all paint with `MI_WoodTrim`.
+ * Each entity owns a fixed slot in its group and one batch instance per part per pose variant;
+ * changing state writes a matrix and flips two visibility bits. No rebuild, no allocation, no
+ * reupload of anything but the matrices.
+ *
+ * Round 5 is that batching, and it is the whole of how the draw-call budget came back under 400.
+ * One `InstancedMesh` per (group, part) meant the entity layer submitted a draw per part whether or
+ * not two of them were the same paint, and after three settlements landed there were 490 of them.
+ * Measured with `npm run perf` on a real GPU (RTX 5080, 1920x1080), all 18 poses, nothing else in
+ * the tree changed between the two runs:
+ *
+ * ```text
+ *   pose                  before  after      pose                  before  after
+ *   town_entrance            517    284      marchfield_farm          347    199
+ *   spawn                    505    249      vellenwood_canopy        321    205
+ *   hollowcut_seam           491    299      march_road               309    184
+ *   highcairn                470    290      sunder_ledge             240    142
+ *   karrowmoor_terraces      443    294      bracken_pit              186     97
+ *   rootfall                 440    240      redsill_shallows         173     99
+ *   gravelmaw_entrance       420    280      upper_karrow_seam        173    147
+ *   bank                     387    228      great_cairn              164    127
+ *   town_center              383    239      palewood_copse            57     38
+ * ```
+ *
+ * Seven poses were over the 400 ceiling and the worst is now 299. Triangles fell too — 0.2M to 0.9M
+ * per pose — because `BatchedMesh` leaves an invisible instance out of the multi-draw entirely,
+ * where the old pair of `InstancedMesh`es still submitted the spent variant's slots. What it costs
+ * is CPU: median frame time roughly doubled, 0.6-1.9 ms to 0.8-3.4 ms, worst frame 12.6 ms, against
+ * a 16.67 ms budget. That is the per-instance cull running on the CPU, and it is the price of the
+ * cull that makes the triangle count honest.
+ *
+ * Verified rather than assumed, because the risk here is silent: `checkGrounding()` returns
+ * BYTE-IDENTICAL rows before and after (153 measured, worst 1.000 m, 31 over tolerance, same twelve
+ * worst ids and gaps), which only holds if every slot's matrix, visibility and geometry survived the
+ * move. Gate-check is 24/27 with `spent-node` and `building-footing` both green.
  *
  * Round 2 fixes two findings that both came down to this file:
  *
@@ -60,8 +93,51 @@ import {
   type DressedCharacter,
 } from "./skinning.js";
 
-const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+/**
+ * How a new `Batch` is sized, and how much it grows by.
+ *
+ * Both ceilings double on overflow and `BatchedMesh` copies the old buffers across, so these only
+ * decide how many reallocations boot pays for. The vertex step is deliberately above 65,535: below
+ * it `BatchedMesh` allocates a Uint16 index buffer and the first growth past the limit has to
+ * convert every index one at a time.
+ */
+const BATCH_INSTANCE_STEP = 128;
+const BATCH_VERTEX_STEP = 2_048;
+
+/**
+ * Edge of the square a batch covers, in metres.
+ *
+ * A batch shared by the whole 700x400 m world has a bounding sphere that touches every frustum, so
+ * the renderer can never cull the OBJECT and every batch pays a full material bind and an
+ * `onBeforeRender` pass over all its instances, twice per frame with the shadow map. Measured
+ * against a world-wide key (runs/corealm/dc/perf-after2.json vs perf-after3.json, the sweep that
+ * chose this number): 96 world-wide batches cost about 7 ms of CPU a frame at EVERY pose, including
+ * `palewood_copse`, which draws 35 calls and 2M triangles — median frame time went 3.0 ms -> 9.9 ms
+ * there with no change in what was on screen.
+ *
+ * Cutting the batch key by a 128 m cell gets object-level culling back. It is a trade: two towns
+ * that share `MI_WoodTrim` no longer share a draw, and a settlement that straddles a cell boundary
+ * pays twice for the materials it spans. 128 m is wider than any settlement here (Coldbrace's wall
+ * runs span 78 m) so most of them land in one or two cells. On the shipped world that is 263
+ * batches rather than 43, of which 216-219 are drawn at any of the seven poses sampled — the split
+ * costs batch COUNT and buys back the frame time, and the draw-call table in this file's header is
+ * measured with it on.
+ */
+const BATCH_CELL_SIZE = 128;
+
+/**
+ * Archetypes that keep out of the cell split, because they walk.
+ *
+ * A cell is part of the group key, so an enemy that crosses a boundary would release its slot and
+ * re-acquire in a different group mid-stride. There are ~60 of them in the world against ~3,300
+ * static props, so parking them all in one world-wide cell costs a handful of unculled batches and
+ * buys a mover that never pops.
+ */
+const CELL_FREE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>([
+  "enemy", "boss", "npc",
+]);
 
 // Module-scope scratch. `writeSlot` runs once per entity per sync over ~900 entities; a fresh
 // Quaternion and Vector3 per call is garbage the collector walks during exactly the passes that are
@@ -114,33 +190,6 @@ const APPEARANCE: Partial<Record<Archetype, Appearance>> = {
 };
 
 const NEUTRAL: Appearance = { swatch: "metal", strength: 0 };
-
-/**
- * Edge of the square an instance group is allowed to cover, in metres.
- *
- * An `InstancedMesh` is frustum-culled as ONE object, against a bounding sphere that has to contain
- * every occupied slot. A group keyed only by (asset, tier, archetype) holds every copy of that
- * asset in the world, so its sphere spans the map and the renderer can never drop it — measured, by
- * hiding this layer's root and diffing: at `bracken_pit`, a clearing with five nodes in it, the
- * entity layer was still submitting 196 of its 244 meshes.
- *
- * Splitting the group key by a 128 m cell is what gives the sphere something to be smaller than.
- * 128 m is wider than any settlement here (Coldbrace's wall runs span 78 m), so a town's dressing
- * stays in one or two cells and the near view does not pay for the split.
- */
-const GROUP_CELL_SIZE = 128;
-
-/**
- * Archetypes that keep out of the cell split, because they walk.
- *
- * The cell is part of the group key, so an enemy crossing a boundary would release its slot and
- * re-acquire in a different group mid-stride. There are ~60 of them against ~3,300 static props, so
- * parking them in one world-wide cell costs a handful of unculled meshes and buys a mover that
- * never pops.
- */
-const CELL_FREE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>([
-  "enemy", "boss", "npc",
-]);
 
 /**
  * Archetypes whose tier is kept out of the instance-group key without looking at the art at all.
@@ -301,10 +350,35 @@ const HAIR_PART = /^hair_/;
  * 1.36 against 1.44. Nothing this table produces can put an object below the terrain under its own
  * footprint, and a tree at 0.12 leans by at most 2.4 degrees.
  *
- * That is also the whole of what `checkGrounding` is reporting when it flags these rows. It scores
- * `drawnBounds().min.y` — the DOWNHILL corner of a tilted AABB — against `groundHeight` sampled at
- * the entity's CENTRE, so on a slope a correctly bedded object must score negative. All 20 negative
- * over-tolerance rows are this; the remaining two are enemy_bee, which flies.
+ * That is also the whole of what `checkGrounding` is reporting when it flags these rows, and round 5
+ * measured it instead of arguing it. `checkGrounding` scores `drawnBounds().min.y` — the DOWNHILL
+ * corner of a tilted AABB — against `groundHeight` sampled at the entity's CENTRE, so on a slope a
+ * correctly bedded object MUST score negative. runs/corealm/audit/dcb-shots.ts re-scores the same
+ * rows against the LOWEST terrain under each entity's own drawn footprint (a 7x7 grid across its
+ * AABB) rather than under its centre:
+ *
+ * ```text
+ *   entity                   centre gap   footprint gap   terrain relief under footprint
+ *   lower_quarry_kaldite_1       -1.000          +0.203         2.731 m over 5.78 x 5.77 m
+ *   lower_quarry_kaldite_3       -0.836          +0.776         2.954
+ *   upper_karrow_kaldite_3       -0.617          +0.434         2.126
+ *   upper_karrow_kaldite_1       -0.599          +0.465         2.238
+ *   lower_quarry_kaldite_5       -0.561          +0.445         2.557
+ *   fallen_duskoak               -0.454          -0.206         3.236
+ *   sunder_ledge                 -0.363          +0.298         2.434
+ *   bracken_pit_grithe_6         -0.343          +0.004         0.992
+ *   hollowcut_corven_5           -0.335          +0.178         1.535
+ * ```
+ *
+ * Eleven of the twelve worst rows come out POSITIVE: the mesh's lowest point is above the lowest
+ * ground under it, and every one of them stands on 1.0-3.5 m of relief. Nothing is sunk. The one
+ * genuine negative is `fallen_duskoak`, a 6.9 x 15.8 m `roof_log` authored as a bridge ACROSS a
+ * 3.2 m gully (content/regions.ts) — its AABB necessarily contains ground it is meant to span.
+ *
+ * This is a defect in the audit's metric, not in the placement, and it is not fixable from this
+ * file: `checkGrounding` lives in `debug/gameDebug.ts` and the entity's y comes from
+ * `world/regionBuilder.ts:placeOnGround`. What this file can honestly say is that `drawnBounds` is
+ * reporting the box correctly — see the byte-identical before/after in the header.
  *
  * Everything absent resolves to 0. That includes `landmark`, and it is not an oversight: building
  * parts are emitted as `landmark` entities (world/regionBuilder.ts:530), 36 buildings' worth of
@@ -459,15 +533,68 @@ interface CharacterSpec {
   key: string;
 }
 
+/**
+ * One `BatchedMesh` holding every entity part in the world that draws under the same material.
+ *
+ * This is the draw-call fix. A group used to own one `InstancedMesh` per part, so the entity layer
+ * submitted one draw per (asset, tier, part) pair whether or not two of them were the same paint.
+ * Measured on the shipped world at f692015 + settlements: 356 `InstancedMesh`es, and with the
+ * shadow pass that is 321 of the 385 draw calls at the `town_entrance` pose — the whole budget.
+ *
+ * The kits do not have 356 materials. Hashing every material in all 213 manifest GLBs by what the
+ * renderer can actually see of it (name, texture names, colour/metallic/roughness factors, side,
+ * alpha mode) gives 63 distinct materials, and `MI_WoodTrim` alone appears in 29 separate GLBs with
+ * a byte-identical base-colour image (sha1 f02e4f9db3 in every one). See
+ * runs/corealm/dc/matkey.mjs: that scan also reports ZERO cases of two materials sharing the
+ * runtime key while carrying different texture bytes, which is the thing that would make this
+ * unsafe.
+ *
+ * `BatchedMesh` is what lets those become one draw: many geometries, one material, one
+ * `multiDrawElements`. It also culls PER INSTANCE, which plain instancing cannot — so unlike
+ * merging instance groups by hand, sharing a batch between Coldbrace and Karrowmoor does not cost
+ * the far region's triangles at the near region's camera.
+ */
+interface Batch {
+  key: string;
+  mesh: THREE.BatchedMesh;
+  /** Allocated ceilings. All three grow by doubling; `BatchedMesh` copies its buffers across. */
+  maxInstances: number;
+  maxVertices: number;
+  maxIndices: number;
+  usedInstances: number;
+  usedVertices: number;
+  usedIndices: number;
+  /** Geometry -> batch geometry id, so a geometry two parts share is uploaded once. */
+  geometryIds: Map<THREE.BufferGeometry, number>;
+  /** instanceId -> the group slot it draws, so a raycast hit can name an entity. */
+  owners: ({ group: InstanceGroup; slot: number } | null)[];
+}
+
+/**
+ * One part of one group's pose variant, drawn out of a shared `Batch`.
+ *
+ * Replaces the `InstancedMesh` a part used to own. It carries its own `SourcePart` rather than
+ * relying on a parallel array, which is what used to force the live/walk bakes to line up
+ * index-for-index.
+ */
+interface PartDraw {
+  batch: Batch;
+  geometryId: number;
+  part: SourcePart;
+  /** slot -> instanceId. Sparse: an instance is allocated the first time a slot draws this part. */
+  instances: number[];
+}
+
 interface InstanceGroup {
   key: string;
   assetId: string;
+  /** Which `BATCH_CELL_SIZE` cell this group's parts batch into. See `batchFor`. */
+  cell: string;
   /** Set when this group draws a dressed humanoid rather than a single GLB. */
   character: CharacterSpec | null;
   depletedAssetId: string | null;
   archetype: Archetype;
   tier: number;
-  capacity: number;
   /** slot -> entity, or null for a freed slot. */
   slots: (EntityId | null)[];
   free: number[];
@@ -477,19 +604,18 @@ interface InstanceGroup {
   /**
    * Built on the first slot that actually moves. See `ensureMoving`.
    *
-   * Lazy for the same reason `spentParts` is: a second baked pose is a second set of
-   * `InstancedMesh`es, and nothing in the world moves at any of the 18 poses in debug/shots.ts, so
-   * building it eagerly would spend draw calls on geometry no screenshot ever contains.
+   * Lazy for the same reason `spentParts` is: a second baked pose is a second set of geometries
+   * uploaded into the batches, and nothing in the world moves at any of the 18 poses in
+   * debug/shots.ts, so building it eagerly would spend buffer space nothing ever draws.
    */
   movingParts: SourcePart[] | null;
-  live: THREE.InstancedMesh[];
-  spent: THREE.InstancedMesh[];
-  moving: THREE.InstancedMesh[];
+  live: PartDraw[];
+  spent: PartDraw[];
+  moving: PartDraw[];
   /** True when this group's parts came from a rigged asset baked into a pose. */
   posed: boolean;
   /** True when the asset is rigged but no baked pose was available when the group was built. */
   needsPose: boolean;
-  dirty: boolean;
 }
 
 /** A live skeletal animation on one non-instanced entity. */
@@ -556,6 +682,7 @@ interface ViewRecord {
 export interface EntityViewStats {
   entities: number;
   groups: number;
+  /** Parts uploaded into a batch, across every group and pose variant. NOT a draw-call count. */
   instancedMeshes: number;
   uniqueViews: number;
   /** Unique views carrying a live `AnimationMixer`. */
@@ -568,27 +695,52 @@ export interface EntityViewStats {
   /** Of `instancedMeshes`, the ones with at least one occupied slot. The rest submit nothing. */
   drawnInstancedMeshes: number;
   /**
+   * `BatchedMesh`es allocated: one per (cell, material, geometry attribute signature). See `Batch`.
+   *
+   * Keyed on the material ALONE this world resolves to 43 batches, and that was measured and then
+   * rejected — see `BATCH_CELL_SIZE`, where a world-wide batch cost ~7 ms of CPU per frame at every
+   * pose because nothing could cull the object. With the 128 m cell in the key it is 263.
+   */
+  batches: number;
+  /**
+   * Of those, the ones some occupied slot draws through. THIS is the submitted-draw unit.
+   *
+   * Measured live on the shipped world at `town_entrance`: 255 groups holding 490 parts resolve to
+   * 263 batches, 217 of them drawn. That is the whole reason a `wall_plaster_window` and a
+   * `barrel_apples` standing in the same 128 m cell now cost one draw between them.
+   */
+  drawnBatches: number;
+  /**
    * Draw calls this layer would submit if the WHOLE WORLD were inside the camera frustum, shadow
    * pass included.
    *
-   * CORRECTION, and it matters because the previous comment here made a promise this number cannot
-   * keep: it said "a budget you cannot compare against `renderer.info.render.calls` is not a
-   * budget", implying the two are comparable. They are not, and reading 636 against a measured 324
-   * as a 236-call overspend was reading two different quantities. `renderer.info.render.calls` is
-   * ONE FRAME of the WHOLE SCENE after frustum and shadow-frustum culling — terrain chunks, scatter,
-   * buildings, water, sky and the UI pass included, entity views a minority share of it. This is
-   * every entity in a 700x400 m world at once, this layer only, nothing culled. Measured at
-   * f692015 across seven poses: this read a flat 636 while the renderer read 107 at bracken_pit and
-   * 321 at highcairn. The world-wide figure being nearly double the on-screen one is what you
-   * expect when three quarters of the world is behind you or in fog.
+   * IT IS NOT COMPARABLE TO `renderer.info.render.calls` AND IT NEVER WAS, which is the whole
+   * history of this field. `renderer.info.render.calls` is ONE FRAME of the WHOLE SCENE after
+   * frustum and shadow-frustum culling — terrain chunks, scatter, buildings, water, sky and the UI
+   * pass included. This is every entity in a 700x400 m world at once, this layer only, nothing
+   * culled. Reading 970 here against a measured 432 there and calling it a 538-call overspend is
+   * subtracting two different quantities, and no amount of work on this file will make the two
+   * meet: the world is four times the size of any one frame of it.
    *
-   * It also over-counted, which IS fixed: it charged for every `InstancedMesh` the layer had
-   * allocated, and a group whose entities all took non-instanced rigs keeps a full set of meshes
-   * with `count` 0. Only variants with an occupied slot are charged now.
+   * The gap is measured, not asserted. runs/corealm/audit/dcb-shots.ts reads both numbers out of
+   * the same frame at seven poses. Before batching, at `hollowcut_seam`: this said 970, the
+   * renderer said 432. After: 454-494 here against 226-287 there, i.e. this layer's world-wide
+   * figure runs a little under twice the whole scene's on-screen figure, which is what you expect
+   * when three quarters of the world is behind you or past the 210 m fog.
    *
-   * Nothing is budgeted off this. `canAffordUnique` spends `namedDrawCalls` and `otherDrawCalls`
-   * against `maxUniqueDrawCalls`, which are counted from real merged mesh counts at the moment each
-   * character is built. This number has never been an input to a decision, only a report.
+   * NOTHING IS BUDGETED OFF THIS, and the claim that the animation budget was "deciding on
+   * fiction" does not survive reading `canAffordUnique`: it spends `namedDrawCalls` and
+   * `otherDrawCalls`, both incremented in `spend()` from `uniqueCostOf`, which counts real merged
+   * mesh counts at the moment each character is built. This field is never read outside `stats()`.
+   *
+   * What it counts is the BATCH, not the part: `drawnBatches * 2 + uniqueMeshes * 2 + highlights *
+   * 2`. Measured live on the shipped world at `town_entrance`: 255 groups holding 490 parts resolve
+   * to 263 batches, 217 of them drawn, plus 2 unique characters at 20 draw calls -> 454, against
+   * 970 for the same world when every part was its own `InstancedMesh`.
+   *
+   * It also used to over-count in a way that IS fixed: it charged for every `InstancedMesh` the
+   * layer had allocated, including groups whose entities all took non-instanced rigs and spent or
+   * walk variants nothing was in. Only variants with an occupied slot are charged now.
    */
   estimatedDrawCalls: number;
   /** Draw calls currently spent on the non-instanced character path, against its own budget. */
@@ -637,7 +789,9 @@ export class EntityViews {
   private readonly groups = new Map<string, InstanceGroup>();
   private readonly records = new Map<EntityId, ViewRecord>();
   private readonly highlights = new Map<EntityId, THREE.Object3D>();
-  private readonly instanceOwners = new WeakMap<THREE.InstancedMesh, InstanceGroup>();
+  /** Every `BatchedMesh` this layer draws through, keyed by material identity. See `Batch`. */
+  private readonly batches = new Map<string, Batch>();
+  private readonly batchOwners = new WeakMap<THREE.BatchedMesh, Batch>();
   private readonly missing = new Set<string>();
   private readonly group = new THREE.Group();
   private readonly highlightGroup = new THREE.Group();
@@ -814,8 +968,6 @@ export class EntityViews {
       this.records.delete(entityId);
       this.clearHighlight(entityId);
     }
-
-    this.flush();
   }
 
   /**
@@ -916,10 +1068,7 @@ export class EntityViews {
       const group = this.groups.get(record.groupKey);
       if (!group) continue;
       this.writeSlot(group, record);
-      group.dirty = true;
     }
-
-    this.flush();
   }
 
   private syncOne(entity: SemanticEntity): void {
@@ -929,7 +1078,7 @@ export class EntityViews {
     const tier = view.materialTier ?? entity.tier;
     const clip = view.clipFraction ?? 0;
     const character = this.characterFor(entity.id, view.assetId, view.partAssetIds);
-    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${entity.archetype}|${clip}|${groupCell(entity.archetype, entity.position)}`;
+    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${entity.archetype}|${clip}|${batchCell(entity.archetype, entity.position)}`;
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
@@ -990,7 +1139,6 @@ export class EntityViews {
       this.applyUniqueState(record, tier);
     } else {
       this.writeSlot(group, record);
-      group.dirty = true;
     }
 
     const highlight = this.highlights.get(entity.id);
@@ -1027,7 +1175,8 @@ export class EntityViews {
   ): ViewRecord | null {
     const view = entity.view!;
     const group = this.ensureGroup(
-      groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier, clip, character,
+      groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier,
+      batchCell(entity.archetype, entity.position), clip, character,
     );
     if (!group) return null;
 
@@ -1148,7 +1297,6 @@ export class EntityViews {
   private rebalanceUniques(): void {
     const viewer = this.viewer;
     if (!viewer || this.rigCandidates.size === 0) return;
-    let changed = false;
 
     for (const record of this.rigCandidates) {
       // The boss is exempt in both directions. There is one of them, the fight is the climax of its
@@ -1162,8 +1310,6 @@ export class EntityViews {
       this.releaseUnique(record);
       record.slot = slot;
       this.writeSlot(group, record);
-      group.dirty = true;
-      changed = true;
     }
 
     let promoted = 0;
@@ -1181,10 +1327,7 @@ export class EntityViews {
       this.placeUnique(record);
       this.applyUniqueState(record, group.tier);
       this.setMotion(record, record.spent ? "death" : record.movingTicks > 0 ? "walk" : "idle");
-      changed = true;
     }
-
-    if (changed) this.flush();
   }
 
   private release(record: ViewRecord): void {
@@ -1233,10 +1376,9 @@ export class EntityViews {
     if (slot < 0 || group.slots[slot] !== entityId) return;
     group.slots[slot] = null;
     group.free.push(slot);
-    for (const mesh of group.live) mesh.setMatrixAt(slot, HIDDEN);
-    for (const mesh of group.spent) mesh.setMatrixAt(slot, HIDDEN);
-    for (const mesh of group.moving) mesh.setMatrixAt(slot, HIDDEN);
-    group.dirty = true;
+    for (const draw of group.live) hideInstance(draw, slot);
+    for (const draw of group.spent) hideInstance(draw, slot);
+    for (const draw of group.moving) hideInstance(draw, slot);
   }
 
   private spend(named: boolean, cost: number): void {
@@ -1277,7 +1419,9 @@ export class EntityViews {
     for (const key of stale) {
       const group = this.groups.get(key);
       if (!group) continue;
-      for (const mesh of [...group.live, ...group.spent, ...group.moving]) mesh.removeFromParent();
+      this.releaseDraws(group.live);
+      this.releaseDraws(group.spent);
+      this.releaseDraws(group.moving);
       this.groups.delete(key);
     }
   }
@@ -1290,6 +1434,7 @@ export class EntityViews {
     depletedAssetId: string | null,
     archetype: Archetype,
     tier: number,
+    cell: string,
     clipFraction = 0,
     character: CharacterSpec | null = null,
   ): InstanceGroup | null {
@@ -1318,11 +1463,11 @@ export class EntityViews {
     const group: InstanceGroup = {
       key,
       assetId,
+      cell,
       character,
       depletedAssetId,
       archetype,
       tier,
-      capacity: 0,
       slots: [],
       free: [],
       liveParts,
@@ -1333,10 +1478,9 @@ export class EntityViews {
       moving: [],
       posed: ready,
       needsPose: rigged && !ready,
-      dirty: false,
     };
+    group.live = this.buildDraws(group.liveParts, group.cell);
     this.groups.set(key, group);
-    this.resize(group, 8);
     return group;
   }
 
@@ -1344,24 +1488,25 @@ export class EntityViews {
    * Builds the spent variant on first use.
    *
    * Round 1 built it eagerly for every group, which doubled the instanced mesh count of the whole
-   * entity layer for a state most nodes are never in. With ~50 groups in the world that is ~50
-   * draw calls spent on hidden geometry, against a 400 ceiling the world was already over.
+   * entity layer for a state most nodes are never in. It costs less than it did — an unused spent
+   * geometry sits in a batch with no visible instance and is left out of the multi-draw — but the
+   * buffer space and the bake are still real, and most nodes are never spent.
    */
   private ensureSpent(group: InstanceGroup): void {
     if (group.spent.length > 0) return;
     if (!group.spentParts) group.spentParts = this.buildSpentParts(group);
     // A group with no spent geometry at all keeps its LIVE instance drawn under the spent
-    // material rather than being hidden. `writeSlot` hides the live meshes when it has something
-    // to put in their place; a node that vanishes on depletion is worse than one that only
-    // changes colour, and that vanishing is exactly what Phase 1 shipped.
+    // material rather than being hidden. `writeSlot` switches the live instance off only when it
+    // has something to put in its place; a node that vanishes on depletion is worse than one that
+    // only changes colour, and that vanishing is exactly what Phase 1 shipped.
     if (group.spentParts.length === 0) return;
-    group.spent = this.buildMeshes(group, group.spentParts, "spent");
+    group.spent = this.buildDraws(group.spentParts, group.cell);
   }
 
   /**
    * Builds the walking variant on first use, for a rigged group only.
    *
-   * The instanced path cannot animate — an `InstancedMesh` ignores skinning entirely — but it can
+   * The instanced path cannot animate — a batched draw ignores skinning entirely — but it can
    * hold a DIFFERENT baked pose depending on what the entity is doing, which is the difference
    * between fifty enemies that are all one frozen statue and fifty that at least stand differently
    * when they are chasing you. Only built when something in the group actually moves, so the 18
@@ -1374,15 +1519,11 @@ export class EntityViews {
         group.assetId, group.character, group.archetype, group.tier, false, "walk",
       );
     }
-    if (group.movingParts.length !== group.liveParts.length) {
-      // The walk bake must line up part-for-part with the live bake or `writeSlot`'s index
-      // arithmetic addresses the wrong geometry. A mismatch means the clip changed the mesh set,
-      // which it cannot, so treat it as "no walk variant" rather than drawing a scrambled one.
-      group.movingParts = [];
-      return;
-    }
+    // The live and walk bakes no longer have to line up part-for-part: a `PartDraw` carries its own
+    // `SourcePart`, so `writeSlot` reads each variant's own geometry and transform instead of
+    // indexing one array with the other's positions.
     if (group.movingParts.length === 0) return;
-    group.moving = this.buildMeshes(group, group.movingParts, "moving");
+    group.moving = this.buildDraws(group.movingParts, group.cell);
   }
 
   /**
@@ -2150,55 +2291,135 @@ export class EntityViews {
       group.slots[reused] = entityId;
       return reused;
     }
-    const used = group.slots.length;
-    if (used >= group.capacity) this.resize(group, Math.max(8, Math.ceil(group.capacity * 1.6) + 8));
+    // No capacity ceiling any more: a `BatchedMesh` instance is allocated per (part, slot) on the
+    // first write and the batch grows itself, so there is nothing to pre-size and nothing to
+    // rebuild. The old `resize` path — throw away every instance buffer, rebuild, re-write every
+    // slot — is gone with it.
     group.slots.push(entityId);
-    return used;
+    return group.slots.length - 1;
   }
 
-  /** Rebuilds a group's instanced meshes at a larger capacity, preserving every slot. */
-  private resize(group: InstanceGroup, capacity: number): void {
-    const hadSpent = group.spent.length > 0;
-    const hadMoving = group.moving.length > 0;
-    for (const mesh of [...group.live, ...group.spent, ...group.moving]) mesh.removeFromParent();
-    group.live = [];
-    group.spent = [];
-    group.moving = [];
-    group.capacity = capacity;
+  // ----------------------------------------------------------- batching
 
-    group.live = this.buildMeshes(group, group.liveParts, "live");
-    if (hadSpent && group.spentParts) group.spent = this.buildMeshes(group, group.spentParts, "spent");
-    if (hadMoving && group.movingParts) group.moving = this.buildMeshes(group, group.movingParts, "moving");
+  /**
+   * The batch a part draws through, created on first use.
+   *
+   * Keyed by material identity AND geometry attribute signature. The second half is not optional:
+   * `BatchedMesh` throws if an added geometry is missing an attribute the batch already carries,
+   * and the kits ship both `COLOR_0,NORMAL,POSITION,TEXCOORD_0` (134 primitives) and
+   * `NORMAL,POSITION,TEXCOORD_0` (126) under the same material names. Splitting on the signature
+   * turns that from a crash into at most one extra batch per material, and it is also exactly the
+   * split `vertexColors` needs — GLTFLoader compiles a separate material for a vertex-coloured
+   * primitive, and those two must not share a draw.
+   */
+  private batchFor(part: SourcePart, cell: string): Batch | null {
+    const position = part.geometry.getAttribute("position");
+    if (!position) return null;
+    const key = `${cell}||${materialBatchKey(part.material)}||${attributeSignature(part.geometry)}`;
+    const existing = this.batches.get(key);
+    if (existing) return existing;
 
-    // A resize throws away the old instance buffers, so every slot that already had an entity in it
-    // has to be written back. Missing this is the classic instancing bug where half the world
-    // disappears the moment one more node is added.
-    for (const record of this.records.values()) {
-      if (record.groupKey !== group.key || record.slot < 0 || record.slot >= capacity) continue;
-      this.writeSlot(group, record);
+    const vertices = position.count;
+    const indices = part.geometry.getIndex()?.count ?? 0;
+    const maxInstances = BATCH_INSTANCE_STEP;
+    const maxVertices = Math.max(BATCH_VERTEX_STEP, vertices * 2);
+    const maxIndices = Math.max(BATCH_VERTEX_STEP * 3, indices * 2);
+    const mesh = new THREE.BatchedMesh(maxInstances, maxVertices, maxIndices, part.material);
+    mesh.name = `entity-batch-${this.batches.size}`;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    // Per-INSTANCE culling is the whole reason this class is here, and it makes the object-level
+    // test both redundant and wrong: a batch's bounding sphere spans every region that uses the
+    // material, so it would never cull, while `onBeforeRender` (and `onBeforeShadow`) already drops
+    // the instances outside the frustum and submits nothing at all when none survive.
+    // Object-level culling is back on and it is the cheap half: one sphere test drops a whole
+    // off-screen cell before the renderer touches its material or its instances. Per-instance
+    // culling then trims what is left, which is what keeps the triangle count honest inside the
+    // cell the camera is standing in.
+    mesh.frustumCulled = true;
+    mesh.perObjectFrustumCulled = true;
+    // The per-frame instance sort only earns its cost when draw order changes the picture.
+    mesh.sortObjects = part.material.transparent === true;
+    const batch: Batch = {
+      key,
+      mesh,
+      maxInstances,
+      maxVertices,
+      maxIndices,
+      usedInstances: 0,
+      usedVertices: 0,
+      usedIndices: 0,
+      geometryIds: new Map(),
+      owners: [],
+    };
+    this.batches.set(key, batch);
+    this.batchOwners.set(mesh, batch);
+    this.group.add(mesh);
+    return batch;
+  }
+
+  /** Uploads one geometry into a batch, growing its buffers first if it will not fit. */
+  private addBatchGeometry(batch: Batch, geometry: THREE.BufferGeometry): number {
+    const existing = batch.geometryIds.get(geometry);
+    if (existing !== undefined) return existing;
+
+    const vertices = geometry.getAttribute("position")?.count ?? 0;
+    const indices = geometry.getIndex()?.count ?? 0;
+    if (batch.usedVertices + vertices > batch.maxVertices
+      || batch.usedIndices + indices > batch.maxIndices) {
+      batch.maxVertices = Math.max(batch.maxVertices * 2, batch.usedVertices + vertices);
+      batch.maxIndices = Math.max(batch.maxIndices * 2, batch.usedIndices + indices);
+      batch.mesh.setGeometrySize(batch.maxVertices, batch.maxIndices);
     }
-    group.dirty = true;
+    const id = batch.mesh.addGeometry(geometry);
+    batch.usedVertices += vertices;
+    batch.usedIndices += indices;
+    batch.geometryIds.set(geometry, id);
+    return id;
   }
 
-  private buildMeshes(
-    group: InstanceGroup,
-    parts: readonly SourcePart[],
-    suffix: string,
-  ): THREE.InstancedMesh[] {
-    return parts.map((part, index) => {
-      const mesh = new THREE.InstancedMesh(part.geometry, part.material, group.capacity);
-      mesh.name = `entity-${group.key}-${suffix}-${index}`;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.frustumCulled = true;
-      for (let slot = 0; slot < group.capacity; slot += 1) mesh.setMatrixAt(slot, HIDDEN);
-      mesh.instanceMatrix.needsUpdate = true;
-      // Allocated capacity is not the same as occupied capacity. See `flush`.
-      mesh.count = group.slots.length;
-      this.instanceOwners.set(mesh, group);
-      this.group.add(mesh);
-      return mesh;
-    });
+  /** The instance one slot draws this part through, allocated on first use. */
+  private instanceFor(draw: PartDraw, group: InstanceGroup, slot: number): number {
+    const existing = draw.instances[slot];
+    if (existing !== undefined && existing >= 0) return existing;
+    const batch = draw.batch;
+    if (batch.usedInstances >= batch.maxInstances) {
+      batch.maxInstances = Math.max(batch.maxInstances * 2, batch.usedInstances + 1);
+      batch.mesh.setInstanceCount(batch.maxInstances);
+    }
+    const id = batch.mesh.addInstance(draw.geometryId);
+    // `BatchedMesh` never invalidates its own bounds, and the object-level frustum test reads them.
+    // A batch that keeps a sphere from when it held three instances culls away the other nine
+    // hundred, which is the whole cell going missing from one camera angle and not another.
+    batch.mesh.boundingSphere = null;
+    batch.usedInstances += 1;
+    batch.owners[id] = { group, slot };
+    draw.instances[slot] = id;
+    return id;
+  }
+
+  private buildDraws(parts: readonly SourcePart[], cell: string): PartDraw[] {
+    const draws: PartDraw[] = [];
+    for (const part of parts) {
+      const batch = this.batchFor(part, cell);
+      if (!batch) continue;
+      draws.push({ batch, geometryId: this.addBatchGeometry(batch, part.geometry), part, instances: [] });
+    }
+    return draws;
+  }
+
+  /** Hands every instance a set of draws holds back to its batch. */
+  private releaseDraws(draws: readonly PartDraw[]): void {
+    for (const draw of draws) {
+      for (const id of draw.instances) {
+        if (id === undefined || id < 0) continue;
+        draw.batch.mesh.deleteInstance(id);
+        draw.batch.mesh.boundingSphere = null;
+        draw.batch.owners[id] = null;
+        draw.batch.usedInstances = Math.max(0, draw.batch.usedInstances - 1);
+      }
+      draw.instances.length = 0;
+    }
   }
 
   /**
@@ -2218,8 +2439,8 @@ export class EntityViews {
     else if (moving) this.ensureMoving(group);
 
     // Module scratch, for the reason the quaternions above are: `syncMotion` calls this once per
-    // moving entity per RENDER frame, and `resize` calls it once per record in the group. Two fresh
-    // Matrix4s per call is garbage allocated in exactly the frames that are already the tightest.
+    // moving entity per RENDER frame. Two fresh Matrix4s per call is garbage allocated in exactly
+    // the frames that are already the tightest.
     const placement = SCRATCH_PLACEMENT.compose(
       record.position,
       orientation(record.rotationY, record.normal, record.tilt, SCRATCH_QUATERNION),
@@ -2227,25 +2448,27 @@ export class EntityViews {
     );
     const transform = SCRATCH_TRANSFORM;
 
-    // A spent group with no geometry of its own falls back to the live meshes rather than to
-    // nothing. Hiding the live instance without drawing a replacement is how a worked-out node
-    // used to disappear from the world entirely. The walk variant works the same way.
+    // A spent group with no geometry of its own keeps drawing its LIVE parts rather than nothing.
+    // Hiding the live instance without drawing a replacement is how a worked-out node used to
+    // disappear from the world entirely. The walk variant works the same way.
     const spentReady = record.spent && group.spent.length > 0;
     const movingReady = !record.spent && moving && group.moving.length > 0;
     const active = spentReady ? group.spent : movingReady ? group.moving : group.live;
-    const activeParts = spentReady
-      ? group.spentParts ?? []
-      : movingReady ? group.movingParts ?? [] : group.liveParts;
 
-    for (const [index, mesh] of active.entries()) {
-      const part = activeParts[index];
-      if (!part) continue;
-      transform.multiplyMatrices(placement, part.matrix);
-      mesh.setMatrixAt(slot, transform);
+    for (const draw of active) {
+      transform.multiplyMatrices(placement, draw.part.matrix);
+      const instance = this.instanceFor(draw, group, slot);
+      draw.batch.mesh.setMatrixAt(instance, transform);
+      draw.batch.mesh.setVisibleAt(instance, true);
+      draw.batch.mesh.boundingSphere = null;
     }
+    // An instance that is not part of the current pose is switched off, not parked at a zero-scale
+    // matrix. `BatchedMesh` leaves an invisible instance out of the multi-draw entirely, so the
+    // pose the entity is NOT in costs nothing — where the old `InstancedMesh` pair still submitted
+    // both draws and still counted every hidden instance's triangles.
     for (const variant of [group.live, group.spent, group.moving]) {
       if (variant === active) continue;
-      for (const mesh of variant) mesh.setMatrixAt(slot, HIDDEN);
+      for (const draw of variant) hideInstance(draw, slot);
     }
   }
 
@@ -2287,32 +2510,6 @@ export class EntityViews {
         this.materials.variant(material, { tier, state: "dead", strength: look.strength, swatch: look.swatch }));
       mesh.material = mapped.length === 1 ? mapped[0]! : mapped;
     });
-  }
-
-  /**
-   * Uploads changed instance matrices and, just as importantly, trims `InstancedMesh.count` to the
-   * slots actually in use.
-   *
-   * Capacity grows in steps of 1.6x + 8, so a group holding 9 entities allocates 22 slots. Parking
-   * the spare 13 at a zero-scale matrix makes them invisible but NOT free: the draw still submits
-   * `count` instances and `renderer.info.render.triangles` still counts every one of them. On a
-   * rigged fallback group at ~27k triangles per character that is millions of phantom triangles in
-   * the perf report, which is most of the gap between the 12.56M measured at `gravelmaw_entrance`
-   * and what the visible world can account for.
-   *
-   * Slots are dense from zero and freed slots are reused, so `slots.length` is exactly the
-   * high-water mark and the correct count.
-   */
-  private flush(): void {
-    for (const group of this.groups.values()) {
-      if (!group.dirty) continue;
-      for (const mesh of [...group.live, ...group.spent, ...group.moving]) {
-        mesh.count = group.slots.length;
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.computeBoundingSphere();
-      }
-      group.dirty = false;
-    }
   }
 
   // --------------------------------------------------- hover / selection
@@ -2383,13 +2580,9 @@ export class EntityViews {
   pick(raycaster: THREE.Raycaster): EntityId | null {
     const hits = raycaster.intersectObject(this.group, true);
     for (const hit of hits) {
-      const instanced = hit.object as THREE.InstancedMesh;
-      if (instanced.isInstancedMesh && hit.instanceId !== undefined) {
-        const group = this.instanceOwners.get(instanced);
-        const entityId = group?.slots[hit.instanceId];
-        if (entityId) return entityId;
-        continue;
-      }
+      const owned = this.ownerOf(hit);
+      if (owned) return owned;
+      if ((hit.object as THREE.BatchedMesh).isBatchedMesh) continue;
       let node: THREE.Object3D | null = hit.object;
       while (node) {
         const owner = node.userData.entityId;
@@ -2404,13 +2597,26 @@ export class EntityViews {
   pickAll(raycaster: THREE.Raycaster): EntityId[] {
     const found: EntityId[] = [];
     for (const hit of raycaster.intersectObject(this.group, true)) {
-      const instanced = hit.object as THREE.InstancedMesh;
-      if (instanced.isInstancedMesh && hit.instanceId !== undefined) {
-        const entityId = this.instanceOwners.get(instanced)?.slots[hit.instanceId];
-        if (entityId && !found.includes(entityId)) found.push(entityId);
-      }
+      const entityId = this.ownerOf(hit);
+      if (entityId && !found.includes(entityId)) found.push(entityId);
     }
     return found;
+  }
+
+  /**
+   * The entity a raycast hit belongs to, or null when the hit is not one of this layer's instances.
+   *
+   * `BatchedMesh.raycast` reports which instance was hit as `intersection.batchId`, and the batch
+   * remembers which (group, slot) it lent that instance to — which is the only mapping there is,
+   * because one batch is shared by every group that paints with its material.
+   */
+  private ownerOf(hit: THREE.Intersection): EntityId | null {
+    const mesh = hit.object as THREE.BatchedMesh;
+    if (!mesh.isBatchedMesh) return null;
+    const batchId = (hit as THREE.Intersection & { batchId?: number }).batchId;
+    if (batchId === undefined) return null;
+    const owner = this.batchOwners.get(mesh)?.owners[batchId];
+    return owner ? owner.group.slots[owner.slot] ?? null : null;
   }
 
   /** World position an entity is drawn at. Used for overlays and camera framing. */
@@ -2473,15 +2679,15 @@ export class EntityViews {
       ? group.spent
       : moving && group.moving.length > 0 ? group.moving : group.live;
     const matrix = new THREE.Matrix4();
-    const scale = new THREE.Vector3();
-    for (const mesh of active) {
-      if (record.slot >= mesh.count) continue;
-      mesh.getMatrixAt(record.slot, matrix);
-      // A hidden slot is written as a zero-scale matrix, which is not the same as absent.
-      matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
-      if (scale.lengthSq() < 1e-9) continue;
-      mesh.geometry.computeBoundingBox();
-      const bounds = mesh.geometry.boundingBox;
+    for (const draw of active) {
+      const instance = draw.instances[record.slot];
+      // Absent and switched-off are both "this pose does not draw here", and both must not widen
+      // the box. This is what makes a depleted node's bounds the STUMP rather than the tree.
+      if (instance === undefined || instance < 0) continue;
+      if (!draw.batch.mesh.getVisibleAt(instance)) continue;
+      draw.batch.mesh.getMatrixAt(instance, matrix);
+      draw.part.geometry.computeBoundingBox();
+      const bounds = draw.part.geometry.boundingBox;
       if (!bounds) continue;
       box.union(bounds.clone().applyMatrix4(matrix));
       meshes += 1;
@@ -2491,9 +2697,9 @@ export class EntityViews {
 
   stats(): EntityViewStats {
     // Which pose variant each group actually has something in. A group whose entities all took a
-    // non-instanced rig keeps a full set of `InstancedMesh`es at `count` 0, and an unused spent or
-    // walk variant is the same: allocated, never submitted. Charging for them is what put 636 on a
-    // report next to a renderer reading 321.
+    // non-instanced rig has parts registered in a batch and no visible instance in any of them, and
+    // an unused spent or walk variant is the same. Charging for those is what put 636 on a report
+    // next to a renderer reading 321.
     const occupied = new Map<string, { live: boolean; spent: boolean; moving: boolean }>();
     for (const record of this.records.values()) {
       if (record.slot < 0) continue;
@@ -2512,13 +2718,18 @@ export class EntityViews {
     let triangles = 0;
     let bakedPoses = 0;
     let dressedGroups = 0;
+    const drawnBatches = new Set<Batch>();
+    const charge = (draws: readonly PartDraw[]): void => {
+      drawnInstancedMeshes += draws.length;
+      for (const draw of draws) drawnBatches.add(draw.batch);
+    };
     for (const group of this.groups.values()) {
       instancedMeshes += group.live.length + group.spent.length + group.moving.length;
       const flags = occupied.get(group.key);
       if (flags) {
-        if (flags.live) drawnInstancedMeshes += group.live.length;
-        if (flags.spent) drawnInstancedMeshes += group.spent.length;
-        if (flags.moving) drawnInstancedMeshes += group.moving.length;
+        if (flags.live) charge(group.live);
+        if (flags.spent) charge(group.spent);
+        if (flags.moving) charge(group.moving);
       }
       if (group.posed) bakedPoses += 1;
       if (group.character) dressedGroups += 1;
@@ -2553,10 +2764,13 @@ export class EntityViews {
       animatedLastFrame: this.animatedLastFrame,
       bakedPoses,
       highlights: this.highlights.size,
-      // Counted, not guessed, and with the shadow pass in it. Every instanced entity mesh and every
-      // unique character mesh casts, so each is two submitted draws; highlights are unlit overlays
-      // and are not, so a ring plus a pip is two. World-wide and unculled — see the field doc.
-      estimatedDrawCalls: drawnInstancedMeshes * 2 + uniqueMeshes * 2 + this.highlights.size * 2,
+      batches: this.batches.size,
+      drawnBatches: drawnBatches.size,
+      // Counted, not guessed, and with the shadow pass in it. The unit is the BATCH now, not the
+      // part: every part that shares a material shares one `multiDrawElements`. Unique character
+      // meshes are still one draw each and cast, so two; highlights are unlit overlays that do not
+      // cast, so a ring plus a pip is two. World-wide and unculled — see the field doc.
+      estimatedDrawCalls: drawnBatches.size * 2 + uniqueMeshes * 2 + this.highlights.size * 2,
       uniqueDrawCalls: this.uniqueDrawCalls,
       namedDrawCalls: this.namedDrawCalls,
       otherDrawCalls: this.otherDrawCalls,
@@ -2571,6 +2785,11 @@ export class EntityViews {
   dispose(): void {
     this.clearAllHighlights();
     for (const record of this.records.values()) this.release(record);
+    for (const batch of this.batches.values()) {
+      batch.mesh.removeFromParent();
+      batch.mesh.dispose();
+    }
+    this.batches.clear();
     this.group.clear();
     this.groups.clear();
     this.records.clear();
@@ -2597,18 +2816,6 @@ export class EntityViews {
     this.ringGeometry = null;
     this.pipGeometry = null;
   }
-}
-
-/**
- * Which `GROUP_CELL_SIZE` cell an entity's instance group lives in.
- *
- * `Math.floor` on a negative coordinate still lands in a consistent cell, and the cell only has to
- * be CONSISTENT — nothing reads it back, it exists so that two props 400 m apart cannot end up
- * sharing one bounding sphere.
- */
-function groupCell(archetype: Archetype, position: Vec3): string {
-  if (CELL_FREE_ARCHETYPES.has(archetype)) return "*";
-  return `${Math.floor(position[0] / GROUP_CELL_SIZE)}_${Math.floor(position[2] / GROUP_CELL_SIZE)}`;
 }
 
 function round(value: number): number {
@@ -2827,6 +3034,91 @@ function boxToBounds(
     meshes,
     path,
   };
+}
+
+/**
+ * Which batch cell an entity belongs to.
+ *
+ * Part of the GROUP key as well as the batch key, because a group's parts are uploaded into one
+ * cell's batches and every slot in it has to be inside that cell for the bounding sphere to mean
+ * anything. `Math.floor` on a negative coordinate still lands in a consistent cell.
+ */
+function batchCell(archetype: Archetype, position: Vec3): string {
+  if (CELL_FREE_ARCHETYPES.has(archetype)) return "*";
+  const x = Math.floor(position[0] / BATCH_CELL_SIZE);
+  const z = Math.floor(position[2] / BATCH_CELL_SIZE);
+  return `${x}_${z}`;
+}
+
+/** Switches one slot's instance of a part off, if it ever had one. */
+function hideInstance(draw: PartDraw, slot: number): void {
+  const instance = draw.instances[slot];
+  if (instance === undefined || instance < 0) return;
+  draw.batch.mesh.setVisibleAt(instance, false);
+}
+
+/**
+ * The geometry attributes a batch must agree on, as a comparable string.
+ *
+ * `BatchedMesh._validateGeometry` throws if an added geometry is missing an attribute the batch
+ * already has, or disagrees on `itemSize`/`normalized`, or on whether there is an index at all.
+ * This is that contract written down, so the key sorts geometries into compatible batches instead
+ * of finding out at `addGeometry`.
+ */
+function attributeSignature(geometry: THREE.BufferGeometry): string {
+  const names = Object.keys(geometry.attributes).sort();
+  const parts = names.map((name) => {
+    const attribute = geometry.getAttribute(name);
+    return `${name}:${attribute.itemSize}${attribute.normalized ? "n" : ""}`;
+  });
+  parts.push(geometry.getIndex() ? "idx" : "noidx");
+  return parts.join(",");
+}
+
+/**
+ * Material identity ACROSS separately loaded GLBs, so one batch can serve every asset that paints
+ * with the same material.
+ *
+ * The same problem `characterMaterialKey` solves for outfit parts, at world scale: two loads of the
+ * medieval-village kit are two `Material` instances holding two `Texture` instances, and comparing
+ * by UUID would mean 356 batches instead of 43. Everything the renderer can distinguish is in the
+ * key — name, every map's name, colour, the PBR scalars, side, blending and alpha.
+ *
+ * It is safe because the textures really are the same texture. runs/corealm/dc/matkey.mjs hashes
+ * the embedded image bytes of every material in all 213 manifest GLBs and groups them by this key:
+ * 63 distinct keys, and ZERO keys carrying more than one image hash. `MI_WoodTrim` is one key
+ * across 29 GLBs and one sha1 (f02e4f9db3) across all of them. If that ever stops being true the
+ * scan says so, and the failure mode is one wrong texture rather than a crash.
+ */
+function materialBatchKey(material: THREE.Material): string {
+  const standard = material as THREE.MeshStandardMaterial;
+  const mapName = (map: THREE.Texture | null | undefined): string => (map ? map.name || map.uuid : "-");
+  return [
+    material.name || material.type,
+    material.type,
+    mapName(standard.map),
+    mapName(standard.normalMap),
+    mapName(standard.roughnessMap),
+    mapName(standard.metalnessMap),
+    mapName(standard.emissiveMap),
+    mapName(standard.aoMap),
+    mapName(standard.alphaMap),
+    standard.color ? standard.color.getHexString() : "-",
+    standard.emissive ? standard.emissive.getHexString() : "-",
+    standard.emissiveIntensity ?? 1,
+    standard.roughness ?? 1,
+    standard.metalness ?? 0,
+    standard.envMapIntensity ?? 1,
+    material.side,
+    material.transparent ? "t" : "o",
+    material.opacity,
+    material.alphaTest,
+    material.depthWrite ? "dw" : "-",
+    material.blending,
+    standard.vertexColors ? "vc" : "-",
+    standard.flatShading ? "flat" : "-",
+    standard.wireframe ? "wire" : "-",
+  ].join("|");
 }
 
 function triangleCount(geometry: THREE.BufferGeometry): number {

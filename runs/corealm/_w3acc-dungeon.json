@@ -1,0 +1,64 @@
+{
+ "regionAfterTeleport": "gravelmaw",
+ "fromArena": [
+  {
+   "target": {
+    "locationId": "bracken_pit"
+   },
+   "error": "NOT_REACHABLE",
+   "pathLength": null
+  },
+  {
+   "target": {
+    "locationId": "town_center"
+   },
+   "error": "NOT_REACHABLE",
+   "pathLength": null
+  },
+  {
+   "target": {
+    "entityId": "npc_cairnkeeper_ode"
+   },
+   "error": "NOT_REACHABLE",
+   "pathLength": null
+  },
+  {
+   "target": {
+    "entityId": "npc_smith_harrow"
+   },
+   "error": "NOT_REACHABLE",
+   "pathLength": null
+  },
+  {
+   "target": {
+    "locationId": "gravelmaw_chamber2"
+   },
+   "error": null,
+   "pathLength": 44.884405793460374
+  },
+  {
+   "target": {
+    "locationId": "gravelmaw_entrance"
+   },
+   "error": "NOT_REACHABLE",
+   "pathLength": null
+  }
+ ],
+ "regionOutside": "karrowmoor",
+ "fromEntrance": [
+  {
+   "target": {
+    "locationId": "bracken_pit"
+   },
+   "error": null,
+   "pathLength": 240.52078178219313
+  },
+  {
+   "target": {
+    "entityId": "npc_cairnkeeper_ode"
+   },
+   "error": null,
+   "pathLength": 102.7358874688532
+  }
+ ]
+}

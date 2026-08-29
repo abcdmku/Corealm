@@ -1,0 +1,67 @@
+{
+  "startedAt": "2026-08-29T03:46:06.856Z",
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "usedRealGpu": true,
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "targetFps": 60,
+  "maxDrawCalls": 400,
+  "shots": [
+    {
+      "shot": "palewood_copse",
+      "frames": 3444,
+      "medianFrameMs": 0.8,
+      "p95FrameMs": 3.1,
+      "worstFrameMs": 5.9,
+      "impliedFps": 1250,
+      "drawCalls": 38,
+      "triangles": 1492078,
+      "programs": 73,
+      "heapMB": 169,
+      "meetsBudget": true
+    },
+    {
+      "shot": "town_center",
+      "frames": 1603,
+      "medianFrameMs": 2.5,
+      "p95FrameMs": 5.3,
+      "worstFrameMs": 9.2,
+      "impliedFps": 400,
+      "drawCalls": 239,
+      "triangles": 7336265,
+      "programs": 76,
+      "heapMB": 169,
+      "meetsBudget": true
+    },
+    {
+      "shot": "hollowcut_seam",
+      "frames": 1566,
+      "medianFrameMs": 2.5,
+      "p95FrameMs": 5.1,
+      "worstFrameMs": 8,
+      "impliedFps": 400,
+      "drawCalls": 276,
+      "triangles": 7242426,
+      "programs": 79,
+      "heapMB": 169,
+      "meetsBudget": true
+    },
+    {
+      "shot": "spawn",
+      "frames": 1481,
+      "medianFrameMs": 2.7,
+      "p95FrameMs": 5.4,
+      "worstFrameMs": 9.1,
+      "impliedFps": 370,
+      "drawCalls": 249,
+      "triangles": 6187442,
+      "programs": 79,
+      "heapMB": 169,
+      "meetsBudget": true
+    }
+  ],
+  "passed": true,
+  "errors": []
+}

@@ -45,6 +45,36 @@
  * the only way to spend fewer draw calls AND fewer triangles at once — the 63-asset nature+rock kit
  * uses only 17 materials — but it lives in `render/scene.ts`, which this pass does not own.
  *
+ * ROUND 5 RE-EXAMINED THE TILING AND LEFT IT ALONE, which is worth writing down because the
+ * standing recommendation said to undo it. The argument for undoing it was that the draw-call
+ * budget was blown (517 of 400 at `town_entrance`) and frame time had 4x headroom, so trading calls
+ * for triangles was the wrong way round. What was actually eating the budget was `render/
+ * entityViews.ts` submitting 490 separate `InstancedMesh`es; batching those took the worst pose from
+ * 517 to 299 and did not touch this file at all. With 100 calls of margin and median frame time
+ * roughly doubled by the per-instance cull, the axis that is tight is now triangles, which is the
+ * side of the trade the tiling is already on.
+ *
+ * The sweep behind that, per pose, is runs/corealm/audit/dcb-sweep.ts: it runs the real
+ * `scatterRegion`, rebuilds every candidate shard's bounding sphere, and tests it against the real
+ * camera frustum (fov 55, far = FOG_FAR 210) and the 96 m shadow box at all 18 shot poses.
+ *
+ * ```text
+ *   config                                 worst-pose calls   worst-pose tris   mean calls   mean tris
+ *   no tiling at all                                     60            12.01M           46       9.98M
+ *   shipped: shadow 96, cover 128 / 4000                166             7.88M          103       5.59M  <-
+ *   + a 4-instance-per-tile floor                       162             8.27M           99       5.91M
+ *   + an 8-instance-per-tile floor                      156             8.87M           93       6.41M
+ *   + a 16-instance-per-tile floor                      125            10.35M           80       7.44M
+ *   + a 24-instance-per-tile floor                      113            10.61M           76       7.67M
+ * ```
+ *
+ * Every step away from the shipped row buys draw calls at 100,000 triangles each, which is a worse
+ * rate than any line in the original sweep. The suspicious-looking buckets are suspicious only
+ * world-wide: `vellenwood:tree_twisted_2` really does hold 14 instances in 8 tiles, and un-tiling it
+ * plus the two `tree_dead_5` buckets saves 74 draw calls WORLD-WIDE and only 4 at any actual pose,
+ * because the culling those tiles exist for is already doing its job. Those species are also 3-10k
+ * triangles each, so the 4 calls cost 0.39M triangles. Left as shipped.
+ *
  * Exclusion zones are how gameplay space stays clear, and they are now a DENSITY FIELD rather than
  * a boolean: a settlement thins out over a band instead of ending in a bare 46 m disc.
  */
@@ -468,7 +498,15 @@ export interface ScatterResult {
   /** Accepted cluster centres, world-wide for this region. A copse is one; a tuft of grass is one. */
   clusters: number;
   instancedMeshes: number;
-  /** Estimated draw calls added, counting the shadow pass for casters. */
+  /**
+   * Draw calls added, counting the shadow pass for casters, WITH NOTHING CULLED.
+   *
+   * Same warning as `estimatedTriangles` below and it is easy to misread the other way: this is an
+   * upper bound over the whole region, not a per-frame figure. Shipped, the three regions report
+   * 127 / 167 / 130 = 424, while the frustum sweep in runs/corealm/audit/dcb-sweep.ts puts the
+   * worst single pose at 166 and the mean at 103 — a quarter of the world-wide number. Do not
+   * subtract this from `renderer.info.render.calls`; they are different quantities.
+   */
   estimatedDrawCalls: number;
   /**
    * Triangles this region submits when it is streamed in AND nothing is frustum-culled, counting

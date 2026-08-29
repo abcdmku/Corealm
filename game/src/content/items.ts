@@ -19,7 +19,7 @@
  * `Math.round` takes that to 12. Seared Cragfin therefore heals 12, and the Ordrun food budget in
  * PRD 2.4 gets slightly cheaper (8 fish instead of 9). Flagged to the root rather than papered over.
  */
-import type { ItemDef } from "../contracts.js";
+import type { EquipSlot, ItemDef, ItemStack } from "../contracts.js";
 import { healAmount, toolBonus } from "./index.js";
 import { EQUIPMENT } from "./equipment.js";
 
@@ -252,6 +252,28 @@ const FOOD: readonly ItemDef[] = [
 // PRD 2.5: "Tools never bypass requirements."
 
 const TOOLS: readonly ItemDef[] = [
+  // Tier 0. The kit the player starts with, and the bottom rung of the tool ladder.
+  //
+  // The bonus is written as a literal 1 rather than as `toolBonus(0)`, and that is the whole point
+  // of these three rows: `toolBonus(0)` is `round(1.6) = 2`, which is exactly `toolBonus(1)`. A
+  // starter tool derived from the formula would be numerically identical to the Grithe one the
+  // player is supposed to save up 60 marks for, so the first purchase in the game would buy
+  // nothing. At 1 the ladder actually reads 1 -> 2 -> 5 -> 9.
+  {
+    id: "worn_pickaxe", name: "Worn Pickaxe", tier: 0,
+    description: "The head is loose and the haft is somebody's fence post. One effective Mining level.",
+    stackable: false, value: 8, category: "tool", tool: { skill: "mining", gatherBonus: 1 },
+  },
+  {
+    id: "worn_hatchet", name: "Worn Hatchet", tier: 0,
+    description: "More wedge than edge. It will get through palewood if you are patient.",
+    stackable: false, value: 8, category: "tool", tool: { skill: "woodcutting", gatherBonus: 1 },
+  },
+  {
+    id: "worn_rod", name: "Worn Rod", tier: 0,
+    description: "A green stick and a length of gut. One effective Fishing level, on a good day.",
+    stackable: false, value: 6, category: "tool", tool: { skill: "fishing", gatherBonus: 1 },
+  },
   {
     id: "grithe_pickaxe", name: "Grithe Pickaxe", tier: 1,
     description: "A bar of Grithe on a palewood haft. Adds two effective Mining levels.",
@@ -315,3 +337,26 @@ export const ALL_ITEMS: readonly ItemDef[] = [...ITEMS, ...EQUIPMENT];
 
 /** The currency item id, so nothing else has to spell it. PRD 2.10: currency is marks. */
 export const CURRENCY_ITEM_ID = "marks";
+
+/**
+ * What a new character carries and wears.
+ *
+ * Applied by `state/store.ts` in `createInitialState`, so a fresh game and `__gameDebug.reset()`
+ * agree — putting it in `app/boot.ts` instead would give the harness a different world after every
+ * reset than the one it booted into, and the driver diffs exactly that.
+ *
+ * The sword is WORN rather than carried. Death drops carried items and keeps worn ones
+ * (runs/corealm/architecture.md, simplification 2), so a starting weapon in the pack would be gone
+ * the first time a Marchwolf caught the player, at the point in the game where they can least
+ * afford to replace it.
+ */
+export const STARTING_INVENTORY: readonly ItemStack[] = [
+  { itemId: "worn_hatchet", quantity: 1 },
+  { itemId: "worn_pickaxe", quantity: 1 },
+  { itemId: "worn_rod", quantity: 1 },
+];
+
+/** Worn at spawn. See `STARTING_INVENTORY` for why the weapon is here and not in the pack. */
+export const STARTING_EQUIPMENT: Readonly<Partial<Record<EquipSlot, ItemStack>>> = {
+  mainHand: { itemId: "worn_sword", quantity: 1 },
+};

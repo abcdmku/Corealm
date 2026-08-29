@@ -123,6 +123,28 @@ const MELEE_SPEED_MS = 2400;
 /** PRD 2.4: "Magic is slower (3.0 s per cast against 2.4 s for a standard sword)". */
 const CAST_SPEED_MS = 3000;
 
+// -------------------------------------------------------------- starter kit, tier 0 (Worn)
+/**
+ * What the player wakes up with.
+ *
+ * Tier 0 exists so the first minute of the game has a weapon in it and so the tier ladder starts
+ * below the first thing you can buy, rather than at it. The numbers are deliberately under
+ * `grithe_dagger`'s 6/6: this is a blade someone else wore out, and replacing it has to be worth
+ * 90 marks. It is the only tier-0 equipment row, and it is not part of any `KITS` entry because
+ * the PRD's derived-health and damage tables are written against tiers 1, 5 and 10.
+ *
+ * `requires` is empty on purpose. A starting item that the starting character cannot equip would
+ * be a bug the player meets before they meet anything else.
+ */
+const STARTER_EQUIPMENT: readonly ItemDef[] = [
+  gear({
+    id: "worn_sword", name: "Worn Shortsword", tier: 0, slot: "mainHand", value: 15,
+    description: "Notched, re-hafted twice, and lighter than it looks. It was somebody else's first.",
+    requires: {}, attackSpeedMs: MELEE_SPEED_MS,
+    bonuses: { accuracy: 3, power: 3 },
+  }),
+];
+
 // ------------------------------------------------------------------ melee, tier 1 (Grithe)
 // Kit totals: accuracy 11, power 8 (sword) / 6 (dagger), armour 16, magicArmour 5, vitality 6.
 
@@ -511,6 +533,7 @@ const MAGIC_TIER_10: readonly ItemDef[] = [
 
 /** Every equippable item, tiers 1 / 5 / 10, melee line then magic line. 57 rows. */
 export const EQUIPMENT: readonly ItemDef[] = [
+  ...STARTER_EQUIPMENT,
   ...MELEE_TIER_1, ...MELEE_TIER_5, ...MELEE_TIER_10,
   ...MAGIC_TIER_1, ...MAGIC_TIER_5, ...MAGIC_TIER_10,
 ];

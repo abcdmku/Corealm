@@ -42,7 +42,18 @@
  *      0.262 m slot at every joint of every building. `jointStuds` puts a post in each joint, which
  *      closes it and is also what half-timbering looks like, but the fix is dropping `compensation`
  *      in `emitParts`.
- *   3. APERTURED AND HALF-TIMBERED PANELS USED AS WALLS. Fixed in the previous pass; the panel
+ *   3. THE EAVES BAND, which is the same compensation seen sideways: the panel MESH shrinks and its
+ *      placement height does not, so the ring stops at 2.905 m at Rootfall and 2.714 m at Highcairn
+ *      under a gable that starts at 3.123 m. The tiles cover that band on the two eave sides, but a
+ *      roof prism is open at its ends, so 83-100% of the width of BOTH gable ends of all 24
+ *      Rootfall and Highcairn buildings was a letterbox you could see the far side of the world
+ *      through - measured before and after with `W4_NO_PLATE=1 npx tsx
+ *      runs/corealm/audit/w4-leak.ts`. `eavesPlate` closes it to 0-8%.
+ *   4. A WINDOW OPPOSITE THE FRONT DOOR. `ringWindows` refuses to put a window opposite a window,
+ *      but the doorway was never in its plan, and every ring prefab puts the door at the mirror
+ *      index of its own entry face. Measured at the drawn scale: a 0.98 m column straight through
+ *      all six Highcairn quarry huts, 0.20 m through the Coldbrace cottages and the vault tower.
+ *   5. APERTURED AND HALF-TIMBERED PANELS USED AS WALLS. Fixed in an earlier pass; the panel
  *      table below is why.
  *
  * WHICH PANELS ARE ACTUALLY SOLID. A bounding box says every `wall_*` is 2.000 x 3.123 x 0.406.
@@ -403,22 +414,38 @@ function wallModule(
  * `count - 1 - i` of side 2; sides 1 and 3 pair the same way. Sides 0 and 1 are drawn first and
  * freely, and 2 and 3 give way to them. The rng is consumed once per module in a fixed order
  * whatever the answer, so the plan is the same for the same building seed.
+ *
+ * THE DOORWAY IS AN APERTURE TOO, and it was not in the plan. `skip` marks the modules that do not
+ * roll, and the doorway is one of them, so it stayed `false` and side 0 was free to put a window
+ * opposite it. Every ring prefab puts its door at `floor(count / 2)` of side 2, and on a 3-module
+ * side `count - 1 - 1` is 1 - the door faces its own mirror index. Measured at the drawn scale with
+ * runs/corealm/audit/w4-leak.ts: a 0.98 m column of daylight straight through all six Highcairn
+ * quarry huts and 0.20 m through the Coldbrace cottages and the vault tower, in at the front door
+ * and out the back wall. `aperture` is the separate question "is this skipped module a HOLE", which
+ * is the door here and NOT the hall's solid window band, and it is what the opposite side now
+ * gives way to.
  */
 function ringWindows(
   sides: readonly Side[],
   rng: Rng,
   chance: number,
-  forced: (side: number, index: number) => boolean = () => false,
+  skip: (side: number, index: number) => boolean = () => false,
+  aperture: (side: number, index: number) => boolean = skip,
 ): boolean[][] {
   const plan: boolean[][] = sides.map((side) => new Array<boolean>(moduleCount(side.length)).fill(false));
+  const holes: boolean[][] = sides.map((side, s) => (
+    Array.from({ length: moduleCount(side.length) }, (_unused, index) => aperture(s, index))
+  ));
   for (const [s, side] of sides.entries()) {
     const count = moduleCount(side.length);
-    const facing = plan[(s + 2) % 4]!;
+    const facing = holes[(s + 2) % 4]!;
     for (let index = 0; index < count; index += 1) {
       const roll = rng.chance(chance);
-      if (forced(s, index)) continue;
+      if (skip(s, index)) continue;
       const opposite = facing[count - 1 - index] === true;
-      plan[s]![index] = roll && !opposite;
+      const isWindow = roll && !opposite;
+      plan[s]![index] = isWindow;
+      if (isWindow) holes[s]![index] = true;
     }
   }
   return plan;
@@ -591,6 +618,63 @@ function gableEnds(
   // assert the relationship the sizing rule is supposed to guarantee rather than trusting it.
   if (GABLE_HALF_AT_BASE * scale < headHalf - 0.35) {
     throw new Error(`gable half ${(GABLE_HALF_AT_BASE * scale).toFixed(3)} cannot reach the wall head at ${headHalf.toFixed(3)}`);
+  }
+  eavesPlate(out, width, depth, roof);
+}
+
+/**
+ * Pivot height of the eaves plate, in metres.
+ *
+ * THE LETTERBOX. The gable now starts at STOREY_METRES and the ring wall now stops at
+ * `STOREY_METRES * (1 / tierSilhouetteScale(tier))`, because `world/regionBuilder.ts` `emitParts`
+ * scales the panel MESH by that compensation and leaves the placement height alone. Those are not
+ * the same number anywhere but Coldbrace: measured with runs/corealm/audit/w4-leak.ts, the wall
+ * head is 2.905 m at Rootfall against a 3.123 m gable base and 2.714 m at Highcairn, so a
+ * horizontal slot 0.218 m and 0.409 m tall runs the full width of BOTH gable ends of every
+ * building in those two towns. The eave hides the same band on the two long sides - the tiles are
+ * out over it - but at a gable end the prism is open below the gable, so you look in one end,
+ * over the wall head, under the tiles, and out the other.
+ *
+ * 2.915 is the one pivot that works at all three tiers. `wall_bottom_trim` straddles its pivot from
+ * -0.117 to +0.121 at scale 1 and the plate is drawn at `((side + 0.3) / 2) * compensation`, so the
+ * worst case is Highcairn's short 4 m gable end: 0.219 m below the pivot and 0.226 above it, which
+ * spans 2.696 to 3.141 against a band of 2.714 to 3.123. The margin is 18 mm at the bottom and
+ * 18 mm at the top; the 0.3 m in the scale is what buys it, and it also returns the plate 0.15 m
+ * past each corner, which is what a wall plate does.
+ *
+ * When the root drops `compensation` this becomes decoration rather than a fix, and that is fine:
+ * a plate under the eaves is what stops a wall head reading as a cut edge.
+ */
+const EAVES_PLATE_Y = 2.915;
+
+/**
+ * A wall plate along the head of the two GABLE-END walls.
+ *
+ * One part per end rather than one per module: `wall_bottom_trim` is 2 m long and a part carries
+ * one uniform scale, so a plate long enough to span the side is also tall enough to bridge the
+ * letterbox, which a per-module plate at scale 1 (0.238 m, drawn 0.207 m at Highcairn) is not.
+ * The kit already draws `wall_bottom_trim` under every panel of every building, so this is two more
+ * instances of an asset every region has, and no new draw call.
+ *
+ * Not on the eave sides: the tiles already cover that band there, and two more parts per building
+ * on a hidden face is two more parts per building.
+ */
+function eavesPlate(
+  out: PartPlacement[],
+  width: number,
+  depth: number,
+  roof: PlacedRoof,
+): void {
+  const sides = ringSides(width, depth);
+  // The gable ends are the two faces the ridge runs INTO, which is the pair `gableEnds` closes.
+  for (const [index, s] of (roof.alongZ ? [0, 2] : [1, 3]).entries()) {
+    const side = sides[s]!;
+    out.push(part(
+      `plate${index}`, "wall_bottom_trim",
+      onSide(side, 1, 0, EAVES_PLATE_Y, 0.01),
+      side.yaw,
+      (side.length + 0.3) / MODULE_METRES,
+    ));
   }
 }
 
@@ -1095,7 +1179,14 @@ function hall(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
   // parities so the band survives intact; on the 6 m gable ends they are the same parity, so the
   // rule takes the two windows out of the second gable and the hall stops being a colonnade.
   const band = rng.chance(0.5) ? 0 : 1;
-  const windows = ringWindows(sides, rng, 1, (s, index) => (s === 2 && index === doorIndex) || index % 2 !== band);
+  // The off-band modules are skipped because they are SOLID, not because they are holes, so only
+  // the doorway is declared an aperture. Handing the whole skip set to the opposite-side rule
+  // would have the band give way to plain wall.
+  const windows = ringWindows(
+    sides, rng, 1,
+    (s, index) => (s === 2 && index === doorIndex) || index % 2 !== band,
+    (s, index) => s === 2 && index === doorIndex,
+  );
   for (const [s, side] of sides.entries()) {
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
@@ -1156,7 +1247,13 @@ function tower(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPl
   // which will not put a window opposite one.
   const plans = [
     ringWindows(sides, rng, 0.25, (s, index) => s === 2 && index === doorIndex),
-    ringWindows(sides, rng, 1, (_s, index) => index !== Math.floor(moduleCount(sides[0]!.length) / 2)),
+    // Storey 1 skips everything but the lookout module, and every one of those skips is solid wall,
+    // so nothing up here is a forced aperture.
+    ringWindows(
+      sides, rng, 1,
+      (_s, index) => index !== Math.floor(moduleCount(sides[0]!.length) / 2),
+      () => false,
+    ),
   ];
   for (let storey = 0; storey < 2; storey += 1) {
     const y = storey * STOREY_METRES;
@@ -1492,7 +1589,9 @@ function forge(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPl
   // wall the anvil stands against - the one face of a forge the player looks at from the square.
   // Windows are the seeded exception on the two side walls, and `ringWindows` keeps the left and
   // right walls from lining up a pair.
-  const windows = ringWindows(sides, rng, 0.3, (s) => s === 0 || s === 2);
+  // Side 0 is skipped because it is the open mouth - a hole - and side 2 because the back wall the
+  // anvil stands against must stay solid, so only side 0 is declared an aperture.
+  const windows = ringWindows(sides, rng, 0.3, (s) => s === 0 || s === 2, (s) => s === 0);
   for (const s of [1, 2, 3]) {
     const side = sides[s]!;
     const count = moduleCount(side.length);

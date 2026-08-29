@@ -47,9 +47,9 @@ function kitTotals(kit: keyof typeof KITS): EquipmentBonuses {
 }
 
 describe("the gear ladder", () => {
-  it("has 57 rows, one per id, all of them equippable", () => {
-    expect(EQUIPMENT).toHaveLength(57);
-    expect(BY_ID.size).toBe(57);
+  it("has 58 rows, one per id, all of them equippable", () => {
+    expect(EQUIPMENT).toHaveLength(58);
+    expect(BY_ID.size).toBe(58);
     for (const def of EQUIPMENT) {
       expect(def.equip, `${def.id} has no equip block`).toBeDefined();
       expect(def.category).toBe("equipment");
@@ -268,7 +268,7 @@ describe("item icons", () => {
     expect(iconShapeFor(BY_ID.get("kaldite_boots"))).toBe("boot");
   });
 
-  it("gives every one of the 57 rows a shape", () => {
+  it("gives every one of the 58 rows a shape", () => {
     for (const def of EQUIPMENT) expect(iconShapeFor(def), def.id).toBeTruthy();
   });
 });

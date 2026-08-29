@@ -1,0 +1,4 @@
+
+> 3d-game-harness@0.1.0 perf
+> tsx tools/perf-test.ts --run runs/corealm
+

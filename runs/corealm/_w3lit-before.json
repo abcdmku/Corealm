@@ -1,0 +1,169 @@
+{
+ "shots": {
+  "spawn": {
+   "fps": 0,
+   "frameMs": 2362.41,
+   "drawCalls": 427,
+   "triangles": 6584736,
+   "programs": 49,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "town_entrance": {
+   "fps": 0,
+   "frameMs": 2305.12,
+   "drawCalls": 435,
+   "triangles": 6579630,
+   "programs": 51,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "town_center": {
+   "fps": 0,
+   "frameMs": 2047.14,
+   "drawCalls": 381,
+   "triangles": 7829363,
+   "programs": 53,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "bank": {
+   "fps": 1,
+   "frameMs": 1827.01,
+   "drawCalls": 368,
+   "triangles": 7345994,
+   "programs": 53,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "bracken_pit": {
+   "fps": 1,
+   "frameMs": 1622.02,
+   "drawCalls": 182,
+   "triangles": 4335672,
+   "programs": 53,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "palewood_copse": {
+   "fps": 1,
+   "frameMs": 1430.9,
+   "drawCalls": 56,
+   "triangles": 1699250,
+   "programs": 54,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "redsill_shallows": {
+   "fps": 1,
+   "frameMs": 1323.92,
+   "drawCalls": 169,
+   "triangles": 4092440,
+   "programs": 54,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "marchfield_farm": {
+   "fps": 1,
+   "frameMs": 1290.21,
+   "drawCalls": 334,
+   "triangles": 7810903,
+   "programs": 54,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "rootfall": {
+   "fps": 1,
+   "frameMs": 1289.9,
+   "drawCalls": 438,
+   "triangles": 5073328,
+   "programs": 55,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "vellenwood_canopy": {
+   "fps": 1,
+   "frameMs": 1358.18,
+   "drawCalls": 314,
+   "triangles": 5571167,
+   "programs": 55,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "hollowcut_seam": {
+   "fps": 1,
+   "frameMs": 1363.43,
+   "drawCalls": 473,
+   "triangles": 7556858,
+   "programs": 55,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "karrowmoor_terraces": {
+   "fps": 1,
+   "frameMs": 1328.09,
+   "drawCalls": 438,
+   "triangles": 7638511,
+   "programs": 55,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "highcairn": {
+   "fps": 1,
+   "frameMs": 1295.87,
+   "drawCalls": 461,
+   "triangles": 8533552,
+   "programs": 55,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "upper_karrow_seam": {
+   "fps": 1,
+   "frameMs": 1234.95,
+   "drawCalls": 171,
+   "triangles": 3537575,
+   "programs": 56,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "sunder_ledge": {
+   "fps": 1,
+   "frameMs": 1190.88,
+   "drawCalls": 235,
+   "triangles": 4902020,
+   "programs": 57,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "gravelmaw_entrance": {
+   "fps": 1,
+   "frameMs": 1269.76,
+   "drawCalls": 416,
+   "triangles": 7457594,
+   "programs": 57,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "great_cairn": {
+   "fps": 1,
+   "frameMs": 1321.98,
+   "drawCalls": 157,
+   "triangles": 3705960,
+   "programs": 57,
+   "entityCount": 3483,
+   "heapMB": 141
+  },
+  "march_road": {
+   "fps": 1,
+   "frameMs": 1374.02,
+   "drawCalls": 297,
+   "triangles": 5410164,
+   "programs": 57,
+   "entityCount": 3483,
+   "heapMB": 141
+  }
+ },
+ "census": "no __probeRenderer hook in renderer.ts",
+ "consoleErrors": [],
+ "pageErrors": []
+}

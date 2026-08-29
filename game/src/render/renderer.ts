@@ -67,8 +67,35 @@ const SKY_STOPS: readonly { e: number; background: number; authored: number }[] 
   { e: 0.045, background: 0xa8d8f2, authored: 0xbed4de },   // 4 degrees
   { e: 0.012, background: 0xc1f7ff, authored: 0xcfe0e2 },   // 1 degree
   { e: 0.000, background: 0xffdf9e, authored: 0xe3d8b7 },   // the warm horizon band
-  { e: -0.012, background: 0xd6e6ea, authored: 0xd4dadb },  // distant haze rather than ground
-  { e: -0.250, background: 0x8f9689, authored: 0x9fa699 },  // 22 degrees down, haze gives way to land
+  // THE HAZE PLATEAU. Two stops at the same colour, and this is what makes the fog and the sky
+  // agree rather than agree at one elevation and diverge everywhere else.
+  //
+  // A single fog colour cannot match a ramp. The shipped table fell from 0xd4dadb at -0.012 to
+  // 0x9fa699 at -0.25 — 53 levels across the 21 degrees directly under the horizon — and the fog
+  // was sampled at ONE point on it, so it agreed with the sky at that point and nowhere else.
+  // Measured at the sky row immediately above the terrain silhouette, fog colour against sky:
+  // great_cairn was 5 levels out, vellenwood_canopy 7, march_road 2 — and palewood_copse, whose
+  // 0.58 rad pitch puts its whole sky band below the horizon, was 38. That is the flat pale band.
+  // After the plateau the same six shots measure 0, 0, 0, 3, 0 and 0.
+  //
+  // The plateau reaches -0.18. `e` is the elevation angle over 90 degrees, so that is 16.2 degrees
+  // down, and it has to go that far: the eighteen shot pitches run 0.34 to 0.62 rad, so at a
+  // 55-degree vertical FOV the TOP of the frame sits between +8.0 and -8.0 degrees of elevation and
+  // a distant silhouette sits lower again — palewood_copse's sky band alone runs -5.7 to -19.9
+  // degrees. Anywhere a hazed ridge can land in these frames now meets exactly the colour the fog
+  // resolves to.
+  //
+  // Flat is also the physical answer. Aerial haze under the horizon is optically thick and very
+  // nearly uniform through the first ten or fifteen degrees; the ramp that was there read as a
+  // grey-green wash getting murkier downward, which is not what air does.
+  //
+  // Costed, because the lower hemisphere is a LIGHT as well as a picture: measured with
+  // runs/corealm/audit/w3lit-irradiance.mjs, this leaves the irradiance on an up-facing surface
+  // bit-identical, raises a down-facing one 15% and the full-sphere mean 8.1%. That is inside the
+  // 0.38-0.62 band light-sweep.mjs found usable for ENVIRONMENT_INTENSITY, so 0.50 stands.
+  { e: -0.012, background: 0xcbe3f2, authored: 0xd0d9de },  // haze plateau, top
+  { e: -0.180, background: 0xcbe3f2, authored: 0xd0d9de },  // haze plateau, bottom: 16 degrees down
+  { e: -0.340, background: 0x8f9689, authored: 0x9fa699 },  // 31 degrees down, haze gives way to land
   { e: -1.000, background: 0x4a4436, authored: 0x403828 },  // nadir, the ground tone the hemisphere uses
 ];
 
@@ -114,17 +141,19 @@ const ENVIRONMENT_INTENSITY = 0.50;
 /**
  * Where on the sky gradient the fog colour is taken from, and how far the haze reaches.
  *
- * -0.03 is 1.7 degrees below the geometric horizon, which is where a distant ridge silhouette
- * actually sits in these eighteen shots: at pitches of 0.34-0.62 rad the far heightfield edge
- * lands between -1 and -6 degrees. Sampling exactly 0 would take the warm horizon streak, which is
- * a 1.4-degree band, and paint the entire mid-ground cream.
+ * -0.09 is 8.1 degrees below the geometric horizon and it sits INSIDE the haze plateau, so every
+ * elevation from -0.012 to -0.18 returns the identical colour and this number cannot be tuned into
+ * a mismatch. That is the point of the plateau: before it existed the shipped -0.03 matched the sky
+ * to within 2 levels in the shots whose silhouette happened to sit near -0.03 and was 38 levels out
+ * in palewood_copse, which looks 5 degrees further down. Sampling exactly 0 would still be wrong:
+ * the warm horizon streak is a 2-degree band and it would paint the whole mid-ground cream.
  *
  * The `light` column, not `background`, because that is the AUTHORED colour — see the fog comment
  * in the constructor for why the fog wants the value the sky DISPLAYS rather than the one it is
  * drawn from. `sampleSky` desaturation only happens in `createSkyGradient`, so reading the light
  * column here returns the authored hex undesaturated, which is what is wanted.
  */
-const FOG_HORIZON_ELEVATION = -0.03;
+const FOG_HORIZON_ELEVATION = -0.09;
 const FOG_NEAR = 26;
 const FOG_FAR = 210;
 
@@ -323,6 +352,7 @@ export class Renderer {
 
     this.resize();
     window.addEventListener("resize", () => this.resize());
+
   }
 
   resize(): void {

@@ -295,9 +295,14 @@ async function main(): Promise<void> {
       check(panels.length === trims.length,
         `${run.id}/${kitId}: ${panels.length} panels but ${trims.length} plinths`);
       if (kit.frame !== null) {
-        const solid = panels.filter((p) => p.assetId === kit.wall).length;
-        check(frames.length === solid,
-          `${run.id}/${kitId}: ${solid} solid panels but ${frames.length} frames`);
+        // A ring wall frames every solid module; a RUN frames a seeded 0.8 of them, because a
+        // 26-module palisade with the same overlay on every panel is the wallpaper the brief
+        // complained about. So the contract here is one-frame-per-non-window-panel at most, not
+        // exactly one each - this assertion still said "exactly", and had been red on all 14 runs
+        // since `buildWallRun` started rolling for the frame and framing `wallFeature` panels too.
+        const framable = panels.filter((p) => p.assetId !== kit.wallWindow).length;
+        check(frames.length <= framable,
+          `${run.id}/${kitId}: ${framable} framable panels but ${frames.length} frames`);
       }
       for (const part of parts) {
         check(part.dx >= -1e-6 && part.dx <= run.length + 1e-6,

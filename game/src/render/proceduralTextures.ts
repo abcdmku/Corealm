@@ -20,8 +20,9 @@
  *    being seamless, which reads as a hard grid line every 2.5 m across the whole world. The
  *    repeat is broken up by a second, separately authored macro texture instead — see the last
  *    paragraph, and note that the first attempt at this reused the atlas and printed a honeycomb.
- *  - 512 px, not 1024. Measured generation cost, node 24 on this machine: 512 takes 125 ms and
- *    1024 takes 461 ms, and that cost lands on the boot path and on every headless audit run. At
+ *  - 512 px, not 1024. Measured generation cost, node 24 on this machine: 512 takes 144 ms with
+ *    the contrast stretch (125 ms without it, and the macro texture adds 25 ms) and 1024 takes
+ *    461 ms, and that cost lands on the boot path and on every headless audit run. At
  *    the 2.5 m detail tiling 512 px is 205 texels/m, finer than a 1080p frame resolves at the
  *    6-34 m camera distances in shots.ts. Memory with mips: 1.4 MB, against the 5.6 MB a 1024
  *    atlas would cost.
@@ -204,6 +205,90 @@ function encode(value: number, low: number, high: number): number {
   return clamp(Math.round((v - DETAIL_VALUE_OFFSET) * 255), 0, 255);
 }
 
+/**
+ * Rescales a generated field in place so its 1st and 99th percentiles land on 0 and 1 AND its mean
+ * lands on 0.5.
+ *
+ * Without this, an authored range is a range the texture never reaches, and that is measurably
+ * most of why the ground reads as one flat field past about 20 m. A four-octave fbm at gain 0.5 is
+ * a sum of four bounded terms, so its output concentrates hard around 0.5 by the central limit
+ * theorem and the tails are almost empty. Measured on the shipped generator with
+ * runs/corealm/audit/w3lit-tex.mjs: the macro grass channel is authored 0.74..1.26 and realises
+ * 0.810..1.206, with p5..p95 of only 0.857..1.127 and a standard deviation of 0.077. The gravel
+ * channel is worse — authored 0.87..1.13, sd 0.035. At 20-60 m the 2.5 m detail read has already
+ * mipped to its own mean, so those two ARE the surface, and a +/-8% multiplier on ground colour is
+ * about four levels of 255 after the sRGB transfer. Four levels is not a surface.
+ *
+ * Percentiles rather than min/max, because a value-noise fbm has isolated extremes: stretching on
+ * the extremes moves almost nothing. 1% and 99% clip 5,243 texels of a 512 atlas and 655 of the
+ * macro, and those clip against the authored bound, which is where the darkest joint and the
+ * brightest crest are supposed to sit anyway.
+ *
+ * The two halves are stretched SEPARATELY, onto [0, 0.5] and [0.5, 1]. That pins the channel mean
+ * to the midpoint of whatever range `encode` maps it onto, and every range in this file is
+ * symmetric about 1.0, so each channel is a pure contrast signal whose mean multiplier lands
+ * within 4% of 1.0 (measured 0.994 to 1.041; the residual is the 1% tails clipping against the
+ * authored bound on the skewed rock and gravel channels). This is what keeps the file's stated contract — hue and VALUE live in `REGION_PALETTES`,
+ * these textures are variation only — true after the stretch. A single-piece stretch broke it: the
+ * detail rock channel came out with a mean of 0.923 and the macro gravel channel 1.070, so
+ * retuning the contrast would silently have darkened every cliff by 8% and brightened every
+ * cobbled square by 7%. The kink at the mean is a slope discontinuity in a multiplier, which
+ * nothing downstream can see.
+ *
+ * A histogram, not a sort. Sorting four 262,144-element channels measured 80 ms against the 125 ms
+ * the whole atlas costs, and this runs on the boot path and in every headless audit. 4,096 bins
+ * over the field's own range is a quantisation of 1/4096 of that range, far finer than the 1/255
+ * the result is stored at.
+ */
+function contrastStretch(field: Float32Array): void {
+  const bins = 4096;
+  let min = Infinity;
+  let max = -Infinity;
+  let total = 0;
+  for (let i = 0; i < field.length; i += 1) {
+    const v = field[i]!;
+    if (v < min) min = v;
+    if (v > max) max = v;
+    total += v;
+  }
+  const span = max - min;
+  if (span <= 1e-6) return;
+  const mean = total / field.length;
+
+  const histogram = new Uint32Array(bins);
+  for (let i = 0; i < field.length; i += 1) {
+    const bin = Math.min(bins - 1, Math.floor(((field[i]! - min) / span) * bins));
+    histogram[bin] = histogram[bin]! + 1;
+  }
+
+  const lowTarget = field.length * 0.01;
+  const highTarget = field.length * 0.99;
+  let seen = 0;
+  let low = min;
+  let high = max;
+  let haveLow = false;
+  for (let bin = 0; bin < bins; bin += 1) {
+    seen += histogram[bin]!;
+    if (!haveLow && seen >= lowTarget) {
+      low = min + (bin / bins) * span;
+      haveLow = true;
+    }
+    if (seen >= highTarget) {
+      high = min + ((bin + 1) / bins) * span;
+      break;
+    }
+  }
+
+  const below = Math.max(1e-6, mean - low);
+  const above = Math.max(1e-6, high - mean);
+  for (let i = 0; i < field.length; i += 1) {
+    const v = field[i]!;
+    field[i] = v <= mean
+      ? clamp(0.5 * (v - low) / below, 0, 0.5)
+      : clamp(0.5 + 0.5 * (v - mean) / above, 0.5, 1);
+  }
+}
+
 // ---------------------------------------------------------- detail atlas
 
 let detailAtlas: THREE.DataTexture | null = null;
@@ -248,37 +333,59 @@ export function createDetailAtlas(): THREE.DataTexture {
   const rockNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x0c0c) >>> 0));
   const gravelCells = makeWorley(new Rng((TEXTURE_SEED ^ 0x9a4e) >>> 0), 32);
 
+  // Fields first, encoded second, because `contrastStretch` needs the whole channel before it can
+  // know what its percentiles are. Four 512 x 512 Float32Arrays are 4 MB of transient allocation
+  // against the 1.4 MB the finished atlas occupies with mips, and they are released on return.
+  const texels = size * size;
+  const grassField = new Float32Array(texels);
+  const soilField = new Float32Array(texels);
+  const rockField = new Float32Array(texels);
+  const gravelField = new Float32Array(texels);
+
   for (let y = 0; y < size; y += 1) {
     const v = y / size;
     for (let x = 0; x < size; x += 1) {
       const u = x / size;
-      const index = (y * size + x) * 4;
+      const index = y * size + x;
 
       // Grass. The clump is a broad tussock swell, NOT a thresholded cell: `1 - f1` smoothed to
       // its own midpoint is a soft dome per cell with no visible boundary between domes.
       const clump = grassClump(u, v);
       const tussock = smoothstep01(0.25 + 0.75 * (1 - clump.f1)) * (0.72 + 0.28 * clump.tone);
-      const grass = fbm(grassNoise, u, v, 5, 12, 12);
-      data[index] = encode(grass * 0.82 + tussock * 0.18, 0.70, 1.24);
+      grassField[index] = fbm(grassNoise, u, v, 5, 12, 12) * 0.82 + tussock * 0.18;
 
       // Soil. 1.6:1 drag (10 cells across x against 16 across z), and a third of the signal is an
       // isotropic grit octave so a road reads as worn dirt rather than as brushed metal.
       const drag = fbm(soilNoise, u, v, 4, 10, 16);
       const grit = fbm(gritNoise, u, v, 3, 40, 40);
-      data[index + 1] = encode(drag * 0.66 + grit * 0.34, 0.72, 1.22);
+      soilField[index] = drag * 0.66 + grit * 0.34;
 
       // Rock. Ridged fracture over a broad face term, so a cliff has both a shape and a grain.
       const face = fbm(rockNoise, u, v, 2, 5, 5);
       const ridged = 1 - Math.abs(fbm(rockNoise, u, v, 3, 18, 18) * 2 - 1);
-      data[index + 2] = encode(ridged * 0.62 + face * 0.38, 0.52, 1.22);
+      rockField[index] = ridged * 0.62 + face * 0.38;
 
       // Gravel and cobble. Per-stone tone, joints darkened where F2-F1 approaches zero, and a
       // little grit inside each stone so a close-up face is not a flat chip.
       const cell = gravelCells(u, v);
       const joint = clamp(cell.edge / 0.09, 0, 1);
       const stone = (0.30 + 0.70 * smoothstep01(joint)) * (0.62 + 0.50 * cell.tone);
-      data[index + 3] = encode(stone * 0.86 + grit * 0.14, 0.56, 1.26);
+      gravelField[index] = stone * 0.86 + grit * 0.14;
     }
+  }
+
+  for (const field of [grassField, soilField, rockField, gravelField]) contrastStretch(field);
+
+  for (let index = 0; index < texels; index += 1) {
+    const offset = index * 4;
+    // Symmetric about 1.0, every one of them, so `contrastStretch`'s mean-centring makes each
+    // channel's mean multiplier exactly 1.0 and the region palette keeps sole authority over how
+    // light a surface is. The half-widths are the authored contrast per surface: grass and worn
+    // soil are gentle, a fracture face and a gravel bed are not.
+    data[offset] = encode(grassField[index]!, 0.73, 1.27);
+    data[offset + 1] = encode(soilField[index]!, 0.75, 1.25);
+    data[offset + 2] = encode(rockField[index]!, 0.65, 1.35);
+    data[offset + 3] = encode(gravelField[index]!, 0.65, 1.35);
   }
 
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
@@ -310,12 +417,12 @@ let macroVariation: THREE.DataTexture | null = null;
  *   B  rock    the widest range of the four; a cliff face wants macro value breaks
  *   A  gravel  scree drift, gentle, because a cobbled square must stay flat
  *
- * Grass and soil were widened from 0.80..1.20 and 0.84..1.16 to 0.74..1.26 and 0.80..1.20. Measured
- * on w2-palewood_copse with runs/corealm/audit/lit-ground.mjs, near-field open ground spanned only
- * p5..p95 = 96..123 of 255 in luminance, and at 20-60 m the 2.5 m detail read has already mipped
- * to its mean, so these two are most of what is left. The grass channel carries double duty now:
- * the ground shader also reads it as a dry/lush selector, and a range this narrow put almost every
- * texel inside the selector's smoothstep instead of on one side of it.
+ * The authored ranges are wide and, since `contrastStretch`, they are the ranges the texture
+ * actually realises. Measured with runs/corealm/audit/w3lit-tex.mjs, the grass channel went from
+ * p5..p95 = 0.857..1.127 and sigma 0.077 to 0.747..1.237 and sigma 0.140 — 1.8x the contrast, on
+ * the one read that survives to 20-60 m. Gravel is deliberately left the tightest of the four: it
+ * covers every cobbled square and paved approach in the game, and a macro swell drawn 12 m across
+ * a laid floor reads as a sagging floor.
  */
 export function createMacroVariation(): THREE.DataTexture {
   if (macroVariation) return macroVariation;
@@ -327,16 +434,37 @@ export function createMacroVariation(): THREE.DataTexture {
   const rock = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x3c52) >>> 0));
   const gravel = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x4d63) >>> 0));
 
+  const texels = size * size;
+  const grassField = new Float32Array(texels);
+  const soilField = new Float32Array(texels);
+  const rockField = new Float32Array(texels);
+  const gravelField = new Float32Array(texels);
+
   for (let y = 0; y < size; y += 1) {
     const v = y / size;
     for (let x = 0; x < size; x += 1) {
       const u = x / size;
-      const index = (y * size + x) * 4;
-      data[index] = encode(fbm(grass, u, v, 4, 3, 3), 0.74, 1.26);
-      data[index + 1] = encode(fbm(soil, u, v, 4, 2, 3), 0.80, 1.20);
-      data[index + 2] = encode(fbm(rock, u, v, 4, 3, 3), 0.72, 1.28);
-      data[index + 3] = encode(fbm(gravel, u, v, 4, 2, 2), 0.87, 1.13);
+      const index = y * size + x;
+      grassField[index] = fbm(grass, u, v, 4, 3, 3);
+      soilField[index] = fbm(soil, u, v, 4, 2, 3);
+      rockField[index] = fbm(rock, u, v, 4, 3, 3);
+      gravelField[index] = fbm(gravel, u, v, 4, 2, 2);
     }
+  }
+
+  for (const field of [grassField, soilField, rockField, gravelField]) contrastStretch(field);
+
+  for (let index = 0; index < texels; index += 1) {
+    const offset = index * 4;
+    // Symmetric about 1.0 for the same reason as the atlas. These half-widths are wider than the
+    // atlas's because this texture is the ONLY signal left at 20-60 m: the 2.5 m detail read has
+    // mipped to its own mean by about 20 m, so whatever contrast the far ground has, it has from
+    // here. Gravel stays the tightest of the four — a cobbled square is laid flat and a macro
+    // swell across it reads as a sagging floor.
+    data[offset] = encode(grassField[index]!, 0.70, 1.30);
+    data[offset + 1] = encode(soilField[index]!, 0.75, 1.25);
+    data[offset + 2] = encode(rockField[index]!, 0.67, 1.33);
+    data[offset + 3] = encode(gravelField[index]!, 0.84, 1.16);
   }
 
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);

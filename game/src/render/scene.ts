@@ -774,6 +774,14 @@ export class WorldScene {
    *
    * The Agility distance ledger in `content/regions.ts` is unaffected: it is straight-line metres
    * between authored coordinates and a haul road changes only y.
+   *
+   * WHERE IT STANDS. 33 corridors over the world's 47 pads; the same 6x7 probe grid now reaches 40
+   * of 42 cells and all 15 named Karrowmoor locations connect from the Lower Quarry. The two cells
+   * still missing, (200,-30) and (50,-90), are shelves on a terrace riser that no authored route
+   * touches: the ground measures 0.59 and 0.49 there, walkable in itself but cut off from the moor
+   * below by the riser it sits on. Across the 15 authored Karrowmoor road links the walked path is
+   * at most 1.26 times the straight line on every link longer than 16 m, and the worst surface
+   * metre is 32.1 degrees, at the five-way junction on the Second Ramp pad.
    */
   private buildHaulRoads(): void {
     this.protectedPads = this.flats.filter(
@@ -782,13 +790,32 @@ export class WorldScene {
     const pads = this.flats.filter((flat) => !this.carvedPads.has(flat));
     if (pads.length < 2) return;
 
+    // A pad may not veto a link that leaves the settlement it is standing in.
+    //
+    // The Gabriel test exists to stop a chord being cut through a place. A link that STARTS inside
+    // a protected core is not that: the corridor has no authority on that ground (see
+    // `protectedAuthority`), so the pads sharing the core cannot be trenched by it, and vetoing on
+    // them only blocks the settlement's own way out. Measured: the authored
+    // `highcairn_bank -> karrow_ramp_two` ramp — the one road onto Karrowmoor's third terrace —
+    // was vetoed by three pads all inside Highcairn's 22 x 14 m core, its own settlement pad at
+    // (142,-61) and the outpost and plots markers, so it got no corridor at all and measured 43.2
+    // degrees against a 48-degree limit while the navmesh detoured 64.3 m round a 51 m link.
+    //
+    // Both conditions matter. Waiving the veto for every pad on immovable ground instead of only
+    // for links that share its core admitted 7 more chords across Karrowmoor, including a 128.3 m
+    // Moor Road Bend to Upper Karrow Seam trench, and pushed `karrow_ramp_three` to
+    // `upper_karrow_seam` from 19.2 to 36.3 surface degrees.
+    const sharesCoreWith = (flat: FlatSpot, a: FlatSpot, b: FlatSpot): boolean => this.protectedPads
+      .some((core) => padDistance(core, flat.x, flat.z) <= 0
+        && (padDistance(core, a.x, a.z) <= 0 || padDistance(core, b.x, b.z) <= 0));
+
     for (let i = 0; i < pads.length; i += 1) {
       for (let j = i + 1; j < pads.length; j += 1) {
         const a = pads[i]!;
         const b = pads[j]!;
         const span = Math.hypot(b.x - a.x, b.z - a.z);
         if (span < HAUL_MIN_LINK || span > HAUL_MAX_LINK) continue;
-        if (!isGabrielNeighbour(pads, i, j)) continue;
+        if (!isGabrielNeighbour(pads, i, j, (other) => sharesCoreWith(other, a, b))) continue;
         const road = this.gradeHaulRoad(a, b, span);
         if (!road) continue;
         this.hauls.push(road);
@@ -950,30 +977,47 @@ export class WorldScene {
     }
 
     if (weightSum <= 0) return height;
-    const reach = influence * (1 - this.protectedAuthority(x, z));
+    const target = accumulated / weightSum;
+    const reach = influence * (1 - this.protectedAuthority(x, z, Math.abs(target - height)));
     if (reach <= 0) return height;
-    return height + (accumulated / weightSum - height) * reach;
+    return height + (target - height) * reach;
   }
 
   /**
    * How much of the ground at a point belongs to a pad a corridor may not move, 0..1.
    *
-   * 1 inside a settlement pad or a basin core, falling to 0 across that pad's own blend, so a
-   * corridor hands the ground back to the settlement over the same distance the settlement is
-   * already using to meet the hillside. That is what lets the haul roads run LAST without a lane
-   * being cut across a town square: Coldbrace, Rootfall and Highcairn keep the 0.000 m of relief
-   * across their pads that `building-footing` measures, while the corridor keeps full authority on
-   * the open riser where the walkable-slope problem actually is.
+   * 1 inside a settlement pad or a basin core, falling to 0 outside it over whatever distance the
+   * handover itself needs. What must not move is the pad's CORE — that is the ground
+   * `building-footing` measures the 0.000 m of relief across, and it is where the buildings stand.
+   * The collar outside it is hillside, and a haul road cut across a hillside beside a town is a
+   * road, not a trench through the square.
+   *
+   * THE HANDBACK IS SIZED BY THE DISAGREEMENT, NOT BY THE PAD, and both fixed sizes were measured
+   * wrong before this. Running it over the pad's whole blend gave Highcairn's 26.1 m pad authority
+   * out to 53.6 m from (142,-61), and the riser the Second Ramp climbs sits 33.6 m out, where the
+   * pad still held 80% of the ground: the corridor got a fifth of a say on the one stretch it
+   * existed for, and the authored `highcairn_bank -> karrow_ramp_two` road line measured 43.2
+   * degrees with a corridor graded to 16.5 running underneath it. Pinning it to a flat 8 m instead
+   * fixed those and broke `moor_road_bend -> highcairn_outpost`, which climbs past Highcairn 5 m
+   * outside the core where the corridor and the collar disagree by 6.7 m: 6.7 m of handover in 8 m
+   * measured 38.6 degrees.
+   *
+   * So the distance comes from the disagreement, exactly the way `gradeHaulRoad` sizes the
+   * corridor's own collar: `SMOOTHSTEP_PEAK` * drop / `HAUL_FEATHER_GRADE`, which is the width at
+   * which a smoothstep of that drop peaks at a walkable gradient. It is bounded by the pad's own
+   * blend, because past that the pad is not holding the ground anyway.
    *
    * Only the protected pads are swept — seven of the world's 47 — and only when a corridor already
    * reaches the point, so this costs nothing on the 99% of the lattice no haul road touches.
    */
-  private protectedAuthority(x: number, z: number): number {
+  private protectedAuthority(x: number, z: number, disagreement: number): number {
+    const needed = (SMOOTHSTEP_PEAK * disagreement) / HAUL_FEATHER_GRADE;
     let authority = 0;
     for (const flat of this.protectedPads) {
+      const handback = clamp(needed, HAUL_MIN_FEATHER, flat.blend);
       const distance = padDistance(flat, x, z);
-      if (distance >= flat.blend) continue;
-      const falloff = distance <= 0 ? 1 : 1 - smoothstep01(distance / Math.max(0.001, flat.blend));
+      if (distance >= handback) continue;
+      const falloff = distance <= 0 ? 1 : 1 - smoothstep01(distance / Math.max(0.001, handback));
       if (falloff > authority) authority = falloff;
     }
     return authority;
@@ -2212,14 +2256,17 @@ const PAD_CORE_EPSILON = 1e-5;
  * measured against `NAV_CONFIG` in app/config.ts, which is cs 0.45 (large world), walkableRadius 2
  * voxels = 0.90 m, walkableClimb 0.40 m, walkableSlopeAngle 48 degrees = a gradient of 1.111.
  *
- * HAUL_TRIGGER_GRADE 0.72 (36 degrees) is where a link stops being walkable in practice rather
+ * HAUL_TRIGGER_GRADE 0.50 (26.6 degrees) is where a link stops being walkable in practice rather
  * than in theory: recast rasterises at 0.45 m and the 2 m terrain lattice quantises the slope it
- * sees, so ground measured at 0.72 has produced spans recast rejected. Everything under it is left
+ * sees, and a smoothstep collar peaks at 1.5x its own mean gradient, so ground whose link mean
+ * measures 0.50 has produced local spans at 0.75 that recast rejected. Everything under it is left
  * exactly as the region field wrote it.
  *
- * HAUL_ROAD_GRADE 0.45 (24 degrees) is what a graded corridor aims for - two thirds of the limit,
- * which leaves the slope headroom for the 2 m lattice's own quantisation and for whatever a pad
- * collar adds on top.
+ * HAUL_ROAD_GRADE 0.30 (16.7 degrees) is what a graded corridor aims for. Less than a third of the
+ * limit, because the graded profile is not what the player walks on: the corridor is blended into
+ * the pads and the region field around it, and every measured route comes out steeper on the
+ * surface than on its own profile. Measured over all 15 authored Karrowmoor road links, 0.30 puts
+ * the worst surface metre on each between 13.6 and 32.1 degrees, mean 21.1.
  *
  * HAUL_ROAD_HALF 2.6 m of full regrade is 5.2 m of flat lane. Recast erodes walkableRadius 0.90 m
  * from each side, so 3.4 m of walkable width survives - nearly four times the agent - and the
@@ -2250,6 +2297,17 @@ const HAUL_SMOOTH_PASSES = 600;
 
 /** Below this much movement a corridor is not worth cutting, in metres. */
 const HAUL_MIN_CUT = 0.35;
+
+/**
+ * Ratio of a smoothstep's steepest gradient to its mean, which is exactly 1.5: the derivative of
+ * 3t^2 - 2t^3 is 6t(1 - t), which peaks at t = 0.5 with value 1.5.
+ *
+ * Every collar in this file — a pad's blend, a corridor's feather, a corridor's handback to a pad
+ * — is a smoothstep, and every one of them used to be sized as `drop / gradient`, which sets the
+ * MEAN gradient and lets the middle of the collar run half again as steep. That is not a rounding
+ * error: `normaliseFlats` aims a pad collar at 0.6 (31 degrees) and Highcairn's measured 43.2.
+ */
+const SMOOTHSTEP_PEAK = 1.5;
 
 /** Gradient of the corridor's own collar back into the hillside. */
 const HAUL_FEATHER_GRADE = 0.5;
@@ -2444,8 +2502,15 @@ function worstRise(profile: Float64Array): number {
  * exactly the long chord that would otherwise cut a corridor straight through a settlement. The
  * test is on pad CENTRES only, because a pad's core is flat and a corridor through flat ground
  * costs nothing.
+ *
+ * `waived` decides which blockers do not count - see `buildHaulRoads` for the ramp that cost.
  */
-function isGabrielNeighbour(pads: readonly FlatSpot[], i: number, j: number): boolean {
+function isGabrielNeighbour(
+  pads: readonly FlatSpot[],
+  i: number,
+  j: number,
+  waived: (flat: FlatSpot) => boolean,
+): boolean {
   const a = pads[i]!;
   const b = pads[j]!;
   const midX = (a.x + b.x) / 2;
@@ -2454,7 +2519,9 @@ function isGabrielNeighbour(pads: readonly FlatSpot[], i: number, j: number): bo
   for (let k = 0; k < pads.length; k += 1) {
     if (k === i || k === j) continue;
     const other = pads[k]!;
-    if ((other.x - midX) ** 2 + (other.z - midZ) ** 2 < radiusSquared) return false;
+    if ((other.x - midX) ** 2 + (other.z - midZ) ** 2 >= radiusSquared) continue;
+    if (waived(other)) continue;
+    return false;
   }
   return true;
 }

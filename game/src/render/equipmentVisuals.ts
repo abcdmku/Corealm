@@ -98,6 +98,8 @@ export const VISIBLE_EQUIP_SLOTS: readonly EquipSlot[] = [
  * three times Kaldite's luminance and a different hue family, so the two separate.
  */
 
+/** Tier 0. Old iron with rust in it: warmer and darker than Grithe, so the upgrade reads. */
+const WORN = 0x6f6257;
 /** Grithe: "dull grey". A near-neutral cool multiply — this is the undyed end of the ladder. */
 const GRITHE = 0x8d9298;
 /** Corven: "dark and slightly oily to the touch". Blue steel, deliberately NOT black. */
@@ -247,6 +249,17 @@ function weaponPart(assetId: WeaponAsset, tint: number, scale: number, accent?: 
 
 function buildTable(): Map<ItemId, GearVisual> {
   const table = new Map<ItemId, GearVisual>();
+
+  // Tier 0, outside the LADDER because it is one weapon and no kit. `tierSilhouetteScale(0)` clamps
+  // to the tier-1 value of 0.900, so the worn blade would draw exactly as big as a Grithe sword;
+  // 0.86 of that keeps it visibly the smaller weapon, which is the only signal a player gets before
+  // they open the Worn panel. WORN is a browner, duller multiply than GRITHE's cool grey — this is
+  // old iron with rust in it, not clean steel.
+  table.set("worn_sword", {
+    slot: "mainHand",
+    parts: [weaponPart("sword", WORN, round3(tierSilhouetteScale(1) * 0.86))],
+  });
+
   for (const row of LADDER) {
     const silhouette = tierSilhouetteScale(row.tier);
     for (const hand of row.mainHand) {
@@ -286,7 +299,7 @@ function buildTable(): Map<ItemId, GearVisual> {
 
 const GEAR_VISUALS = buildTable();
 
-/** Every id this file covers. 57 today, and the test asserts it equals the content table exactly. */
+/** Every id this file covers. 58 today, and the test asserts it equals the content table exactly. */
 export const GEAR_APPEARANCE_IDS: readonly ItemId[] = [...GEAR_VISUALS.keys()];
 
 /**

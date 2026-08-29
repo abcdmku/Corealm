@@ -13,6 +13,7 @@ import type {
 } from "../contracts.js";
 import { EQUIP_SLOTS, SKILL_IDS } from "../contracts.js";
 import { levelForXp, totalXpAt } from "../content/xp.js";
+import { STARTING_EQUIPMENT, STARTING_INVENTORY } from "../content/items.js";
 
 export const INVENTORY_SLOTS = 28;
 export const BANK_CAPACITY = 400;
@@ -131,6 +132,19 @@ export function createInitialState(seed = 1337, nowMs = 0): GameState {
 
   const equipment = {} as Record<EquipSlot, ItemStack | null>;
   for (const slot of EQUIP_SLOTS) equipment[slot] = null;
+  // The starter kit, from one list in `content/items.ts` so a fresh game, a `__gameDebug.reset()`
+  // and the docs cannot drift apart. Copied rather than referenced: the state is mutated in place
+  // every tick, and handing out the content table's own object would let a stack count change the
+  // canonical content.
+  for (const [slot, stack] of Object.entries(STARTING_EQUIPMENT)) {
+    equipment[slot as EquipSlot] = { ...stack };
+  }
+
+  const startingSlots = new Array<InventorySlot | null>(INVENTORY_SLOTS).fill(null);
+  for (const [index, stack] of STARTING_INVENTORY.entries()) {
+    if (index >= INVENTORY_SLOTS) break;
+    startingSlots[index] = { ...stack, slotIndex: index };
+  }
 
   return {
     meta: { saveVersion: SAVE_VERSION, createdAtMs: nowMs, lastSavedAtMs: 0, playSeconds: 0, seed },
@@ -146,7 +160,7 @@ export function createInitialState(seed = 1337, nowMs = 0): GameState {
       movement: { mode: "idle", path: null, pathIndex: 0, destination: null, destinationEntityId: null },
     },
     skills,
-    inventory: { slots: new Array<InventorySlot | null>(INVENTORY_SLOTS).fill(null) },
+    inventory: { slots: startingSlots },
     equipment,
     bank: { slots: [], filter: "" },
     currency: 0,

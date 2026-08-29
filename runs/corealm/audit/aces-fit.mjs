@@ -1,6 +1,6 @@
 // Forward ACES (three's RRTAndODTFit) on each shipped SKY_STOP, at toneMappingExposure 1.0.
 // The result is what that stop DISPLAYS as, i.e. the authored colour the pre-compensation solved for.
-const STOPS=[[1.000,0x4e79ae],[0.450,0x6997cb],[0.120,0x89bdee],[0.045,0xa8d8f2],[0.012,0xc1f7ff],[0.000,0xffdf9e],[-0.012,0xd6e6ea],[-0.250,0x8f9689],[-1.000,0x4a4436]];
+const STOPS=[[1.000,0x4e79ae],[0.450,0x6997cb],[0.120,0x89bdee],[0.045,0xa8d8f2],[0.012,0xc1f7ff],[0.000,0xffdf9e],[-0.012,0xcbe3f2],[-0.180,0xcbe3f2],[-0.340,0x8f9689],[-1.000,0x4a4436]];
 const s2l=c=>c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);
 const l2s=c=>c<=0.0031308?c*12.92:1.055*Math.pow(c,1/2.4)-0.055;
 const IN=[[0.59719,0.35458,0.04823],[0.07600,0.90834,0.01566],[0.02840,0.13383,0.83777]];

@@ -398,12 +398,16 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
   // went back to one flat green. The 9.5 m read fills that gap with 3 m features, and it
   // comes from the macro texture, so it costs one fetch and no memory.
   //
-  // Clamped because the three ranges multiply out to 0.36..1.75, and the top of that lifted lit
-  // grass past the roof tiles beside it.
+  // Clamped, and the bounds moved with the textures. contrastStretch in proceduralTextures.ts
+  // now makes each channel realise its authored range instead of hugging its mean, so the standard
+  // deviations went detail 0.061 -> 0.123 and macro 0.077 -> 0.140 (runs/corealm/audit/w3lit-tex.mjs).
+  // The product's own sigma is therefore 0.212 near the camera and 0.173 past 20 m where the fine
+  // read has mipped away, which puts p1..p99 at 0.51..1.49. 0.52..1.38 was clipping 4% of texels
+  // against the top bound and flattening exactly the crests the contrast was added for.
   float shade = dot( channel, detail )
     * mix( 1.0, dot( channel, middle ), 0.85 )
     * mix( 1.0, dot( channel, macro ), 0.9 );
-  shade = clamp( shade, 0.52, 1.38 );
+  shade = clamp( shade, 0.50, 1.46 );
 
   // Two wheel ruts at +/-0.55 m from the centreline, 0.16 m wide.
   float perpendicular = ( vGroundExtra.x - 0.5 ) * 7.0;
@@ -415,11 +419,11 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
   // PER-SURFACE CHROMA, and this is the part that survives distance.
   //
   // Everything above is a VALUE multiplier read out of a texture, and every texture read mips
-  // toward its own mean: measured on w2-palewood_copse (runs/corealm/audit/lit-ground.mjs), the
-  // high-pass RMS of open ground falls 17.00 -> 8.18 -> 5.55 from the 20-60 m band to the near
-  // band, and the p5..p95 luminance spread of near ground is 96..123 out of 255. So past about
-  // 20 m all four channels converge on the same colour and the ground is one flat field, which is
-  // exactly the "one untextured green field at this distance" in the brief.
+  // toward its own mean, so past about 20 m all four channels converge on the same colour. The
+  // contrast stretch in proceduralTextures.ts is what stops that happening this side of 60 m:
+  // measured on palewood_copse open ground, the 20-60 m band went p5..p95 = 101.9..177.0 with a
+  // high-pass RMS of 8.67 to 93.5..209.2 and 11.31, the near band 109.3..130.7 / 6.22 to
+  // 105.2..137.7 / 6.31, and the near road 89.6..117.6 / 3.83 to 88.5..125.6 / 5.05.
   //
   // These tints come from the WEIGHTS, not from a texture, so they do not mip and they are the
   // only surface signal left at 60 m. Each vector is normalised to Rec. 709 luminance 1.0, so this
@@ -435,7 +439,11 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
   const vec3 TINT_SOIL       = vec3( 1.184, 0.973, 0.722 );
   const vec3 TINT_ROCK       = vec3( 0.987, 0.997, 1.068 );
   const vec3 TINT_GRAVEL     = vec3( 1.035, 0.996, 0.937 );
-  float dryness = smoothstep( 0.93, 1.11, macro.x );
+  // 0.88..1.16, widened with the channel. The macro grass channel's sigma went 0.077 -> 0.140, and
+  // at the old 0.93..1.11 window that is +/-0.64 sigma: dryness would saturate to 0 or 1 across
+  // most of the field and the sward/straw boundary would read as a drawn edge rather than as one
+  // drying into the other. +/-1.0 sigma keeps the transition about as soft as it was.
+  float dryness = smoothstep( 0.88, 1.16, macro.x );
   vec3 tint = channel.x * mix( TINT_GRASS_LUSH, TINT_GRASS_DRY, dryness )
             + channel.y * TINT_SOIL
             + channel.z * TINT_ROCK
@@ -455,11 +463,15 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
  *
  * The strength is deliberately restrained. The terrain lattice is 2 m and this perturbs a normal
  * that lighting, shadow receipt and fog all read, so pushed hard it turns a hillside at a grazing
- * sun angle into noise. 3.0 against a detail value that spans 0.55..1.34 is enough that a gravel
- * bed catches the sun differently from the grass beside it, which is the whole difference between
- * a surface and a printed picture of one.
+ * sun angle into noise. Enough that a gravel bed catches the sun differently from the grass beside
+ * it is the whole difference between a surface and a printed picture of one.
+ *
+ * 1.5, halved from 3.0, and the halving is arithmetic rather than taste: this reads the SLOPE of
+ * `gGroundShade`, and the contrast stretch in proceduralTextures.ts exactly doubled the standard
+ * deviation of the fine detail channel that dominates that slope, 0.061 -> 0.123. Leaving 3.0
+ * would have doubled the perturbation along with it.
  */
-const GROUND_BUMP_SCALE = 3.0;
+const GROUND_BUMP_SCALE = 1.5;
 
 const GROUND_NORMAL_BODY = /* glsl */ `
 {
@@ -569,9 +581,10 @@ export class MaterialLibrary {
    * cannot: measured, the colour changed by 0.12 of 255 per channel across a 2 m quad, which is
    * below the 8-bit display floor, so the ground was one flat colour at every scale a player sees.
    *
-   * Eight per-vertex surface weights select which channel of the detail atlas is sampled, and the
-   * atlas is read TWICE from the same texture at 2.5 m and 37 m tiling. Two scales from one
-   * texture is what kills the tile repeat across a 700 x 400 m world at zero extra memory.
+   * Eight per-vertex surface weights select which channel is sampled, and there are THREE reads at
+   * 2.5 m, 9.5 m and 37 m across two textures — the detail atlas for the near read and the macro
+   * texture, twice, for the two far ones. Three scales from two textures is what kills the tile
+   * repeat across a 700 x 400 m world for one extra sampler and no extra memory.
    *
    * Everything here happens to `diffuseColor` before `<lights_fragment_begin>`, so shadows, all
    * four lights, ACES tone mapping, fog and the sRGB output conversion stay downstream and keep
@@ -604,7 +617,7 @@ export class MaterialLibrary {
       // Held so a hot reload cannot orphan the atlas while a compiled program still references it.
       this.groundUniforms = uniforms;
 
-      material.customProgramCacheKey = () => "corealm-ground-splat-v4";
+      material.customProgramCacheKey = () => "corealm-ground-splat-v5";
       material.onBeforeCompile = (shader) => {
         shader.uniforms.uDetail = uniforms.uDetail;
         shader.uniforms.uMacro = uniforms.uMacro;

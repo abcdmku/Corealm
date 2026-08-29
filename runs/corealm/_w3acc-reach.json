@@ -1,0 +1,460 @@
+{
+ "where": {
+  "npc_smith_harrow": {
+   "position": [
+    -147.4,
+    0.9,
+    -87.4
+   ],
+   "regionId": "fallowmarch"
+  },
+  "npc_cairnkeeper_ode": {
+   "position": [
+    134.6,
+    27.09,
+    -60.5
+   ],
+   "regionId": "karrowmoor"
+  },
+  "npc_watcher_hale": {
+   "position": [
+    155.5,
+    27.09,
+    -55.4
+   ],
+   "regionId": "karrowmoor"
+  },
+  "npc_quarrymaster_vess": null,
+  "gravelmaw_mouth_portal": {
+   "position": [
+    46,
+    18.61,
+    -24
+   ],
+   "regionId": "karrowmoor"
+  },
+  "great_cairn_stones": null
+ },
+ "rows": [
+  {
+   "start": "spawn",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 1.072,
+    "z": -118
+   },
+   "region": "fallowmarch",
+   "target": "npc_smith_harrow",
+   "error": null,
+   "message": null,
+   "pathLength": 36.26576357528202
+  },
+  {
+   "start": "spawn",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 1.072,
+    "z": -118
+   },
+   "region": "fallowmarch",
+   "target": "npc_cairnkeeper_ode",
+   "error": null,
+   "message": null,
+   "pathLength": 348.1493950267866
+  },
+  {
+   "start": "spawn",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 1.072,
+    "z": -118
+   },
+   "region": "fallowmarch",
+   "target": "npc_watcher_hale",
+   "error": null,
+   "message": null,
+   "pathLength": 368.4913916590604
+  },
+  {
+   "start": "spawn",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 1.072,
+    "z": -118
+   },
+   "region": "fallowmarch",
+   "target": "npc_quarrymaster_vess",
+   "error": "NOT_FOUND",
+   "message": "No entity with id npc_quarrymaster_vess",
+   "pathLength": null
+  },
+  {
+   "start": "spawn",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 1.072,
+    "z": -118
+   },
+   "region": "fallowmarch",
+   "target": "gravelmaw_mouth_portal",
+   "error": null,
+   "message": null,
+   "pathLength": 245.0948328628813
+  },
+  {
+   "start": "spawn",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 1.072,
+    "z": -118
+   },
+   "region": "fallowmarch",
+   "target": "great_cairn_stones",
+   "error": "NOT_FOUND",
+   "message": "No entity with id great_cairn_stones",
+   "pathLength": null
+  },
+  {
+   "start": "town_center",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 0.98,
+    "z": -80
+   },
+   "region": "fallowmarch",
+   "target": "npc_smith_harrow",
+   "error": null,
+   "message": null,
+   "pathLength": 14.65188168139595
+  },
+  {
+   "start": "town_center",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 0.98,
+    "z": -80
+   },
+   "region": "fallowmarch",
+   "target": "npc_cairnkeeper_ode",
+   "error": null,
+   "message": null,
+   "pathLength": 325.21162740108645
+  },
+  {
+   "start": "town_center",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 0.98,
+    "z": -80
+   },
+   "region": "fallowmarch",
+   "target": "npc_watcher_hale",
+   "error": null,
+   "message": null,
+   "pathLength": 345.5536799027202
+  },
+  {
+   "start": "town_center",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 0.98,
+    "z": -80
+   },
+   "region": "fallowmarch",
+   "target": "npc_quarrymaster_vess",
+   "error": "NOT_FOUND",
+   "message": "No entity with id npc_quarrymaster_vess",
+   "pathLength": null
+  },
+  {
+   "start": "town_center",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 0.98,
+    "z": -80
+   },
+   "region": "fallowmarch",
+   "target": "gravelmaw_mouth_portal",
+   "error": null,
+   "message": null,
+   "pathLength": 222.1571811404387
+  },
+  {
+   "start": "town_center",
+   "teleported": true,
+   "from": {
+    "x": -160,
+    "y": 0.98,
+    "z": -80
+   },
+   "region": "fallowmarch",
+   "target": "great_cairn_stones",
+   "error": "NOT_FOUND",
+   "message": "No entity with id great_cairn_stones",
+   "pathLength": null
+  },
+  {
+   "start": "rootfall_hamlet",
+   "teleported": true,
+   "from": {
+    "x": 59.5,
+    "y": 8.38,
+    "z": 119.5
+   },
+   "region": "vellenwood",
+   "target": "npc_smith_harrow",
+   "error": null,
+   "message": null,
+   "pathLength": 313.7329188613697
+  },
+  {
+   "start": "rootfall_hamlet",
+   "teleported": true,
+   "from": {
+    "x": 59.5,
+    "y": 8.38,
+    "z": 119.5
+   },
+   "region": "vellenwood",
+   "target": "npc_cairnkeeper_ode",
+   "error": null,
+   "message": null,
+   "pathLength": 247.98920091780883
+  },
+  {
+   "start": "rootfall_hamlet",
+   "teleported": true,
+   "from": {
+    "x": 59.5,
+    "y": 8.38,
+    "z": 119.5
+   },
+   "region": "vellenwood",
+   "target": "npc_watcher_hale",
+   "error": null,
+   "message": null,
+   "pathLength": 238.49167379374467
+  },
+  {
+   "start": "rootfall_hamlet",
+   "teleported": true,
+   "from": {
+    "x": 59.5,
+    "y": 8.38,
+    "z": 119.5
+   },
+   "region": "vellenwood",
+   "target": "npc_quarrymaster_vess",
+   "error": "NOT_FOUND",
+   "message": "No entity with id npc_quarrymaster_vess",
+   "pathLength": null
+  },
+  {
+   "start": "rootfall_hamlet",
+   "teleported": true,
+   "from": {
+    "x": 59.5,
+    "y": 8.38,
+    "z": 119.5
+   },
+   "region": "vellenwood",
+   "target": "gravelmaw_mouth_portal",
+   "error": null,
+   "message": null,
+   "pathLength": 165.53496280967823
+  },
+  {
+   "start": "rootfall_hamlet",
+   "teleported": true,
+   "from": {
+    "x": 59.5,
+    "y": 8.38,
+    "z": 119.5
+   },
+   "region": "vellenwood",
+   "target": "great_cairn_stones",
+   "error": "NOT_FOUND",
+   "message": "No entity with id great_cairn_stones",
+   "pathLength": null
+  },
+  {
+   "start": "karrowmoor_terraces",
+   "teleported": true,
+   "from": {
+    "x": 60,
+    "y": 15.303,
+    "z": -16
+   },
+   "region": "karrowmoor",
+   "target": "npc_smith_harrow",
+   "error": null,
+   "message": null,
+   "pathLength": 236.61117275276675
+  },
+  {
+   "start": "karrowmoor_terraces",
+   "teleported": true,
+   "from": {
+    "x": 60,
+    "y": 15.303,
+    "z": -16
+   },
+   "region": "karrowmoor",
+   "target": "npc_cairnkeeper_ode",
+   "error": null,
+   "message": null,
+   "pathLength": 89.29071765121937
+  },
+  {
+   "start": "karrowmoor_terraces",
+   "teleported": true,
+   "from": {
+    "x": 60,
+    "y": 15.303,
+    "z": -16
+   },
+   "region": "karrowmoor",
+   "target": "npc_watcher_hale",
+   "error": null,
+   "message": null,
+   "pathLength": 109.65253599529153
+  },
+  {
+   "start": "karrowmoor_terraces",
+   "teleported": true,
+   "from": {
+    "x": 60,
+    "y": 15.303,
+    "z": -16
+   },
+   "region": "karrowmoor",
+   "target": "npc_quarrymaster_vess",
+   "error": "NOT_FOUND",
+   "message": "No entity with id npc_quarrymaster_vess",
+   "pathLength": null
+  },
+  {
+   "start": "karrowmoor_terraces",
+   "teleported": true,
+   "from": {
+    "x": 60,
+    "y": 15.303,
+    "z": -16
+   },
+   "region": "karrowmoor",
+   "target": "gravelmaw_mouth_portal",
+   "error": null,
+   "message": null,
+   "pathLength": 16.50330760597484
+  },
+  {
+   "start": "karrowmoor_terraces",
+   "teleported": true,
+   "from": {
+    "x": 60,
+    "y": 15.303,
+    "z": -16
+   },
+   "region": "karrowmoor",
+   "target": "great_cairn_stones",
+   "error": "NOT_FOUND",
+   "message": "No entity with id great_cairn_stones",
+   "pathLength": null
+  },
+  {
+   "start": "highcairn_outpost",
+   "teleported": true,
+   "from": {
+    "x": 144,
+    "y": 27.18,
+    "z": -66
+   },
+   "region": "karrowmoor",
+   "target": "npc_smith_harrow",
+   "error": null,
+   "message": null,
+   "pathLength": 339.2763923898831
+  },
+  {
+   "start": "highcairn_outpost",
+   "teleported": true,
+   "from": {
+    "x": 144,
+    "y": 27.18,
+    "z": -66
+   },
+   "region": "karrowmoor",
+   "target": "npc_cairnkeeper_ode",
+   "error": null,
+   "message": null,
+   "pathLength": 10.110151750407093
+  },
+  {
+   "start": "highcairn_outpost",
+   "teleported": true,
+   "from": {
+    "x": 144,
+    "y": 27.18,
+    "z": -66
+   },
+   "region": "karrowmoor",
+   "target": "npc_watcher_hale",
+   "error": null,
+   "message": null,
+   "pathLength": 16.536583610765938
+  },
+  {
+   "start": "highcairn_outpost",
+   "teleported": true,
+   "from": {
+    "x": 144,
+    "y": 27.18,
+    "z": -66
+   },
+   "region": "karrowmoor",
+   "target": "npc_quarrymaster_vess",
+   "error": "NOT_FOUND",
+   "message": "No entity with id npc_quarrymaster_vess",
+   "pathLength": null
+  },
+  {
+   "start": "highcairn_outpost",
+   "teleported": true,
+   "from": {
+    "x": 144,
+    "y": 27.18,
+    "z": -66
+   },
+   "region": "karrowmoor",
+   "target": "gravelmaw_mouth_portal",
+   "error": null,
+   "message": null,
+   "pathLength": 111.30027694522394
+  },
+  {
+   "start": "highcairn_outpost",
+   "teleported": true,
+   "from": {
+    "x": 144,
+    "y": 27.18,
+    "z": -66
+   },
+   "region": "karrowmoor",
+   "target": "great_cairn_stones",
+   "error": "NOT_FOUND",
+   "message": "No entity with id great_cairn_stones",
+   "pathLength": null
+  }
+ ]
+}
