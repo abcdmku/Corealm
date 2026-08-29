@@ -715,7 +715,49 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   api.register("docs", { search: (query, limit) => docs.search(query, limit) });
 
   // 15. Input.
-  const input = new InputController(canvas, renderer, camera, api, movement);
+  const WALK_DESTINATION_HIGHLIGHT_ID = "ui:walk-destination";
+  const HOVER_HIGHLIGHT = "#e4bd62";
+  const SELECTION_HIGHLIGHT = "#dbe5cf";
+  let hoveredActionId: EntityId | null = null;
+  let selectedEntityId: EntityId | null = null;
+
+  const repaintEntityHighlight = (entityId: EntityId | null): void => {
+    if (!entityId) return;
+    entityViews.clearHighlight(entityId);
+    if (entityId === selectedEntityId) {
+      entityViews.setHighlight(entityId, SELECTION_HIGHLIGHT, true);
+    } else if (entityId === hoveredActionId) {
+      entityViews.setHighlight(entityId, HOVER_HIGHLIGHT, false);
+    }
+  };
+
+  const input = new InputController(canvas, renderer, camera, api, movement, {
+    onHoverChange: (entityId) => {
+      const inspected = entityId ? api.inspect(entityId) : null;
+      const next = inspected?.ok && inspected.value.interactions.length > 0 ? entityId : null;
+      const previous = hoveredActionId;
+      if (previous === next) return;
+
+      hoveredActionId = next;
+      repaintEntityHighlight(previous);
+      repaintEntityHighlight(next);
+    },
+    onSelectionChange: (entityId) => {
+      const previous = selectedEntityId;
+      selectedEntityId = entityId;
+
+      repaintEntityHighlight(previous);
+      repaintEntityHighlight(entityId);
+      if (entityId) {
+        // An action target owns the outline. A ground highlight here would imply the click was only
+        // movement, even when the API is walking into range before mining, talking, or attacking.
+        overlays.clear(WALK_DESTINATION_HIGHLIGHT_ID);
+      }
+    },
+    onWalkDestination: (point) => {
+      overlays.setWalkDestination(WALK_DESTINATION_HIGHLIGHT_ID, point, clock.elapsedMs);
+    },
+  });
   input.setEntityPickSource((raycaster) => {
     const entityId = entityViews.pick(raycaster);
     if (!entityId) return null;
@@ -777,6 +819,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // that caused it: a conversation opened by a mouse click, by the context menu, or by an agent
   // calling `corealm_interact` all raise the same window.
   events.subscribe((event) => {
+    if (event.type === "navigation.completed" || event.type === "navigation.failed") {
+      overlays.clear(WALK_DESTINATION_HIGHLIGHT_ID);
+    }
     if (event.type === "dialogue.opened") ui.openDialogue();
     else if (event.type === "dialogue.closed") ui.closeDialogue();
     else if (event.type === "player.died") {

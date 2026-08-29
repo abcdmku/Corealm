@@ -568,6 +568,12 @@ const DEFAULT_TILT: Partial<Record<Archetype, number>> = {
  */
 const MOVING_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["enemy", "boss", "npc"]);
 
+/** Characters get a forgiving capsule pick target without adding invisible render geometry. */
+const EXPANDED_PICK_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "enemy", "boss"]);
+const MIN_CHARACTER_PICK_RADIUS = 0.72;
+const MAX_CHARACTER_PICK_RADIUS = 1.35;
+const CHARACTER_PICK_RADIUS_SCALE = 0.85;
+
 /**
  * How many syncs a character keeps walking after the last observed position change.
  *
@@ -1041,6 +1047,10 @@ export class EntityViews {
   private readonly missing = new Set<string>();
   private readonly group = new THREE.Group();
   private readonly highlightGroup = new THREE.Group();
+  private readonly pickCapsuleBase = new THREE.Vector3();
+  private readonly pickCapsuleTop = new THREE.Vector3();
+  private readonly pickRayPoint = new THREE.Vector3();
+  private readonly pickCapsulePoint = new THREE.Vector3();
 
   /**
    * The ORIGINAL loaded scene graph per asset id, not a clone.
@@ -3030,10 +3040,14 @@ export class EntityViews {
   // --------------------------------------------------- hover / selection
 
   /**
-   * Ring plus an overhead pip. The ring says "this is the thing on the ground", the pip is what
-   * you can still see when the thing is a 7 m tree. Colour is `#rrggbb`, matching `OverlaySpec`.
+   * Ring with an optional overhead pip. The ring says "this is the thing on the ground"; selected
+   * targets keep the pip so a 7 m tree remains identifiable. Colour matches `OverlaySpec`.
    */
-  setHighlight(entityId: EntityId, colour: string | number = "#ffd98a"): boolean {
+  setHighlight(
+    entityId: EntityId,
+    colour: string | number = "#ffd98a",
+    showPip = true,
+  ): boolean {
     const record = this.records.get(entityId);
     if (!record) return false;
 
@@ -3046,9 +3060,11 @@ export class EntityViews {
     ring.rotation.x = -Math.PI / 2;
     marker.add(ring);
 
-    const pip = new THREE.Mesh(this.pip(), material);
-    pip.name = "pip";
-    marker.add(pip);
+    if (showPip) {
+      const pip = new THREE.Mesh(this.pip(), material);
+      pip.name = "pip";
+      marker.add(pip);
+    }
 
     this.highlightGroup.add(marker);
     this.highlights.set(entityId, marker);
@@ -3093,29 +3109,78 @@ export class EntityViews {
    * does not know about the mouse.
    */
   pick(raycaster: THREE.Raycaster): EntityId | null {
-    const hits = raycaster.intersectObject(this.group, true);
-    for (const hit of hits) {
-      const owned = this.ownerOf(hit);
-      if (owned) return owned;
-      if ((hit.object as THREE.BatchedMesh).isBatchedMesh) continue;
-      let node: THREE.Object3D | null = hit.object;
-      while (node) {
-        const owner = node.userData.entityId;
-        if (typeof owner === "string") return owner;
-        node = node.parent;
-      }
-    }
-    return null;
+    return this.pickCandidates(raycaster)[0]?.entityId ?? null;
   }
 
   /** Distance-sorted pick, returning every entity under the ray. Right-click menus want this. */
   pickAll(raycaster: THREE.Raycaster): EntityId[] {
-    const found: EntityId[] = [];
+    return this.pickCandidates(raycaster).map((candidate) => candidate.entityId);
+  }
+
+  private pickCandidates(raycaster: THREE.Raycaster): { entityId: EntityId; distance: number }[] {
+    const nearest = new Map<EntityId, number>();
     for (const hit of raycaster.intersectObject(this.group, true)) {
-      const entityId = this.ownerOf(hit);
-      if (entityId && !found.includes(entityId)) found.push(entityId);
+      const entityId = this.entityOfHit(hit);
+      if (!entityId) continue;
+      const previous = nearest.get(entityId);
+      if (previous === undefined || hit.distance < previous) nearest.set(entityId, hit.distance);
+    }
+
+    for (const candidate of this.expandedCharacterPicks(raycaster)) {
+      const previous = nearest.get(candidate.entityId);
+      if (previous === undefined || candidate.distance < previous) {
+        nearest.set(candidate.entityId, candidate.distance);
+      }
+    }
+
+    return [...nearest].map(([entityId, distance]) => ({ entityId, distance }))
+      .sort((a, b) => a.distance - b.distance);
+  }
+
+  private expandedCharacterPicks(
+    raycaster: THREE.Raycaster,
+  ): { entityId: EntityId; distance: number }[] {
+    const found: { entityId: EntityId; distance: number }[] = [];
+    for (const record of this.records.values()) {
+      if (!EXPANDED_PICK_ARCHETYPES.has(record.archetype)) continue;
+
+      const radius = Math.max(
+        MIN_CHARACTER_PICK_RADIUS,
+        Math.min(MAX_CHARACTER_PICK_RADIUS, record.radius * CHARACTER_PICK_RADIUS_SCALE),
+      );
+      const height = Math.max(1.4, record.labelHeight);
+      const inset = Math.min(radius, height * 0.45);
+      this.pickCapsuleBase.copy(record.position).addScaledVector(THREE.Object3D.DEFAULT_UP, inset);
+      this.pickCapsuleTop.copy(record.position).addScaledVector(THREE.Object3D.DEFAULT_UP, height - inset);
+
+      const gapSq = raycaster.ray.distanceSqToSegment(
+        this.pickCapsuleBase,
+        this.pickCapsuleTop,
+        this.pickRayPoint,
+        this.pickCapsulePoint,
+      );
+      if (gapSq > radius * radius) continue;
+
+      const centreDistance = raycaster.ray.origin.distanceTo(this.pickRayPoint);
+      const entryDistance = Math.max(0, centreDistance - Math.sqrt(radius * radius - gapSq));
+      if (entryDistance < raycaster.near || entryDistance > raycaster.far) continue;
+      found.push({ entityId: record.entityId, distance: entryDistance });
     }
     return found;
+  }
+
+  private entityOfHit(hit: THREE.Intersection): EntityId | null {
+    const owned = this.ownerOf(hit);
+    if (owned) return owned;
+    if ((hit.object as THREE.BatchedMesh).isBatchedMesh) return null;
+
+    let node: THREE.Object3D | null = hit.object;
+    while (node) {
+      const entityId = node.userData.entityId;
+      if (typeof entityId === "string") return entityId;
+      node = node.parent;
+    }
+    return null;
   }
 
   /**

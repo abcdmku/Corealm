@@ -35,6 +35,7 @@ interface MeshHeightSampler {
 interface LiveOverlay {
   spec: OverlaySpec;
   object: THREE.Object3D;
+  style: "default" | "walkDestination";
   /** Sim time at which this disappears, or null for "until cleared". */
   expiresAtMs: number | null;
   /** Kept so a followed entity's overlay tracks it as it moves. */
@@ -93,6 +94,19 @@ export class Overlays {
 
   /** Creates or replaces an overlay. Returns the number now active. */
   set(spec: OverlaySpec, nowMs: number): number {
+    return this.setStyled(spec, nowMs, "default");
+  }
+
+  /** A compact ground decal for human click-to-walk feedback. */
+  setWalkDestination(id: string, position: Vec3, nowMs: number, colour = "#d2c07a"): number {
+    return this.setStyled({ id, kind: "highlight", position, colour }, nowMs, "walkDestination");
+  }
+
+  private setStyled(
+    spec: OverlaySpec,
+    nowMs: number,
+    style: "default" | "walkDestination",
+  ): number {
     this.clear(spec.id);
 
     // A hard cap, because an agent in a loop can otherwise fill the scene with rings.
@@ -110,7 +124,9 @@ export class Overlays {
 
     switch (spec.kind) {
       case "highlight":
-        object = this.makeHighlight(colour, conform);
+        object = style === "walkDestination"
+          ? this.makeWalkDestination(colour, conform)
+          : this.makeHighlight(colour, conform);
         break;
       case "marker":
         object = this.makeMarker(colour, conform);
@@ -132,6 +148,7 @@ export class Overlays {
     const entry: LiveOverlay = {
       spec,
       object,
+      style,
       expiresAtMs: spec.ttlMs && spec.ttlMs > 0 ? nowMs + spec.ttlMs : null,
       ...(spec.entityId ? { entityId: spec.entityId } : {}),
       ...(element ? { element } : {}),
@@ -183,7 +200,8 @@ export class Overlays {
       // and being per-frame rather than per-second it also made every overlay recompute its world
       // matrix on every frame for that nothing.
       if (entry.spec.kind === "highlight") {
-        const pulse = 1 + Math.sin(nowMs / 320) * 0.06;
+        const strength = entry.style === "walkDestination" ? 0.018 : 0.06;
+        const pulse = 1 + Math.sin(nowMs / 320) * strength;
         entry.object.scale.set(pulse, 1, pulse);
       }
 
@@ -220,6 +238,21 @@ export class Overlays {
     const ring = this.makeGroundRing(colour, 0.85, 1.15, 40, 0.75, 0.06);
     conform.push(ring.conform);
     return ring.mesh;
+  }
+
+  /** A small tinted patch with a fine edge. This marks a clicked tile without becoming scenery. */
+  private makeWalkDestination(colour: THREE.Color, conform: ConformRing[]): THREE.Object3D {
+    const group = new THREE.Group();
+
+    const fill = this.makeGroundDisc(colour, 0.62, 32, 0.12, 0.055);
+    conform.push(fill.conform);
+    group.add(fill.mesh);
+
+    const edge = this.makeGroundRing(colour, 0.6, 0.69, 32, 0.62, 0.065);
+    conform.push(edge.conform);
+    group.add(edge.mesh);
+
+    return group;
   }
 
   /** A floating pin, for a destination the player cannot see yet. */
@@ -269,6 +302,38 @@ export class Overlays {
     // Conformed geometry has real relief, and the bounding sphere is only computed from the flat
     // bind pose, so a frustum test can cull a ring that is still on screen. These are a few dozen
     // triangles; skipping the test is cheaper than keeping the bounds honest every conform.
+    mesh.frustumCulled = false;
+
+    const position = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const localX = new Float32Array(position.count);
+    const localZ = new Float32Array(position.count);
+    for (let index = 0; index < position.count; index += 1) {
+      localX[index] = position.getX(index);
+      localZ[index] = position.getZ(index);
+    }
+    return { mesh, conform: { mesh, localX, localZ, lift } };
+  }
+
+  private makeGroundDisc(
+    colour: THREE.Color,
+    radius: number,
+    segments: number,
+    opacity: number,
+    lift: number,
+  ): { mesh: THREE.Mesh; conform: ConformRing } {
+    const geometry = new THREE.CircleGeometry(radius, segments);
+    geometry.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: colour,
+        transparent: true,
+        opacity,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    mesh.renderOrder = 9;
     mesh.frustumCulled = false;
 
     const position = geometry.getAttribute("position") as THREE.BufferAttribute;

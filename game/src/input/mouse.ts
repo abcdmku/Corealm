@@ -12,7 +12,7 @@
  * the render layer reorganises.
  */
 import type * as THREE from "three";
-import type { EntityId, GameApi, InteractionId, Vec3 } from "../contracts.js";
+import type { EntityId, GameApi, InteractionId, MoveTarget, Vec3 } from "../contracts.js";
 import { CAMERA } from "../app/config.js";
 import { Picker, type Pick, type PickSource, type PickerSources } from "./picking.js";
 import { KeyboardController, type KeyBindingRegistry } from "./keyboard.js";
@@ -56,6 +56,8 @@ export interface InputOptions {
   onHoverChange?: (entityId: EntityId | null) => void;
   /** Notified when the selected (last left-clicked) entity changes. */
   onSelectionChange?: (entityId: EntityId | null) => void;
+  /** Notified after a walk-only click starts a valid path, so the view can mark its destination. */
+  onWalkDestination?: (point: Vec3) => void;
   /** Defaults to #ui-root. */
   uiRoot?: HTMLElement | null;
   hoverThrottleMs?: number;
@@ -276,7 +278,7 @@ export class InputController {
   // ----------------------------------------------------------------- actions
 
   /**
-   * Left click. On an entity: its primary interaction. On ground: walk there.
+   * Left click. Actionable entities run their primary interaction; ground and scenery walk there.
    * `GameApi.interact` already walks into range first, so one click is always one intent.
    */
   private handleLeftClick(clientX: number, clientY: number): void {
@@ -284,13 +286,21 @@ export class InputController {
     if (!pick) return;
 
     if (pick.entityId) {
+      const interaction = this.primaryInteractionFor(pick.entityId);
+      if (!interaction) {
+        // Scenery can sit on top of otherwise walkable ground. Treat it exactly like a ground
+        // click instead of making a non-actionable prop look actionable.
+        this.setSelected(null);
+        this.moveTo({ entityId: pick.entityId }, pick.point);
+        return;
+      }
       this.setSelected(pick.entityId);
-      this.interactPrimary(pick.entityId);
+      this.runInteraction(pick.entityId, interaction);
       return;
     }
 
     this.setSelected(null);
-    this.moveTo(pick.point);
+    this.moveTo({ position: pick.point }, pick.point);
   }
 
   private handleRightClick(clientX: number, clientY: number): void {
@@ -300,20 +310,27 @@ export class InputController {
     else this.contextMenu.openForGround(pick.point, clientX, clientY);
   }
 
-  private moveTo(point: Vec3): void {
-    reportResult(this.api.moveTo({ position: point }));
+  private moveTo(target: MoveTarget, feedbackPoint: Vec3): void {
+    const moved = this.api.moveTo(target);
+    if (!reportResult(moved)) return;
+    this.options.onWalkDestination?.(feedbackPoint);
   }
 
-  /** Shared by the left click and by Space, so both routes cannot drift apart. */
+  /** Resolves Space's hovered or selected target through the same interaction path as a click. */
   private interactPrimary(entityId: EntityId): void {
     const interaction = this.primaryInteractionFor(entityId);
     if (!interaction) {
       // No interactions known yet (the entity hook may not be registered). Walking there is still
-      // the honest interpretation of the click.
+      // the honest interpretation of the action.
       reportResult(this.api.moveTo({ entityId }));
       return;
     }
     // Examine is a read, so it takes the read path — same as the context menu's Examine entry.
+    this.runInteraction(entityId, interaction);
+  }
+
+  /** Shared by the left click and by Space, so both routes cannot drift apart. */
+  private runInteraction(entityId: EntityId, interaction: InteractionId): void {
     if (interaction === "inspect") {
       const inspected = this.api.inspect(entityId);
       if (!reportResult(inspected)) return;
