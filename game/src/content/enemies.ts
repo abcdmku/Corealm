@@ -1,7 +1,31 @@
 /**
- * Enemy stat blocks for the four families the world already places, plus Ordrun.
+ * Enemy stat blocks: nine families across nineteen blocks, plus Ordrun.
  *
  * Owned by W-CONTENT.
+ *
+ * ---------------------------------------------------------------------------------------------
+ * THE FAMILY VOCABULARY. Five of the nine families were solved straight from PRD 2.4's rows; four
+ * were added because two groups per region left the ground between the settlements empty. A family
+ * earns its name by being a distinct SHAPE in the numbers, not a rename - there are only four enemy
+ * meshes in the whole library, so the mechanics have to carry the difference the art cannot.
+ *
+ *  family        shape                  the number that defines it
+ *  ------------- ---------------------- ----------------------------------------------------------
+ *  skitterling   armoured scuttler      high armour, high magicArmour: the melee-favouring block
+ *  marchwolf     pack hunter            low magicArmour, and at tier 10 an 1800 ms cadence
+ *  thornbound    drifting husk          magicArmour 45-70: the target you do NOT bring a staff to
+ *  cairnwight    armoured dead          armour 55 against magicArmour 10: the staff's answer
+ *  quarrykeeper  boss                   200 health, two phases, a telegraphed slam
+ *  fenmite       swarm                  1200 ms, max hit 1-3, 4-12 health, passive at 4-5 m
+ *  mudback       bulwark                the highest armour in the game against magicArmour 0
+ *  reaver        humanoid raider        aggro 14 m, symmetric armour, and 2.4x the mark drop
+ *  hollow        glass cannon           armour 0-6 and the biggest single blow at its tier
+ *
+ * Behaviour is the second axis and it is doing real work: `passive` fenmites and `territorial`
+ * mudbacks/hollows can be walked past, so the four aggressive families (marchwolf, skitterling
+ * above tier 1, reaver) are what actually decides whether a stretch of ground is dangerous.
+ * `systems/enemyAI.ts` reads exactly `behaviour` and `aggroRadius`; `systems/combat.ts` reads every
+ * other field on the row. Nothing here is decorative.
  *
  * LOOKUP. `world/regionBuilder.ts` stamps each spawned entity with `meta.family`, `meta.groupId`
  * and `tier`, and nothing else. So every stat block is published twice: once under
@@ -61,6 +85,17 @@ function marksFor(tier: number): [number, number] {
   return [Math.round(tier * 3), Math.round(tier * 11)];
 }
 
+/**
+ * Reavers carry a purse, so they pay 2.4x the ordinary band.
+ *
+ * This is the one mechanical reason to take an aggressive 14 m-aggro fight you could have walked
+ * around: at tier 1 a Reaver averages 25 marks against a Marchwolf Pup's 7, which is a Grithe
+ * dagger (90 marks) in four fights instead of thirteen.
+ */
+function purseMarksFor(tier: number): [number, number] {
+  return [Math.round(tier * 7), Math.round(tier * 27)];
+}
+
 /** The canonical id for a family at a tier. `meta.family` + `tier` is all the entity carries. */
 export function enemyIdFor(family: string, tier: number): string {
   return `${family}_t${tier}`;
@@ -96,6 +131,86 @@ const BLOCKS: readonly EnemyDef[] = [
       { itemId: "coarse_hide", quantity: [1, 2], chance: 0.60 },
       { itemId: "grithe_ore", quantity: [1, 2], chance: 0.20 },
       { itemId: "grithe_dagger", quantity: [1, 1], chance: 0.02 },
+    ],
+  },
+
+  {
+    id: "fenmite_t1", name: "Bracken Fenmite", family: "fenmite", tier: 1,
+    // The swarm shape, and the only one in the table: 1200 ms is the fastest cadence in the game
+    // (two combat ticks), and 1 max hit makes every landed swing worth exactly 1. Against a Melee 1
+    // player in the starter kit it deals 0.437 dmg/s and dies in 12.6 s, so one fenmite costs 5.5 of
+    // 23 health - four of them is a real problem and one of them is a nuisance. Passive at 4 m, so a
+    // starting player walks the March Road through the cloud and fights only what they swing at.
+    maxHealth: 4, attackLevel: 2, defenceLevel: 1,
+    accuracy: 0, armour: 0, magicArmour: 0,
+    maxHit: 1, attackSpeedMs: 1200, aggroRadius: 4, behaviour: "passive",
+    marks: marksFor(1),
+    drops: [
+      { itemId: "bittergrain_seed", quantity: [1, 2], chance: 0.30 },
+      { itemId: "duskberry_seed", quantity: [1, 1], chance: 0.12 },
+      { itemId: "pale_quartz", quantity: [1, 1], chance: 0.04 },
+    ],
+  },
+  {
+    id: "mudback_t1", name: "Redsill Mudback", family: "mudback", tier: 1,
+    // The bulwark shape. Armour 35 and a 3600 ms cadence are the two numbers that define it: it is
+    // the slowest thing in Fallowmarch and the hardest to cut, and it is the ONLY tier 1 block with
+    // magicArmour 0. Melee 3 with a Grithe dagger takes 34.9 s and 16.1 of 26 health.
+    //
+    // Deliberately NOT a Melee 1 fight: at 0.25 dmg/s in the starter kit it runs 65.9 s and costs
+    // 32.8 against a 23 health pool, i.e. the player loses. That is what `territorial` is for - it
+    // never initiates, its aggro radius is 5 m, and it stands off the road. It is the block that
+    // says "come back", and the one whose magicArmour 0 says how.
+    maxHealth: 16, attackLevel: 5, defenceLevel: 3,
+    accuracy: 6, armour: 35, magicArmour: 0,
+    maxHit: 5, attackSpeedMs: 3600, aggroRadius: 5, behaviour: "territorial",
+    marks: marksFor(1),
+    drops: [
+      { itemId: "march_stone", quantity: [2, 4], chance: 0.65 },
+      { itemId: "grithe_ore", quantity: [1, 2], chance: 0.30 },
+      { itemId: "pale_quartz", quantity: [1, 1], chance: 0.10 },
+    ],
+  },
+  {
+    id: "reaver_t1", name: "March Road Reaver", family: "reaver", tier: 1,
+    // The humanoid shape, and the widest aggro radius in the game outside Ordrun: 14 m, against
+    // 6-11 m everywhere else. A Reaver is the enemy that comes to you, and the one that pays for
+    // it (see `purseMarksFor`). Balanced armour and magicArmour both at 10, so neither style has an
+    // answer to it and it is the block a new player learns to just fight.
+    //
+    // 9 health is the number that makes an UNAVOIDABLE tier 1 fight survivable, and it is a hard
+    // constraint rather than a taste: at Melee 1 in the starter kit the player deals 0.26 dmg/s, so
+    // every extra point of enemy health costs about 2 of the player's 23. At 9 the fight runs 34.4 s
+    // and costs 17.6 - worse than a Marchwolf Pup's 20.3 only in that it finds you from 14 m instead
+    // of 8. Everything harder than this in Fallowmarch is territorial and can be walked past.
+    maxHealth: 9, attackLevel: 6, defenceLevel: 4,
+    accuracy: 6, armour: 10, magicArmour: 10,
+    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 14, behaviour: "aggressive",
+    marks: purseMarksFor(1),
+    drops: [
+      { itemId: "coarse_hide", quantity: [1, 2], chance: 0.35 },
+      { itemId: "grithe_ore", quantity: [1, 2], chance: 0.25 },
+      { itemId: "essence_shard", quantity: [1, 1], chance: 0.10 },
+      { itemId: "grithe_helm", quantity: [1, 1], chance: 0.03 },
+    ],
+  },
+  {
+    id: "hollow_t1", name: "Palewood Hollow", family: "hollow", tier: 1,
+    // The glass cannon. Armour 0 and 9 health make it the second-fastest tier 1 kill in the table,
+    // and max hit 5 on a 3000 ms cadence makes it the hardest single blow at tier 1 - a bad roll
+    // takes a fifth of a starting player's health in one swing. Same damage race as at tier 5: 29.8 s
+    // and 19.0 of 23 health against a Marchwolf Pup's 42.5 s and 20.3 - nearly the same bill in 70%
+    // of the time. magicArmour 20 against armour 0 is the inverse of the Mudback standing 264 m east,
+    // so the two of them teach the same lesson from opposite ends.
+    // Territorial: it does not leave the dead wood south of the copse.
+    maxHealth: 9, attackLevel: 7, defenceLevel: 2,
+    accuracy: 10, armour: 0, magicArmour: 20,
+    maxHit: 5, attackSpeedMs: 3000, aggroRadius: 7, behaviour: "territorial",
+    marks: marksFor(1),
+    drops: [
+      { itemId: "palewood_log", quantity: [1, 2], chance: 0.30 },
+      { itemId: "pale_quartz", quantity: [1, 1], chance: 0.20 },
+      { itemId: "essence_shard", quantity: [1, 1], chance: 0.08 },
     ],
   },
 
@@ -141,6 +256,59 @@ const BLOCKS: readonly EnemyDef[] = [
     ],
   },
 
+  {
+    id: "fenmite_t5", name: "Mire Fenmite", family: "fenmite", tier: 5,
+    // Same shape one tier up: still 1200 ms, still passive, still the cheapest kill in its region.
+    // Armour and magicArmour both 8 keep it deliberately unresistant - the swarm is a pace change
+    // over the Blackwater pools, not a wall.
+    maxHealth: 12, attackLevel: 10, defenceLevel: 5,
+    accuracy: 6, armour: 8, magicArmour: 8,
+    maxHit: 3, attackSpeedMs: 1200, aggroRadius: 5, behaviour: "passive",
+    marks: marksFor(5),
+    drops: [
+      { itemId: "duskberry_seed", quantity: [1, 2], chance: 0.28 },
+      { itemId: "bramble_hide", quantity: [1, 1], chance: 0.15 },
+      { itemId: "vell_amber", quantity: [1, 1], chance: 0.06 },
+    ],
+  },
+  {
+    id: "reaver_t5", name: "Gorge Reaver", family: "reaver", tier: 5,
+    // Armour 26 / magicArmour 24 hold the family's "no style has the answer" rule at tier 5, where
+    // every other Vellenwood block is lopsided (Thornbound 10/45, Bramble Skitterling 18/55,
+    // Marchwolf 14/8). Melee 7 with a Corven sword takes 35.0 s and 28.9 of 32 health, which is the
+    // most expensive ordinary fight in the region - just past the Marchwolf's 27.6 and no further,
+    // because this one initiates from 14 m and the Marchwolf does not. The purse pays 35-135 marks.
+    maxHealth: 26, attackLevel: 14, defenceLevel: 9,
+    accuracy: 14, armour: 26, magicArmour: 24,
+    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 14, behaviour: "aggressive",
+    marks: purseMarksFor(5),
+    drops: [
+      { itemId: "bramble_hide", quantity: [1, 2], chance: 0.35 },
+      { itemId: "corven_ore", quantity: [1, 2], chance: 0.25 },
+      { itemId: "essence_shard", quantity: [1, 2], chance: 0.15 },
+      { itemId: "corven_boots", quantity: [1, 1], chance: 0.03 },
+    ],
+  },
+  {
+    id: "hollow_t5", name: "Canopy Hollow", family: "hollow", tier: 5,
+    // Armour 6 is the lowest in Vellenwood and max hit 8 at 3000 ms is the biggest single blow in
+    // it, two above the Marchwolf. That is the glass cannon stated in numbers: a Corven-kitted
+    // player kills it in 27.0 s - faster than the Husk's 30.7 and the Marchwolf's 34.7 - and still
+    // pays 23.8 of 32 health for it, more than either. It is a damage race, not a grind.
+    // magicArmour 40 is the second highest in the region behind the Husk's 45, so a staff gets no
+    // discount here: 14.9 s against the Bramble Skitterling's 14.2.
+    maxHealth: 24, attackLevel: 16, defenceLevel: 6,
+    accuracy: 16, armour: 6, magicArmour: 40,
+    maxHit: 8, attackSpeedMs: 3000, aggroRadius: 8, behaviour: "territorial",
+    marks: marksFor(5),
+    drops: [
+      { itemId: "duskoak_log", quantity: [1, 2], chance: 0.30 },
+      { itemId: "vell_amber", quantity: [1, 1], chance: 0.15 },
+      { itemId: "essence_shard", quantity: [1, 2], chance: 0.12 },
+      { itemId: "amber_focus", quantity: [1, 1], chance: 0.02 },
+    ],
+  },
+
   // ---------------------------------------------------------------- Karrowmoor / Gravelmaw, tier 10
   {
     id: "cairnwight_t10", name: "Cairnwight", family: "cairnwight", tier: 10,
@@ -183,6 +351,60 @@ const BLOCKS: readonly EnemyDef[] = [
       { itemId: "cairnleaf_seed", quantity: [1, 2], chance: 0.15 },
       { itemId: "cairn_garnet", quantity: [1, 1], chance: 0.12 },
       { itemId: "cairnpine_staff", quantity: [1, 1], chance: 0.02 },
+    ],
+  },
+  {
+    id: "mudback_t10", name: "Terrace Mudback", family: "mudback", tier: 10,
+    // Armour 78 is the highest in the game, boss included, and magicArmour 0 is the lowest. That
+    // pairing is the point: Melee 12 with a Kaldite sword needs 45.2 s, Voltrend at Magic 10 needs
+    // 29.1 s, so MAGIC WINS by 35% - the exact mirror of the Scree Skitterling standing 60 m away,
+    // where melee wins by 10%. Between them, the two blocks make "which style do I bring" a question
+    // about the target rather than a global answer.
+    // Territorial at 6 m, because 39.6 of 41 health is not a fight to be dragged into.
+    maxHealth: 46, attackLevel: 20, defenceLevel: 13,
+    accuracy: 14, armour: 78, magicArmour: 0,
+    maxHit: 11, attackSpeedMs: 3600, aggroRadius: 6, behaviour: "territorial",
+    marks: marksFor(10),
+    drops: [
+      { itemId: "kaldite_ore", quantity: [2, 4], chance: 0.55 },
+      { itemId: "march_stone", quantity: [2, 5], chance: 0.35 },
+      { itemId: "cairn_garnet", quantity: [1, 1], chance: 0.12 },
+    ],
+  },
+  {
+    id: "reaver_t10", name: "Karrow Reaver", family: "reaver", tier: 10,
+    // The last quarry crew, still armed. Armour 42 / magicArmour 40 keeps the family symmetric at
+    // the top tier, and 40 health puts it between the Cairnwight (38) and the Thornbound Elder (44)
+    // rather than beyond either. Aggro 14 makes it the thing that finds you on the moor road, so its
+    // cost is capped at the Cairnwight's: 34.6 s and 31.8 of 41 health at Melee 12 in a Kaldite
+    // sword, against the Cairnwight's 32.7 s and 27.9.
+    maxHealth: 40, attackLevel: 22, defenceLevel: 13,
+    accuracy: 18, armour: 42, magicArmour: 40,
+    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 14, behaviour: "aggressive",
+    marks: purseMarksFor(10),
+    drops: [
+      { itemId: "wight_shroud", quantity: [1, 1], chance: 0.30 },
+      { itemId: "kaldite_ore", quantity: [1, 3], chance: 0.30 },
+      { itemId: "essence_shard", quantity: [1, 3], chance: 0.20 },
+      { itemId: "kaldite_dagger", quantity: [1, 1], chance: 0.03 },
+    ],
+  },
+  {
+    id: "marchwolf_t10", name: "Tarn Marchwolf", family: "marchwolf", tier: 10,
+    // The family's third tier, and the only tier 10 block that swings faster than 2400 ms. 1800 ms
+    // is three combat ticks, so it lands four swings for every three of anything else on the moor:
+    // 1.206 dmg/s through a Melee 12 Kaldite kit, the highest on the surface, off the LOWEST tier 10
+    // armour (20) and magicArmour (12). It dies fast and hurts while it lives - 23.3 s and 28.0 of
+    // 41 health, where a Cairnwight is 32.7 s and 27.9.
+    maxHealth: 30, attackLevel: 21, defenceLevel: 12,
+    accuracy: 18, armour: 20, magicArmour: 12,
+    maxHit: 7, attackSpeedMs: 1800, aggroRadius: 12, behaviour: "aggressive",
+    marks: marksFor(10),
+    drops: [
+      { itemId: "bramble_hide", quantity: [1, 2], chance: 0.40 },
+      { itemId: "cragfin", quantity: [1, 2], chance: 0.30 },
+      { itemId: "coarse_hide", quantity: [1, 2], chance: 0.25 },
+      { itemId: "cairn_garnet", quantity: [1, 1], chance: 0.06 },
     ],
   },
   {
@@ -237,16 +459,32 @@ export const ORDRUN_PHASES: readonly BossPhase[] = [
  * dungeon appears here, so a combat system can resolve straight off `meta.groupId`.
  */
 const GROUP_BLOCK: readonly (readonly [string, string])[] = [
+  // Fallowmarch, tier 1
   ["rill_skitterlings", "skitterling_t1"],
   ["marchwolf_pups", "marchwolf_t1"],
+  ["bracken_fenmites", "fenmite_t1"],
+  ["redsill_mudbacks", "mudback_t1"],
+  ["march_road_reavers", "reaver_t1"],
+  ["palewood_hollows", "hollow_t1"],
+  // Vellenwood, tier 5
   ["thornbound_husks", "thornbound_t5"],
   ["bramble_skitterlings", "skitterling_t5"],
   ["marchwolves_deepwood", "marchwolf_t5"],
+  ["mire_fenmites", "fenmite_t5"],
+  ["gorge_reavers", "reaver_t5"],
+  ["canopy_hollows", "hollow_t5"],
+  // Karrowmoor, tier 10
   ["cairnwights_fields", "cairnwight_t10"],
   ["scree_skitterlings", "skitterling_t10"],
   ["thornbound_elders_ridge", "thornbound_t10"],
+  ["terrace_mudbacks", "mudback_t10"],
+  ["karrow_reavers", "reaver_t10"],
+  ["tarn_marchwolves", "marchwolf_t10"],
+  // Gravelmaw, tier 10
   ["gravelmaw_ch1_wights", "cairnwight_t10"],
+  ["gravelmaw_ch1_reavers", "reaver_t10"],
   ["gravelmaw_ch2_skitterlings", "skitterling_t10"],
+  ["gravelmaw_ch2_mudbacks", "mudback_t10"],
   ["gravelmaw_ch3_elders", "thornbound_t10"],
   // Count 1, so the entity id is the group id: content.enemy("ordrun") resolves the boss.
   ["ordrun", "quarrykeeper_t10"],
@@ -259,8 +497,8 @@ const GROUP_ALIASES: readonly EnemyDef[] = GROUP_BLOCK.flatMap(([groupId, blockI
   return base === undefined ? [] : [{ ...base, id: groupId }];
 });
 
-/** Nine stat blocks plus twelve group aliases: 21 rows. */
+/** Nineteen stat blocks plus twenty-four group aliases: 43 rows. */
 export const ENEMIES: readonly EnemyDef[] = [...BLOCKS, ...GROUP_ALIASES];
 
-/** The nine canonical stat blocks, without the group aliases. For docs and the bestiary. */
+/** The nineteen canonical stat blocks, without the group aliases. For docs and the bestiary. */
 export const ENEMY_BLOCKS: readonly EnemyDef[] = BLOCKS;

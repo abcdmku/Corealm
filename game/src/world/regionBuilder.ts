@@ -110,7 +110,7 @@ export interface RouteNodeOut {
   id: string;
   name: string;
   position: Vec3;
-  regionId: string;
+  regionId: RegionId;
 }
 
 export interface RouteEdgeOut {
@@ -118,10 +118,46 @@ export interface RouteEdgeOut {
   to: string;
   /** Seconds. */
   cost: number;
-  kind: "walk" | "shortcut";
+  kind: "walk" | "shortcut" | "portal";
   obstacleId?: string;
+  /** The portal entity a `portal` edge crosses. */
+  portalId?: string;
   reqLevel?: number;
+  /** Where the player must stand to use a portal. */
+  entrance?: Vec3;
+  /** Where the portal puts them down. */
+  exit?: Vec3;
+  /** How long the crossing takes, in milliseconds. */
+  durationMs?: number;
 }
+
+/**
+ * A portal the route graph can cross, collected in pass 2 and turned into edges in pass 3.
+ *
+ * Collected rather than authored because the portal ENTITY is where the truth lives: it carries
+ * `meta.toRegionId` / `meta.toLocationId`, `systems/travel.ts` reads those to run the interaction,
+ * and a second authored copy of the same link in `content/regions.ts` would be free to drift.
+ */
+export interface PortalLinkOut {
+  entityId: EntityId;
+  /** The route node the portal stands at. */
+  fromLocationId: string;
+  /** The route node it leads to, from `meta.toLocationId`. */
+  toLocationId: string;
+  /** The portal's own world position: where the player must be standing to use it. */
+  position: Vec3;
+}
+
+/**
+ * How long stepping through a portal takes, in milliseconds.
+ *
+ * A crossing with no duration is a free edge, and a free edge makes the planner treat the Gravelmaw
+ * mouth as if it were not in the way at all. 800 ms is a beat the player spends standing in the
+ * mouth. It charges the route 3.4 m of walking against the 17.1 m the crossing covers, which is
+ * cheap enough that going through is still obviously the way out and dear enough that the plan is
+ * not free.
+ */
+const PORTAL_CROSSING_MS = 800;
 
 /**
  * A solid mass a building occupies, in world space.
@@ -214,6 +250,7 @@ export function buildWorld(seed: number, heightAt: HeightAt, ports?: WorldPorts)
   const edges: RouteEdgeOut[] = [];
   const buildings: BuildingBox[] = [];
   const solids: SolidVolume[] = [];
+  const portalLinks: PortalLinkOut[] = [];
   const ctx: BuildContext = {
     heightAt,
     baseY: ports?.baseY ?? (() => 0),
@@ -222,6 +259,7 @@ export function buildWorld(seed: number, heightAt: HeightAt, ports?: WorldPorts)
     buildings,
     solids,
     locationEntity: new Map<string, EntityId>(),
+    portalLinks,
   };
 
   /** locationId -> resolved world position, so edge costs use the same Y the player walks on. */
@@ -271,10 +309,51 @@ export function buildWorld(seed: number, heightAt: HeightAt, ports?: WorldPorts)
     edges.push(edge);
   };
 
+  /**
+   * Portal crossings, both ways, ahead of the roads so the walk-edge suppression below has them.
+   *
+   * Measured before this existed: standing on `gravelmaw_arena`, every overworld target was
+   * NOT_REACHABLE and so was `gravelmaw_entrance` itself, because the route graph's only link
+   * between the surface and chamber one was a WALK edge that no navmesh path can satisfy — the
+   * mouth is at y 18.61 on the Karrowmoor surface, chamber one's floor is at 16.61, and the cavern
+   * outline stops 4.9 m short of the mouth's wall line behind a blocker that runs floor to ceiling.
+   * Detour was right to refuse it; the graph was the thing lying.
+   *
+   * Cost is the walk from the node to the portal plus the crossing. The far side is the target
+   * route node itself, which is exactly where `systems/travel.ts` puts the player when a human
+   * uses the same portal by hand, so the two agree by construction.
+   */
+  const portalPairs = new Set<string>();
+  for (const link of portalLinks) {
+    const from = nodePositions.get(link.fromLocationId);
+    const to = nodePositions.get(link.toLocationId);
+    if (!from || !to) continue;
+    portalPairs.add(`${link.fromLocationId}>${link.toLocationId}`);
+    const approach = distanceXZSpot([from[0], from[2]], [link.position[0], link.position[2]]);
+    pushEdge({
+      from: link.fromLocationId,
+      to: link.toLocationId,
+      cost: round2(approach / WALK_SPEED_MPS + PORTAL_CROSSING_MS / 1000),
+      kind: "portal",
+      portalId: link.entityId,
+      entrance: link.position,
+      exit: to,
+      durationMs: PORTAL_CROSSING_MS,
+    });
+  }
+
+  /** A road between two locations a portal already joins is not a walk. See `portalPairs`. */
+  const portalled = (a: string, b: string): boolean =>
+    portalPairs.has(`${a}>${b}`) || portalPairs.has(`${b}>${a}`);
+
+  /** Pass 2's output by id, so a shortcut edge can carry the obstacle's own entrance and exit. */
+  const builtById = new Map<EntityId, SemanticEntity>(entities.map((entry) => [entry.id, entry]));
+
   for (const region of REGIONS) {
     // Roads inside a region. Bidirectional: the moor is steep but nothing here is one-way except
     // the Scree Slide, which is an obstacle, not a road.
     for (const road of region.roads) {
+      if (portalled(road.from, road.to)) continue;
       const from = nodePositions.get(road.from);
       const to = nodePositions.get(road.to);
       if (!from || !to) continue;
@@ -292,12 +371,13 @@ export function buildWorld(seed: number, heightAt: HeightAt, ports?: WorldPorts)
     }
 
     for (const obstacle of region.obstacles) {
-      pushShortcutEdges(obstacle, nodePositions, pushEdge);
+      pushShortcutEdges(obstacle, nodePositions, builtById.get(obstacle.id), pushEdge);
     }
 
     const dungeon = region.dungeon;
     if (!dungeon) continue;
     for (const road of dungeon.roads) {
+      if (portalled(road.from, road.to)) continue;
       const from = nodePositions.get(road.from);
       const to = nodePositions.get(road.to);
       if (!from || !to) continue;
@@ -307,7 +387,7 @@ export function buildWorld(seed: number, heightAt: HeightAt, ports?: WorldPorts)
       pushEdge({ from: road.to, to: road.from, cost, kind: "walk" });
     }
     for (const obstacle of dungeon.obstacles) {
-      pushShortcutEdges(obstacle, nodePositions, pushEdge);
+      pushShortcutEdges(obstacle, nodePositions, builtById.get(obstacle.id), pushEdge);
     }
   }
 
@@ -331,6 +411,7 @@ export function buildWorld(seed: number, heightAt: HeightAt, ports?: WorldPorts)
 function pushShortcutEdges(
   obstacle: ObstacleDef,
   nodePositions: Map<string, Vec3>,
+  built: SemanticEntity | undefined,
   pushEdge: (edge: RouteEdgeOut) => void,
 ): void {
   const from = nodePositions.get(obstacle.fromLocationId);
@@ -343,9 +424,26 @@ function pushShortcutEdges(
   const departure = distanceXZSpot(exit, [to[0], to[2]]);
   const cost = round2((approach + departure) / WALK_SPEED_MPS + obstacle.durationMs / 1000);
 
+  /**
+   * The two points the traversal actually uses, taken off the built entity rather than re-derived
+   * from the authored 2-D spots: `systems/agility.ts` lands a hand-run climb on exactly
+   * `entity.obstacle.exitPosition`, so a routed climb that computed its own Y would put the player
+   * somewhere the same climb run by hand does not.
+   *
+   * Without these the leg is node to node, and at Agility 20 that is a 3.5 s teleport from
+   * Thornline Camp to Rootfall Hamlet — the shortcut's duration spent covering the whole gap the
+   * shortcut only shaves. The duration matters too: it was being dropped, so until routes had a
+   * caller every traversal leg would have taken 0 ms.
+   */
+  const entrancePosition = built?.position;
+  const exitPosition = built?.obstacle?.exitPosition;
+
   pushEdge({
     from: obstacle.fromLocationId, to: obstacle.toLocationId,
     cost, kind: "shortcut", obstacleId: obstacle.id, reqLevel: obstacle.reqLevel,
+    durationMs: obstacle.durationMs,
+    ...(entrancePosition ? { entrance: entrancePosition } : {}),
+    ...(exitPosition ? { exit: exitPosition } : {}),
   });
   // A slide you cannot climb back up gets one edge. Everything else works both ways, and the
   // reverse walk is symmetric because the entrance and exit swap roles.
@@ -353,6 +451,9 @@ function pushShortcutEdges(
     pushEdge({
       from: obstacle.toLocationId, to: obstacle.fromLocationId,
       cost, kind: "shortcut", obstacleId: obstacle.id, reqLevel: obstacle.reqLevel,
+      durationMs: obstacle.durationMs,
+      ...(exitPosition ? { entrance: exitPosition } : {}),
+      ...(entrancePosition ? { exit: entrancePosition } : {}),
     });
   }
 }
@@ -375,6 +476,8 @@ interface BuildContext {
   readonly buildings: BuildingBox[];
   readonly solids: SolidVolume[];
   readonly locationEntity: Map<string, EntityId>;
+  /** Filled by the dungeon builder in pass 2, drained into route edges in pass 3. */
+  readonly portalLinks: PortalLinkOut[];
 }
 
 /** Resolves a 2-D authored spot to a world position with the asset's bbox floor on the ground. */
@@ -1237,13 +1340,14 @@ function buildDungeonEntities(
   const mouth: Vec3 = [dungeon.entrance[0], floorBase, dungeon.entrance[1]];
   const mouthRotation = dungeon.entranceRotationY ?? 0;
   const mouthScale = trueScale(dungeon.entranceScale ?? 4, region.tier);
+  const mouthPosition = placeOn(dungeon.entrance, 0, dungeon.entranceAssetId, mouthScale);
   out.push({
     id: "gravelmaw_mouth_portal",
     archetype: "portal",
     name: dungeon.name,
     tier: dungeon.tier,
     regionId: region.id,
-    position: placeOn(dungeon.entrance, 0, dungeon.entranceAssetId, mouthScale),
+    position: mouthPosition,
     state: "open",
     interactions: ["inspect", "enter"],
     view: {
@@ -1257,6 +1361,71 @@ function buildDungeonEntities(
     meta: { toRegionId: dungeon.id, toLocationId: "gravelmaw_chamber1" },
   });
   ctx.locationEntity.set("gravelmaw_entrance", "gravelmaw_mouth_portal");
+  // The route graph's copy of the same link. `content/regions.ts` declares
+  // gravelmaw_entrance -> gravelmaw_chamber1 as a ROAD, which is a walk edge, which no navmesh path
+  // can ever satisfy; pass 3 replaces it with this.
+  ctx.portalLinks.push({
+    entityId: "gravelmaw_mouth_portal",
+    fromLocationId: "gravelmaw_entrance",
+    toLocationId: "gravelmaw_chamber1",
+    position: mouthPosition,
+  });
+
+  // The way OUT. Measured, live, from `gravelmaw_arena` where the gate check leaves the player:
+  // every overworld target was NOT_REACHABLE and so was `gravelmaw_entrance` itself. The dungeon
+  // emitted exactly one portal, it lived in Karrowmoor, and it only pointed inward — so entering
+  // the Gravelmaw was one-way and dying was the only way back to the surface. Three acceptance
+  // lines were red because of it, and all three read as a Karrowmoor terrain fault.
+  //
+  // A reciprocal portal rather than a corridor, because the two layers do not touch: the mouth
+  // sits at y 18.61 on the surface and chamber one's floor is at 16.61, and the cavern outline
+  // stops 4.9 m short of the mouth's wall line. Terrain cannot bridge that — the cavern wall is a
+  // nav blocker from floor to ceiling, so cutting ground into it would only put a hole in the
+  // hillside. `systems/travel.ts` already reads `meta.toRegionId` / `meta.toLocationId` off any
+  // portal, so this needs no new system.
+  //
+  // It stands on the chamber rim on the bearing back toward the mouth, which is where a player who
+  // just walked in would turn round and look.
+  const firstChamber = dungeon.chambers[0];
+  if (firstChamber) {
+    const bearing = Math.atan2(
+      dungeon.entrance[0] - firstChamber.centre[0],
+      dungeon.entrance[1] - firstChamber.centre[1],
+    );
+    const rim = firstChamber.radius * 0.78;
+    const exitSpot: Spot = [
+      round2(firstChamber.centre[0] + Math.sin(bearing) * rim),
+      round2(firstChamber.centre[1] + Math.cos(bearing) * rim),
+    ];
+    const exitScale = trueScale(2.2, dungeon.tier);
+    const exitPosition = placeOn(exitSpot, firstChamber.floorOffset, "wall_arch", exitScale);
+    out.push({
+      id: "gravelmaw_exit_portal",
+      archetype: "portal",
+      name: `${dungeon.name} Mouth`,
+      tier: dungeon.tier,
+      regionId: dungeon.id,
+      position: exitPosition,
+      state: "open",
+      interactions: ["inspect", "enter"],
+      // `wall_arch` is the same 2 x 3 m opening the region gates use. At this scale it reads as
+      // daylight in the rock rather than as another chamber door, which matters because the
+      // chamber already has `door` entities in it and they are not exits.
+      view: {
+        assetId: "wall_arch",
+        scale: exitScale,
+        rotationY: bearing,
+        labelHeight: 3.2,
+      },
+      meta: { toRegionId: region.id, toLocationId: "gravelmaw_entrance" },
+    });
+    ctx.portalLinks.push({
+      entityId: "gravelmaw_exit_portal",
+      fromLocationId: "gravelmaw_chamber1",
+      toLocationId: "gravelmaw_entrance",
+      position: exitPosition,
+    });
+  }
 
   // Finding 8: the twelve-metre wound was a lone wooden door frame on open ground. The cliffs, the
   // brow of rock above it and the two braziers are what make it read as a hole in a quarry face.

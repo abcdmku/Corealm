@@ -1,0 +1,76 @@
+  /**
+   * Writes one entity's dye into one batch instance, when it is not already there.
+   *
+   * This is the whole recolour mechanism on the instanced path, and the reason it is free.
+   * `BatchedMesh.setColorAt` writes into a per-instance RGBA float texture the batch owns and the
+   * shader multiplies into `vColor` (three 0.185: `USE_BATCHING_COLOR` in `color_vertex`, which the
+   * fragment stage picks up as `USE_COLOR_ALPHA` and applies as `diffuseColor *= vColor`). It does
+   * NOT clone a material, so the `(cell, material, attribute signature)` batch key is untouched and
+   * two hundred differently dyed NPCs still share whatever draws their neighbours share. A material
+   * clone per tint would have done the opposite: 63 materials x 10 dyes is 630 batches where there
+   * are 263 today, and the ~100 draw calls of headroom this project just bought would have gone on
+   * shirt colours.
+   *
+   * The white case is skipped rather than written, and that matters: the FIRST `setColorAt` on a
+   * batch allocates its colours texture, which switches the whole batch onto a different compiled
+   * program. Doing that to a batch on which every instance is white costs a program and buys
+   * nothing.
+   */
+  private paintInstance(
+    draw: PartDraw,
+    slot: number,
+    instance: number,
+    tints: EntityTints | null,
+  ): void {
+    if (draw.role === "none") return;
+    const hex = tints ? tintFor(tints, draw.role) : NO_TINT;
+    if (draw.tints[slot] === hex) return;
+    if (draw.tints[slot] === undefined && hex === NO_TINT) {
+      draw.tints[slot] = hex;
+      return;
+    }
+    draw.batch.mesh.setColorAt(instance, SCRATCH_COLOUR.setHex(hex));
+    draw.tints[slot] = hex;
+  }
+
+  /**
+   * The same dye on the non-instanced path: one cloned material per (source material, tint).
+   *
+   * A rigged character is its own object with its own draws, so there is no batch to fragment here
+   * and a clone costs nothing but the clone. It is cached anyway, keyed on the pair, because the
+   * palettes are small tables and a settlement's worth of characters resolves to a handful of
+   * entries — 8 of them across the whole shipped roster, measured. The clones are owned by this
+   * class and freed in `dispose`; the SOURCE material is shared with the loaded asset and is never
+   * touched.
+   *
+   * `Color.multiply` in three's working (linear) space is the same arithmetic the shader does to
+   * `vColor`, so a character keeps exactly its colour when it is promoted from an instance to a rig
+   * and back — which is a thing the player watches happen every time they walk into a town.
+   */
+  private tintedMaterial(base: THREE.Material, hex: number): THREE.Material {
+    if (hex === NO_TINT) return base;
+    const standard = base as THREE.MeshStandardMaterial;
+    if (!standard.isMeshStandardMaterial) return base;
+    const key = `${base.uuid}|${hex}`;
+    const cached = this.tintedMaterials.get(key);
+    if (cached) return cached;
+    const clone = standard.clone();
+    clone.color = standard.color.clone().multiply(SCRATCH_COLOUR.setHex(hex));
+    this.tintedMaterials.set(key, clone);
+    return clone;
+  }
+
+  /** Applies a record's dye to its non-instanced object, over whatever state painted it. */
+  private applyEntityTint(record: ViewRecord): void {
+    const tints = record.tints;
+    if (!tints || !record.unique) return;
+    record.unique.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const mapped = materials.map((material) =>
+        this.tintedMaterial(material, tintFor(tints, tintRoleFor(material.name))));
+      mesh.material = mapped.length === 1 ? mapped[0]! : mapped;
+    });
+  }
+

@@ -207,6 +207,29 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   };
   const built = buildWorld(store.get().meta.seed, heightAt, worldPorts);
 
+  // The portal arch is intentionally open geometry. From the quarry approach that otherwise
+  // frames the bright world behind the hill, turning the promised "black wound" into a gate to
+  // daylight. A recessed, unlit plane supplies only the visual darkness of the tunnel; it has no
+  // collider, semantic entity, or navmesh volume, so the real portal remains the interaction.
+  const gravelmawMouth = built.entities.find((entity) => entity.id === "gravelmaw_mouth_portal");
+  if (gravelmawMouth) {
+    const yaw = gravelmawMouth.view?.rotationY ?? 0;
+    const backdrop = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.35, 6.9),
+      new THREE.MeshBasicMaterial({ color: 0x050709, toneMapped: false }),
+    );
+    backdrop.name = "gravelmaw-shadow-mouth";
+    backdrop.position.set(
+      gravelmawMouth.position[0] - Math.sin(yaw) * 0.18,
+      gravelmawMouth.position[1] + 3.45,
+      gravelmawMouth.position[2] - Math.cos(yaw) * 0.18,
+    );
+    backdrop.rotation.y = yaw;
+    backdrop.castShadow = false;
+    backdrop.receiveShadow = false;
+    renderer.scene.add(backdrop);
+  }
+
   const skillLevels = (): Record<SkillId, number> => {
     const levels = {} as Record<SkillId, number>;
     const skills = store.get().skills;
@@ -586,6 +609,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     }
     return scene.regionAt(point[0], point[2]);
   };
+  // Region is part of semantic player state, so ordinary movement must update it too. This port
+  // uses Y to distinguish Gravelmaw from the Karrowmoor terrain directly above it.
+  movement.setPorts({ regionAt: (point) => regionAtPoint(point) });
 
   const teleportPlayer = (position: Vec3, regionId: RegionId): void => {
     const snapped = nav.closestPoint(position) ?? position;

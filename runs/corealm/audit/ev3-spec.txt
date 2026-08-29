@@ -1,0 +1,195 @@
+/**
+ * Resolves what a dressed humanoid is made of, or null when the entity is not one.
+ *
+ * Two inputs, in priority order. `view.partAssetIds` is the authored answer and the one the world
+ * layer is moving to. Failing that, `OUTFIT_BODIES` recognises the four clothes-only outfit GLBs
+ * that `view.assetId` still carries today and puts the right base body under them — without which
+ * every NPC in the game renders with no head, no eyes and no eyebrows.
+ *
+ * On top of the authored answer this REMIXES, and that is the whole of the mesh-level variety this
+ * library can give. Measured before: `world/regionBuilder` emits one outfit family per character,
+ * so the 12 shipped NPCs realise 4 authored part sets, and with the two hair picks the peasants get
+ * that is at most 6 distinct bodies for the whole world — the reason `npc_carter_bel` and the
+ * player are pixel-for-pixel identical in
+ * runs/corealm/screenshots/ev3-before-npc-carter_bel.png. Keeping the chest and re-rolling legs,
+ * boots, gloves, hood and pauldron per entity takes the same 24 meshes to 2^3 x 2 x 2 = 32 part
+ * sets per (sex, chest family), and the hair and beard rolls multiply that again.
+ *
+ * Every pick is a fresh `Rng` seeded by a hash of the entity id and the slot name, exactly as
+ * `skinning.hairAssetFor` does it: pure function of the id, no shared stream consumed, so adding
+ * this shifts no other deterministic draw in the game and a `__gameDebug.reset({seed})` diff sees
+ * the same faces twice.
+ *
+ * A body with no measured head-cap plane no longer refuses outright. It refuses only on the
+ * OUTFIT_BODIES fallback path, where the whole point is to cut a base body down to a head; when the
+ * world layer authors `view.partAssetIds` — including on an `enemy` archetype, which is how a
+ * humanoid monster is built — the spec is returned and `assembleDressedCharacter` simply finds no
+ * cut to make. Hair is still skipped there: it is a base-body decision, not a parts decision.
+ */
+function characterSpecFor(
+  entityId: EntityId,
+  assetId: string,
+  partAssetIds: readonly string[] | undefined,
+): CharacterSpec | null {
+  let bodyAssetId = assetId;
+  let parts: string[] = partAssetIds ? [...partAssetIds] : [];
+  const authored = parts.length > 0;
+
+  if (!authored) {
+    const implied = OUTFIT_BODIES[assetId];
+    if (!implied) return null;
+    bodyAssetId = implied;
+    parts = [assetId];
+    // Only the two base bodies have a measured head-cap plane, and without one this fallback would
+    // layer clothes over an INTACT body — the case that leaks bare skin through the trousers.
+    if (headCapHeightFor(bodyAssetId) === null) return null;
+  }
+
+  const humanoid = headCapHeightFor(bodyAssetId) !== null;
+  if (humanoid) parts = remixOutfit(entityId, parts);
+
+  const hooded = parts.some((id) => HOODED_PARTS.has(id));
+  const haired = parts.some((id) => HAIR_PART.test(id));
+  if (humanoid && !hooded && !haired) {
+    const female = bodyAssetId === "base_female";
+    parts.push(pickFrom(female ? FEMALE_HAIR : MALE_HAIR, `hair:${bodyAssetId}:${entityId}`));
+    if (!female && chance(`beard:${entityId}`, BEARD_CHANCE)) parts.push(BEARD_ASSET);
+  }
+
+  return { bodyAssetId, partAssetIds: parts, key: `${bodyAssetId}>${parts.join("+")}` };
+}
+
+/**
+ * Re-rolls the mixable slots of an authored outfit, keeping the chest family.
+ *
+ * Returns the input untouched when it is not the authored `outfit_<sex>_<family>_<slot>` shape.
+ * The world layer is allowed to hand over anything; guessing at a part list this does not recognise
+ * would be this file inventing appearance rather than reading it.
+ */
+function remixOutfit(entityId: EntityId, parts: readonly string[]): string[] {
+  const parsed = parts.map((id) => OUTFIT_PART.exec(id));
+  if (parsed.some((match) => match === null)) return [...parts];
+
+  const sex = parsed[0]?.[1];
+  const chest = parsed.find((match) => match?.[3] === "chest");
+  if (!sex || !chest) return [...parts];
+  const chestFamily = chest[2] ?? "peasant";
+
+  const out: string[] = [`outfit_${sex}_${chestFamily}_chest`];
+  for (const slot of MIXABLE_SLOTS) {
+    // A slot the world layer did not author is not invented here: peasant and ranger both ship all
+    // three, so an absent one means the caller meant it to be absent.
+    if (!parsed.some((match) => match?.[3] === slot)) continue;
+    const family = chance(`slot:${slot}:${entityId}`, 0.5) ? "ranger" : "peasant";
+    out.push(`outfit_${sex}_${family}_${slot}`);
+  }
+
+  const authoredHood = parsed.some((match) => match?.[3] === "hood");
+  if (chance(`hood:${entityId}`, authoredHood ? HOOD_KEEP_CHANCE : HOOD_CHANCE)) {
+    out.push(`outfit_${sex}_ranger_hood`);
+  }
+  if (chance(`pauldron:${entityId}`, PAULDRON_CHANCE)) out.push(`outfit_${sex}_ranger_pauldron`);
+  return out;
+}
+
+/** Deterministic index into a table, from a seed string. Fresh `Rng`, no shared stream. */
+function pickFrom<T>(values: readonly T[], seed: string): T {
+  const picked = values[new Rng(hashString(seed)).int(0, values.length - 1)];
+  return picked ?? values[0]!;
+}
+
+/** Deterministic coin flip at probability `p`, from a seed string. */
+function chance(seed: string, p: number): boolean {
+  return new Rng(hashString(seed)).float(0, 1) < p;
+}
+
+/**
+ * Which tint a source material answers to, from its name alone.
+ *
+ * Name alone is enough because these two kits do not share names with anything else in the library:
+ * `runs/corealm/dc/matkey.mjs` groups all 213 manifest GLBs into 63 distinct materials, and
+ * `MI_*`, `Main*`, `Wings` and `Horns` occur only in the character, outfit and monster packs. The
+ * caller gates on archetype anyway (`TINTABLE_ARCHETYPES`), so a prop that one day ships a material
+ * called `Main` still cannot be recoloured by this.
+ */
+function tintRoleFor(name: string): TintRole {
+  if (CLOTH_MATERIAL.test(name)) return "cloth";
+  if (CLOTH_ALT_MATERIAL.test(name)) return "clothAlt";
+  if (HAIR_MATERIAL.test(name)) return "hair";
+  if (SKIN_MATERIAL.test(name)) return "skin";
+  if (CREATURE_BODY_MATERIAL.test(name)) return "creature";
+  if (CREATURE_ACCENT_MATERIAL.test(name)) return "creatureAccent";
+  return "none";
+}
+
+function tintFor(tints: EntityTints, role: TintRole): number {
+  switch (role) {
+    case "cloth": return tints.cloth;
+    case "clothAlt": return tints.clothAlt;
+    case "skin": return tints.skin;
+    case "hair": return tints.hair;
+    case "creature": return tints.creature;
+    case "creatureAccent": return tints.creatureAccent;
+    default: return NO_TINT;
+  }
+}
+
+/**
+ * One entity's dye lots, or null when nothing about it is tintable.
+ *
+ * Creature hue is keyed on the entity id with its trailing index stripped — `scree_skitterlings_4`
+ * becomes `scree_skitterlings` — so a whole spawn group is one animal and two groups of the same
+ * mesh are two. That is the difference the brief asks for between a moor crab and a scree crab, and
+ * it is the FAMILY the world layer already spells into the id rather than `entity.meta`, which
+ * `render/` does not read. Individuals inside a group then take one of three value steps, so a
+ * swarm of six is not six copies.
+ */
+function tintsFor(
+  entityId: EntityId,
+  archetype: Archetype,
+  character: CharacterSpec | null,
+): EntityTints | null {
+  const creatureFamily = entityId.replace(/_\d+$/, "");
+  const isCreature = archetype === "enemy" || archetype === "boss";
+  if (!character && !isCreature) return null;
+
+  const creature = isCreature
+    ? shade(
+      pickFrom(CREATURE_TINTS, `family:${creatureFamily}`),
+      pickFrom(CREATURE_SHADES, `shade:${entityId}`),
+    )
+    : NO_TINT;
+
+  return {
+    cloth: character ? pickFrom(CLOTH_TINTS, `cloth:${entityId}`) : NO_TINT,
+    clothAlt: character ? pickFrom(CLOTH_TINTS, `clothAlt:${entityId}`) : NO_TINT,
+    skin: character ? pickFrom(SKIN_TINTS, `skin:${entityId}`) : NO_TINT,
+    hair: character ? pickFrom(HAIR_TINTS, `hairColour:${entityId}`) : NO_TINT,
+    creature,
+    // The accent is a different entry in the same table rather than a second table: wings and horns
+    // want to read as belonging to the animal and not to a palette of their own.
+    creatureAccent: isCreature ? pickFrom(CREATURE_TINTS, `accent:${creatureFamily}`) : NO_TINT,
+  };
+}
+
+/** Scales an 8-bit-per-channel hex toward black. Used for the per-individual creature step. */
+function shade(hex: number, factor: number): number {
+  if (factor >= 1) return hex;
+  const scale = (value: number): number => Math.max(0, Math.min(255, Math.round(value * factor)));
+  return (scale((hex >> 16) & 0xff) << 16) | (scale((hex >> 8) & 0xff) << 8) | scale(hex & 0xff);
+}
+
+/**
+ * The per-entity build multiplier, or `NO_BUILD`.
+ *
+ * Deliberately NOT folded into the change-detection signature: it is a pure function of the entity
+ * id, so it cannot change while the record lives, and a record rebuilt after a release recomputes
+ * exactly the same numbers.
+ */
+function buildFor(entityId: EntityId, archetype: Archetype): readonly [number, number, number] {
+  if (!BUILD_ARCHETYPES.has(archetype)) return NO_BUILD;
+  const uniform = pickFrom(BUILD_SCALES, `build:${entityId}`);
+  const height = pickFrom(BUILD_HEIGHTS, `height:${entityId}`);
+  return [uniform, uniform * height, uniform];
+}
+

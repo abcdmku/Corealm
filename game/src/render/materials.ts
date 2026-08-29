@@ -16,9 +16,11 @@
 import * as THREE from "three";
 import type { RegionId } from "../contracts.js";
 import {
+  DETAIL_TILING_METRES,
   DETAIL_VALUE_OFFSET,
   createContactDecalTexture,
   createDetailAtlas,
+  createDetailNormals,
   createMacroVariation,
   createWaterNormalMap,
   disposeGeneratedTextures,
@@ -263,7 +265,9 @@ function swatchColour(palette: TierPalette, swatch: PaletteSwatch): number {
 interface GroundUniforms {
   uDetail: { value: THREE.Texture };
   uMacro: { value: THREE.Texture };
-  uDetailTiling: { value: THREE.Vector3 };
+  uNormalGS: { value: THREE.Texture };
+  uNormalRV: { value: THREE.Texture };
+  uDetailTiling: { value: THREE.Vector4 };
 }
 
 /**
@@ -357,19 +361,24 @@ vGroundWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
 const GROUND_FRAGMENT_HEADER = /* glsl */ `
 uniform sampler2D uDetail;
 uniform sampler2D uMacro;
-uniform vec3 uDetailTiling;
+uniform sampler2D uNormalGS;
+uniform sampler2D uNormalRV;
+uniform vec4 uDetailTiling;
 varying vec4 vSplatA;
 varying vec4 vSplatB;
 varying vec4 vGroundExtra;
 varying vec3 vGroundWorld;
-float gGroundShade;
+float gMacroShade;
+vec2 gGroundBump;
 `;
 
 const GROUND_FRAGMENT_BODY = /* glsl */ `
 {
-  vec4 detail = texture2D( uDetail, vGroundWorld.xz * uDetailTiling.x ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
-  vec4 middle = texture2D( uMacro, vGroundWorld.xz * uDetailTiling.y ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
-  vec4 macro = texture2D( uMacro, vGroundWorld.xz * uDetailTiling.z ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
+  vec2 detailUv = vGroundWorld.xz * uDetailTiling.x;
+  vec4 detail = texture2D( uDetail, detailUv ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
+  vec4 near = texture2D( uMacro, vGroundWorld.xz * uDetailTiling.y ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
+  vec4 middle = texture2D( uMacro, vGroundWorld.xz * uDetailTiling.z ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
+  vec4 macro = texture2D( uMacro, vGroundWorld.xz * uDetailTiling.w ) + ${DETAIL_VALUE_OFFSET.toFixed(1)};
 
   // Atlas channels are R grass, G soil, B rock, A gravel; the macro texture uses the same order.
   // The eight per-vertex weights fold onto those four, and dry grass is deliberately SPLIT rather
@@ -391,30 +400,47 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
   float total = max( 0.001, channel.x + channel.y + channel.z + channel.w );
   channel /= total;
 
-  // THREE reads, multiplied rather than mixed, because each one mips away at a different range
-  // and whichever survives has to still carry contrast on its own. Measured with only 2.5 m and
-  // 37 m: the fine read is gone by about 20 m and the 37 m read gives 12 m blobs, so the band of
-  // ground between 5 and 20 m from the camera, which in look1-spawn.png is most of the frame,
-  // went back to one flat green. The 9.5 m read fills that gap with 3 m features, and it
-  // comes from the macro texture, so it costs one fetch and no memory.
+  // FOUR reads, multiplied rather than mixed, because each one mips away at a different range and
+  // whichever survives has to still carry contrast on its own. The rates are a 2.5x geometric
+  // ladder — 2.5, 6.3, 16, 40 m — and the 6.3 m rung is this round's addition. With only 2.5 /
+  // 9.5 / 37 the ground carried no signal at all between 40 cm and 1.2 m, because the detail
+  // atlas's coarsest authored feature is one of its 12 base cells (21 cm) and the 9.5 m read's
+  // finest was 40 cm. That band is what the eye reads at 5-20 m, which in every open-field shot is
+  // most of the frame, and its absence is the "flattens toward a single tone" in the brief.
+  //
+  // Weights 0.85/0.9 became 0.72 each when the fourth read landed, to hold the product's variance
+  // roughly where it was: 0.123^2 + 3 * (0.72 * 0.140)^2 = 0.045, sigma 0.212, against the 0.212
+  // the three-read version measured. Same contrast, spread over one more octave of scale.
   //
   // Clamped, and the bounds moved with the textures. contrastStretch in proceduralTextures.ts
-  // now makes each channel realise its authored range instead of hugging its mean, so the standard
-  // deviations went detail 0.061 -> 0.123 and macro 0.077 -> 0.140 (runs/corealm/audit/w3lit-tex.mjs).
-  // The product's own sigma is therefore 0.212 near the camera and 0.173 past 20 m where the fine
-  // read has mipped away, which puts p1..p99 at 0.51..1.49. 0.52..1.38 was clipping 4% of texels
-  // against the top bound and flattening exactly the crests the contrast was added for.
-  float shade = dot( channel, detail )
-    * mix( 1.0, dot( channel, middle ), 0.85 )
-    * mix( 1.0, dot( channel, macro ), 0.9 );
-  shade = clamp( shade, 0.50, 1.46 );
+  // makes each channel realise its authored range instead of hugging its mean, so the standard
+  // deviations are detail 0.123 and macro 0.140 (runs/corealm/audit/w3lit-tex.mjs), which puts
+  // p1..p99 at 0.51..1.49. 0.52..1.38 was clipping 4% of texels against the top bound and
+  // flattening exactly the crests the contrast was added for.
+  float macroShade = mix( 1.0, dot( channel, near ), 0.72 )
+    * mix( 1.0, dot( channel, middle ), 0.72 )
+    * mix( 1.0, dot( channel, macro ), 0.72 );
+  float shade = clamp( dot( channel, detail ) * macroShade, 0.50, 1.46 );
 
   // Two wheel ruts at +/-0.55 m from the centreline, 0.16 m wide.
   float perpendicular = ( vGroundExtra.x - 0.5 ) * 7.0;
   float rut = vGroundExtra.y * exp( -pow( ( abs( perpendicular ) - 0.55 ) / 0.16, 2.0 ) );
   shade *= 1.0 - 0.22 * rut;
 
-  gGroundShade = shade;
+  // The macro reads alone drive the screen-space bump in GROUND_NORMAL_BODY. The detail read is
+  // excluded from it because the detail atlas now has a real normal map of its own, and running
+  // both off the same signal counts its relief twice.
+  gMacroShade = macroShade * ( 1.0 - 0.22 * rut );
+
+  // PER-CHANNEL RELIEF, sampled from the two normal maps generated alongside the albedo atlas.
+  // Both store the world X and Z of a heightfield normal, because the atlas is mapped planar in
+  // world XZ, so blending is a weighted sum of the four tangential pairs and no tangent frame is
+  // needed. The channel weights are already a partition of unity, so the blend can never exceed
+  // any one surface's authored relief.
+  vec4 bumpGS = texture2D( uNormalGS, detailUv ) * 2.0 - 1.0;
+  vec4 bumpRV = texture2D( uNormalRV, detailUv ) * 2.0 - 1.0;
+  gGroundBump = channel.x * bumpGS.xy + channel.y * bumpGS.zw
+              + channel.z * bumpRV.xy + channel.w * bumpRV.zw;
 
   // PER-SURFACE CHROMA, and this is the part that survives distance.
   //
@@ -430,8 +456,9 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
   // rotates hue and cannot move the region palette's value — REGION_PALETTES still decides how
   // light the ground is, and this decides what it is made of.
   //
-  // Grass gets two, and the dryness selector comes from the 37 m macro read, whose 3 authored cells put its
-  // patches at about 12.3 m across, which is the feature size the 20-60 m band needs. Tying it to
+  // Grass gets two, and the dryness selector comes from the 40 m macro read, whose 3 authored
+  // cells put its patches at about 13.3 m across, which is the feature size the 20-60 m band
+  // needs. Tying it to
   // the same channel that brightens the shade is deliberate — straw IS brighter than sward, so the
   // value and the hue move together instead of fighting.
   const vec3 TINT_GRASS_LUSH = vec3( 0.880, 1.056, 0.802 );
@@ -454,36 +481,51 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
 `;
 
 /**
- * Bumps the terrain normal from the detail value that was just sampled.
+ * Screen-space bump strength for the three MACRO reads.
  *
- * Screen-space derivatives, not a normal map: `gGroundShade` is already in registers, so this
- * costs two `dFdx`-class instructions and no extra texture fetch, and it is automatically
- * mip-correct — as the fine detail averages away with distance the derivatives go to zero and the
- * bump fades out on its own, which is what stops a 2.5 m tile from shimmering at 30 m.
+ * The macro texture has no normal map — it is sampled at 6.3, 16 and 40 m, so a single stored
+ * relief would be wrong at two of the three rates — and a screen-space derivative is the right
+ * tool at that scale: `gMacroShade` is already in registers, so this costs two `dFdx`-class
+ * instructions and no fetch, and it is automatically mip-correct.
  *
- * The strength is deliberately restrained. The terrain lattice is 2 m and this perturbs a normal
- * that lighting, shadow receipt and fog all read, so pushed hard it turns a hillside at a grazing
- * sun angle into noise. Enough that a gravel bed catches the sun differently from the grass beside
- * it is the whole difference between a surface and a printed picture of one.
- *
- * 1.5, halved from 3.0, and the halving is arithmetic rather than taste: this reads the SLOPE of
- * `gGroundShade`, and the contrast stretch in proceduralTextures.ts exactly doubled the standard
- * deviation of the fine detail channel that dominates that slope, 0.061 -> 0.123. Leaving 3.0
- * would have doubled the perturbation along with it.
+ * 2.4, up from the 1.5 the combined detail+macro signal used, because the detail read has been
+ * taken OUT of this term (it has its own map now) and the macro-only signal is the shallower of
+ * the two. Restrained regardless: this perturbs a normal that lighting, shadow receipt and fog all
+ * read, and pushed hard it turns a hillside at a grazing sun angle into noise.
  */
-const GROUND_BUMP_SCALE = 1.5;
+const GROUND_MACRO_BUMP_SCALE = 2.4;
+
+/**
+ * Strength multiplier on the detail normal maps, on top of the metres of relief baked into them.
+ *
+ * 1.0 means the atlas's authored relief is taken literally. It is set by looking at the ground at
+ * the camera's actual pitch and height — the shot presets sit 6-34 m out at a 28-38 degree
+ * pitch — rather than at a debug close-up, because relief that reads correctly with the surface
+ * filling the frame is roughly twice too strong once the same surface is 20 m away and lit at a
+ * grazing angle.
+ */
+const GROUND_NORMAL_SCALE = 1.0;
 
 const GROUND_NORMAL_BODY = /* glsl */ `
 {
   // three's own perturbNormalArb, inlined: that function is compiled only under USE_BUMPMAP and
-  // this material has no bumpMap, so it is not in the program to call.
-  vec2 dHdxy = vec2( dFdx( gGroundShade ), dFdy( gGroundShade ) ) * ${GROUND_BUMP_SCALE.toFixed(1)};
+  // this material has no bumpMap, so it is not in the program to call. Macro relief only.
+  vec2 dHdxy = vec2( dFdx( gMacroShade ), dFdy( gMacroShade ) ) * ${GROUND_MACRO_BUMP_SCALE.toFixed(1)};
   vec3 sigmaX = normalize( dFdx( - vViewPosition ) );
   vec3 sigmaY = normalize( dFdy( - vViewPosition ) );
   vec3 r1 = cross( sigmaY, normal );
   vec3 r2 = cross( normal, sigmaX );
   float det = dot( sigmaX, r1 );
   normal = normalize( abs( det ) * normal - sign( det ) * ( dHdxy.x * r1 + dHdxy.y * r2 ) );
+
+  // Detail relief, added in WORLD space and rotated into view space by the view matrix's rotation.
+  // The atlas is mapped planar in world XZ, so its stored components ARE the world X and Z of the
+  // perturbed normal; adding them to the geometric normal and renormalising is the standard cheap
+  // blend, and on ground that is within about 20 degrees of level — which is all of it outside the
+  // Karrowmoor risers — it is within a degree of the exact frame construction. viewMatrix is a
+  // rigid transform, so mat3 of it needs no inverse-transpose.
+  vec3 worldBump = vec3( gGroundBump.x, 0.0, gGroundBump.y ) * ${GROUND_NORMAL_SCALE.toFixed(1)};
+  normal = normalize( normal + mat3( viewMatrix ) * worldBump );
 }
 `;
 
@@ -581,10 +623,12 @@ export class MaterialLibrary {
    * cannot: measured, the colour changed by 0.12 of 255 per channel across a 2 m quad, which is
    * below the 8-bit display floor, so the ground was one flat colour at every scale a player sees.
    *
-   * Eight per-vertex surface weights select which channel is sampled, and there are THREE reads at
-   * 2.5 m, 9.5 m and 37 m across two textures — the detail atlas for the near read and the macro
-   * texture, twice, for the two far ones. Three scales from two textures is what kills the tile
-   * repeat across a 700 x 400 m world for one extra sampler and no extra memory.
+   * Eight per-vertex surface weights select which channel is sampled, and there are FOUR value
+   * reads — 2.5 m from the detail atlas, then 6.3, 16 and 40 m from the macro texture — plus two
+   * normal-map fetches at the detail rate. Four scales from two value textures is what kills the
+   * tile repeat across a 700 x 400 m world for one extra sampler and no extra memory, and the
+   * normal maps are the surface relief the ground has never had: before them the only bump on the
+   * terrain was a screen-space derivative of its own albedo.
    *
    * Everything here happens to `diffuseColor` before `<lights_fragment_begin>`, so shadows, all
    * four lights, ACES tone mapping, fog and the sRGB output conversion stay downstream and keep
@@ -603,24 +647,28 @@ export class MaterialLibrary {
       });
       material.name = "ground";
 
+      const normals = createDetailNormals();
       const uniforms = {
         uDetail: { value: createDetailAtlas() },
         uMacro: { value: createMacroVariation() },
-        // 2.5 m for the detail read, 9.5 m for the mid read, 37 m for the macro read. 2.5 m is
-        // roughly a footstep at the 6-34 m camera distances in shots.ts; the other two are
-        // deliberately not integer multiples of it or of each other, so no two reads come back
-        // into phase inside the visible radius. The far two come from their OWN texture — reading
-        // the atlas again at 37 m printed its cell structure at 1.5 m and 2.9 m across every stone
-        // and gravel surface in the world, which is the reported honeycomb.
-        uDetailTiling: { value: new THREE.Vector3(1 / 2.5, 1 / 9.5, 1 / 37) },
+        uNormalGS: { value: normals.grassSoil },
+        uNormalRV: { value: normals.rockGravel },
+        // 2.5 m for the detail read, then 6.3, 16 and 40 m — a 2.5x geometric ladder, so the four
+        // reads cover 1 cm to 13 m features with no gap and no two of them come back into phase
+        // inside the fog radius. The three far reads come from their OWN texture: reading the
+        // atlas again at 37 m printed its cell structure at 1.5 m and 2.9 m across every stone and
+        // gravel surface in the world, which is the reported honeycomb.
+        uDetailTiling: { value: new THREE.Vector4(1 / DETAIL_TILING_METRES, 1 / 6.3, 1 / 16, 1 / 40) },
       };
       // Held so a hot reload cannot orphan the atlas while a compiled program still references it.
       this.groundUniforms = uniforms;
 
-      material.customProgramCacheKey = () => "corealm-ground-splat-v5";
+      material.customProgramCacheKey = () => "corealm-ground-splat-v6";
       material.onBeforeCompile = (shader) => {
         shader.uniforms.uDetail = uniforms.uDetail;
         shader.uniforms.uMacro = uniforms.uMacro;
+        shader.uniforms.uNormalGS = uniforms.uNormalGS;
+        shader.uniforms.uNormalRV = uniforms.uNormalRV;
         shader.uniforms.uDetailTiling = uniforms.uDetailTiling;
 
         shader.vertexShader = `${GROUND_VERTEX_HEADER}\n${shader.vertexShader}`.replace(

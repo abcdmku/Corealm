@@ -16,7 +16,7 @@ import type {
   Result, SemanticEntity, SkillId, SkillView, SpellId, Vec3, OverlaySpec,
 } from "../contracts.js";
 import { EQUIP_SLOTS, SKILL_IDS, err, ok } from "../contracts.js";
-import type { Store } from "../state/store.js";
+import type { GameState, Store } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
 import type { Navigation } from "../systems/navigation.js";
 import type { Movement } from "../systems/movement.js";
@@ -24,7 +24,7 @@ import { equipmentTotalsOf } from "../systems/equipment.js";
 import type { SimClock } from "../core/time.js";
 import { levelProgress, xpToNextLevel } from "../content/xp.js";
 import { distanceXZ } from "../core/math.js";
-import { INTERACT_RANGE } from "../app/config.js";
+import { INTERACT_RANGE, PLAYER_SPEED } from "../app/config.js";
 
 /**
  * Systems register themselves here as they come online in later build rounds. The API surface is
@@ -204,6 +204,7 @@ export class CorealmGameApi implements GameApiContract {
 
     let destination: Vec3 | null = null;
     let entityId: EntityId | null = null;
+    let locationId: string | null = null;
 
     if ("position" in target) {
       destination = target.position;
@@ -216,14 +217,73 @@ export class CorealmGameApi implements GameApiContract {
       const node = this.nav.routeNode(target.locationId);
       if (!node) return err("NOT_FOUND", `No known location ${target.locationId}`);
       destination = node.position;
+      locationId = target.locationId;
     }
 
     if (!destination) return err("INVALID_ARGUMENT", "No destination resolved");
 
-    const started = this.movement.startPath(state, destination, entityId, this.clock.elapsedMs);
-    if (!started) return err("NOT_REACHABLE", "No walkable path to that destination");
-    this.store.markDirty();
-    return ok(started);
+    // The probe is silent on failure: it is a question, not an answer, and an agent waiting on
+    // `navigation.failed` must not hear it while the route below is walking the player out.
+    const started = this.movement.startPath(state, destination, entityId, this.clock.elapsedMs, {
+      quietFailure: true,
+    });
+    if (started) {
+      this.store.markDirty();
+      return ok(started);
+    }
+
+    // One navmesh query is not the whole answer to "walk to that thing". A portal is a gameplay
+    // link the mesh cannot express, so from inside the Gravelmaw every overworld target is
+    // correctly NOT_REACHABLE on the mesh and still perfectly reachable on foot — you walk out
+    // through the mouth first. That is what a player does, so it is what this does.
+    const routed = this.startPlannedRoute(state, destination, entityId, locationId);
+    if (routed) {
+      this.store.markDirty();
+      return ok(routed);
+    }
+
+    // Both answers are no, so now the failure is real and it is emitted exactly as `startPath`
+    // used to emit it, because that is what the UI and every waiting agent already handle.
+    this.eventBus.emit(
+      "navigation.failed",
+      { reason: "unreachable", to: destination },
+      entityId ?? undefined,
+      this.clock.elapsedMs,
+    );
+    return err("NOT_REACHABLE", "No walkable path to that destination");
+  }
+
+  /**
+   * The route fallback behind `moveTo`.
+   *
+   * `pathLength` counts only the walk legs, because a portal crossing and an Agility traversal are
+   * durations rather than distances and folding them in at walking pace would report metres nobody
+   * walks. `etaMs` is the whole plan, which is what a caller waiting on arrival actually needs.
+   */
+  private startPlannedRoute(
+    state: GameState,
+    destination: Vec3,
+    entityId: EntityId | null,
+    locationId: string | null,
+  ): { pathLength: number; etaMs: number } | null {
+    const agility = state.skills.agility.level;
+    const plan = locationId !== null
+      ? this.nav.planRouteVia(state.player.position, { locationId }, agility)
+      : this.nav.planRouteVia(
+        state.player.position,
+        entityId !== null ? { position: destination, id: entityId } : { position: destination },
+        agility,
+      );
+    if (!plan || plan.legs.length === 0) return null;
+    if (!this.movement.startRoute(state, plan.legs, this.clock.elapsedMs, entityId)) return null;
+
+    const walked = plan.legs
+      .filter((leg) => leg.kind === "walk")
+      .reduce((sum, leg) => sum + leg.cost, 0) * PLAYER_SPEED;
+    return {
+      pathLength: Math.round(walked * 100) / 100,
+      etaMs: Math.round(plan.cost * 1000),
+    };
   }
 
   stop(): Result<{ stopped: string[] }> {

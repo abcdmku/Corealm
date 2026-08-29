@@ -28,7 +28,7 @@
 import * as THREE from "three";
 import { init as initRecast, NavMeshQuery, type NavMesh } from "@recast-navigation/core";
 import { threeToSoloNavMesh, threeToTiledNavMesh } from "@recast-navigation/three";
-import type { EntityId, SolidVolume, Vec3 } from "../contracts.js";
+import type { EntityId, RegionId, SolidVolume, Vec3 } from "../contracts.js";
 import { NAV_CONFIG, PLAYER_SPEED } from "../app/config.js";
 import { distance, distanceXZ, pathLength } from "../core/math.js";
 
@@ -101,6 +101,32 @@ const MIN_CARVE_HEIGHT = 1;
 /** Sides on a cylinder carve. 10 gives a decagon within 5% of the circle it stands in for. */
 const CYLINDER_SEGMENTS = 10;
 
+/**
+ * How many reachable anchors each end of a `planRouteVia` plan considers, and how many nodes it
+ * probes to find them.
+ *
+ * Both numbers come off one measurement: the route nodes ranked by 3-D distance from
+ * `gravelmaw_arena`, with the walk the mesh will actually give you and the graph route out at
+ * Agility 1.
+ *
+ *   1  gravelmaw_arena       0.0 m   walk  0.0 m   no route out
+ *   2  gravelmaw_chamber3   23.4 m   walk 23.4 m   no route out
+ *   3  gravelmaw_chamber2   43.4 m   walk 44.6 m   169.12 s
+ *   4  redsill_shallows     62.1 m   UNREACHABLE   (86.23 s, and worthless)
+ *   5  gravelmaw_chamber1   64.3 m   walk 64.9 m   164.13 s
+ *
+ * The first two have no route out because the only chamber2-chamber3 link is the Agility 14 Chimney
+ * Climb, so stopping at the nearest node would answer NOT_REACHABLE. Rank 4 is 62 m away through
+ * solid rock, which is why the mesh filter is not optional. Rank 5 is the anchor actually chosen
+ * and it beats rank 3 by 0.16 s, so five candidates is the number that finds the best answer rather
+ * than merely an answer.
+ *
+ * Every probe is a Detour query and this only runs after a direct query has already failed, so the
+ * probe ceiling bounds the worst case at fourteen queries per end instead of one per graph node.
+ */
+const ANCHOR_CANDIDATES = 5;
+const ANCHOR_PROBES = 14;
+
 export interface NavigationSnapshot {
   /** The harness checks this exact string. Do not rename. */
   status: NavStatus;
@@ -142,21 +168,32 @@ export interface RouteNode {
   id: string;
   name: string;
   position: Vec3;
-  regionId: string;
+  regionId: RegionId;
 }
 
-/** An edge in the route graph. Shortcut edges carry an Agility requirement. */
+/**
+ * An edge in the route graph.
+ *
+ * Three kinds, and the two non-walk ones exist for the same reason: the navmesh is one connected
+ * surface and some links in this world are not. A `shortcut` is an Agility obstacle. A `portal` is
+ * a placement — measured, the Gravelmaw mouth stands at y 18.61 on the Karrowmoor surface while
+ * chamber one's floor is at 16.61 and 4.9 m inside a cavern wall that blocks the mesh from floor to
+ * ceiling, so no amount of ground can join them and Detour correctly answers NOT_REACHABLE. The
+ * route graph is the only layer that can say "leave the dungeon, then walk there".
+ */
 export interface RouteEdge {
   from: string;
   to: string;
   /** Seconds. Walk edges are pathLength / PLAYER_SPEED; shortcuts add their traversal duration. */
   cost: number;
-  kind: "walk" | "shortcut";
+  kind: "walk" | "shortcut" | "portal";
   obstacleId?: EntityId;
+  /** The portal entity crossed by a `portal` edge. */
+  portalId?: EntityId;
   reqLevel?: number;
-  /** Where the player must stand to start the shortcut. Defaults to the `from` node. */
+  /** Where the player must stand to start the shortcut or use the portal. Defaults to `from`. */
   entrance?: Vec3;
-  /** Where the shortcut deposits the player. Defaults to the `to` node. */
+  /** Where the shortcut or portal deposits the player. Defaults to the `to` node. */
   exit?: Vec3;
   /** Traversal animation time in milliseconds, from `SemanticEntity.obstacle.durationMs`. */
   durationMs?: number;
@@ -167,10 +204,10 @@ export interface RouteEdge {
 /**
  * One walkable step of a planned route. This is what makes a route actually walkable rather than
  * only plannable: `Movement.startRoute` consumes these in order, walking the `walk` legs over the
- * navmesh and playing the traversal for the `shortcut` legs.
+ * navmesh and playing the traversal for the `shortcut` and `portal` legs.
  */
 export interface RouteLeg {
-  kind: "walk" | "shortcut";
+  kind: "walk" | "shortcut" | "portal";
   from: Vec3;
   to: Vec3;
   fromId: string;
@@ -178,8 +215,19 @@ export interface RouteLeg {
   /** Seconds. */
   cost: number;
   obstacleId?: EntityId;
+  /** The portal entity a `portal` leg crosses. */
+  portalId?: EntityId;
   reqLevel?: number;
   durationMs?: number;
+  /**
+   * Which region the player is standing in once a `portal` leg completes.
+   *
+   * Carried on the leg because the region is a property of the far END of the crossing, and the
+   * only thing that knows it is the route node the edge points at. Without it the player walks out
+   * of the Gravelmaw still tagged `gravelmaw`, and the render filter that hides dungeon interiors
+   * from the surface keeps the whole cavern drawn around them.
+   */
+  toRegionId?: RegionId;
   /** Only populated when the caller asks for paths. */
   path?: Vec3[];
 }
@@ -620,10 +668,13 @@ export class Navigation {
         continue;
       }
 
-      const entrance = edge.entrance ?? fromNode.position;
-      const exit = edge.exit ?? toNode.position;
-      const approach = this.pathDistance(fromNode.position, entrance);
+      // A shortcut and a portal are the same shape of leg: walk to a spot, spend a duration
+      // standing there, reappear somewhere the navmesh could not have carried you. Only what the
+      // far side means differs, so they share one branch rather than growing a second mechanism.
+      const entrance = this.knownToMesh(edge.entrance) ?? fromNode.position;
+      const exit = this.knownToMesh(edge.exit) ?? toNode.position;
       if (distanceXZ(fromNode.position, entrance) > 0.5) {
+        const approach = this.pathDistance(fromNode.position, entrance);
         legs.push(this.walkLeg(
           edge.from,
           `${edge.to}:entrance`,
@@ -635,7 +686,7 @@ export class Navigation {
       }
 
       const leg: RouteLeg = {
-        kind: "shortcut",
+        kind: edge.kind,
         from: entrance,
         to: exit,
         fromId: `${edge.to}:entrance`,
@@ -644,7 +695,9 @@ export class Navigation {
         durationMs: edge.durationMs ?? 0,
       };
       if (edge.obstacleId !== undefined) leg.obstacleId = edge.obstacleId;
+      if (edge.portalId !== undefined) leg.portalId = edge.portalId;
       if (edge.reqLevel !== undefined) leg.reqLevel = edge.reqLevel;
+      if (edge.kind === "portal") leg.toRegionId = toNode.regionId;
       legs.push(leg);
 
       if (distanceXZ(exit, toNode.position) > 0.5) {
@@ -660,6 +713,119 @@ export class Navigation {
       }
     }
     return legs;
+  }
+
+  /**
+   * A route between two arbitrary world points, anchored onto the graph at both ends.
+   *
+   * `planRoute` needs two node ids. A player and an agent have a position and a thing they want to
+   * reach, and neither is usually a node — so this picks the anchors, and it picks them by asking
+   * the navmesh rather than by distance alone. That distinction is the whole reason it exists:
+   * standing on `gravelmaw_arena` the nearest node IS the arena, and no graph edge leaves it below
+   * Agility 14. Walking outward and costing each candidate lands on `gravelmaw_chamber1`, 64.9 m of
+   * real walking away, for 179.58 s to the Bracken Pit. See `ANCHOR_CANDIDATES` for the full table.
+   *
+   * Every anchor is proved with a real path query before it is used, so this cannot invent a leg
+   * through solid rock the way the old fabricated last leg did.
+   */
+  planRouteVia(
+    from: Vec3,
+    to: { locationId: string } | { position: Vec3; id?: string },
+    agilityLevel: number,
+    options: { withPaths?: boolean } = {},
+  ): RoutePlan | null {
+    const withPaths = options.withPaths ?? false;
+    const starts = this.reachableNodesNear(from);
+    if (starts.length === 0) return null;
+
+    let ends: { node: RouteNode; metres: number }[];
+    let tail: Vec3 | null = null;
+    let tailId = "destination";
+    if ("locationId" in to) {
+      const node = this.routeNodes.get(to.locationId);
+      if (!node) return null;
+      ends = [{ node, metres: 0 }];
+    } else {
+      ends = this.reachableNodesNear(to.position);
+      tail = to.position;
+      tailId = to.id ?? "destination";
+    }
+    if (ends.length === 0) return null;
+
+    let best: {
+      plan: RoutePlan;
+      start: RouteNode; startMetres: number;
+      end: RouteNode; endMetres: number;
+      total: number;
+    } | null = null;
+
+    for (const start of starts) {
+      for (const end of ends) {
+        const plan = this.planRoute(start.node.id, end.node.id, agilityLevel, { withPaths });
+        if (!plan) continue;
+        const total = (start.metres + end.metres) / PLAYER_SPEED + plan.cost;
+        if (best && total >= best.total) continue;
+        best = {
+          plan,
+          start: start.node, startMetres: start.metres,
+          end: end.node, endMetres: end.metres,
+          total,
+        };
+      }
+    }
+    if (!best) return null;
+
+    const legs: RouteLeg[] = [];
+    if (distanceXZ(from, best.start.position) > 0.5) {
+      legs.push(this.walkLeg(
+        "start", best.start.id, from, best.start.position, best.startMetres / PLAYER_SPEED, withPaths,
+      ));
+    }
+    legs.push(...best.plan.legs);
+    if (tail && distanceXZ(best.end.position, tail) > 0.5) {
+      legs.push(this.walkLeg(
+        best.end.id, tailId, best.end.position, tail, best.endMetres / PLAYER_SPEED, withPaths,
+      ));
+    }
+    if (legs.length === 0) return null;
+
+    const path = [...best.plan.path];
+    if (tail) path.push(tailId);
+    return { path, cost: Math.round(best.total * 100) / 100, edges: best.plan.edges, legs };
+  }
+
+  /**
+   * The point, if the mesh knows about it at all; otherwise null so the caller uses the node.
+   *
+   * Measured: the Scree Slide's authored `exitPosition` snaps to nothing — `closestPoint` returns
+   * null there, and a traversal leg that trusted it would put the player off the mesh. The node is
+   * always a place the graph already claims you can stand, so it is the honest fallback.
+   */
+  private knownToMesh(point: Vec3 | undefined): Vec3 | null {
+    if (!point) return null;
+    return this.closestPoint(point) ? point : null;
+  }
+
+  /**
+   * Route nodes the navmesh can genuinely walk between and `position`, nearest first.
+   *
+   * `pathDistance` is null on a partial path, so a node on the far side of a cavern wall is dropped
+   * rather than ranked — which is what keeps a surface node from being chosen as the anchor for a
+   * player standing 12 m under it in the Gravelmaw.
+   */
+  private reachableNodesNear(position: Vec3): { node: RouteNode; metres: number }[] {
+    const byDistance = [...this.routeNodes.values()]
+      .map((node) => ({ node, gap: distance(node.position, position) }))
+      .sort((a, b) => a.gap - b.gap);
+
+    const hits: { node: RouteNode; metres: number }[] = [];
+    for (const candidate of byDistance.slice(0, ANCHOR_PROBES)) {
+      if (hits.length >= ANCHOR_CANDIDATES) break;
+      const metres = this.pathDistance(position, candidate.node.position);
+      if (metres === null) continue;
+      hits.push({ node: candidate.node, metres });
+    }
+    return hits;
   }
 
   private walkLeg(

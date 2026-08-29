@@ -1,0 +1,145 @@
+
+const HAIR_PART = /^hair_/;
+
+/**
+ * An authored outfit part id, split into (sex, family, slot).
+ *
+ * `world/regionBuilder.outfitPartsFor` emits exactly this shape: one family for the whole
+ * character, chosen from the npc id. That gives the world FOUR outfits - male/female x
+ * peasant/ranger - and the shipped roster of 12 NPCs realises all four, which is why three of the
+ * five male peasants in the world are the same person and why the player and `npc_carter_bel` are
+ * pixel-for-pixel identical in runs/corealm/screenshots/ev3-before-npc-carter_bel.png.
+ */
+const OUTFIT_PART = /^outfit_(male|female)_(peasant|ranger)_(chest|legs|boots|gloves|hood|pauldron)$/;
+
+/**
+ * Outfit slots that may take EITHER family on the same character.
+ *
+ * Mixing is legal because both families are authored onto the same body and their coverage bands
+ * overlap at every seam. Measured from the manifest (base y + size y, i.e. the authored bind-space
+ * span of each part GLB):
+ *
+ * ```text
+ *   male    chest 0.921-1.558 (peasant)  0.909-1.600 (ranger)
+ *           legs  0.403-1.054            0.423-1.052
+ *           boots -0.004-0.448           -0.004-0.556
+ *   female  chest 0.988-1.519            0.919-1.541
+ *           legs  0.436-1.091            0.411-1.061
+ *           boots -0.007-0.458           -0.004-0.556
+ * ```
+ *
+ * Every cross-family pair overlaps: the smallest chest/leg margin is a ranger chest over female
+ * peasant legs, 1.091 - 0.919 = 172 mm, and the tightest boot/leg pair is female peasant boots
+ * under female peasant legs at 458 - 436 = 22 mm. Nothing here can open a gap that shows bare skin,
+ * which is the one regression this mixing could plausibly cause. The head-cap seam survives too:
+ * the cut is 1.550 male / 1.500 female and the LOWEST chest top of the four is 1.519, so there is
+ * at least 19 mm of collar over the cut whichever chest is chosen.
+ *
+ * `chest` is deliberately not in the list. It is what says whether this person is a villager or an
+ * outdoorsman, and `regionBuilder` derives that from the npc's own role.
+ *
+ * `hood` and `pauldron` exist only as ranger meshes, so they are presence choices rather than
+ * family choices. A hood over a peasant tunic reads as a traveller and a single pauldron over one
+ * reads as a militia guard; both are silhouette changes this library otherwise cannot make.
+ */
+const MIXABLE_SLOTS: readonly string[] = ["legs", "boots", "gloves"];
+
+/** How often a character not authored with one is given a hood / a pauldron. */
+const HOOD_CHANCE = 0.18;
+const PAULDRON_CHANCE = 0.34;
+/** How often an authored ranger keeps its hood. The rest go bare-headed and get hair. */
+const HOOD_KEEP_CHANCE = 0.6;
+/** How often a male character wears a beard. `hair_beard` is a second layer, not a hair choice. */
+const BEARD_CHANCE = 0.45;
+
+/**
+ * Hair meshes offered per sex.
+ *
+ * `render/skinning.hairAssetFor` offers two per sex; this widens the female list and adds the
+ * beard, and it deliberately does NOT put `hair_long` on a male body. hair_long spans bind y
+ * 1.501-1.777 against a male head cap at 1.550, so 49 mm of it hangs below the cut and over the
+ * shoulder line of a rig it was not authored for. `hair_short` at 1.661-1.840 and `hair_buzzed` at
+ * 1.644-1.813 sit entirely above the cut, and `hair_beard` at 1.550-1.690 sits on the chin.
+ *
+ * The variety that matters here is COLOUR, not mesh: the packed hair texture is near-white on
+ * every character in runs/corealm/screenshots/ev3-before-npc-carter_bel.png, so a per-entity
+ * multiply moves it across the whole natural range.
+ */
+const MALE_HAIR: readonly string[] = ["hair_short", "hair_buzzed"];
+const FEMALE_HAIR: readonly string[] = ["hair_long", "hair_buns", "hair_short"];
+const BEARD_ASSET = "hair_beard";
+
+/**
+ * What a per-entity tint is allowed to move, resolved from the SOURCE material's name.
+ *
+ * The names are stable and few. Dumped from all 36 character and outfit GLBs: the humanoid kit
+ * paints with `MI_Peasant`, `MI_Ranger`, `MI_Regular_{Male,Female}`, `MI_Superhero_{Male,Female}`,
+ * `MI_Hair_{1,2}` and `MI_Eyes`; the four monster packs with `Main`, `Main_Dark`, `Main_Light`,
+ * `Main_2`, `Wings`, `Horns`, `Teeth`, `Tongue`, `Eyes`, `Black` and `White`.
+ *
+ * `cloth` and `clothAlt` are two roles rather than one because a mixed character wears both
+ * families at once, and giving the two their own dye is what turns "a different pair of trousers"
+ * into "a different person". Eyes, teeth, tongue and the pure black/white trims resolve to `none`
+ * for the same reason `PROTECTED_MATERIAL` exists: a tinted eye is a smear.
+ */
+type TintRole = "none" | "cloth" | "clothAlt" | "skin" | "hair" | "creature" | "creatureAccent";
+
+const CLOTH_MATERIAL = /^MI_Peasant/i;
+const CLOTH_ALT_MATERIAL = /^MI_Ranger/i;
+const SKIN_MATERIAL = /^MI_(Regular|Superhero)_(Male|Female)/i;
+const HAIR_MATERIAL = /^MI_Hair/i;
+const CREATURE_BODY_MATERIAL = /^Main(_Dark|_Light|_2)?$/i;
+const CREATURE_ACCENT_MATERIAL = /^(Wings|Horns)$/i;
+
+/** Archetypes whose parts carry a per-entity instance colour. Nothing else is ever tinted. */
+const TINTABLE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "enemy", "boss"]);
+
+/**
+ * The dye lots, hair colours, skin tones and creature hues, as MULTIPLIERS against the authored
+ * texture.
+ *
+ * Every entry keeps a channel at or near 1.0 on purpose. `diffuseColor *= vColor` in the fragment
+ * shader (three 0.185, ShaderChunk/color_fragment) is a straight multiply, so a swatch whose
+ * brightest channel is 0.7 does not recolour the art, it dims it by 30% - the same mistake
+ * `MaterialLibrary.variant` documents under `preserveLuminance`. These shift hue and leave the
+ * value where the texture's author put it.
+ *
+ * The skin ramp is the exception and is a value ramp as well as a hue one, because skin tone IS a
+ * value difference. It stops at 0.50 rather than going darker because the key light here is a low
+ * sun, and a face below that reads as being in shadow rather than as a face.
+ */
+const CLOTH_TINTS: readonly number[] = [
+  0xffb3a4, 0xa9c4ff, 0xc4e59a, 0xffd98f, 0xf0e8dc,
+  0xb2aeb8, 0xdca8d6, 0xffb573, 0x9fd9c4, 0xe6cfa2,
+];
+const HAIR_TINTS: readonly number[] = [0x4a4038, 0x7d5a3a, 0xb08050, 0xd4712e, 0xf2dd9b, 0xdadade];
+const SKIN_TINTS: readonly number[] = [0xfff2e6, 0xf6dcc4, 0xe0bc98, 0xc39a70, 0xa07850, 0x805c40];
+const CREATURE_TINTS: readonly number[] = [
+  0xffb0a0, 0xa8d8ff, 0xc8ffa8, 0xffe6a0, 0xd8b0ff,
+  0xa0ffe0, 0xffa8d8, 0xd0d0d0, 0xffd0b0, 0xb8ffb8,
+];
+
+/** Per-individual value steps inside one creature family, so a swarm is not six copies. */
+const CREATURE_SHADES: readonly number[] = [1, 0.92, 0.84];
+
+/** No tint. Also the value a `BatchedMesh` colours texture is initialised to. */
+const NO_TINT = 0xffffff;
+
+/**
+ * Per-entity build, as a multiplier on the drawn scale.
+ *
+ * Uniform first, then a small extra on Y, because the two together are what read as different
+ * PEOPLE rather than as one person at two zoom levels. The combined envelope is 0.95 x 0.98 = 0.93
+ * to 1.06 x 1.03 = 1.09, i.e. a 1.82 m `base_male` is drawn between 1.70 m and 1.99 m. Anything
+ * wider than that stops reading as a crowd and starts reading as a bug.
+ *
+ * `BatchedMesh` handles the non-uniform half correctly: `defaultnormal_vertex` divides the normal
+ * by the per-axis squared column lengths of the instance matrix before transforming it (three
+ * 0.185), so a stretched instance still lights right. The unique path is a plain `Object3D.scale`
+ * and three does the same thing there through the normal matrix.
+ */
+const BUILD_SCALES: readonly number[] = [0.95, 0.98, 1, 1.02, 1.04, 1.06];
+const BUILD_HEIGHTS: readonly number[] = [0.98, 1, 1.015, 1.03];
+/** Archetypes that get a build. The boss is excluded: there is one, and its size is the read. */
+const BUILD_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "enemy"]);
+const NO_BUILD: readonly [number, number, number] = [1, 1, 1];

@@ -87,7 +87,6 @@ import { Rng } from "../core/rng.js";
 import { MaterialLibrary, tierSilhouetteScale } from "./materials.js";
 import {
   assembleDressedCharacter,
-  hairAssetFor,
   headCapHeightFor,
   type CharacterPartSource,
   type DressedCharacter,
@@ -149,6 +148,8 @@ const SCRATCH_TILT = new THREE.Quaternion();
 const SCRATCH_BLEND = new THREE.Quaternion();
 const SCRATCH_PLACEMENT = new THREE.Matrix4();
 const SCRATCH_TRANSFORM = new THREE.Matrix4();
+// Written and consumed inside one synchronous call, exactly like the matrices above.
+const SCRATCH_COLOUR = new THREE.Color();
 
 /** States that render with the spent treatment. Everything else renders live. */
 const SPENT_STATES = new Set(["depleted", "dead", "empty", "harvested", "closed", "spent"]);
@@ -321,6 +322,149 @@ const HOODED_PARTS: ReadonlySet<string> = new Set([
 ]);
 
 const HAIR_PART = /^hair_/;
+
+/**
+ * An authored outfit part id, split into (sex, family, slot).
+ *
+ * `world/regionBuilder.outfitPartsFor` emits exactly this shape: one family for the whole
+ * character, chosen from the npc id. That gives the world FOUR outfits - male/female x
+ * peasant/ranger - and the shipped roster of 12 NPCs realises all four, which is why three of the
+ * five male peasants in the world are the same person and why the player and `npc_carter_bel` are
+ * pixel-for-pixel identical in runs/corealm/screenshots/ev3-before-npc-carter_bel.png.
+ */
+const OUTFIT_PART = /^outfit_(male|female)_(peasant|ranger)_(chest|legs|boots|gloves|hood|pauldron)$/;
+
+/**
+ * Outfit slots that may take EITHER family on the same character.
+ *
+ * Mixing is legal because both families are authored onto the same body and their coverage bands
+ * overlap at every seam. Measured from the manifest (base y + size y, i.e. the authored bind-space
+ * span of each part GLB):
+ *
+ * ```text
+ *   male    chest 0.921-1.558 (peasant)  0.909-1.600 (ranger)
+ *           legs  0.403-1.054            0.423-1.052
+ *           boots -0.004-0.448           -0.004-0.556
+ *   female  chest 0.988-1.519            0.919-1.541
+ *           legs  0.436-1.091            0.411-1.061
+ *           boots -0.007-0.458           -0.004-0.556
+ * ```
+ *
+ * Every cross-family pair overlaps: the smallest chest/leg margin is a ranger chest over female
+ * peasant legs, 1.091 - 0.919 = 172 mm, and the tightest boot/leg pair is female peasant boots
+ * under female peasant legs at 458 - 436 = 22 mm. Nothing here can open a gap that shows bare skin,
+ * which is the one regression this mixing could plausibly cause. The head-cap seam survives too:
+ * the cut is 1.550 male / 1.500 female and the LOWEST chest top of the four is 1.519, so there is
+ * at least 19 mm of collar over the cut whichever chest is chosen.
+ *
+ * `chest` is deliberately not in the list. It is what says whether this person is a villager or an
+ * outdoorsman, and `regionBuilder` derives that from the npc's own role.
+ *
+ * `hood` and `pauldron` exist only as ranger meshes, so they are presence choices rather than
+ * family choices. A hood over a peasant tunic reads as a traveller and a single pauldron over one
+ * reads as a militia guard; both are silhouette changes this library otherwise cannot make.
+ */
+const MIXABLE_SLOTS: readonly string[] = ["legs", "boots", "gloves"];
+
+/** How often a character not authored with one is given a hood / a pauldron. */
+const HOOD_CHANCE = 0.18;
+const PAULDRON_CHANCE = 0.34;
+/** How often an authored ranger keeps its hood. The rest go bare-headed and get hair. */
+const HOOD_KEEP_CHANCE = 0.6;
+/** How often a male character wears a beard. `hair_beard` is a second layer, not a hair choice. */
+const BEARD_CHANCE = 0.45;
+
+/**
+ * Hair meshes offered per sex.
+ *
+ * `render/skinning.hairAssetFor` offers two per sex; this widens the female list and adds the
+ * beard, and it deliberately does NOT put `hair_long` on a male body. hair_long spans bind y
+ * 1.501-1.777 against a male head cap at 1.550, so 49 mm of it hangs below the cut and over the
+ * shoulder line of a rig it was not authored for. `hair_short` at 1.661-1.840 and `hair_buzzed` at
+ * 1.644-1.813 sit entirely above the cut, and `hair_beard` at 1.550-1.690 sits on the chin.
+ *
+ * The variety that matters here is COLOUR, not mesh: the packed hair texture is near-white on
+ * every character in runs/corealm/screenshots/ev3-before-npc-carter_bel.png, so a per-entity
+ * multiply moves it across the whole natural range.
+ */
+const MALE_HAIR: readonly string[] = ["hair_short", "hair_buzzed"];
+const FEMALE_HAIR: readonly string[] = ["hair_long", "hair_buns", "hair_short"];
+const BEARD_ASSET = "hair_beard";
+
+/**
+ * What a per-entity tint is allowed to move, resolved from the SOURCE material's name.
+ *
+ * The names are stable and few. Dumped from all 36 character and outfit GLBs: the humanoid kit
+ * paints with `MI_Peasant`, `MI_Ranger`, `MI_Regular_{Male,Female}`, `MI_Superhero_{Male,Female}`,
+ * `MI_Hair_{1,2}` and `MI_Eyes`; the four monster packs with `Main`, `Main_Dark`, `Main_Light`,
+ * `Main_2`, `Wings`, `Horns`, `Teeth`, `Tongue`, `Eyes`, `Black` and `White`.
+ *
+ * `cloth` and `clothAlt` are two roles rather than one because a mixed character wears both
+ * families at once, and giving the two their own dye is what turns "a different pair of trousers"
+ * into "a different person". Eyes, teeth, tongue and the pure black/white trims resolve to `none`
+ * for the same reason `PROTECTED_MATERIAL` exists: a tinted eye is a smear.
+ */
+type TintRole = "none" | "cloth" | "clothAlt" | "skin" | "hair" | "creature" | "creatureAccent";
+
+const CLOTH_MATERIAL = /^MI_Peasant/i;
+const CLOTH_ALT_MATERIAL = /^MI_Ranger/i;
+const SKIN_MATERIAL = /^MI_(Regular|Superhero)_(Male|Female)/i;
+const HAIR_MATERIAL = /^MI_Hair/i;
+const CREATURE_BODY_MATERIAL = /^Main(_Dark|_Light|_2)?$/i;
+const CREATURE_ACCENT_MATERIAL = /^(Wings|Horns)$/i;
+
+/** Archetypes whose parts carry a per-entity instance colour. Nothing else is ever tinted. */
+const TINTABLE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "enemy", "boss"]);
+
+/**
+ * The dye lots, hair colours, skin tones and creature hues, as MULTIPLIERS against the authored
+ * texture.
+ *
+ * Every entry keeps a channel at or near 1.0 on purpose. `diffuseColor *= vColor` in the fragment
+ * shader (three 0.185, ShaderChunk/color_fragment) is a straight multiply, so a swatch whose
+ * brightest channel is 0.7 does not recolour the art, it dims it by 30% - the same mistake
+ * `MaterialLibrary.variant` documents under `preserveLuminance`. These shift hue and leave the
+ * value where the texture's author put it.
+ *
+ * The skin ramp is the exception and is a value ramp as well as a hue one, because skin tone IS a
+ * value difference. It stops at 0.50 rather than going darker because the key light here is a low
+ * sun, and a face below that reads as being in shadow rather than as a face.
+ */
+const CLOTH_TINTS: readonly number[] = [
+  0xffb3a4, 0xa9c4ff, 0xc4e59a, 0xffd98f, 0xf0e8dc,
+  0xb2aeb8, 0xdca8d6, 0xffb573, 0x9fd9c4, 0xe6cfa2,
+];
+const HAIR_TINTS: readonly number[] = [0x4a4038, 0x7d5a3a, 0xb08050, 0xd4712e, 0xf2dd9b, 0xdadade];
+const SKIN_TINTS: readonly number[] = [0xfff2e6, 0xf6dcc4, 0xe0bc98, 0xc39a70, 0xa07850, 0x805c40];
+const CREATURE_TINTS: readonly number[] = [
+  0xffb0a0, 0xa8d8ff, 0xc8ffa8, 0xffe6a0, 0xd8b0ff,
+  0xa0ffe0, 0xffa8d8, 0xd0d0d0, 0xffd0b0, 0xb8ffb8,
+];
+
+/** Per-individual value steps inside one creature family, so a swarm is not six copies. */
+const CREATURE_SHADES: readonly number[] = [1, 0.92, 0.84];
+
+/** No tint. Also the value a `BatchedMesh` colours texture is initialised to. */
+const NO_TINT = 0xffffff;
+
+/**
+ * Per-entity build, as a multiplier on the drawn scale.
+ *
+ * Uniform first, then a small extra on Y, because the two together are what read as different
+ * PEOPLE rather than as one person at two zoom levels. The combined envelope is 0.95 x 0.98 = 0.93
+ * to 1.06 x 1.03 = 1.09, i.e. a 1.82 m `base_male` is drawn between 1.70 m and 1.99 m. Anything
+ * wider than that stops reading as a crowd and starts reading as a bug.
+ *
+ * `BatchedMesh` handles the non-uniform half correctly: `defaultnormal_vertex` divides the normal
+ * by the per-axis squared column lengths of the instance matrix before transforming it (three
+ * 0.185), so a stretched instance still lights right. The unique path is a plain `Object3D.scale`
+ * and three does the same thing there through the normal matrix.
+ */
+const BUILD_SCALES: readonly number[] = [0.95, 0.98, 1, 1.02, 1.04, 1.06];
+const BUILD_HEIGHTS: readonly number[] = [0.98, 1, 1.015, 1.03];
+/** Archetypes that get a build. The boss is excluded: there is one, and its size is the read. */
+const BUILD_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "enemy"]);
+const NO_BUILD: readonly [number, number, number] = [1, 1, 1];
 
 /**
  * How far each archetype beds into the terrain normal, 0..1, when the world layer supplies a normal
@@ -534,6 +678,23 @@ interface CharacterSpec {
 }
 
 /**
+ * One entity's dye lots, one per `TintRole`. `NO_TINT` means "draw the art as authored".
+ *
+ * Chosen from the entity id and nothing else, so two loads of the same world produce the same
+ * faces and a `__gameDebug.reset({seed})` diff does not flap. Each pick is a fresh `Rng` seeded by
+ * a hash of the id and the role name, exactly like `skinning.hairAssetFor`: no shared stream is
+ * consumed, so adding these shifts no other deterministic draw in the game.
+ */
+interface EntityTints {
+  cloth: number;
+  clothAlt: number;
+  skin: number;
+  hair: number;
+  creature: number;
+  creatureAccent: number;
+}
+
+/**
  * One `BatchedMesh` holding every entity part in the world that draws under the same material.
  *
  * This is the draw-call fix. A group used to own one `InstancedMesh` per part, so the entity layer
@@ -583,6 +744,23 @@ interface PartDraw {
   part: SourcePart;
   /** slot -> instanceId. Sparse: an instance is allocated the first time a slot draws this part. */
   instances: number[];
+  /**
+   * Which per-entity tint this part's material answers to, resolved once from its name.
+   *
+   * "none" for every part in the world that is not a character, which is 3,400 of the 3,484
+   * entities, so the tint check costs one string compare on the rest.
+   */
+  role: TintRole;
+  /**
+   * slot -> the tint hex last written into the batch for it. Never re-uploaded when unchanged.
+   *
+   * `BatchedMesh.setColorAt` flags the whole colours texture `needsUpdate`, and `writeSlot` runs
+   * once per moving entity per RENDER frame, so writing an unchanged colour would re-upload a
+   * DataTexture per batch per frame for nothing. It also has to be keyed by SLOT rather than by
+   * instance: a freed slot keeps its `BatchedMesh` instance and is handed to the next entity that
+   * needs one, which would otherwise inherit the previous occupant's dye.
+   */
+  tints: number[];
 }
 
 interface InstanceGroup {
@@ -671,6 +849,17 @@ interface ViewRecord {
   /** Syncs left before this entity stops counting as moving. See `MOVING_HOLD_SYNCS`. */
   movingTicks: number;
   scale: number;
+  /**
+   * Per-entity dye lots, resolved once from the entity id. Null for anything not a character.
+   *
+   * On the record rather than looked up per write because `writeSlot` runs at render rate for
+   * everything that moves, and because both draw paths — the batched instance colour and the
+   * cloned material on a rigged unique — have to read the same answer or a character changes
+   * colour the moment it walks into rig range.
+   */
+  tints: EntityTints | null;
+  /** Per-entity build multiplier on `scale`, as (x, y, z). `NO_BUILD` for everything else. */
+  build: readonly [number, number, number];
   spent: boolean;
   /** Unit terrain normal from `view.groundNormal`, or null. */
   normal: readonly [number, number, number] | null;
@@ -752,6 +941,16 @@ export interface EntityViewStats {
   dressedCharacters: number;
   /** Instance groups whose parts were baked from a dressed body-plus-parts assembly. */
   dressedGroups: number;
+  /**
+   * Distinct visual combinations across every character and creature currently drawn.
+   *
+   * The unit is what a player can actually tell apart: the part set (or asset plus tier), the
+   * dye lots, and the build, all rounded the way they are drawn. Measured on the shipped world
+   * this was 12 before this pass - 4 authored outfits plus two hair picks on the peasants, and 8
+   * enemy (mesh, tier) pairs - against 63 entities. It is the number the brief's "a wider variety
+   * of npc models / entities recolour" asks about, so it is reported rather than argued.
+   */
+  distinctLooks: number;
   /** Records currently drawn in their walk pose. */
   movingViews: number;
   triangles: number;
@@ -812,6 +1011,8 @@ export class EntityViews {
   /** `(assetKey, archetype)` -> does tier belong in the group key. See `groupTier`. */
   private readonly tierKeyed = new Map<string, boolean>();
   private readonly seamGeometries = new Map<string, THREE.BufferGeometry>();
+  /** Per-entity dye clones for the non-instanced path, keyed (source material, tint hex). */
+  private readonly tintedMaterials = new Map<string, THREE.Material>();
   private readonly bakedGeometries: THREE.BufferGeometry[] = [];
   /** Rigged records with a mixer. Kept as its own set so `update` never walks 600 ore nodes. */
   private readonly animated = new Set<ViewRecord>();
@@ -892,7 +1093,8 @@ export class EntityViews {
       if (entity.view.depletedAssetId) wanted.add(entity.view.depletedAssetId);
       // A dressed character needs its body, every outfit part and its hair before the first sync,
       // or it is built from whatever HAS landed and re-acquired later — which is a visible pop.
-      const character = characterSpecFor(entity.id, entity.view.assetId, entity.view.partAssetIds);
+      const character = characterSpecFor(
+        entity.id, entity.archetype, entity.view.assetId, entity.view.partAssetIds);
       if (!character) continue;
       wanted.add(character.bodyAssetId);
       for (const partId of character.partAssetIds) wanted.add(partId);
@@ -1077,7 +1279,7 @@ export class EntityViews {
 
     const tier = view.materialTier ?? entity.tier;
     const clip = view.clipFraction ?? 0;
-    const character = this.characterFor(entity.id, view.assetId, view.partAssetIds);
+    const character = this.characterFor(entity.id, entity.archetype, view.assetId, view.partAssetIds);
     const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${entity.archetype}|${clip}|${batchCell(entity.archetype, entity.position)}`;
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
@@ -1127,7 +1329,8 @@ export class EntityViews {
     record.normal = normal;
     record.tilt = tilt;
     record.labelHeight = view.labelHeight ?? 1.6;
-    record.radius = Math.max(this.minHighlightRadius, this.assetRadius(view.assetId) * scale);
+    record.radius = Math.max(
+      this.minHighlightRadius, this.assetRadius(view.assetId) * scale * record.build[0]);
 
     const group = this.groups.get(groupKey);
     if (!group) return;
@@ -1212,6 +1415,8 @@ export class EntityViews {
       previousRotationY: view.rotationY ?? 0,
       movingTicks: 0,
       scale: 1,
+      tints: tintsFor(entity.id, entity.archetype, character),
+      build: buildFor(entity.id, entity.archetype),
       spent: false,
       normal: null,
       tilt: 0,
@@ -1479,7 +1684,7 @@ export class EntityViews {
       posed: ready,
       needsPose: rigged && !ready,
     };
-    group.live = this.buildDraws(group.liveParts, group.cell);
+    group.live = this.buildDraws(group.liveParts, group.cell, group.archetype);
     this.groups.set(key, group);
     return group;
   }
@@ -1500,7 +1705,7 @@ export class EntityViews {
     // has something to put in its place; a node that vanishes on depletion is worse than one that
     // only changes colour, and that vanishing is exactly what Phase 1 shipped.
     if (group.spentParts.length === 0) return;
-    group.spent = this.buildDraws(group.spentParts, group.cell);
+    group.spent = this.buildDraws(group.spentParts, group.cell, group.archetype);
   }
 
   /**
@@ -1523,7 +1728,7 @@ export class EntityViews {
     // `SourcePart`, so `writeSlot` reads each variant's own geometry and transform instead of
     // indexing one array with the other's positions.
     if (group.movingParts.length === 0) return;
-    group.moving = this.buildDraws(group.movingParts, group.cell);
+    group.moving = this.buildDraws(group.movingParts, group.cell, group.archetype);
   }
 
   /**
@@ -1724,13 +1929,14 @@ export class EntityViews {
    */
   private characterFor(
     entityId: EntityId,
+    archetype: Archetype,
     assetId: string,
     partAssetIds: readonly string[] | undefined,
   ): CharacterSpec | null {
-    const cacheKey = `${entityId}|${assetId}|${partAssetIds?.join("+") ?? ""}`;
+    const cacheKey = `${entityId}|${archetype}|${assetId}|${partAssetIds?.join("+") ?? ""}`;
     const cached = this.characterSpecs.get(cacheKey);
     if (cached !== undefined) return cached;
-    const spec = characterSpecFor(entityId, assetId, partAssetIds);
+    const spec = characterSpecFor(entityId, archetype, assetId, partAssetIds);
     this.characterSpecs.set(cacheKey, spec);
     // Start the clothes loading the FIRST time this entity is seen, not when its instance group is
     // built. `boot.preloadEntityAssets` does not know about `view.partAssetIds`, so if the request
@@ -2398,12 +2604,20 @@ export class EntityViews {
     return id;
   }
 
-  private buildDraws(parts: readonly SourcePart[], cell: string): PartDraw[] {
+  private buildDraws(parts: readonly SourcePart[], cell: string, archetype: Archetype): PartDraw[] {
+    const tintable = TINTABLE_ARCHETYPES.has(archetype);
     const draws: PartDraw[] = [];
     for (const part of parts) {
       const batch = this.batchFor(part, cell);
       if (!batch) continue;
-      draws.push({ batch, geometryId: this.addBatchGeometry(batch, part.geometry), part, instances: [] });
+      draws.push({
+        batch,
+        geometryId: this.addBatchGeometry(batch, part.geometry),
+        part,
+        instances: [],
+        role: tintable ? tintRoleFor(part.material.name) : "none",
+        tints: [],
+      });
     }
     return draws;
   }
@@ -2419,6 +2633,7 @@ export class EntityViews {
         draw.batch.usedInstances = Math.max(0, draw.batch.usedInstances - 1);
       }
       draw.instances.length = 0;
+      draw.tints.length = 0;
     }
   }
 
@@ -2441,10 +2656,11 @@ export class EntityViews {
     // Module scratch, for the reason the quaternions above are: `syncMotion` calls this once per
     // moving entity per RENDER frame. Two fresh Matrix4s per call is garbage allocated in exactly
     // the frames that are already the tightest.
+    const build = record.build;
     const placement = SCRATCH_PLACEMENT.compose(
       record.position,
       orientation(record.rotationY, record.normal, record.tilt, SCRATCH_QUATERNION),
-      SCRATCH_SCALE.setScalar(record.scale),
+      SCRATCH_SCALE.set(record.scale * build[0], record.scale * build[1], record.scale * build[2]),
     );
     const transform = SCRATCH_TRANSFORM;
 
@@ -2461,6 +2677,7 @@ export class EntityViews {
       draw.batch.mesh.setMatrixAt(instance, transform);
       draw.batch.mesh.setVisibleAt(instance, true);
       draw.batch.mesh.boundingSphere = null;
+      this.paintInstance(draw, slot, instance, record.tints);
     }
     // An instance that is not part of the current pose is switched off, not parked at a zero-scale
     // matrix. `BatchedMesh` leaves an invisible instance out of the multi-draw entirely, so the
@@ -2472,6 +2689,82 @@ export class EntityViews {
     }
   }
 
+  /**
+   * Writes one entity's dye into one batch instance, when it is not already there.
+   *
+   * This is the whole recolour mechanism on the instanced path, and the reason it is free.
+   * `BatchedMesh.setColorAt` writes into a per-instance RGBA float texture the batch owns and the
+   * shader multiplies into `vColor` (three 0.185: `USE_BATCHING_COLOR` in `color_vertex`, which the
+   * fragment stage picks up as `USE_COLOR_ALPHA` and applies as `diffuseColor *= vColor`). It does
+   * NOT clone a material, so the `(cell, material, attribute signature)` batch key is untouched and
+   * two hundred differently dyed NPCs still share whatever draws their neighbours share. A material
+   * clone per tint would have done the opposite: 63 materials x 10 dyes is 630 batches where there
+   * are 263 today, and the ~100 draw calls of headroom this project just bought would have gone on
+   * shirt colours.
+   *
+   * The white case is skipped rather than written, and that matters: the FIRST `setColorAt` on a
+   * batch allocates its colours texture, which switches the whole batch onto a different compiled
+   * program. Doing that to a batch on which every instance is white costs a program and buys
+   * nothing.
+   */
+  private paintInstance(
+    draw: PartDraw,
+    slot: number,
+    instance: number,
+    tints: EntityTints | null,
+  ): void {
+    if (draw.role === "none") return;
+    const hex = tints ? tintFor(tints, draw.role) : NO_TINT;
+    if (draw.tints[slot] === hex) return;
+    if (draw.tints[slot] === undefined && hex === NO_TINT) {
+      draw.tints[slot] = hex;
+      return;
+    }
+    draw.batch.mesh.setColorAt(instance, SCRATCH_COLOUR.setHex(hex));
+    draw.tints[slot] = hex;
+  }
+
+  /**
+   * The same dye on the non-instanced path: one cloned material per (source material, tint).
+   *
+   * A rigged character is its own object with its own draws, so there is no batch to fragment here
+   * and a clone costs nothing but the clone. It is cached anyway, keyed on the pair, because the
+   * palettes are small tables and a settlement's worth of characters resolves to a handful of
+   * entries — 8 of them across the whole shipped roster, measured. The clones are owned by this
+   * class and freed in `dispose`; the SOURCE material is shared with the loaded asset and is never
+   * touched.
+   *
+   * `Color.multiply` in three's working (linear) space is the same arithmetic the shader does to
+   * `vColor`, so a character keeps exactly its colour when it is promoted from an instance to a rig
+   * and back — which is a thing the player watches happen every time they walk into a town.
+   */
+  private tintedMaterial(base: THREE.Material, hex: number): THREE.Material {
+    if (hex === NO_TINT) return base;
+    const standard = base as THREE.MeshStandardMaterial;
+    if (!standard.isMeshStandardMaterial) return base;
+    const key = `${base.uuid}|${hex}`;
+    const cached = this.tintedMaterials.get(key);
+    if (cached) return cached;
+    const clone = standard.clone();
+    clone.color = standard.color.clone().multiply(SCRATCH_COLOUR.setHex(hex));
+    this.tintedMaterials.set(key, clone);
+    return clone;
+  }
+
+  /** Applies a record's dye to its non-instanced object, over whatever state painted it. */
+  private applyEntityTint(record: ViewRecord): void {
+    const tints = record.tints;
+    if (!tints || !record.unique) return;
+    record.unique.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const mapped = materials.map((material) =>
+        this.tintedMaterial(material, tintFor(tints, tintRoleFor(material.name))));
+      mesh.material = mapped.length === 1 ? mapped[0]! : mapped;
+    });
+  }
+
   /** Applies a record's drawn transform to its non-instanced object. */
   private placeUnique(record: ViewRecord): void {
     if (!record.unique) return;
@@ -2479,7 +2772,10 @@ export class EntityViews {
     record.unique.quaternion.copy(
       orientation(record.rotationY, record.normal, record.tilt, SCRATCH_QUATERNION),
     );
-    record.unique.scale.setScalar(record.scale);
+    const build = record.build;
+    record.unique.scale.set(
+      record.scale * build[0], record.scale * build[1], record.scale * build[2],
+    );
   }
 
   /**
@@ -2498,6 +2794,9 @@ export class EntityViews {
     if (!record.spent) {
       this.materials.retint(record.unique, tier, look.strength, look.swatch, (material) =>
         !PROTECTED_MATERIAL.test(material.name));
+      // After the tier pass, not instead of it: the tier says what LEAGUE a thing is in and the
+      // dye says which individual it is, and both are multiplies against the same texture.
+      this.applyEntityTint(record);
       return;
     }
     record.unique.traverse((child) => {
@@ -2510,6 +2809,9 @@ export class EntityViews {
         this.materials.variant(material, { tier, state: "dead", strength: look.strength, swatch: look.swatch }));
       mesh.material = mapped.length === 1 ? mapped[0]! : mapped;
     });
+    // A corpse keeps the individual's dye. Losing it on death would make every body in a swarm
+    // the same body, which is the read this whole pass exists to remove.
+    this.applyEntityTint(record);
   }
 
   // --------------------------------------------------- hover / selection
@@ -2742,8 +3044,10 @@ export class EntityViews {
     let uniqueTriangles = 0;
     let dressedCharacters = 0;
     let movingViews = 0;
+    const looks = new Set<string>();
     for (const record of this.records.values()) {
       if (record.movingTicks > 0) movingViews += 1;
+      if (record.tints) looks.add(lookKey(record));
       if (!record.unique) continue;
       unique += 1;
       if (record.dressed) dressedCharacters += 1;
@@ -2776,6 +3080,7 @@ export class EntityViews {
       otherDrawCalls: this.otherDrawCalls,
       dressedCharacters,
       dressedGroups,
+      distinctLooks: looks.size,
       movingViews,
       triangles: Math.round(triangles + uniqueTriangles),
       missingAssets: [...this.missing],
@@ -2803,6 +3108,8 @@ export class EntityViews {
     this.namedDrawCalls = 0;
     this.otherDrawCalls = 0;
     this.uniqueViewCount = 0;
+    for (const material of this.tintedMaterials.values()) material.dispose();
+    this.tintedMaterials.clear();
     for (const geometry of this.seamGeometries.values()) geometry.dispose();
     for (const geometry of this.bakedGeometries) geometry.dispose();
     this.seamGeometries.clear();
@@ -2822,6 +3129,16 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Everything a player could use to tell one drawn character or creature from another. */
+function lookKey(record: ViewRecord): string {
+  const tints = record.tints;
+  const dye = tints
+    ? [tints.cloth, tints.clothAlt, tints.skin, tints.hair, tints.creature, tints.creatureAccent]
+      .map((hex) => hex.toString(16)).join(",")
+    : "-";
+  return `${record.groupKey}|${dye}|${record.build.map(round).join(",")}`;
+}
+
 /**
  * Resolves what a dressed humanoid is made of, or null when the entity is not one.
  *
@@ -2830,37 +3147,196 @@ function round(value: number): number {
  * that `view.assetId` still carries today and puts the right base body under them — without which
  * every NPC in the game renders with no head, no eyes and no eyebrows.
  *
- * Hair is appended here rather than authored upstream because it is a look decision and it must be
- * a pure function of the entity id: the harness calls `__gameDebug.reset({seed})` and diffs, so an
- * unseeded pick would make every screenshot flap. `hairAssetFor` is a fresh `Rng` per call and
- * consumes no shared stream, so adding this shifts nothing else.
+ * On top of the authored answer this REMIXES, and that is the whole of the mesh-level variety this
+ * library can give. Measured before: `world/regionBuilder` emits one outfit family per character,
+ * so the 12 shipped NPCs realise 4 authored part sets, and with the two hair picks the peasants get
+ * that is at most 6 distinct bodies for the whole world — the reason `npc_carter_bel` and the
+ * player are pixel-for-pixel identical in
+ * runs/corealm/screenshots/ev3-before-npc-carter_bel.png. Keeping the chest and re-rolling legs,
+ * boots, gloves, hood and pauldron per entity takes the same 24 meshes to 2^3 x 2 x 2 = 32 part
+ * sets per (sex, chest family), and the hair and beard rolls multiply that again.
+ *
+ * Every pick is a fresh `Rng` seeded by a hash of the entity id and the slot name, exactly as
+ * `skinning.hairAssetFor` does it: pure function of the id, no shared stream consumed, so adding
+ * this shifts no other deterministic draw in the game and a `__gameDebug.reset({seed})` diff sees
+ * the same faces twice.
+ *
+ * A body with no measured head-cap plane no longer refuses outright. It refuses only on the
+ * OUTFIT_BODIES fallback path, where the whole point is to cut a base body down to a head; when the
+ * world layer authors `view.partAssetIds` — including on an `enemy` archetype, which is how a
+ * humanoid monster is built — the spec is returned and `assembleDressedCharacter` simply finds no
+ * cut to make. Hair is still skipped there: it is a base-body decision, not a parts decision.
  */
 function characterSpecFor(
   entityId: EntityId,
+  archetype: Archetype,
   assetId: string,
   partAssetIds: readonly string[] | undefined,
 ): CharacterSpec | null {
   let bodyAssetId = assetId;
   let parts: string[] = partAssetIds ? [...partAssetIds] : [];
+  const authored = parts.length > 0;
 
-  if (parts.length === 0) {
+  if (!authored) {
     const implied = OUTFIT_BODIES[assetId];
     if (!implied) return null;
     bodyAssetId = implied;
     parts = [assetId];
+    // Only the two base bodies have a measured head-cap plane, and without one this fallback would
+    // layer clothes over an INTACT body — the case that leaks bare skin through the trousers.
+    if (headCapHeightFor(bodyAssetId) === null) return null;
   }
 
-  // Only the two base bodies have a measured head-cap plane, and without one this assembly would
-  // layer clothes over an intact body — the case that leaks bare skin through the trousers.
-  if (headCapHeightFor(bodyAssetId) === null) return null;
+  const humanoid = headCapHeightFor(bodyAssetId) !== null;
+  if (humanoid) parts = remixOutfit(entityId, parts, archetype === "npc");
 
   const hooded = parts.some((id) => HOODED_PARTS.has(id));
   const haired = parts.some((id) => HAIR_PART.test(id));
-  if (!hooded && !haired) {
-    parts.push(hairAssetFor(entityId, bodyAssetId === "base_female" ? "female" : "male"));
+  if (humanoid && !hooded && !haired) {
+    const female = bodyAssetId === "base_female";
+    parts.push(pickFrom(female ? FEMALE_HAIR : MALE_HAIR, `hair:${bodyAssetId}:${entityId}`));
+    if (!female && chance(`beard:${entityId}`, BEARD_CHANCE)) parts.push(BEARD_ASSET);
   }
 
   return { bodyAssetId, partAssetIds: parts, key: `${bodyAssetId}>${parts.join("+")}` };
+}
+
+/**
+ * Re-rolls the mixable slots of an authored outfit, keeping the chest family.
+ *
+ * Returns the input untouched when it is not the authored `outfit_<sex>_<family>_<slot>` shape.
+ * The world layer is allowed to hand over anything; guessing at a part list this does not recognise
+ * would be this file inventing appearance rather than reading it.
+ */
+function remixOutfit(entityId: EntityId, parts: readonly string[], headwear: boolean): string[] {
+  const parsed = parts.map((id) => OUTFIT_PART.exec(id));
+  if (parsed.some((match) => match === null)) return [...parts];
+
+  const sex = parsed[0]?.[1];
+  const chest = parsed.find((match) => match?.[3] === "chest");
+  if (!sex || !chest) return [...parts];
+  const chestFamily = chest[2] ?? "peasant";
+
+  const out: string[] = [`outfit_${sex}_${chestFamily}_chest`];
+  for (const slot of MIXABLE_SLOTS) {
+    // A slot the world layer did not author is not invented here: peasant and ranger both ship all
+    // three, so an absent one means the caller meant it to be absent.
+    if (!parsed.some((match) => match?.[3] === slot)) continue;
+    const family = chance(`slot:${slot}:${entityId}`, 0.5) ? "ranger" : "peasant";
+    out.push(`outfit_${sex}_${family}_${slot}`);
+  }
+
+  const authoredHood = parsed.some((match) => match?.[3] === "hood");
+  // Only an NPC's headwear is re-rolled. A humanoid MONSTER's hood is the silhouette the content
+  // layer chose to make it read as that monster, and taking it off 40% of the time would be this
+  // file overruling `content/enemies.ts` rather than varying it.
+  const hooded = headwear
+    ? chance(`hood:${entityId}`, authoredHood ? HOOD_KEEP_CHANCE : HOOD_CHANCE)
+    : authoredHood;
+  if (hooded) out.push(`outfit_${sex}_ranger_hood`);
+  if (chance(`pauldron:${entityId}`, PAULDRON_CHANCE)) out.push(`outfit_${sex}_ranger_pauldron`);
+  return out;
+}
+
+/** Deterministic index into a table, from a seed string. Fresh `Rng`, no shared stream. */
+function pickFrom<T>(values: readonly T[], seed: string): T {
+  const picked = values[new Rng(hashString(seed)).int(0, values.length - 1)];
+  return picked ?? values[0]!;
+}
+
+/** Deterministic coin flip at probability `p`, from a seed string. */
+function chance(seed: string, p: number): boolean {
+  return new Rng(hashString(seed)).float(0, 1) < p;
+}
+
+/**
+ * Which tint a source material answers to, from its name alone.
+ *
+ * Name alone is enough because these two kits do not share names with anything else in the library:
+ * `runs/corealm/dc/matkey.mjs` groups all 213 manifest GLBs into 63 distinct materials, and
+ * `MI_*`, `Main*`, `Wings` and `Horns` occur only in the character, outfit and monster packs. The
+ * caller gates on archetype anyway (`TINTABLE_ARCHETYPES`), so a prop that one day ships a material
+ * called `Main` still cannot be recoloured by this.
+ */
+function tintRoleFor(name: string): TintRole {
+  if (CLOTH_MATERIAL.test(name)) return "cloth";
+  if (CLOTH_ALT_MATERIAL.test(name)) return "clothAlt";
+  if (HAIR_MATERIAL.test(name)) return "hair";
+  if (SKIN_MATERIAL.test(name)) return "skin";
+  if (CREATURE_BODY_MATERIAL.test(name)) return "creature";
+  if (CREATURE_ACCENT_MATERIAL.test(name)) return "creatureAccent";
+  return "none";
+}
+
+function tintFor(tints: EntityTints, role: TintRole): number {
+  switch (role) {
+    case "cloth": return tints.cloth;
+    case "clothAlt": return tints.clothAlt;
+    case "skin": return tints.skin;
+    case "hair": return tints.hair;
+    case "creature": return tints.creature;
+    case "creatureAccent": return tints.creatureAccent;
+    default: return NO_TINT;
+  }
+}
+
+/**
+ * One entity's dye lots, or null when nothing about it is tintable.
+ *
+ * Creature hue is keyed on the entity id with its trailing index stripped — `scree_skitterlings_4`
+ * becomes `scree_skitterlings` — so a whole spawn group is one animal and two groups of the same
+ * mesh are two. That is the difference the brief asks for between a moor crab and a scree crab, and
+ * it is the FAMILY the world layer already spells into the id rather than `entity.meta`, which
+ * `render/` does not read. Individuals inside a group then take one of three value steps, so a
+ * swarm of six is not six copies.
+ */
+function tintsFor(
+  entityId: EntityId,
+  archetype: Archetype,
+  character: CharacterSpec | null,
+): EntityTints | null {
+  const creatureFamily = entityId.replace(/_\d+$/, "");
+  const isCreature = archetype === "enemy" || archetype === "boss";
+  if (!character && !isCreature) return null;
+
+  const creature = isCreature
+    ? shade(
+      pickFrom(CREATURE_TINTS, `family:${creatureFamily}`),
+      pickFrom(CREATURE_SHADES, `shade:${entityId}`),
+    )
+    : NO_TINT;
+
+  return {
+    cloth: character ? pickFrom(CLOTH_TINTS, `cloth:${entityId}`) : NO_TINT,
+    clothAlt: character ? pickFrom(CLOTH_TINTS, `clothAlt:${entityId}`) : NO_TINT,
+    skin: character ? pickFrom(SKIN_TINTS, `skin:${entityId}`) : NO_TINT,
+    hair: character ? pickFrom(HAIR_TINTS, `hairColour:${entityId}`) : NO_TINT,
+    creature,
+    // The accent is a different entry in the same table rather than a second table: wings and horns
+    // want to read as belonging to the animal and not to a palette of their own.
+    creatureAccent: isCreature ? pickFrom(CREATURE_TINTS, `accent:${creatureFamily}`) : NO_TINT,
+  };
+}
+
+/** Scales an 8-bit-per-channel hex toward black. Used for the per-individual creature step. */
+function shade(hex: number, factor: number): number {
+  if (factor >= 1) return hex;
+  const scale = (value: number): number => Math.max(0, Math.min(255, Math.round(value * factor)));
+  return (scale((hex >> 16) & 0xff) << 16) | (scale((hex >> 8) & 0xff) << 8) | scale(hex & 0xff);
+}
+
+/**
+ * The per-entity build multiplier, or `NO_BUILD`.
+ *
+ * Deliberately NOT folded into the change-detection signature: it is a pure function of the entity
+ * id, so it cannot change while the record lives, and a record rebuilt after a release recomputes
+ * exactly the same numbers.
+ */
+function buildFor(entityId: EntityId, archetype: Archetype): readonly [number, number, number] {
+  if (!BUILD_ARCHETYPES.has(archetype)) return NO_BUILD;
+  const uniform = pickFrom(BUILD_SCALES, `build:${entityId}`);
+  const height = pickFrom(BUILD_HEIGHTS, `height:${entityId}`);
+  return [uniform, uniform * height, uniform];
 }
 
 /**

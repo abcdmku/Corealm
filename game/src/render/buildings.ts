@@ -217,11 +217,11 @@ export interface PartPlacement {
 export type PrefabId =
   | "cottage" | "hall" | "tower" | "stall" | "wall_segment"
   | "gatehouse" | "shed" | "ruin" | "quarry_hut"
-  | "forge" | "porch" | "arcade" | "market_row" | "well";
+  | "forge" | "porch" | "arcade" | "market_row" | "well" | "farmstead";
 
 export const PREFAB_IDS: readonly PrefabId[] = [
   "cottage", "hall", "tower", "stall", "wall_segment", "gatehouse", "shed", "ruin", "quarry_hut",
-  "forge", "porch", "arcade", "market_row", "well",
+  "forge", "porch", "arcade", "market_row", "well", "farmstead",
 ] as const;
 
 export function isPrefabId(value: string): value is PrefabId {
@@ -248,12 +248,13 @@ export type CompositionId =
   | "forge_yard"
   | "market_pitch"
   | "wood_pile"
-  | "garden";
+  | "garden"
+  | "farm_yard";
 
 export const COMPOSITION_IDS: readonly CompositionId[] = [
   "vault_door", "milestone", "highcairn_crane", "gravelmaw_mouth",
   "great_cairn", "standing_stones", "rootfall_stump", "region_gate",
-  "bank_counter", "forge_yard", "market_pitch", "wood_pile", "garden",
+  "bank_counter", "forge_yard", "market_pitch", "wood_pile", "garden", "farm_yard",
 ] as const;
 
 export function isCompositionId(value: string): value is CompositionId {
@@ -1042,6 +1043,7 @@ export function buildPrefab(
     case "arcade": return arcade(width, depth, kit);
     case "market_row": return marketRow(width, depth, rng);
     case "well": return well(kit);
+    case "farmstead": return farmstead(width, depth, rng, kit);
   }
 }
 
@@ -1065,6 +1067,9 @@ export function prefabHeight(prefab: PrefabId): number {
     case "market_row": return 2.7;
     // A wellhead is a curb 1 m high. Its roof clears 3.2 m and is deliberately not solid.
     case "well": return 1;
+    // A barn is one tall storey under the kit's LARGE roof, so it clears the hall by the difference
+    // between `roofLargeApex` and the hall's own roof: 3.123 + 5.4 against the hall's 3.123 + 4.9.
+    case "farmstead": return STOREY_METRES + 5.4;
   }
 }
 
@@ -1355,6 +1360,81 @@ function quarryHut(width: number, depth: number, rng: Rng, kit: BuildingKit): Pa
   out.push(loose("prop_l", "support_beam", -width / 2 - 0.35, -1.211 * 1.3, depth * 0.2, Math.PI / 2, 1.3));
   out.push(loose("prop_r", "support_beam", width / 2 + 0.35, -1.211 * 1.3, -depth * 0.2, -Math.PI / 2, 1.3));
   out.push(loose("crate", "crate_metal", -width * 0.25, 0, -depth / 2 - 0.6, rng.float(0, Math.PI), 1.2));
+
+  return out;
+}
+
+/**
+ * A barn. One tall storey of solid wall under the kit's LARGE roof, cart doors on the entry face,
+ * and the yard clutter a working farm leaves outside them.
+ *
+ * WHY IT EXISTS. `marchfield_farm`'s stated shot intent is "plots, fence, and a building that reads
+ * as a farmstead" and the library ships no farm building at all - the asset report's gap 5. What it
+ * does ship is the same modular kit every other building here is made of, so a barn is a `hall`
+ * plan (long roof, one storey) with the hall's civic dressing taken off and a cart, crates, sacks
+ * and a fodder barrel put in front of the doors instead. `roofLarge` rather than `roofSmall` is the
+ * whole read: at a [10,6] footprint the plaster kit draws a 13.7 m ridge over a 10 m building,
+ * which is a barn silhouette and not a cottage one.
+ *
+ * The door is on side 2, which is LOCAL -Z, exactly like `cottage`, `hall`, `shed` and
+ * `quarry_hut`, so a settlement author points a farmstead at a yard with the same `rotationY` they
+ * would use for a house. (The open-fronted prefabs - `forge`, `porch`, `arcade` - use +Z for their
+ * mouth instead, which is the file's one standing inconsistency and is not mine to change here.)
+ *
+ * Windows are seeded at 0.3 and go through `ringWindows`, so no window ever faces the cart doors:
+ * a barn is the deepest building in the settlement and a hole straight through it would be seen
+ * from further away than any cottage's.
+ */
+function farmstead(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPlacement[] {
+  const out: PartPlacement[] = [];
+  const sides = ringSides(width, depth);
+  const entry = sides[2]!;
+  const entryCount = moduleCount(entry.length);
+  const doorIndex = Math.floor(entryCount / 2);
+
+  const windows = ringWindows(sides, rng, 0.3, (s, index) => s === 2 && index === doorIndex);
+  for (const [s, side] of sides.entries()) {
+    const count = moduleCount(side.length);
+    for (let index = 0; index < count; index += 1) {
+      const isDoor = s === 2 && index === doorIndex;
+      const assetId = isDoor
+        ? kit.wallDoor
+        : windows[s]![index] === true ? kit.wallWindow : kit.wall;
+      wallModule(out, `${s}_${index}`, assetId, side, count, index, kit);
+    }
+    jointStuds(out, `j${s}_`, side, count, kit);
+  }
+  corners(out, width, depth, kit.corner, 0, 1, "c");
+
+  const roof = largeRoof(kit, width, depth);
+  out.push(loose("roof", kit.roofLarge, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
+  addRoofline(out, width, depth, roof, kit);
+  out.push(part("door", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
+  out.push(part("lamp", "lamp_wall", onSide(entry, entryCount, doorIndex, 2.1, 0.08, 1.35), entry.yaw, 1.15));
+
+  // The yard side. Everything here sits OUTSIDE the footprint, so it is outside the prefab's own
+  // collision box and stays walk-through dressing, the same way `shed` puts its crate at
+  // -depth / 2 - 0.65. The door module is the middle of the entry face, so the load is stacked to
+  // one side of it and the cart is parked at the far corner rather than across the threshold.
+  const front = -depth / 2;
+  const load = width * 0.3;
+  // `wagon` is 1.95 x 1.53 x 4.02 with its bed running along local Z, so a quarter turn lays it
+  // along the front of the barn instead of pointing at the doors.
+  out.push(loose("wagon", "wagon", -width / 2 + 1.2, 0, front - 2.4, Math.PI / 2 + rng.float(-0.12, 0.12), 1));
+  out.push(loose("crate", "crate_village", load, 0, front - 1.0, rng.float(0, Math.PI)));
+  out.push(loose("crate_apple", "farm_crate_apple", load + 0.95, 0, front - 1.5, rng.float(0, Math.PI)));
+  out.push(loose("crate_carrot", "farm_crate_carrot", load - 0.85, 0, front - 1.7, rng.float(0, Math.PI)));
+  out.push(loose("sack_l", "sack", load - 0.2, 0, front - 2.3, rng.float(0, Math.PI)));
+  out.push(loose("sack_r", "sack", load + 0.5, 0, front - 2.5, rng.float(0, Math.PI)));
+  out.push(loose("barrel", "barrel", -width / 2 + 0.55, 0, front - 0.75, rng.float(0, Math.PI)));
+  // Two panels of the same fence the yard uses, running off each gable end, so the barn reads as
+  // part of an enclosure even when it is placed on its own.
+  for (const [index, sx] of [-1, 1].entries()) {
+    out.push(loose(
+      `fence${index}`, "fence_wood_single",
+      (width / 2 + 1.03) * sx, -0.1, front + 0.4, 0,
+    ));
+  }
 
   return out;
 }
@@ -1952,6 +2032,7 @@ export function buildComposition(
     case "market_pitch": return marketPitch(rng);
     case "wood_pile": return woodPile();
     case "garden": return garden(rng);
+    case "farm_yard": return farmYard(rng, kit);
   }
 }
 
@@ -1999,53 +2080,161 @@ function highcairnCrane(): PartPlacement[] {
 
 /**
  * The Gravelmaw. PRD: "a twelve-metre black wound in grey stone, visible from anywhere on terrace
- * one". The 12 m comes from the portal's own `wall_arch` at 4x (8 m wide, 12 m tall); this builds
- * the stone around it - two jaws, two shoulders, a brow of rock behind and above the opening, spoil
- * at the lip, and a brazier on each side. There is no black material available (every tier palette
- * lerps toward a light metal colour), so the darkness is geometry and shadow rather than paint.
+ * one". The arch itself is the dungeon portal entity (`wall_arch` at 3x, drawn 4.61 m wide and
+ * 7.82 m tall); this builds the larger stone silhouette around it. A recessed brick door panel
+ * closes the daylight behind the arch while leaving a narrower, shadowed passage in its centre.
  *
- * Local +Z faces the approach from the Lower Quarry.
+ * WHY EVERY PART IS A `rock_medium_*` AND NOT A `cliff_*` OR `boulder_*`. Measured on the shipped
+ * GLBs: the six ultimate-platformer rocks - boulder_large, boulder_medium, cliff_tall,
+ * cliff_step_1..3 - carry POSITION and NORMAL and NOTHING ELSE. No TEXCOORD_0, no texture, no
+ * vertex colour; one flat `baseColorFactor` (0.384, 0.208, 0.108) on a doubleSided material. They
+ * CANNOT be textured, at any tier, by any material swap, because there are no UVs to sample with.
+ * At the 1.7-2.6x scales this composition used they drew as 8.9 m wide smooth tan truncated cones
+ * and were most of runs/corealm/screenshots/w3-gravelmaw_entrance.png. The
+ * stylized-nature-megakit rocks (`rock_medium_1/2/3`, 3.0-3.4 m) carry TEXCOORD_0 and an embedded
+ * `Rocks_Diffuse` jpeg, so they are the only rock in the library that reads as stone.
+ *
+ * AND WHY NOTHING REACHES PAST 9.3 m. `world/regionBuilder.emitParts` places every composition part
+ * at `origin.y + dy` - flat, with no terrain sample of its own - so a part's grounding error is
+ * exactly how far the terrain has moved by the time you get out to it. Measured around (46, -24)
+ * with `__gameDebug.groundHeight` (runs/corealm/audit/wd-probe.json): +-0.14 m at 3 m, -1.01 m at
+ * 5 m, -1.57 m at 7 m, -2.13 m at 9 m and -3.37 m at 13 m, all of it on the downhill approach.
+ * The old `shoulder_l` at 13.4 m floated 3.03 m, `spoil_l` at 15.2 m floated 3.22 m, and the
+ * `brow` at dy 6.0 floated 5.59 m with daylight under a 19.9 m wide rock. Everything here is
+ * inside 9.3 m and sunk 0.5-0.9 m, so the worst measured local ground still buries its footing.
+ *
+ * Local +Z faces the approach from the Lower Quarry. The corridor between the spoil heaps is 7 m
+ * clear, so the mouth stays reachable by `moveTo({ entityId: "gravelmaw_mouth_portal" })`.
  */
 function gravelmawMouth(): PartPlacement[] {
   return [
-    loose("jaw_l", "cliff_tall", -6.6, 0, 1.0, 0.42, 2.6),
-    loose("jaw_r", "cliff_tall", 6.6, 0, 1.0, -0.95, 2.6),
-    loose("shoulder_l", "cliff_step_1", -12.5, 0, 5.5, 0.65, 1.7),
-    loose("shoulder_r", "cliff_step_1", 12.5, 0, 5.5, -0.6, 1.7),
-    loose("brow", "cliff_step_2", 0, 6.0, -9.0, 0, 2.0),
-    loose("spoil_l", "boulder_medium", -9.2, 0, 8.4, 0.8, 1.4),
-    loose("spoil_r", "boulder_medium", 10.1, 0, 9.6, 2.2, 1.1),
-    loose("rock_l", "rock_medium_2", -4.6, 0, 5.6, 1.5, 1.8),
-    loose("rock_r", "rock_medium_3", 4.9, 0, 6.1, 2.9, 1.6),
-    loose("brazier_l", "torch", -4.7, 1.7, 0.6, 0, 3.4),
-    loose("brazier_r", "torch", 4.7, 1.7, 0.6, 0, 3.4),
+    // The two jaws, three courses each, leaning in over the arch.
+    loose("jaw_l", "rock_medium_3", -6.6, -0.5, 0.2, 0.55, 2.2),
+    loose("jaw_r", "rock_medium_1", 6.6, -0.5, 0.2, -1.15, 2.35),
+    loose("rock_l", "rock_medium_1", -6.0, 2.6, -0.4, 2.35, 1.8),
+    loose("rock_r", "rock_medium_3", 6.0, 2.6, -0.4, 0.85, 1.75),
+    loose("crown_l", "rock_medium_2", -5.6, 5.2, 0.3, 1.6, 1.4),
+    loose("crown_r", "rock_medium_2", 5.6, 5.2, 0.3, -0.4, 1.35),
+    // Recessed masonry keeps the portal from framing the bright horizon. `wall_brick_door`
+    // preserves a real opening and sits behind the interaction point, so it neither seals nor
+    // obstructs the approach.
+    loose("back_wall", "wall_brick_door", 0, 0, -4.2, 0, 2.7),
+    // Behind the arch, so the opening leads into rock rather than into sky. Its solid is capped by
+    // `emitComposition` (4.6 m out against a 3.3 m half-diagonal), which keeps the portal's own
+    // 2.4 m interact ring clear.
+    loose("brow", "rock_medium_3", -0.2, -0.7, -4.6, 1.9, 3.0),
+    loose("brow_top", "rock_medium_1", 0.6, 3.4, -5.6, 0.7, 2.4),
+    loose("shoulder_l", "rock_medium_3", -9.2, -0.8, -1.0, 1.1, 2.0),
+    loose("shoulder_r", "rock_medium_3", 9.2, -0.8, -1.0, -0.7, 2.05),
+    // Spoil at the lip, on the falling ground, sunk deeper for it.
+    loose("spoil_l", "rock_medium_2", -5.0, -0.9, 5.5, 0.8, 1.15),
+    loose("spoil_r", "rock_medium_1", 5.0, -0.9, 5.5, 2.2, 1.05),
+    loose("rubble_l", "rock_medium_2", -3.3, -0.7, 7.4, 2.6, 0.7),
+    loose("rubble_r", "rock_medium_3", 3.6, -0.7, 7.0, 0.4, 0.6),
+    // `torch` base.y is -0.278, so at 2.6x it hangs 0.63 m below its own pivot: dy 0.5 stands it on
+    // the ground instead of leaving the head floating 1.7 m up, which is where dy 1.7 left it.
+    loose("brazier_l", "torch", -4.4, 0.5, 1.4, 0, 2.6),
+    loose("brazier_r", "torch", 4.4, 0.5, 1.4, 0, 2.6),
   ];
 }
 
-/** Wide, not tall: "head height and forty paces round", with a stack of slate on the crown. */
+/**
+ * The Great Cairn: a clad heap. "Head height and forty paces round", and Karrowmoor's navigation
+ * beacon, so it has to read as stacked stone against the sky from 30 m.
+ *
+ * The hero and every composed part now use the textured `rock_medium_*` family. Three courses make
+ * the mass: eight stones on 45-degree centres at radius 3.3-3.6, five bedded into their tops at
+ * dy 1.8, and a crown of four. The mixed assets, scales, and yaw keep it from reading as a ring of
+ * duplicated props.
+ *
+ * Grounding, measured at (140, -176) with `__gameDebug.groundHeight`: the ground is level to
+ * +-0.15 m at 3 m and falls 0.74 m at 5 m on one bearing only. A uniform dy of -0.55 therefore
+ * buries every ring stone by 0.3-1.2 m, which is what a cairn's footings look like, and nothing
+ * floats. The old five-part version put `flank_l` 4.75 m out at dy 0 and it floated 0.53 m.
+ */
 function greatCairn(): PartPlacement[] {
-  return [
-    loose("flank_l", "boulder_medium", -4.2, 0, 2.2, 0.7, 1.0),
-    loose("flank_r", "boulder_medium", 3.9, 0, -2.1, 2.1, 0.85),
-    loose("crown_1", "rock_medium_1", 0.4, 4.3, 0.2, 1.4, 1.4),
-    loose("crown_2", "rock_medium_3", -0.9, 4.6, -1.2, 2.7, 1.0),
-    loose("skirt", "rock_medium_2", 5.6, 0, 2.6, 0.3, 0.9),
-  ];
-}
-
-/** Four uprights in a ring around the hero boulder. The edge the Thornbound will not cross. */
-function standingStones(rng: Rng): PartPlacement[] {
   const out: PartPlacement[] = [];
-  for (let index = 0; index < 4; index += 1) {
-    const angle = (index / 4) * Math.PI * 2 + 0.4;
+  // The lower course. Asset, radius, scale and yaw vary per index so the ring is not eight copies
+  // of one silhouette; authored rather than seeded, because a landmark has to look the same in
+  // every screenshot of it. Each stone tops out 2.4-2.7 m above the origin.
+  const ring: readonly (readonly [string, number, number, number])[] = [
+    ["rock_medium_1", 3.4, 1.85, 0.4],
+    ["rock_medium_3", 3.6, 1.75, 2.1],
+    ["rock_medium_2", 3.3, 1.90, 1.2],
+    ["rock_medium_1", 3.5, 1.70, 2.9],
+    ["rock_medium_3", 3.4, 1.80, 0.8],
+    ["rock_medium_2", 3.6, 1.85, 2.4],
+    ["rock_medium_1", 3.3, 1.75, 1.7],
+    ["rock_medium_3", 3.5, 1.85, 0.2],
+  ];
+  for (const [index, entry] of ring.entries()) {
+    const [assetId, radius, scale, yaw] = entry;
+    const angle = (index / ring.length) * Math.PI * 2 + 0.26;
     out.push(loose(
-      `stone${index}`, "cliff_tall",
-      Math.cos(angle) * 6.4, 0, Math.sin(angle) * 6.4,
-      rng.float(0, Math.PI * 2), rng.float(0.62, 0.85),
+      `ring${index}`, assetId,
+      Math.cos(angle) * radius, -0.55, Math.sin(angle) * radius, yaw, scale,
     ));
   }
-  out.push(loose("low_1", "rock_medium_2", 2.6, 0, 3.4, 1.1, 1.0));
-  out.push(loose("low_2", "rock_medium_1", -3.1, 0, -2.8, 2.5, 0.8));
+  // The second course is bedded into the first at 1.8 m and reaches roughly 4.4 m.
+  const mid: readonly (readonly [string, number, number])[] = [
+    ["rock_medium_2", 1.45, 2.6],
+    ["rock_medium_1", 1.40, 0.9],
+    ["rock_medium_3", 1.35, 1.9],
+    ["rock_medium_2", 1.50, 0.3],
+    ["rock_medium_1", 1.30, 2.2],
+  ];
+  for (const [index, entry] of mid.entries()) {
+    const [assetId, scale, yaw] = entry;
+    const angle = (index / mid.length) * Math.PI * 2 + 0.9;
+    out.push(loose(
+      `mid${index}`, assetId,
+      Math.cos(angle) * 2.4, 1.8, Math.sin(angle) * 2.4, yaw, scale,
+    ));
+  }
+  // The crown, and one capstone. 5.7 m above the ground at the top, which is what "visible against
+  // the sky" from 30 m needs; the blurb's "head height" is content's number and predates the hero
+  // mesh, which is 4.26 m on its own before anything is stacked on it.
+  out.push(loose("crown_1", "rock_medium_1", 0.4, 3.4, 0.2, 1.4, 1.35));
+  out.push(loose("crown_2", "rock_medium_3", -1.2, 3.3, -1.1, 2.7, 1.15));
+  out.push(loose("crown_3", "rock_medium_2", 1.2, 3.6, -1.0, 0.5, 1.05));
+  out.push(loose("cap", "rock_medium_2", 0.1, 4.4, -0.1, 1.9, 0.8));
+  // The two outliers that make it read as a heap somebody built rather than a rock that grew there.
+  out.push(loose("flank_l", "rock_medium_2", -5.4, -0.5, 1.4, 1.1, 0.95));
+  out.push(loose("skirt", "rock_medium_1", 5.3, -0.5, 2.2, 0.3, 0.85));
+  return out;
+}
+
+/**
+ * Four uprights in a ring around the hero boulder. The edge the Thornbound will not cross.
+ *
+ * `cliff_tall` was the upright and it is one of the six untextured platformer rocks
+ * (`gravelmawMouth` carries the measurement), so all four read as smooth tan cones.
+ * `rock_medium_*` are the textured alternative and they are boulders rather than menhirs, which is
+ * the trade this library forces.
+ *
+ * Each stone carries its own dy because the ground here is NOT level: measured at (206, 168) on the
+ * ring radius the four bearings differ by 1.88 m (-0.94, +0.26, +0.23, +0.94), and one shared dy
+ * either floats the low stone or buries the high one to its shoulders.
+ */
+function standingStones(rng: Rng): PartPlacement[] {
+  const out: PartPlacement[] = [];
+  const stones: readonly (readonly [string, number])[] = [
+    ["rock_medium_1", -1.49],
+    ["rock_medium_3", -0.29],
+    ["rock_medium_1", -0.32],
+    ["rock_medium_3", 0.39],
+  ];
+  for (const [index, entry] of stones.entries()) {
+    const [assetId, dy] = entry;
+    const angle = (index / stones.length) * Math.PI * 2 + 0.4;
+    out.push(loose(
+      `stone${index}`, assetId,
+      Math.cos(angle) * 5.4, dy, Math.sin(angle) * 5.4,
+      rng.float(0, Math.PI * 2), rng.float(1.15, 1.45),
+    ));
+  }
+  out.push(loose("low_1", "rock_medium_2", 2.6, -0.35, 3.4, 1.1, 1.0));
+  out.push(loose("low_2", "rock_medium_1", -3.1, -0.35, -2.8, 2.5, 0.8));
   return out;
 }
 
@@ -2186,6 +2375,79 @@ function garden(rng: Rng): PartPlacement[] {
   out.push(loose("crate_1", "farm_crate_carrot", -1.2, 0, -1.2, rng.float(0, Math.PI)));
   out.push(loose("crate_2", "farm_crate_apple", -0.4, 0, -0.5, rng.float(0, Math.PI)));
   out.push(loose("flowers", "flower_a_group", 1.4, 0, -1.1, rng.float(0, Math.PI * 2), 0.9));
+  return out;
+}
+
+/**
+ * A whole farmstead as ONE placeable composition: a paddock fence, a barn at the back of it, and
+ * the yard between them.
+ *
+ * This is the answer to `marchfield_farm`, which is six crop frames on open grass. Marchfield is a
+ * resource cluster, not a settlement, so `RegionDef.settlement.buildings` cannot reach it and the
+ * only hook the content layer has there is a landmark with a `composition`. A composition that
+ * emits only dressing would still leave the farm without a farm, so this one emits the barn too,
+ * through `buildPrefab("farmstead", ...)` rotated half a turn so its cart doors face the yard.
+ *
+ * SIZED TO THE GROUND IT STANDS ON, measured at Marchfield (-96, -22) with
+ * `__gameDebug.groundHeight`: dead level out to 4 m, +-0.21 m at 8 m, and -0.62..+1.26 m at 12 m.
+ * `emitParts` places every part at `origin.y + dy` with no terrain sample of its own, so a 12 m
+ * enclosure would float one corner by 0.6 m and bury the opposite one to the top rail. The ring is
+ * therefore radius 7.9 m - 24 panels of `fence_wood_single`, whose 2.064 m length is within 0.01 m
+ * of the arc it has to cover at that radius - and the barn sits at local z -6.4, on the one bearing
+ * that measures +-0.06 m at 12 m. Every part is inside 9.1 m of the origin.
+ *
+ * The six Marchfield plots reach 6.55 m from the cluster centre, so they all fall inside the ring
+ * with the barn clear of the nearest by 0.5 m. Local +Z is the way in: five panels are left out
+ * there for a 10 m gate, and three more behind, where the barn closes the ring itself.
+ */
+function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
+  const out: PartPlacement[] = [];
+  const panels = 24;
+  const radius = 7.9;
+  // Left out: the gate on local +Z, and the run the barn stands in.
+  const gate = new Set([5, 6, 7, 17, 18, 19]);
+  for (let index = 0; index < panels; index += 1) {
+    if (gate.has(index)) continue;
+    const angle = (index / panels) * Math.PI * 2;
+    // A part's rotationY turns its local +X toward (cos, -sin); the tangent at `angle` is
+    // (-sin, cos), and -angle - PI/2 is the rotation that lands one on the other.
+    out.push(loose(
+      `fence${index}`, "fence_wood_single",
+      Math.cos(angle) * radius, -0.1, Math.sin(angle) * radius,
+      -angle - Math.PI / 2,
+    ));
+  }
+  // Gate posts at the two ends of the +Z opening. `kit.corner` is 3.0-3.02 m tall, so 0.4 is a
+  // 1.2 m post: a head taller than the 0.84 m fence and not a fifth of the barn.
+  for (const [index, step] of [4, 8].entries()) {
+    const angle = (step / panels) * Math.PI * 2;
+    out.push(loose(
+      `post${index}`, kit.corner,
+      Math.cos(angle) * radius, 0, Math.sin(angle) * radius, -angle, 0.4,
+    ));
+  }
+
+  // The barn, turned to face the yard. (-dx, -dz) with PI added to the yaw is a half turn about the
+  // composition origin; the translation then puts its centre at local (0, -6.4).
+  for (const placement of buildPrefab("farmstead", [7, 4], rng.int(1, 1_000_000), kit.id)) {
+    out.push({
+      tag: `barn_${placement.tag}`,
+      assetId: placement.assetId,
+      dx: r3(-placement.dx),
+      dy: placement.dy,
+      dz: r3(-placement.dz - 6.4),
+      rotationY: r4(placement.rotationY + Math.PI),
+      scale: placement.scale,
+    });
+  }
+
+  // The yard. `training_dummy` is a post with a stuffed body and outstretched arms - the closest
+  // thing in the library to the scarecrow the asset report lists as gap 5.
+  out.push(loose("scarecrow", "training_dummy", -3.4, 0, 2.6, rng.float(0, Math.PI * 2), 1.15));
+  out.push(loose("trough", "barrel_rack", 3.9, 0, -2.2, rng.float(2.9, 3.4), 1.1));
+  out.push(loose("yard_crate", "farm_crate_empty", 2.4, 0, -3.4, rng.float(0, Math.PI)));
+  out.push(loose("yard_sack", "sack", 1.6, 0, -3.9, rng.float(0, Math.PI)));
+  out.push(loose("yard_barrel", "barrel", -2.2, 0, -3.6, rng.float(0, Math.PI)));
   return out;
 }
 

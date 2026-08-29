@@ -840,6 +840,52 @@ const FALLOWMARCH: RegionDef = {
       assetId: "enemy_blob", scale: 0.75,
       level: 4, maxHealth: 26, aggroRadius: 8, behaviour: "aggressive",
     },
+    {
+      // On the March Road, 106 m north of the square at its nearest, between the Broken Milestone
+      // and the Bracken Pit. The first thing a new character walks through, and by design the
+      // cheapest: 4 health, passive at 4 m, one damage a swing.
+      id: "bracken_fenmites", family: "fenmite", name: "Bracken Fenmite", tier: 1,
+      count: 7, centre: [-152, 44], radius: 18,
+      // enemy_bee is the only rig in the library that hovers. At 0.40 x the tier 1 silhouette 0.90
+      // it draws 0.67 m tall against the Thornbound Husk's 1.36 m on the same mesh - far enough
+      // apart in size that they do not read as the same animal.
+      assetId: "enemy_bee", scale: 0.40,
+      level: 3, maxHealth: 4, aggroRadius: 4, behaviour: "passive",
+    },
+    {
+      // South of the Redsill Shallows, on the water the Fishing tutorial sends you to. Territorial,
+      // 5 m aggro, off the road: at Melee 1 this fight is unwinnable (65.9 s, 32.8 damage against
+      // 23 health) and the whole point is that it never starts it.
+      id: "redsill_mudbacks", family: "mudback", name: "Redsill Mudback", tier: 1,
+      count: 3, centre: [-56, -88], radius: 14,
+      // Same crab as the Rill Skitterling 37 m west, at 1.05 against its 0.70: 1.43 m tall and
+      // 2.40 m across, half again the Skitterling's footprint.
+      assetId: "enemy_crab", scale: 1.05,
+      level: 6, maxHealth: 16, aggroRadius: 5, behaviour: "territorial",
+    },
+    {
+      // The west track between Coldbrace and the Open March camp - empty ground before this, and
+      // the one stretch of Fallowmarch a player crosses without meeting anything. 77 m from the
+      // square at its nearest, so it cannot become the closest enemy to town.
+      id: "march_road_reavers", family: "reaver", name: "March Road Reaver", tier: 1,
+      count: 3, centre: [-234, -24], radius: 16,
+      // Humanoid, via the same body + parts path the NPCs use: `render/entityViews.ts` maps a
+      // clothes-only outfit id onto `base_male` and layers a per-entity hair pick on top, which is
+      // why three Reavers standing together are three different men rather than three copies.
+      // 1.12 x 0.90 puts a 1.84 m raider next to a 1.82 m player.
+      assetId: "outfit_male_peasant", scale: 1.12,
+      level: 7, maxHealth: 9, aggroRadius: 14, behaviour: "aggressive",
+    },
+    {
+      // The dead ground south of the Palewood Copse, 37 m from the woodcutting cluster - close
+      // enough to be the reason you look up, territorial so it is not the reason you die.
+      id: "palewood_hollows", family: "hollow", name: "Palewood Hollow", tier: 1,
+      count: 4, centre: [-320, -98], radius: 16,
+      // enemy_skull, which Karrowmoor uses for the Cairnwight at 0.80. At 0.85 x 0.90 this is
+      // 1.14 m against the Cairnwight's 1.37 m, and 340 m of world plus two tier palettes apart.
+      assetId: "enemy_skull", scale: 0.85,
+      level: 8, maxHealth: 9, aggroRadius: 7, behaviour: "territorial",
+    },
   ],
 
   landmarks: [
@@ -867,6 +913,15 @@ const FALLOWMARCH: RegionDef = {
       id: "lone_dead_palewood", name: "The Lone Palewood", position: [-196, 24],
       assetId: "tree_dead_3", scale: 0.85,
       blurb: "One dead Palewood at the top of the rise. Every direction from here looks the same.",
+    },
+    {
+      // Marchfield is a resource cluster rather than a settlement, so the farmstead has to enter
+      // through the landmark composition hook. The empty crate is a quiet semantic anchor; the
+      // composition supplies the barn, paddock fence, gate, and yard dressing around the plots.
+      id: "marchfield_farmstead", name: "Marchfield Farmstead", position: [-96, -22],
+      assetId: "farm_crate_empty", scale: 0.8, rotationY: 0,
+      composition: "farm_yard",
+      blurb: "A working yard around six bittergrain plots, with a barn backed into the old wall line.",
     },
   ],
 
@@ -1044,6 +1099,41 @@ const VELLENWOOD: RegionDef = {
       count: 4, centre: [40, 162], radius: 24,
       assetId: "enemy_blob", scale: 0.8,
       level: 12, maxHealth: 50, aggroRadius: 10, behaviour: "aggressive",
+    },
+    {
+      // The mire skirt on the Marchgate road, 20 m from the Marchgate node itself - the first
+      // thing a player crossing from Fallowmarch meets, and the passive family is why that is fair.
+      //
+      // Was [124, 96], 12 m off the Blackwater Pools node: measured in-game, that is inside the
+      // drawn water disc, and seven fenmites spawned submerged with the player standing chest-deep
+      // among them. The water surface is built by marching a shoreline outward from the fishing
+      // cluster until the terrain rises through the plane, so its true radius is not knowable from
+      // this file - the fix is distance, not arithmetic. This centre is 134 m from that pool.
+      id: "mire_fenmites", family: "fenmite", name: "Mire Fenmite", tier: 5,
+      count: 7, centre: [4, 134], radius: 12,
+      // 0.45 x the tier 5 silhouette 1.075 = 0.90 m, against the Thornbound Husk's 1.36 m on the
+      // same hovering rig 60 m north-east.
+      assetId: "enemy_bee", scale: 0.45,
+      level: 11, maxHealth: 12, aggroRadius: 5, behaviour: "passive",
+    },
+    {
+      // Between the Gorge Ford and the Thornline camp, on the road that carries every trip to the
+      // east gate. The most expensive ordinary fight in the region and the only one that starts
+      // itself from 14 m, which is what makes the gorge road a decision.
+      id: "gorge_reavers", family: "reaver", name: "Gorge Reaver", tier: 5,
+      count: 3, centre: [214, 64], radius: 16,
+      // The female ranger set, so a Gorge Reaver is hooded where the Fallowmarch Reaver is a
+      // bare-headed peasant. 0.95 x 1.075 = 1.81 m on `base_female`'s 1.775 m frame.
+      assetId: "outfit_female_ranger", scale: 0.95,
+      level: 15, maxHealth: 26, aggroRadius: 14, behaviour: "aggressive",
+    },
+    {
+      // The deep canopy north of the Duskoak stand. Territorial, and standing in the darkest fog
+      // in the world (Vellenwood's fogStart is 55 m against Fallowmarch's 180).
+      id: "canopy_hollows", family: "hollow", name: "Canopy Hollow", tier: 5,
+      count: 4, centre: [30, 182], radius: 12,
+      assetId: "enemy_skull", scale: 0.75,
+      level: 17, maxHealth: 24, aggroRadius: 8, behaviour: "territorial",
     },
   ],
 
@@ -1273,6 +1363,44 @@ const KARROWMOOR: RegionDef = {
       assetId: "enemy_bee", scale: 0.7,
       level: 28, maxHealth: 120, aggroRadius: 11, behaviour: "territorial",
     },
+    {
+      // On the lower terrace, 30 m from the Karrowmoor terraces node and 30 m from the Gravelmaw
+      // mouth, i.e. beside the road into the dungeon rather than across it. Territorial at 6 m: a
+      // wall the player walks around until they bring a staff, not an ambush.
+      id: "terrace_mudbacks", family: "mudback", name: "Terrace Mudback", tier: 10,
+      count: 3, centre: [72, -44], radius: 14,
+      // 1.15 x the tier 10 silhouette 1.151 = 2.00 m tall and 3.36 m across, the largest non-boss
+      // thing in the world and 46% wider than the Scree Skitterling on the same crab rig.
+      assetId: "enemy_crab", scale: 1.15,
+      level: 22, maxHealth: 46, aggroRadius: 6, behaviour: "territorial",
+    },
+    {
+      // 7.6 m off the ramp_three -> Upper Karrow Seam road, which is the tier 10 mining run the
+      // DISTANCE LEDGER at the top of this file is built on. Anyone walking it is Mining 12 and
+      // Melee 12 by construction, so this is the one place an aggressive tier 10 group can sit on a
+      // road without being a wall across the region.
+      //
+      // Was [206, -30] on the moor road, which is wrong twice: measured in-game that spot is inside
+      // a field of the large rock formations Karrowmoor scatters, so the Reavers were hidden inside
+      // geometry; and it is the FIRST junction a tier 5 player reaches walking in from Vellenwood.
+      id: "karrow_reavers", family: "reaver", name: "Karrow Reaver", tier: 10,
+      count: 4, centre: [148, -128], radius: 12,
+      // The male ranger set - hooded, and the same silhouette family as Ordrun four chambers down,
+      // which is the intended read: the Quarrykeeper's crew, still on the moor. 0.90 x 1.151 =
+      // 1.89 m, against Ordrun's 4.52 m.
+      assetId: "outfit_male_ranger", scale: 0.90,
+      level: 26, maxHealth: 40, aggroRadius: 14, behaviour: "aggressive",
+    },
+    {
+      // The tarn road between Highcairn and the Ridge Pines, 20 m north of it. Placed clear of the
+      // ridge_pines_trees cluster (34 m centre to centre against a combined 32 m of radius) so a
+      // wolf cannot spawn inside a pine.
+      id: "tarn_marchwolves", family: "marchwolf", name: "Tarn Marchwolf", tier: 10,
+      count: 4, centre: [228, -70], radius: 14,
+      // 0.85 x 1.151 = 1.61 m, against the tier 5 Marchwolf's 1.42 m on the same rig.
+      assetId: "enemy_blob", scale: 0.85,
+      level: 25, maxHealth: 30, aggroRadius: 12, behaviour: "aggressive",
+    },
   ],
 
   landmarks: [
@@ -1288,7 +1416,10 @@ const KARROWMOOR: RegionDef = {
     },
     {
       id: "great_cairn_stone", name: "The Great Cairn", position: [140, -176],
-      assetId: "boulder_large", scale: 1.3,
+      // The platformer boulder is an untextured truncated cone and remained visible through the
+      // dressed ring. Use the same textured rock family as the composition so the semantic anchor
+      // belongs to the cairn instead of reading as a placeholder at its centre.
+      assetId: "rock_medium_2", scale: 1.8,
       composition: "great_cairn",
       blurb: "Head height and forty paces round. It was already old when the quarry opened.",
     },
@@ -1310,12 +1441,13 @@ const KARROWMOOR: RegionDef = {
     name: "The Gravelmaw",
     tier: 10,
     entrance: [46, -24],
-    // `wall_arch` is 2 x 3 m, so 4x is the PRD's "twelve-metre black wound": 8 m wide, 12 m tall.
+    // `wall_arch` is 2 x 3 m. At 3x it fits inside the dressed rock face; the composition, rather
+    // than a bare timber-coloured panel protruding above it, carries the twelve-metre silhouette.
     // Round 1 drew it unrotated and unaccompanied, which is why it read as a wooden door frame on
     // open ground. It now faces the approach from the Lower Quarry (60,-16): atan2(14,8) = 1.05.
     entranceAssetId: "wall_arch",
     entranceRotationY: 1.05,
-    entranceScale: 4,
+    entranceScale: 3,
     entranceComposition: "gravelmaw_mouth",
     palette: ["#3a3f47", "#2a2e35", "#4a505a", "#5a6250", "#1b1e23", "#7a6a52", "#c86a2a", "#8f97a1"],
     chambers: [
@@ -1360,10 +1492,30 @@ const KARROWMOOR: RegionDef = {
         level: 24, maxHealth: 96, aggroRadius: 9, behaviour: "aggressive",
       },
       {
+        // The Lit Gallery is lit because somebody is keeping it lit. Two of them, at the chamber's
+        // north edge - 5.7 m from its centre with a 5 m spawn radius, so both stay inside the 11 m
+        // carved floor. Count 2 rather than 4: chamber one is the room every dungeon trip enters
+        // through, and it already holds the four Cairnwights `long_cairn` stage 4 sends you for.
+        id: "gravelmaw_ch1_reavers", family: "reaver", name: "Gravelmaw Reaver", tier: 10,
+        count: 2, centre: [44, -36], radius: 5,
+        assetId: "outfit_male_ranger", scale: 0.90,
+        level: 26, maxHealth: 40, aggroRadius: 14, behaviour: "aggressive",
+      },
+      {
         id: "gravelmaw_ch2_skitterlings", family: "skitterling", name: "Scree Skitterling", tier: 10,
         count: 6, centre: [30, -58], radius: 9,
         assetId: "enemy_crab", scale: 0.75,
         level: 20, maxHealth: 78, aggroRadius: 8, behaviour: "aggressive",
+      },
+      {
+        // In the fallen rock of The Collapse, beside the Scree Skitterlings on the same crab rig at
+        // 1.15 against their 0.75 - the size difference is the whole visual argument, and the
+        // 78-armour / 0-magicArmour split is the mechanical one. Territorial, so the room stays
+        // navigable while the door puzzle is being worked out.
+        id: "gravelmaw_ch2_mudbacks", family: "mudback", name: "Gravelmaw Mudback", tier: 10,
+        count: 3, centre: [27, -54], radius: 4,
+        assetId: "enemy_crab", scale: 1.15,
+        level: 22, maxHealth: 46, aggroRadius: 6, behaviour: "territorial",
       },
       {
         id: "gravelmaw_ch3_elders", family: "thornbound", name: "Thornbound Elder", tier: 10,

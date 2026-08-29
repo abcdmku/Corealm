@@ -1,0 +1,152 @@
+
+fenmite_t1  Bracken Fenmite  tier 1  hp 4  passive aggro 4m
+  vs M1 worn sword      hit  50.7%  ttk   12.6s  takes    5.5 of 23 hp  (0.437 dmg/s)
+  vs M3 grithe dagger   hit  56.0%  ttk    6.9s  takes    2.7 of 26 hp  (0.399 dmg/s)
+  vs M7 corven sword    hit  64.6%  ttk    3.7s  takes    1.1 of 32 hp  (0.294 dmg/s)
+  vs M12 kaldite sword  hit  72.9%  ttk    2.2s  takes    0.5 of 41 hp  (0.225 dmg/s)
+  vs M18 tier10 kit     hit  79.3%  ttk    1.9s  takes    0.3 of 75 hp  (0.167 dmg/s)
+  vs Voltrend M10 t10   hit  76.3%  ttk    2.0s
+
+hollow_t1  Palewood Hollow  tier 1  hp 9  territorial aggro 7m
+  vs M1 worn sword      hit  48.4%  ttk   29.8s  takes   19.0 of 23 hp  (0.638 dmg/s)
+  vs M3 grithe dagger   hit  53.6%  ttk   16.1s  takes    9.6 of 26 hp  (0.595 dmg/s)
+  vs M7 corven sword    hit  62.4%  ttk    8.7s  takes    4.0 of 32 hp  (0.466 dmg/s)
+  vs M12 kaldite sword  hit  71.0%  ttk    5.1s  takes    1.9 of 41 hp  (0.371 dmg/s)
+  vs M18 tier10 kit     hit  77.7%  ttk    4.3s  takes    1.2 of 75 hp  (0.287 dmg/s)
+  vs Voltrend M10 t10   hit  70.9%  ttk    4.8s
+
+marchwolf_t1  Marchwolf Pup  tier 1  hp 12  aggressive aggro 8m
+  vs M1 worn sword      hit  45.2%  ttk   42.5s  takes   20.3 of 23 hp  (0.479 dmg/s)
+  vs M3 grithe dagger   hit  50.5%  ttk   22.8s  takes   10.1 of 26 hp  (0.441 dmg/s)
+  vs M7 corven sword    hit  59.4%  ttk   12.1s  takes    4.1 of 32 hp  (0.335 dmg/s)
+  vs M12 kaldite sword  hit  68.3%  ttk    7.0s  takes    1.8 of 41 hp  (0.260 dmg/s)
+  vs M18 tier10 kit     hit  75.4%  ttk    5.9s  takes    1.2 of 75 hp  (0.197 dmg/s)
+  vs Voltrend M10 t10   hit  72.4%  ttk    6.2s
+
+mudback_t1  Redsill Mudback  tier 1  hp 16  territorial aggro 5m
+  vs M1 worn sword      hit  38.9%  ttk   65.9s  takes   32.8 of 23 hp  (0.498 dmg/s)
+  vs M3 grithe dagger   hit  44.0%  ttk   34.9s  takes   16.1 of 26 hp  (0.461 dmg/s)
+  vs M7 corven sword    hit  53.0%  ttk   18.1s  takes    6.4 of 32 hp  (0.353 dmg/s)
+  vs M12 kaldite sword  hit  62.4%  ttk   10.3s  takes    2.8 of 41 hp  (0.277 dmg/s)
+  vs M18 tier10 kit     hit  70.3%  ttk    8.4s  takes    1.8 of 75 hp  (0.211 dmg/s)
+  vs Voltrend M10 t10   hit  72.8%  ttk    8.2s
+
+reaver_t1  March Road Reaver  tier 1  hp 9  aggressive aggro 14m
+  vs M1 worn sword      hit  41.9%  ttk   34.4s  takes   17.6 of 23 hp  (0.512 dmg/s)
+  vs M3 grithe dagger   hit  47.1%  ttk   18.4s  takes    8.7 of 26 hp  (0.475 dmg/s)
+  vs M7 corven sword    hit  56.1%  ttk    9.6s  takes    3.5 of 32 hp  (0.367 dmg/s)
+  vs M12 kaldite sword  hit  65.3%  ttk    5.5s  takes    1.6 of 41 hp  (0.290 dmg/s)
+  vs M18 tier10 kit     hit  72.8%  ttk    4.6s  takes    1.0 of 75 hp  (0.222 dmg/s)
+  vs Voltrend M10 t10   hit  69.2%  ttk    4.9s
+
+skitterling_t1  Rill Skitterling  tier 1  hp 6  passive aggro 6m
+  vs M1 worn sword      hit  50.7%  ttk   18.9s  takes    6.2 of 23 hp  (0.327 dmg/s)
+  vs M3 grithe dagger   hit  56.0%  ttk   10.3s  takes    3.1 of 26 hp  (0.299 dmg/s)
+  vs M7 corven sword    hit  64.6%  ttk    5.6s  takes    1.2 of 32 hp  (0.221 dmg/s)
+  vs M12 kaldite sword  hit  72.9%  ttk    3.3s  takes    0.6 of 41 hp  (0.168 dmg/s)
+  vs M18 tier10 kit     hit  79.3%  ttk    2.8s  takes    0.4 of 75 hp  (0.126 dmg/s)
+  vs Voltrend M10 t10   hit  76.3%  ttk    3.0s
+
+fenmite_t5  Mire Fenmite  tier 5  hp 12  passive aggro 5m
+  vs M1 worn sword      hit  40.5%  ttk   47.4s  takes   52.8 of 23 hp  (1.114 dmg/s)
+  vs M3 grithe dagger   hit  45.7%  ttk   25.2s  takes   26.3 of 26 hp  (1.044 dmg/s)
+  vs M7 corven sword    hit  54.7%  ttk   13.2s  takes   11.0 of 32 hp  (0.833 dmg/s)
+  vs M12 kaldite sword  hit  64.0%  ttk    7.5s  takes    5.0 of 41 hp  (0.672 dmg/s)
+  vs M18 tier10 kit     hit  71.7%  ttk    6.2s  takes    3.2 of 75 hp  (0.525 dmg/s)
+  vs Voltrend M10 t10   hit  68.0%  ttk    6.6s
+
+hollow_t5  Canopy Hollow  tier 5  hp 24  territorial aggro 8m
+  vs M1 worn sword      hit  39.3%  ttk   97.7s  takes  108.9 of 23 hp  (1.115 dmg/s)
+  vs M3 grithe dagger   hit  44.4%  ttk   51.8s  takes   55.0 of 26 hp  (1.061 dmg/s)
+  vs M7 corven sword    hit  53.4%  ttk   27.0s  takes   23.8 of 32 hp  (0.885 dmg/s)
+  vs M12 kaldite sword  hit  62.8%  ttk   15.3s  takes   11.3 of 41 hp  (0.740 dmg/s)
+  vs M18 tier10 kit     hit  70.7%  ttk   12.5s  takes    7.5 of 75 hp  (0.598 dmg/s)
+  vs Voltrend M10 t10   hit  60.5%  ttk   14.9s
+
+marchwolf_t5  Marchwolf  tier 5  hp 28  aggressive aggro 10m
+  vs M1 worn sword      hit  34.7%  ttk  129.1s  takes  133.2 of 23 hp  (1.032 dmg/s)
+  vs M3 grithe dagger   hit  39.6%  ttk   67.8s  takes   66.1 of 26 hp  (0.975 dmg/s)
+  vs M7 corven sword    hit  48.5%  ttk   34.7s  takes   27.6 of 32 hp  (0.796 dmg/s)
+  vs M12 kaldite sword  hit  58.1%  ttk   19.3s  takes   12.6 of 41 hp  (0.653 dmg/s)
+  vs M18 tier10 kit     hit  66.4%  ttk   15.6s  takes    8.1 of 75 hp  (0.519 dmg/s)
+  vs Voltrend M10 t10   hit  63.6%  ttk   16.5s
+
+reaver_t5  Gorge Reaver  tier 5  hp 26  aggressive aggro 14m
+  vs M1 worn sword      hit  31.2%  ttk  133.2s  takes  140.6 of 23 hp  (1.056 dmg/s)
+  vs M3 grithe dagger   hit  35.9%  ttk   69.5s  takes   69.5 of 26 hp  (1.000 dmg/s)
+  vs M7 corven sword    hit  44.6%  ttk   35.0s  takes   28.9 of 32 hp  (0.824 dmg/s)
+  vs M12 kaldite sword  hit  54.2%  ttk   19.2s  takes   13.1 of 41 hp  (0.682 dmg/s)
+  vs M18 tier10 kit     hit  62.8%  ttk   15.3s  takes    8.4 of 75 hp  (0.547 dmg/s)
+  vs Voltrend M10 t10   hit  59.0%  ttk   16.5s
+
+skitterling_t5  Bramble Skitterling  tier 5  hp 22  aggressive aggro 7m
+  vs M1 worn sword      hit  36.8%  ttk   95.7s  takes   67.0 of 23 hp  (0.700 dmg/s)
+  vs M3 grithe dagger   hit  41.8%  ttk   50.5s  takes   33.2 of 26 hp  (0.657 dmg/s)
+  vs M7 corven sword    hit  50.8%  ttk   26.0s  takes   13.7 of 32 hp  (0.525 dmg/s)
+  vs M12 kaldite sword  hit  60.3%  ttk   14.6s  takes    6.2 of 41 hp  (0.425 dmg/s)
+  vs M18 tier10 kit     hit  68.4%  ttk   11.9s  takes    3.9 of 75 hp  (0.333 dmg/s)
+  vs Voltrend M10 t10   hit  58.0%  ttk   14.2s
+
+thornbound_t5  Thornbound Husk  tier 5  hp 26  territorial aggro 9m
+  vs M1 worn sword      hit  36.9%  ttk  112.7s  takes   98.8 of 23 hp  (0.877 dmg/s)
+  vs M3 grithe dagger   hit  42.0%  ttk   59.5s  takes   49.2 of 26 hp  (0.828 dmg/s)
+  vs M7 corven sword    hit  50.9%  ttk   30.7s  takes   20.6 of 32 hp  (0.673 dmg/s)
+  vs M12 kaldite sword  hit  60.4%  ttk   17.2s  takes    9.5 of 41 hp  (0.551 dmg/s)
+  vs M18 tier10 kit     hit  68.5%  ttk   14.0s  takes    6.1 of 75 hp  (0.437 dmg/s)
+  vs Voltrend M10 t10   hit  58.1%  ttk   16.8s
+
+cairnwight_t10  Cairnwight  tier 10  hp 38  aggressive aggro 10m
+  vs M1 worn sword      hit  24.9%  ttk  243.8s  takes  308.0 of 23 hp  (1.263 dmg/s)
+  vs M3 grithe dagger   hit  29.1%  ttk  125.4s  takes  151.1 of 26 hp  (1.205 dmg/s)
+  vs M7 corven sword    hit  37.0%  ttk   61.6s  takes   62.4 of 32 hp  (1.014 dmg/s)
+  vs M12 kaldite sword  hit  46.4%  ttk   32.7s  takes   27.9 of 41 hp  (0.854 dmg/s)
+  vs M18 tier10 kit     hit  55.3%  ttk   25.4s  takes   17.6 of 75 hp  (0.695 dmg/s)
+  vs Voltrend M10 t10   hit  59.3%  ttk   24.0s
+
+marchwolf_t10  Tarn Marchwolf  tier 10  hp 30  aggressive aggro 12m
+  vs M1 worn sword      hit  29.0%  ttk  165.4s  takes  286.7 of 23 hp  (1.733 dmg/s)
+  vs M3 grithe dagger   hit  33.5%  ttk   85.9s  takes  142.5 of 26 hp  (1.660 dmg/s)
+  vs M7 corven sword    hit  42.0%  ttk   42.9s  takes   60.7 of 32 hp  (1.416 dmg/s)
+  vs M12 kaldite sword  hit  51.6%  ttk   23.3s  takes   28.0 of 41 hp  (1.206 dmg/s)
+  vs M18 tier10 kit     hit  60.3%  ttk   18.4s  takes   18.2 of 75 hp  (0.994 dmg/s)
+  vs Voltrend M10 t10   hit  57.7%  ttk   19.5s
+
+mudback_t10  Terrace Mudback  tier 10  hp 46  territorial aggro 6m
+  vs M1 worn sword      hit  20.8%  ttk  353.4s  takes  452.2 of 23 hp  (1.280 dmg/s)
+  vs M3 grithe dagger   hit  24.5%  ttk  180.1s  takes  220.2 of 26 hp  (1.223 dmg/s)
+  vs M7 corven sword    hit  31.8%  ttk   86.9s  takes   89.9 of 32 hp  (1.035 dmg/s)
+  vs M12 kaldite sword  hit  40.7%  ttk   45.2s  takes   39.6 of 41 hp  (0.876 dmg/s)
+  vs M18 tier10 kit     hit  49.5%  ttk   34.3s  takes   24.6 of 75 hp  (0.717 dmg/s)
+  vs Voltrend M10 t10   hit  59.3%  ttk   29.1s
+
+quarrykeeper_t10  Ordrun the Quarrykeeper  tier 10  hp 200  territorial aggro 24m
+  vs M1 worn sword      hit  18.0%  ttk 1779.6s  takes 3051.6 of 23 hp  (1.715 dmg/s)
+  vs M3 grithe dagger   hit  21.3%  ttk  901.1s  takes 1483.4 of 26 hp  (1.646 dmg/s)
+  vs M7 corven sword    hit  28.0%  ttk  429.1s  takes  607.1 of 32 hp  (1.415 dmg/s)
+  vs M12 kaldite sword  hit  36.4%  ttk  219.8s  takes  266.7 of 41 hp  (1.213 dmg/s)
+  vs M18 tier10 kit     hit  44.9%  ttk  164.3s  takes  165.4 of 75 hp  (1.007 dmg/s)
+  vs Voltrend M10 t10   hit  48.4%  ttk  154.9s
+
+reaver_t10  Karrow Reaver  tier 10  hp 40  aggressive aggro 14m
+  vs M1 worn sword      hit  24.8%  ttk  258.1s  takes  337.8 of 23 hp  (1.309 dmg/s)
+  vs M3 grithe dagger   hit  28.9%  ttk  132.7s  takes  166.5 of 26 hp  (1.255 dmg/s)
+  vs M7 corven sword    hit  36.9%  ttk   65.1s  takes   70.0 of 32 hp  (1.074 dmg/s)
+  vs M12 kaldite sword  hit  46.2%  ttk   34.6s  takes   31.8 of 41 hp  (0.918 dmg/s)
+  vs M18 tier10 kit     hit  55.1%  ttk   26.8s  takes   20.3 of 75 hp  (0.759 dmg/s)
+  vs Voltrend M10 t10   hit  51.0%  ttk   29.4s
+
+skitterling_t10  Scree Skitterling  tier 10  hp 34  aggressive aggro 8m
+  vs M1 worn sword      hit  28.4%  ttk  191.7s  takes  207.0 of 23 hp  (1.080 dmg/s)
+  vs M3 grithe dagger   hit  32.9%  ttk   99.4s  takes  102.0 of 26 hp  (1.026 dmg/s)
+  vs M7 corven sword    hit  41.2%  ttk   49.5s  takes   42.3 of 32 hp  (0.854 dmg/s)
+  vs M12 kaldite sword  hit  50.8%  ttk   26.8s  takes   19.1 of 41 hp  (0.713 dmg/s)
+  vs M18 tier10 kit     hit  59.6%  ttk   21.1s  takes   12.1 of 75 hp  (0.575 dmg/s)
+  vs Voltrend M10 t10   hit  42.8%  ttk   29.8s
+
+thornbound_t10  Thornbound Elder  tier 10  hp 44  territorial aggro 11m
+  vs M1 worn sword      hit  28.7%  ttk  245.5s  takes  285.0 of 23 hp  (1.161 dmg/s)
+  vs M3 grithe dagger   hit  33.2%  ttk  127.3s  takes  141.4 of 26 hp  (1.111 dmg/s)
+  vs M7 corven sword    hit  41.6%  ttk   63.5s  takes   59.9 of 32 hp  (0.944 dmg/s)
+  vs M12 kaldite sword  hit  51.2%  ttk   34.4s  takes   27.6 of 41 hp  (0.802 dmg/s)
+  vs M18 tier10 kit     hit  59.9%  ttk   27.1s  takes   17.8 of 75 hp  (0.658 dmg/s)
+  vs Voltrend M10 t10   hit  47.4%  ttk   34.8s

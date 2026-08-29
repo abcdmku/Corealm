@@ -1693,9 +1693,16 @@ export class WorldScene {
     const centreX = (rect.minX + rect.maxX) / 2;
     const centreZ = (rect.minZ + rect.maxZ) / 2;
     const maxRadius = Math.max(rect.maxX - rect.minX, rect.maxZ - rect.minZ) / 2;
+    // See `WATER_SHORE_ARC`: the spoke count follows the body, so the shoreline is always solved
+    // at the terrain lattice's own 2 m spacing rather than at a fixed 32 azimuths.
+    const segments = clamp(
+      Math.round((2 * Math.PI * maxRadius) / WATER_SHORE_ARC),
+      WATER_MIN_SEGMENTS,
+      WATER_MAX_SEGMENTS,
+    );
 
     // Shoreline distance per azimuth: the FIRST radius at which the drawn ground crosses the
-    // surface, found by marching outward and then bisecting inside the metre it crossed in.
+    // surface, found by marching outward and then bisecting inside the step it crossed in.
     //
     // This was a pure bisection with an early-out that returned `maxRadius` whenever the ground at
     // maxRadius was below the level, on the stated reasoning that the bank is monotonic over the
@@ -1703,9 +1710,9 @@ export class WorldScene {
     // footprints stood ABOVE the surface by up to 2.12 m, because a spur crosses the plane at
     // r = 21 and drops back under it by r = 23, and the early-out drew straight over the top of it.
     // Marching finds the first crossing by construction, which is the definition of a shoreline.
-    const shoreline = new Float64Array(WATER_SEGMENTS);
-    for (let step = 0; step < WATER_SEGMENTS; step += 1) {
-      const angle = (step / WATER_SEGMENTS) * Math.PI * 2;
+    const shoreline = new Float64Array(segments);
+    for (let step = 0; step < segments; step += 1) {
+      const angle = (step / segments) * Math.PI * 2;
       const dx = Math.cos(angle);
       const dz = Math.sin(angle);
       let low = 0;
@@ -1728,37 +1735,43 @@ export class WorldScene {
     }
 
     const rings = WATER_RINGS;
-    const vertexCount = 1 + WATER_SEGMENTS * rings;
+    const vertexCount = 1 + segments * rings;
     const positions = new Float32Array(vertexCount * 3);
     const depths = new Float32Array(vertexCount);
     const indices: number[] = [];
 
     depths[0] = Math.max(0, level - this.meshHeightAt(centreX, centreZ));
-    for (let step = 0; step < WATER_SEGMENTS; step += 1) {
-      const angle = (step / WATER_SEGMENTS) * Math.PI * 2;
+    for (let step = 0; step < segments; step += 1) {
+      const angle = (step / segments) * Math.PI * 2;
       const dx = Math.cos(angle);
       const dz = Math.sin(angle);
       const reach = shoreline[step]!;
       for (let ring = 0; ring < rings; ring += 1) {
-        const radius = (reach * (ring + 1)) / rings;
+        // Biased so the rings bunch toward the rim; see `WATER_RING_BIAS`.
+        const radius = reach * Math.pow((ring + 1) / rings, WATER_RING_BIAS);
         const index = 1 + step * rings + ring;
         const x = dx * radius;
         const z = dz * radius;
         positions[index * 3] = x;
         positions[index * 3 + 2] = z;
         // The outer ring is the edge of the surface whether the terrain closed it or the caller's
-        // rect did. Writing zero depth there makes the material fade the last ring out in both
-        // cases, so a disc cut off by its rect ends as a haze rather than as a straight line
-        // across open water. Measured, that is 26 of 32 azimuths on the Redsill basin, where the
-        // ground under the rim is still 0.6-0.8 m below the surface.
+        // rect did, so it carries zero depth in both cases and the material fades it out; measured,
+        // that is 26 of 32 azimuths on the Redsill basin, where the ground under the rim is still
+        // 0.6-0.8 m below the surface.
+        //
+        // The taper inside it is `WATER_EDGE_METRES` of real bank rather than one ring, because a
+        // ring is `reach / rings` metres wide and that is 1.9 m at Redsill against 0.21 m at a pool
+        // that only cleared `WATER_MIN_RADIUS` — the wet edge used to be eight times wider on a big
+        // pond than on a small one for no reason but the tessellation.
+        const trueDepth = Math.max(0, level - this.meshHeightAt(centreX + x, centreZ + z));
         depths[index] = ring === rings - 1
           ? 0
-          : Math.max(0, level - this.meshHeightAt(centreX + x, centreZ + z));
+          : trueDepth * clamp((reach - radius) / WATER_EDGE_METRES, 0, 1);
       }
     }
 
-    for (let step = 0; step < WATER_SEGMENTS; step += 1) {
-      const next = (step + 1) % WATER_SEGMENTS;
+    for (let step = 0; step < segments; step += 1) {
+      const next = (step + 1) % segments;
       const a0 = 1 + step * rings;
       const b0 = 1 + next * rings;
       indices.push(0, b0, a0);
@@ -1787,7 +1800,7 @@ export class WorldScene {
     // registered at the radius the SHORELINE reached rather than at the rect the caller guessed.
     // Registering the guess put the mud and wet bands metres inside or outside the drawn edge.
     let reached = WATER_MIN_RADIUS;
-    for (let step = 0; step < WATER_SEGMENTS; step += 1) reached = Math.max(reached, shoreline[step]!);
+    for (let step = 0; step < segments; step += 1) reached = Math.max(reached, shoreline[step]!);
     this.waters.push({ centre: [centreX, centreZ], radius: reached, level });
     if (this.chunks.length > 0) {
       const reach = reached + WATER_BANK_METRES;
@@ -1820,7 +1833,13 @@ export class WorldScene {
       if (!mesh.isMesh || !mesh.geometry) return;
       const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
       if (!material) return;
-      parts.push({ geometry: mesh.geometry, material, matrix: mesh.matrixWorld.clone() });
+      parts.push({
+        geometry: mesh.geometry,
+        // The six platformer rocks ship with no UVs and no texture, so a scattered crag drew as a
+        // smooth flat cone. See `stoneDetail`.
+        material: needsStoneDetail(mesh.geometry, material) ? stoneDetail(material) : material,
+        matrix: mesh.matrixWorld.clone(),
+      });
     });
 
     const created: THREE.InstancedMesh[] = [];
@@ -2056,6 +2075,157 @@ export class WorldScene {
   }
 }
 
+// ------------------------------------------------------- untextured stone
+
+/**
+ * Screen-space relief and mottling for a mesh that has NO UVs and therefore cannot be textured.
+ *
+ * THE MEASUREMENT. Of the 213 shipped GLBs, 19 carry no texture at all, and the six that matter
+ * are the ultimate-platformer rocks: `boulder_large`, `boulder_medium`, `cliff_tall` and
+ * `cliff_step_1..3`. Their primitives carry POSITION and NORMAL and nothing else — no TEXCOORD_0,
+ * no COLOR_0 — under one `baseColorFactor` of (0.384, 0.208, 0.108) at roughness 0.85. The
+ * stylized-nature-megakit rocks beside them (`rock_medium_*`, `pebble_*`, `path_rock_*`) all carry
+ * TEXCOORD_0 and an embedded `Rocks_Diffuse` or `PathRocks_Diffuse` jpeg. So this is not a tint
+ * being flattened, a texture failing to load, or an atlas tiling once across a large mesh: there is
+ * no UV set to sample any texture with, at any scale, and no material swap can fix it. It is why
+ * runs/corealm/screenshots/w3-karrowmoor_terraces.png is two thirds smooth pale-tan cones — the
+ * Karrowmoor `crags` scatter layer draws `boulder_medium` at up to 2.4x and `cliff_tall` at 1.8x.
+ *
+ * WHAT THIS DOES INSTEAD. Two octaves of 3D value noise evaluated at the WORLD position need no UVs
+ * at all, and the same scalar drives three things: the diffuse mottling, a roughness break-up, and
+ * — through `dFdx`/`dFdy` of that scalar — a bump-mapped normal. That last one is what actually
+ * kills the cone read; colour alone leaves the silhouette smooth. The perturbation is three's own
+ * `perturbNormalArb` inlined, exactly as `materials.ts` `GROUND_NORMAL_BODY` does it and for the
+ * same reason: that function is only compiled under `USE_BUMPMAP` and these materials have no
+ * bumpMap, so it is not in the program to call.
+ *
+ * COST. No extra draw calls — the derived material replaces the source on the same
+ * `InstancedMesh`, one for one. One extra compiled program per distinct source material, which is
+ * two for the whole world (`boulder_medium`'s `Rock` and `cliff_tall`'s), and it is paid at the
+ * boot warmup rather than on a frame. Per fragment it is 16 hash evaluations plus the four
+ * derivatives, and only on rock.
+ *
+ * Exported because `render/entityViews.ts` draws the SAME six assets through `BatchedMesh` for
+ * landmark and scatter entities and is a different owner's file; `buildings.ts` has moved every
+ * composition it owns off the platformer rocks, but `content/regions.ts` still names
+ * `boulder_large` as the Great Cairn's hero mesh and `boulder_medium` as the Thornline Stones'.
+ */
+const STONE_DETAIL_CACHE = new WeakMap<THREE.Material, THREE.MeshStandardMaterial>();
+
+/**
+ * The neutral the flat platformer brown is pulled toward, and how far.
+ *
+ * (0.384, 0.208, 0.108) linear renders as sRGB (166, 125, 93), which is the tan in the shots. At
+ * 0.75 toward 0x6d6f6e it lands at sRGB (124, 114, 105) — a warm grey that sits with the megakit
+ * rocks beside it instead of glowing against them — and the noise then swings it 0.74x to 1.26x.
+ */
+const STONE_TINT = 0x6d6f6e;
+const STONE_TINT_MIX = 0.75;
+
+/** How hard the noise gradient bends the normal. 2.6 was read off the crags at 20-30 m, not close up. */
+const STONE_BUMP_SCALE = 2.6;
+
+const STONE_SHARED_HEADER = /* glsl */ `
+varying vec3 vStoneWorld;
+`;
+
+const STONE_VERTEX_BODY = /* glsl */ `
+{
+  // 'transformed' is still the object-space position after <project_vertex>; this repeats that
+  // chunk's own instancing and batching steps rather than trying to invert the view matrix, which
+  // GLSL ES 1.00 has no inverse() for.
+  vec4 stoneObject = vec4( transformed, 1.0 );
+  #ifdef USE_BATCHING
+    stoneObject = batchingMatrix * stoneObject;
+  #endif
+  #ifdef USE_INSTANCING
+    stoneObject = instanceMatrix * stoneObject;
+  #endif
+  vStoneWorld = ( modelMatrix * stoneObject ).xyz;
+}
+`;
+
+const STONE_FRAGMENT_HEADER = /* glsl */ `
+float gStoneRelief = 0.0;
+
+float stoneHash( vec3 p ) {
+  p = fract( p * 0.3183099 + vec3( 0.71, 0.113, 0.419 ) );
+  p *= 17.0;
+  return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) );
+}
+
+float stoneNoise( vec3 x ) {
+  vec3 i = floor( x );
+  vec3 f = fract( x );
+  f = f * f * ( 3.0 - 2.0 * f );
+  return mix(
+    mix( mix( stoneHash( i + vec3( 0.0, 0.0, 0.0 ) ), stoneHash( i + vec3( 1.0, 0.0, 0.0 ) ), f.x ),
+         mix( stoneHash( i + vec3( 0.0, 1.0, 0.0 ) ), stoneHash( i + vec3( 1.0, 1.0, 0.0 ) ), f.x ), f.y ),
+    mix( mix( stoneHash( i + vec3( 0.0, 0.0, 1.0 ) ), stoneHash( i + vec3( 1.0, 0.0, 1.0 ) ), f.x ),
+         mix( stoneHash( i + vec3( 0.0, 1.0, 1.0 ) ), stoneHash( i + vec3( 1.0, 1.0, 1.0 ) ), f.x ), f.y ), f.z );
+}
+`;
+
+const STONE_COLOUR_BODY = /* glsl */ `
+{
+  // 0.53 m and 2.4 m features, plus a bedding term in world Y warped by the coarse octave. The
+  // bedding is what makes a 9 m crag read as rock rather than as noise sprayed on a cone.
+  float fine = stoneNoise( vStoneWorld * 1.9 );
+  float coarse = stoneNoise( vStoneWorld * 0.42 );
+  float bedding = sin( vStoneWorld.y * 2.1 + coarse * 6.28 );
+  gStoneRelief = fine * 0.55 + coarse * 0.45 + bedding * 0.13;
+  diffuseColor.rgb *= 0.74 + 0.52 * gStoneRelief;
+}
+`;
+
+const STONE_ROUGHNESS_BODY = /* glsl */ `
+roughnessFactor = clamp( roughnessFactor * ( 0.86 + 0.26 * gStoneRelief ), 0.2, 1.0 );
+`;
+
+const STONE_NORMAL_BODY = /* glsl */ `
+{
+  vec2 dHdxy = vec2( dFdx( gStoneRelief ), dFdy( gStoneRelief ) ) * ${STONE_BUMP_SCALE.toFixed(1)};
+  vec3 sigmaX = normalize( dFdx( - vViewPosition ) );
+  vec3 sigmaY = normalize( dFdy( - vViewPosition ) );
+  vec3 r1 = cross( sigmaY, normal );
+  vec3 r2 = cross( normal, sigmaX );
+  float det = dot( sigmaX, r1 );
+  normal = normalize( abs( det ) * normal - sign( det ) * ( dHdxy.x * r1 + dHdxy.y * r2 ) );
+}
+`;
+
+/** True when a (geometry, material) pair has no UV set and no base-colour map to sample with one. */
+export function needsStoneDetail(geometry: THREE.BufferGeometry, material: THREE.Material): boolean {
+  if (geometry.getAttribute("uv") !== undefined) return false;
+  const standard = material as THREE.MeshStandardMaterial;
+  return standard.isMeshStandardMaterial === true && standard.map === null;
+}
+
+/** The derived material for one untextured source material. Cached, so the program compiles once. */
+export function stoneDetail(source: THREE.Material): THREE.MeshStandardMaterial {
+  const cached = STONE_DETAIL_CACHE.get(source);
+  if (cached) return cached;
+
+  const derived = (source as THREE.MeshStandardMaterial).clone();
+  derived.name = `${source.name || "stone"}-detail`;
+  derived.color.lerp(new THREE.Color(STONE_TINT), STONE_TINT_MIX);
+  // Required: without a cache key of its own, three keys the program on the material's PROPERTIES,
+  // so an untouched copy of the same GLB material would be handed this one's compiled program.
+  derived.customProgramCacheKey = () => "corealm-stone-detail-v1";
+  derived.onBeforeCompile = (shader) => {
+    shader.vertexShader = `${STONE_SHARED_HEADER}\n${shader.vertexShader}`.replace(
+      "#include <project_vertex>",
+      `#include <project_vertex>\n${STONE_VERTEX_BODY}`,
+    );
+    shader.fragmentShader = `${STONE_SHARED_HEADER}${STONE_FRAGMENT_HEADER}\n${shader.fragmentShader}`
+      .replace("#include <color_fragment>", `#include <color_fragment>\n${STONE_COLOUR_BODY}`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\n${STONE_ROUGHNESS_BODY}`)
+      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>\n${STONE_NORMAL_BODY}`);
+  };
+  STONE_DETAIL_CACHE.set(source, derived);
+  return derived;
+}
+
 // ------------------------------------------------------------ region fields
 
 function characterFor(regionId: RegionId): RegionCharacter {
@@ -2201,11 +2371,45 @@ const PAVING_FEATHER = 1.2;
 /** How far past a water body's radius the bank treatment reaches, in metres. */
 const WATER_BANK_METRES = 6;
 
-/** Azimuths on a water disc. 32 is round at the distance a pond is ever seen from. */
-const WATER_SEGMENTS = 32;
+/**
+ * Arc between two shoreline spokes, in metres. NOT a fixed azimuth count.
+ *
+ * A fixed 32 spokes is 4.5 m of arc at the Redsill rim, and the fan draws a straight chord across
+ * every one of those gaps whatever the ground does inside it. Measured on the shipped world with
+ * `__gameDebug.groundHeight` on a 1 m grid over each disc footprint (runs/corealm/audit/
+ * wd-measure.ts): 14.6% of the Redsill footprint and 18.4% of the Cairn Tarn's had DRY GROUND
+ * above the drawn surface, by up to 5.16 m — spurs narrower than one spoke gap, that the solver
+ * never sampled and the fan therefore flooded.
+ *
+ * 2 m is the terrain lattice's own quad, so the shoreline is now sampled at the finest spacing the
+ * drawn mesh can actually represent a bank at. The spoke count follows the body's size, clamped so
+ * a 2.5 m pool is still round and the widest disc in the world stays under 200 spokes.
+ */
+const WATER_SHORE_ARC = 2;
+const WATER_MIN_SEGMENTS = 32;
+const WATER_MAX_SEGMENTS = 192;
 
-/** Rings between the hub and the shoreline. 10 x 32 + 1 = 321 vertices, against the old 34. */
-const WATER_RINGS = 10;
+/** Rings between the hub and the shoreline. */
+const WATER_RINGS = 12;
+
+/**
+ * Ring distribution exponent. `radius = reach * pow(ring / rings, WATER_RING_BIAS)`.
+ *
+ * Evenly spaced rings put reach/12 = 1.9 m between the last two at Redsill, which is wider than
+ * the band `WATER_EDGE_METRES` has to taper across, so the taper landed on a single vertex and
+ * the edge came back as a hard arc. 0.6 packs the outer ring spacing down to 5.1% of the reach.
+ */
+const WATER_RING_BIAS = 0.6;
+
+/**
+ * How far in from the waterline the drawn depth is tapered to zero, in metres.
+ *
+ * The depth attribute drives the material's colour ramp AND its alpha (`materials.water`, alpha =
+ * smoothstep(0, 0.25 m, depth)), so this is the width of the wet edge. It used to be "the outer
+ * ring", which is a resolution-dependent distance: reach/10, or 2.3 m at Redsill and 0.25 m at a
+ * pool that only cleared `WATER_MIN_RADIUS`. A metre and a bit is a bank, at any size of pond.
+ */
+const WATER_EDGE_METRES = 1.4;
 
 /** Smallest shoreline radius a water body will draw, in metres. */
 const WATER_MIN_RADIUS = 2.5;
@@ -2217,7 +2421,7 @@ const WATER_MIN_RADIUS = 2.5;
  * is able to represent. 26 steps on the widest disc in the world, then 12 bisections inside the
  * metre it crossed in, which resolves the waterline to 0.25 mm.
  */
-const WATER_MARCH_METRES = 1;
+const WATER_MARCH_METRES = 0.5;
 
 
 

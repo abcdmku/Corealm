@@ -31,9 +31,12 @@
  *     new species costs 1-2 calls (2-4 with shadows) in every tile it appears in. Every number in
  *     `DEFAULT_SCATTER` is chosen against that asymmetry: counts run high, species lists stay
  *     short.
- *  5. **Continuous.** Two layers carry the low cover: `groundcover` clusters it into tufts and
- *     `carpet` lays a Poisson floor under the whole region so it never drops to nothing. `carpet`
- *     names the same assets, so under (4) it shares their meshes and costs no extra draw call.
+ *  5. **Continuous, and REGIONAL.** Two layers carry the low cover: `groundcover` clusters it into
+ *     tufts and `carpet` lays a Poisson floor under the whole region so it never drops to nothing.
+ *     `carpet` names the same assets, so under (4) it shares their meshes and costs no extra draw
+ *     call. Each region has its own pool — `MEADOW_COVER`, `WOODLAND_COVER`, `UPLAND_COVER` —
+ *     because one shared pool made all three regions the same sward with a different vertex colour
+ *     under it, and because a species another layer in the SAME region already instances is free.
  *
  * The consequence of (4) worth stating out loud, and what it used to cost: a REGION-wide
  * `InstancedMesh` has a region-wide bounding sphere, so it was never frustum-culled and never
@@ -1392,7 +1395,7 @@ const SHRUB_EXCLUSION: ExclusionProfile = {
 const COVER_EXCLUSION: ExclusionProfile = {
   base: { hard: 0.6, fade: 3 },
   byKind: {
-    settlement: { hard: -48, fade: 22 },
+    settlement: { hard: -48, fade: 14 },
     road: { hard: 1.4, fade: 2.6 },
     cluster: { hard: -30, fade: 4 },
     spawn: { hard: 1, fade: 6 },
@@ -1404,7 +1407,7 @@ const COVER_EXCLUSION: ExclusionProfile = {
 const LITTER_EXCLUSION: ExclusionProfile = {
   base: { hard: 0.5, fade: 3 },
   byKind: {
-    settlement: { hard: -50, fade: 16 },
+    settlement: { hard: -50, fade: 12 },
     road: { hard: -1, fade: 2 },
     cluster: { hard: -30, fade: 3 },
     spawn: { hard: 0.5, fade: 4 },
@@ -1415,9 +1418,9 @@ const LITTER_EXCLUSION: ExclusionProfile = {
 // --------------------------------------------------------- species presets
 
 /**
- * The ground-cover pool, shared by all three regions.
+ * The colour census every cover pool below is picked against.
  *
- * **Every species here is picked off its own UVs, not off its material name.** The nature kit's
+ * **Every species is picked off its own UVs, not off its material name.** The nature kit's
  * `Leaves` atlas is one 512x512 sheet holding greens, a blue leaf, two orange leaves and a purple
  * clover side by side, so two assets on the same material can be opposite colours and a
  * whole-texture mean says nothing. Sampled at the UVs each mesh actually reads
@@ -1427,47 +1430,43 @@ const LITTER_EXCLUSION: ExclusionProfile = {
  *     grass_common_short/tall  rgb(121,171,32)  green    grass_wispy_*      rgb(182,159,0)   gold
  *     plant_broad_small/large  rgb(184,63,27)   RED      clover_1/2         rgb(220,95,34)   RED
  *     flower_a_* petals        rgb(216,116,106) salmon   flower_b_* petals  rgb(167,129,190) violet
+ *     mushroom_common          rgb(162,134,114) buff
  *
- * That table corrects a comment this file used to carry. `plant_broad_large` was described as "the
- * shared green `Leaves` texture, mean rgb(94,118,81)" and used as the green stand-in after
- * `bush_common` was banned for rendering red; it is rgb(184,63,27) at its own UVs, redder than the
- * bush it replaced. Carried at weight 3 in the first cut of this layer it turned every Fallowmarch
- * verge into purple cabbages - `runs/corealm/screenshots/sct-crop-bloom.png` is what that looked
- * like. `clover_1` has the same problem and was the old `bloom` layer's base.
+ * That table is why `plant_broad_small` is absent from every pool despite being, at 48 triangles
+ * for a 1.05 x 0.96 m mat, by far the cheapest ground coverage in the kit — 46 triangles per
+ * square metre against `grass_common_short`'s 330. It is red. `plant_broad_large`, `clover_1` and
+ * `clover_2` are red for the same reason, and `bush_common`'s only material is the red autumn
+ * `Leaves_TwistedTree`. Losing them is what makes dense cover cost triangles.
  *
- * Scale bands are set against the manifest's native size so a prop lands at 0.3-0.65 m in world
- * space and, for the flat ones, under ~1.2 m across. Round 1 used `grass_common_short` (1.334 m
- * native) at [0.8, 1.5], i.e. 1.07-2.00 m - taller than the 1.8 m player - which is why the "grass"
- * read as scattered shrubs rather than as a surface.
+ * ONE POOL PER REGION, which is this round's change and the brief's "not the same carpet tinted
+ * three ways". The shared pool made all three regions the same sward with a different vertex
+ * colour under it. Fallowmarch is river-plain meadow: common grass, a tall grass for silhouette,
+ * and drifts of the salmon flower. Vellenwood is shaded woodland floor: fern and leafy plant carry
+ * it, grass is thinned to a third, and mushrooms and stone litter stand in for leaf mould.
+ * Karrowmoor is thin upland turf on scree: gold wispy moor grass, short common grass, and roughly
+ * twice as much loose stone as either of the others.
  *
- * `grass_wispy_tall` and the second `fern_1` entry are shore-only: gold reeds standing out of the
- * water and a bigger damp-bank frond. That band is the only place in the world with a moisture rule.
+ * The cost argument that shapes every weight below: buckets are keyed on (asset, castShadow)
+ * REGION-WIDE (`scatterRegion`), so a species already named by another layer in the same region
+ * adds instances to an existing `InstancedMesh` and costs zero draw calls. `flower_a_single` is
+ * free in Fallowmarch because `bloom` already instances it, `mushroom_common` is free in
+ * Vellenwood because `fungus` does, and `grass_wispy_short` is free in Karrowmoor because `scrub`
+ * does. Only `grass_common_tall` is genuinely new, and only in Fallowmarch.
+ *
+ * Scale bands are set against the manifest's native size. Round 2 put cover at 0.30-0.65 m and
+ * that is measurably too small to read as a field: at the shipped 0.24 instances/m2 a 0.4 m tuft
+ * covers about 3% of the ground, which is `w3-palewood_copse.png` — a green shader with occasional
+ * props on it. Coverage is linear in count and QUADRATIC in scale, and scale is free in both
+ * triangles and draw calls, so the bands here are ~1.35x wider and `sizeBias` has come down from
+ * 1.6 to 1.25 so more of the draw lands near the top of the band. Together with roughly double the
+ * count that is about 5x the ground coverage for about 2x the triangles.
  */
-const GROUND_COVER: ScatterSpeciesSpec[] = [
-  // 1.334 m native -> 0.32-0.64 m. 155 triangles.
-  { assetId: "grass_common_short", weight: 5, scale: [0.24, 0.48] },
-  // 1.014 m tall, 1.27 m wide native -> 0.30-0.61 m tall, 0.38-0.76 m across. 120 triangles: the
-  // cheapest green leaf in the kit now that the broad-leaf mats are out.
-  { assetId: "plant_leafy_small", weight: 5, scale: [0.3, 0.6] },
-  // Small stones through the sward, and the cheapest trick in this file: 48 triangles, and the
-  // `stones`/`scree` layer already instances it in every region, so buckets being keyed on asset id
-  // means these cost ZERO extra draw calls and pull the layer's mean cost down from 166 to 132
-  // triangles per instance. 0.34 x 0.17 x 0.29 m native -> 0.17-0.48 m.
-  { assetId: "rock_small_2", weight: 2.2, scale: [0.5, 1.4], tilt: 1, sink: 0.04 },
-  // Same argument, 114 triangles, a rounder silhouette. Between them these two are what makes the
-  // open ground read as GROUND rather than as a lawn with tufts on it.
-  { assetId: "pebble_round_1", weight: 1.3, scale: [0.5, 1.3], tilt: 1, sink: 0.03 },
-  // 0.840 m tall, 2.83 m wide native -> 0.19-0.36 m tall, 0.62-1.19 m across: a low frond mat, and
-  // the flat silhouette the red broad-leaf plants used to supply. Weight cut from 2 to 1 because at
-  // 288 triangles it is 2.3x the cost of the greens either side of it and was carrying 19% of the
-  // instances for 30% of the layer's triangles.
-  { assetId: "fern_1", weight: 1, scale: [0.22, 0.42], tilt: 1 },
-  // Size hierarchy, and free. A field of cover all at one height reads as a texture; what makes it
-  // read as ground is a few knee-high tussocks standing out of the ankle-high mat. These are two
-  // more ENTRIES on assets the layer already carries, so they share the same InstancedMesh and cost
-  // nothing: 0.67-1.27 m of grass and 0.71-1.17 m of leafy plant against the 0.3-0.6 m base.
-  { assetId: "grass_common_short", weight: 1.6, scale: [0.5, 0.95], tilt: 0.25 },
-  { assetId: "plant_leafy_small", weight: 1.2, scale: [0.7, 1.15], tilt: 0.3 },
+
+/**
+ * Reeds and damp-bank fronds. Appended to every region's cover pool, because the moisture band is
+ * the same plant everywhere and the shore source is what carries it.
+ */
+const SHORE_COVER: ScatterSpeciesSpec[] = [
   // 1.672 m native -> 1.25-2.09 m. Reeds stand plumb out of still water, so tilt is 0.
   { assetId: "grass_wispy_tall", weight: 5, scale: [0.75, 1.25], tilt: 0, sources: ["shore"] },
   // The same fern at damp-bank size. A second entry rather than a second asset: buckets are keyed
@@ -1475,27 +1474,128 @@ const GROUND_COVER: ScatterSpeciesSpec[] = [
   { assetId: "fern_1", weight: 3, scale: [0.45, 0.85], sources: ["shore"] },
 ];
 
+/** Fallowmarch: river-plain meadow. Grass-dominant, waist-high tussocks, drifts of salmon flower. */
+const MEADOW_COVER: ScatterSpeciesSpec[] = [
+  // 1.334 m native -> 0.45-0.87 m. 155 triangles, and the backbone of the region.
+  { assetId: "grass_common_short", weight: 11, scale: [0.34, 0.68] },
+  // 1.014 m tall, 1.27 m wide native -> 0.44-0.83 m tall, 0.55-1.04 m across. 120 triangles: the
+  // cheapest green leaf in the kit now that the red broad-leaf mats are out.
+  { assetId: "plant_leafy_small", weight: 1.6, scale: [0.4, 0.72] },
+  // 1.873 m native -> 0.60-1.09 m, 326 triangles. The only genuinely new species in any pool, and
+  // the one thing a meadow needs that a scaled-up short tuft cannot fake: a different silhouette
+  // at knee-to-waist height. Weight 1.6 keeps the bucket under `TILE_MIN_INSTANCES`, so it stays
+  // one region-wide mesh and costs exactly one draw call.
+  { assetId: "grass_common_tall", weight: 1.7, scale: [0.32, 0.58], tilt: 0.3 },
+  // Small stones through the sward, and the cheapest trick in this file: 48 triangles, and the
+  // `stones` layer already instances it, so these cost ZERO extra draw calls. 0.34 m native.
+  { assetId: "rock_small_2", weight: 1.2, scale: [0.5, 1.4], tilt: 1, sink: 0.04 },
+  // Same argument, 114 triangles, a rounder silhouette.
+  { assetId: "pebble_round_1", weight: 1.1, scale: [0.5, 1.3], tilt: 1, sink: 0.03 },
+  // 0.840 m tall, 2.83 m wide native -> 0.25-0.50 m tall, 0.85-1.70 m across: a low frond mat, and
+  // the flat silhouette the red broad-leaf plants used to supply. Kept at weight 1: at 288
+  // triangles it is 2.3x the cost of the greens either side of it.
+  { assetId: "fern_1", weight: 0.7, scale: [0.3, 0.62], tilt: 1 },
+  // 1.072 m tall, 1.32 m wide native -> 0.48-0.91 m tall, 0.59-1.12 m across. Gold, and free in
+  // draw calls because `bracken` already instances it in this region. Fallowmarch is a FALLOW
+  // march: a dry grass through the green is the region's name doing its job.
+  { assetId: "grass_wispy_short", weight: 1.4, scale: [0.45, 0.85], tilt: 0.25 },
+  // 2.068 m native -> 0.48-0.83 m. Free in draw calls (the `bloom` layer instances it) and weighted
+  // low enough that the shared bucket stays one mesh. Colour through the whole field rather than
+  // only in `bloom`'s drifts, which is what a river meadow in flower actually looks like.
+  { assetId: "flower_a_single", weight: 0.5, scale: [0.23, 0.4], tilt: 0.3 },
+  // Size hierarchy, and free. A field of cover all at one height reads as a texture; what makes it
+  // read as ground is a few knee-high tussocks standing out of the ankle-high mat. Two more
+  // ENTRIES on assets the pool already carries, so they share the same mesh and cost nothing.
+  { assetId: "grass_common_short", weight: 2.6, scale: [0.62, 1.02], tilt: 0.25 },
+  { assetId: "plant_leafy_small", weight: 0.5, scale: [0.8, 1.2], tilt: 0.3 },
+  ...SHORE_COVER,
+];
+
+/** Vellenwood: shaded woodland floor. Fern and leaf, a third of the grass, mould-brown litter. */
+const WOODLAND_COVER: ScatterSpeciesSpec[] = [
+  // Fern leads here rather than trailing. 288 triangles, and the only asset in the kit whose
+  // silhouette reads as a woodland floor rather than as a lawn.
+  { assetId: "fern_1", weight: 3.4, scale: [0.32, 0.68], tilt: 0.9 },
+  { assetId: "plant_leafy_small", weight: 2.6, scale: [0.36, 0.68] },
+  // A third of Fallowmarch's grass weight. Grass under a closed canopy is patchy and thin, and
+  // making it so is most of what separates this floor from that meadow.
+  { assetId: "grass_common_short", weight: 4, scale: [0.3, 0.58] },
+  // Stone litter carries what leaf mould would if the kit had a leaf-mould asset. 48 and 114
+  // triangles, both already instanced by `stones`, so both are free.
+  { assetId: "rock_small_2", weight: 2.8, scale: [0.5, 1.5], tilt: 1, sink: 0.05 },
+  { assetId: "pebble_round_1", weight: 1.6, scale: [0.5, 1.4], tilt: 1, sink: 0.04 },
+  // 880 triangles, so weighted to about 1.5% of the pool. Free in draw calls (`fungus` instances
+  // it) and worth its triangles: a buff mushroom against dark green is the one warm note on this
+  // floor, and finding them scattered rather than only in `fungus`'s rings is what makes the wood
+  // feel walked in.
+  { assetId: "mushroom_common", weight: 0.14, scale: [0.5, 1.0], tilt: 0.7 },
+  // 360 triangles, free (the `undergrowth` layer instances it), and the mid-height green.
+  { assetId: "plant_leafy_large", weight: 0.45, scale: [0.28, 0.5] },
+  // The tussock entries, at woodland heights.
+  { assetId: "plant_leafy_small", weight: 0.6, scale: [0.8, 1.2], tilt: 0.3 },
+  { assetId: "fern_1", weight: 1.2, scale: [0.7, 1.15], tilt: 0.6 },
+  ...SHORE_COVER,
+];
+
+/** Karrowmoor: thin upland turf on scree. Gold moor grass, short green, twice the loose stone. */
+const UPLAND_COVER: ScatterSpeciesSpec[] = [
+  // 1.072 m native -> 0.43-0.78 m of dry gold moor grass, rgb(182,159,0) at its own UVs. 494
+  // triangles is expensive for cover, which is why it is weighted below the common grass despite
+  // being the region's signature colour; free in draw calls because `scrub` already instances it.
+  { assetId: "grass_wispy_short", weight: 1.8, scale: [0.4, 0.73], tilt: 0.25 },
+  // Short, because upland turf is short. 155 triangles.
+  { assetId: "grass_common_short", weight: 8, scale: [0.3, 0.58] },
+  { assetId: "plant_leafy_small", weight: 1.3, scale: [0.36, 0.66] },
+  // Roughly twice the stone weight of the other two regions, which is the whole read: this is turf
+  // growing THROUGH scree rather than turf with a few stones on it. Both free in draw calls.
+  { assetId: "rock_small_2", weight: 3.8, scale: [0.5, 1.6], tilt: 1, sink: 0.05 },
+  { assetId: "pebble_round_1", weight: 2.2, scale: [0.5, 1.45], tilt: 1, sink: 0.04 },
+  // The tussock entry. Gold, because a wind-blown moor tussock is the thing that catches the eye
+  // on a grey slope.
+  { assetId: "grass_wispy_short", weight: 0.8, scale: [0.62, 1.0], tilt: 0.2 },
+  ...SHORE_COVER,
+];
+
 /**
  * The continuous floor under everything, and the answer to "open ground is bare".
  *
- * `groundcover` clusters into tufts, which is right for what a tuft is and wrong for the 60% of the
- * region between tufts: measured on the shot poses, only 22% of the 3 m cells within 30 m of
- * Palewood Copse held anything at all, and 2% within Coldbrace. A clustered layer cannot fix that,
- * because clustering is what makes the gaps.
+ * `groundcover` clusters into tufts, which is right for what a tuft is and wrong for the ground
+ * between tufts: measured on the shot poses, only 22% of the 3 m cells within 30 m of Palewood
+ * Copse held anything at all before this layer existed. A clustered layer cannot fix that, because
+ * clustering is what makes the gaps.
  *
  * So this layer is deliberately NOT clustered and carries NO mask: plain Poisson at `spacing` over
  * the whole region, thinned only by the exclusion density field and the slope rule. That is what
  * "thins near roads and settlements but never drops to nothing" has to mean mechanically.
  *
- * Every id here is already instanced by `groundcover` or by `stones`, so the whole layer is free in
- * draw calls — the entire cost is triangles, and the pool is weighted to the cheap end for it:
- * mean 113 triangles per instance against `GROUND_COVER`'s 132.
+ * Every id here is already instanced by that region's `groundcover` or by `stones`, so the whole
+ * layer is free in draw calls — the entire cost is triangles, and each pool is the region's own
+ * cover mix cut to its cheapest three or four members and scaled a size down, so the carpet reads
+ * as the same ground as the tufts standing in it rather than as a second species list.
  */
-const CARPET_COVER: ScatterSpeciesSpec[] = [
-  { assetId: "plant_leafy_small", weight: 4, scale: [0.26, 0.5] },
-  { assetId: "grass_common_short", weight: 4, scale: [0.22, 0.44] },
-  { assetId: "rock_small_2", weight: 3, scale: [0.45, 1.2], tilt: 1, sink: 0.04 },
-  { assetId: "pebble_round_1", weight: 1, scale: [0.45, 1.1], tilt: 1, sink: 0.03 },
+const MEADOW_CARPET: ScatterSpeciesSpec[] = [
+  { assetId: "grass_common_short", weight: 9, scale: [0.3, 0.6] },
+  { assetId: "plant_leafy_small", weight: 1.6, scale: [0.34, 0.62] },
+  { assetId: "rock_small_2", weight: 1.6, scale: [0.45, 1.2], tilt: 1, sink: 0.04 },
+  { assetId: "pebble_round_1", weight: 0.8, scale: [0.45, 1.1], tilt: 1, sink: 0.03 },
+  // 494 triangles is expensive for a carpet, so weight 1 — about 6% of the layer. Enough that the
+  // gold reads as part of the sward rather than as a separate stratum sitting on top of it.
+  { assetId: "grass_wispy_short", weight: 0.7, scale: [0.4, 0.75], tilt: 0.2 },
+];
+
+const WOODLAND_CARPET: ScatterSpeciesSpec[] = [
+  { assetId: "plant_leafy_small", weight: 2.4, scale: [0.32, 0.6] },
+  { assetId: "fern_1", weight: 1.6, scale: [0.26, 0.5], tilt: 0.9 },
+  { assetId: "grass_common_short", weight: 4.5, scale: [0.28, 0.54] },
+  { assetId: "rock_small_2", weight: 3.4, scale: [0.45, 1.3], tilt: 1, sink: 0.04 },
+  { assetId: "pebble_round_1", weight: 1.4, scale: [0.45, 1.2], tilt: 1, sink: 0.03 },
+];
+
+const UPLAND_CARPET: ScatterSpeciesSpec[] = [
+  { assetId: "grass_common_short", weight: 8, scale: [0.26, 0.52] },
+  { assetId: "plant_leafy_small", weight: 1.4, scale: [0.34, 0.62] },
+  { assetId: "rock_small_2", weight: 4, scale: [0.45, 1.4], tilt: 1, sink: 0.04 },
+  { assetId: "pebble_round_1", weight: 2.4, scale: [0.45, 1.25], tilt: 1, sink: 0.03 },
 ];
 
 /**
@@ -1543,8 +1643,23 @@ const STONE_SPECIES: ScatterSpeciesSpec[] = [
  *     submitted every frame. The only levers are count and species.
  *
  * Round 1 shipped 2,019 instances over 28 ha — one prop per 139 m2, every one of them standing
- * alone — for 62 draw calls and 2.50M triangles. This pass keeps the species lists tight and spends
- * the whole gain on count and on clustering.
+ * alone — for 62 draw calls and 2.50M triangles. Round 2 took that to 59,534 instances and 12.0M
+ * triangles by clustering. This round takes it to 128,766 and 25.0M, and the reason is that
+ * instance COUNT was never the number the eye reads: measured with runs/corealm/audit/gd-cover.ts,
+ * which sums each instance's drawn footprint rather than counting props, round 2's ground cover
+ * covered 6% of the ground within 25 m of the Palewood pose. That is `w3-palewood_copse.png` — a
+ * green shader with a few tufts on it — and it is what "the look and feel is terribly basic" and
+ * "still look sparse" both point at. Coverage is linear in count and QUADRATIC in scale, so this
+ * round spends on both: counts roughly double, scale bands widen about 1.35x, `sizeBias` drops
+ * from 1.6 to 1.25 so more of the draw lands at the top of the band, and the pools lean on
+ * `plant_leafy_small` (1.27 x 1.39 m native for 120 triangles, i.e. 87 triangles per square metre
+ * covered, against `grass_common_short`'s 419). Palewood is now 26%, march_road 28%, the
+ * Vellenwood floor 45%.
+ *
+ * The offline sweep (runs/corealm/audit/dcb-sweep.ts) puts the price at the worst of the 18 poses
+ * at 201 draw calls against 166, and 17.5M triangles against 7.9M. Draw calls were the tight axis
+ * and are still not tight; the 35 extra are almost all extra TILES, not extra species, because a
+ * bucket that crosses `TILE_MIN_INSTANCES` starts being cut up.
  *
  *  Fallowmarch  sparse, long sightlines (PRD, "Look"). Real copses with real gaps between them;
  *               choppable trees are entities, not scatter.
@@ -1591,9 +1706,9 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
           // 1.672 m native -> 0.84-1.51 m of dry gold moor grass, rgb(182,159,0) at its own UVs.
           { assetId: "grass_wispy_short", weight: 2, scale: [0.8, 1.4], tilt: 0.2 },
         ],
-        maxCount: 1100, scale: [0.7, 1.25], tilt: 0.35, mirror: true,
+        maxCount: 1750, scale: [0.7, 1.25], tilt: 0.35, mirror: true,
         exclusion: SHRUB_EXCLUSION,
-        cluster: { spacing: 20, radius: [5, 12], memberSpacing: 2.2, accept: 0.62, falloff: 0.75, dominance: 0.8 },
+        cluster: { spacing: 17, radius: [5, 13], memberSpacing: 1.8, accept: 0.68, falloff: 0.75, dominance: 0.8 },
         mask: { strength: 0.45, featureSize: 62 },
       },
       {
@@ -1609,42 +1724,43 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         shore: { band: [1.5, 12], perMetre: 0.5 },
       },
       {
-        // The layer that carries the ground read, replacing round 1's `tussock` and its
-        // player-height "short grass" on 11 m centres. Patches of ~25 tufts at 1.05 m spacing
-        // inside a 2.4-5.6 m disc, patches on 10.5 m centres: dense where it is, honestly bare
-        // between, which is what tussocky moorland looks like from eye height.
-        id: "groundcover", species: GROUND_COVER,
-        maxCount: 11500, scale: [0.2, 0.4], sizeBias: 1.6, tilt: 0.55, mirror: true,
+        // The layer that carries the ground read. Tufts at 0.62 m member spacing inside a
+        // 2.4-5.6 m disc on 6.4 m centres: dense where it is, honestly thinner between, which is
+        // what a grazed river meadow looks like from eye height. Member spacing came down from
+        // 0.9 m and the cap up from 11,500, which is 2.1x the instances for 2.1x the triangles and
+        // zero extra draw calls — the buckets already exist and are already tiled.
+        id: "groundcover", species: MEADOW_COVER,
+        maxCount: 29000, scale: [0.2, 0.4], sizeBias: 1.25, tilt: 0.55, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: {
           slopeBias: { low: 0.2, high: 0.7, flat: 1.35, steep: 0.35 },
           moisture: { reach: 18, boost: 2.5 },
         },
-        cluster: { spacing: 7.6, radius: [2.2, 5.0], memberSpacing: 0.9, accept: 0.62, falloff: 0.65, dominance: 0.62 },
-        mask: { strength: 0.3, featureSize: 46 },
-        road: { band: [2.6, 6.5], perMetre: 1.4 },
-        shore: { band: [-0.6, 9], perMetre: 2.2 },
+        cluster: { spacing: 6.4, radius: [2.4, 5.6], memberSpacing: 0.58, accept: 0.74, falloff: 0.55, dominance: 0.55 },
+        mask: { strength: 0.22, featureSize: 46 },
+        road: { band: [2.6, 6.5], perMetre: 2.2 },
+        shore: { band: [-0.6, 9], perMetre: 3.0 },
       },
       {
-        // The continuous floor. Bridson at 2.7 m yields ~10,300 points over the 96,000 m2 region and
-        // the cap takes all of them, which with `groundcover`'s tufts puts something in 68% of the
-        // 3 m cells within 14 m of the Palewood pose against 0% before. No mask and no cluster: this layer's whole job is
-        // that it never goes to zero. The `road` source is what puts pebbles and stones along the
-        // drawn verge, since two of the four species are the path-rock meshes.
-        id: "carpet", species: CARPET_COVER,
-        spacing: 2.7, maxCount: 10500, scale: [0.18, 0.4], sizeBias: 1.5, tilt: 0.8, mirror: true,
+        // The continuous floor. No mask and no cluster: this layer's whole job is that it never
+        // goes to zero, so it is plain Bridson over the whole region thinned only by the exclusion
+        // field and the slope rule. 1.75 m spacing rather than 2.7 m is 2.4x the points, and it is
+        // the single change that most moves the "dense grass" read: `groundcover`'s tufts are what
+        // the eye lands on, this is what stops the ground between them being bare shader.
+        id: "carpet", species: MEADOW_CARPET,
+        spacing: 1.6, maxCount: 30000, scale: [0.18, 0.4], sizeBias: 1.25, tilt: 0.8, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: { slopeBias: { low: 0.3, high: 0.85, flat: 1.15, steep: 0.45 } },
-        road: { band: [2.4, 7.5], perMetre: 0.7 },
+        road: { band: [2.4, 7.5], perMetre: 1.1 },
       },
       {
         // Colour accents only, as drifts rather than as a lawn. `flower_a_group` is 2.055 m native
         // and was scaled to 1.44-2.47 m in round 1; at [0.28, 0.5] it lands at 0.58-1.03 m.
         id: "bloom",
         assetIds: ["flower_a_single"],
-        maxCount: 320, scale: [0.28, 0.5], tilt: 0.4, mirror: true,
+        maxCount: 640, scale: [0.28, 0.5], tilt: 0.4, mirror: true,
         exclusion: COVER_EXCLUSION,
-        cluster: { spacing: 30, radius: [2.5, 7], memberSpacing: 1.4, accept: 0.32, falloff: 0.8, dominance: 0.85 },
+        cluster: { spacing: 24, radius: [2.5, 8], memberSpacing: 1.1, accept: 0.4, falloff: 0.8, dominance: 0.85 },
         mask: { strength: 0.6, featureSize: 40 },
       },
     ],
@@ -1715,9 +1831,9 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
           { assetId: "plant_leafy_large", weight: 2 },
           { assetId: "plant_leafy_small", weight: 3, scale: [0.5, 1.1] },
         ],
-        maxCount: 1850, scale: [0.8, 1.5], tilt: 0.5, mirror: true,
+        maxCount: 2600, scale: [0.8, 1.5], tilt: 0.5, mirror: true,
         exclusion: SHRUB_EXCLUSION,
-        cluster: { spacing: 10.5, radius: [3, 8], memberSpacing: 1.7, accept: 0.7, falloff: 0.7, dominance: 0.7 },
+        cluster: { spacing: 9.5, radius: [3, 8.5], memberSpacing: 1.45, accept: 0.74, falloff: 0.7, dominance: 0.7 },
         mask: { strength: 0.35, featureSize: 55 },
       },
       {
@@ -1741,27 +1857,30 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         shore: { band: [1.5, 10], perMetre: 0.4 },
       },
       {
-        id: "groundcover", species: GROUND_COVER,
-        maxCount: 8200, scale: [0.2, 0.4], sizeBias: 1.6, tilt: 0.55, mirror: true,
+        // Fern and leaf rather than turf, and clumpier than the meadow: a woodland floor is a
+        // mosaic of dense patches under the gaps and near-bare ground under a closed crown, which
+        // is what the lower `accept` and the stronger mask buy.
+        id: "groundcover", species: WOODLAND_COVER,
+        maxCount: 19000, scale: [0.2, 0.4], sizeBias: 1.25, tilt: 0.55, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: {
           slopeBias: { low: 0.2, high: 0.75, flat: 1.3, steep: 0.4 },
           moisture: { reach: 18, boost: 2.5 },
         },
-        cluster: { spacing: 7.4, radius: [2.2, 4.8], memberSpacing: 0.9, accept: 0.7, falloff: 0.65, dominance: 0.6 },
-        mask: { strength: 0.3, featureSize: 42 },
-        road: { band: [2.6, 6.5], perMetre: 1.4 },
-        shore: { band: [-0.6, 9], perMetre: 2 },
+        cluster: { spacing: 6.2, radius: [2.2, 5.2], memberSpacing: 0.66, accept: 0.72, falloff: 0.6, dominance: 0.58 },
+        mask: { strength: 0.34, featureSize: 42 },
+        road: { band: [2.6, 6.5], perMetre: 2.2 },
+        shore: { band: [-0.6, 9], perMetre: 2.8 },
       },
       {
         // Woodland floor. See the Fallowmarch `carpet` for why this layer exists and why it costs
-        // no draw calls; the only difference here is that a wood's floor is leaf and stone rather
-        // than turf, so the stones carry more of the weight through `CARPET_COVER`.
-        id: "carpet", species: CARPET_COVER,
-        spacing: 2.8, maxCount: 9000, scale: [0.18, 0.4], sizeBias: 1.5, tilt: 0.8, mirror: true,
+        // no draw calls; the difference here is that a wood's floor is leaf and stone rather than
+        // turf, so `WOODLAND_CARPET` gives the stones and the fern more of the weight.
+        id: "carpet", species: WOODLAND_CARPET,
+        spacing: 1.85, maxCount: 17000, scale: [0.18, 0.4], sizeBias: 1.25, tilt: 0.8, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: { slopeBias: { low: 0.3, high: 0.9, flat: 1.15, steep: 0.5 } },
-        road: { band: [2.4, 7.5], perMetre: 0.7 },
+        road: { band: [2.4, 7.5], perMetre: 1.1 },
       },
     ],
   },
@@ -1770,14 +1889,17 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
     regionId: "karrowmoor",
     layers: [
       {
-        // cliff_step_2 (1664 triangles) costs five times boulder_medium for the same read at this
-        // scale, and the terrain itself already does the terracing. cliff_tall is 288 and is the
-        // vertical silhouette the terraces shot needs. Clustered and slope-biased x2.4, so crags
-        // gather on the risers where a crag belongs.
+        // The terrain already supplies the terraces. The old platformer boulder/cliff pair was
+        // cheap, but its broad untextured faces filled the foreground and hid those terraces in
+        // the authored shot. These textured rocks are already loaded by the stone layer, so the
+        // crags retain their clustered silhouette without adding a material family or a draw call.
         id: "crags",
         species: [
-          { assetId: "boulder_medium", weight: 3, scale: [0.8, 2.4] },
-          { assetId: "cliff_tall", weight: 2 },
+          // Species scale composes with the layer's 0.8..1.8 band. Keep the product below 2.25:
+          // larger values turn a crag on the first riser into the entire foreground.
+          { assetId: "rock_medium_1", weight: 3, scale: [0.75, 1.25] },
+          { assetId: "rock_medium_2", weight: 2, scale: [0.7, 1.2] },
+          { assetId: "rock_medium_3", weight: 2, scale: [0.65, 1.15] },
         ],
         maxCount: 150, scale: [0.8, 1.8], sizeBias: 1.8, mirror: true,
         tilt: 0.3, sink: 0.6, castShadow: true,
@@ -1826,34 +1948,38 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
           // rgb(184,63,27) - the same red the `bush_common` swap was made to get rid of.
           { assetId: "grass_wispy_short", weight: 3, scale: [0.7, 1.3], tilt: 0.2 },
         ],
-        maxCount: 1000, scale: [0.6, 1.1], tilt: 0.5, mirror: true,
+        maxCount: 1500, scale: [0.6, 1.1], tilt: 0.5, mirror: true,
         exclusion: SHRUB_EXCLUSION,
         terrain: { slopeBias: { low: 0.3, high: 0.7, flat: 1.2, steep: 0.5 } },
-        cluster: { spacing: 16, radius: [4, 10], memberSpacing: 1.8, accept: 0.62, falloff: 0.75, dominance: 0.72 },
+        cluster: { spacing: 14, radius: [4, 11], memberSpacing: 1.55, accept: 0.66, falloff: 0.75, dominance: 0.72 },
         mask: { strength: 0.45, featureSize: 58 },
       },
       {
-        id: "groundcover", species: GROUND_COVER,
-        maxCount: 8200, scale: [0.2, 0.38], sizeBias: 1.6, tilt: 0.6, mirror: true,
+        // Thin upland turf, so this is the least dense of the three cover layers by design: a
+        // 0.72 m member spacing against the meadow's 0.62, a stronger mask, and `UPLAND_COVER`
+        // spending roughly a third of its weight on loose stone. Karrowmoor should read as turf
+        // growing through scree, not as a lawn on a hill.
+        id: "groundcover", species: UPLAND_COVER,
+        maxCount: 16000, scale: [0.2, 0.38], sizeBias: 1.25, tilt: 0.6, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: {
           slopeBias: { low: 0.25, high: 0.8, flat: 1.3, steep: 0.45 },
           moisture: { reach: 16, boost: 2.5 },
         },
-        cluster: { spacing: 7.6, radius: [2.0, 4.6], memberSpacing: 0.95, accept: 0.7, falloff: 0.65, dominance: 0.6 },
-        mask: { strength: 0.35, featureSize: 44 },
-        road: { band: [2.6, 6.5], perMetre: 1.4 },
-        shore: { band: [-0.6, 8], perMetre: 1.2 },
+        cluster: { spacing: 6.6, radius: [2.0, 5.0], memberSpacing: 0.72, accept: 0.7, falloff: 0.62, dominance: 0.58 },
+        mask: { strength: 0.4, featureSize: 44 },
+        road: { band: [2.6, 6.5], perMetre: 2.0 },
+        shore: { band: [-0.6, 8], perMetre: 1.8 },
       },
       {
         // Moorland floor. The slope bias is harder here than in the other two regions because
         // Karrowmoor's risers reach 60 degrees and a turf carpet on a 60-degree face reads as a
         // texture bug; the `scree` layer is what dresses those, biased x4 the other way.
-        id: "carpet", species: CARPET_COVER,
-        spacing: 2.8, maxCount: 9000, scale: [0.18, 0.38], sizeBias: 1.5, tilt: 0.85, mirror: true,
+        id: "carpet", species: UPLAND_CARPET,
+        spacing: 2.0, maxCount: 15000, scale: [0.18, 0.38], sizeBias: 1.25, tilt: 0.85, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: { slopeBias: { low: 0.3, high: 0.8, flat: 1.2, steep: 0.3 } },
-        road: { band: [2.4, 7.5], perMetre: 0.7 },
+        road: { band: [2.4, 7.5], perMetre: 1.1 },
       },
     ],
   },

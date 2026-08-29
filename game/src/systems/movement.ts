@@ -3,7 +3,8 @@
  *
  *  - "path"   click-to-move. A navmesh path, rounded at the corners, walked by arc length.
  *  - "direct" WASD. A desired direction, projected back onto the navmesh each step.
- *  - route    a planned multi-leg journey: walk, traverse an Agility shortcut, walk again.
+ *  - route    a planned multi-leg journey: walk, traverse an Agility shortcut or step through
+ *             a dungeon portal, walk again.
  *
  * Movement is authoritative in the store. The renderer follows it, never the other way round.
  *
@@ -203,6 +204,14 @@ export interface MovementPorts {
    * authoritative for XZ and Y comes from the ground everything else is placed on.
    */
   heightAt?: (regionId: RegionId, x: number, z: number) => number;
+  /**
+   * Resolves the semantic region at a snapped world position.
+   *
+   * This takes the full point rather than only XZ because Gravelmaw sits directly below
+   * Karrowmoor. The app owns that distinction; movement only makes sure a long walk updates the
+   * player's region as it crosses authored borders.
+   */
+  regionAt?: (position: Vec3, currentRegionId: RegionId) => RegionId;
   /** NPCs and enemies, pushed out as circles. Without it, the player walks through them. */
   entities?: MovementEntityPort;
 }
@@ -230,6 +239,17 @@ export interface PathOptions {
   /** Suppress navigation.started. Used for the middle legs of a planned route. */
   quiet?: boolean;
   /**
+   * Suppress navigation.failed when no path is found, because the caller has a second answer.
+   *
+   * `GameApi.moveTo` probes the navmesh first and falls back to a route plan. Without this the
+   * probe's failure lands in the event stream a beat before the route starts walking, and every
+   * caller that waits on `["navigation.completed", "navigation.failed"]` reads the journey as
+   * failed while the player is walking it — which is exactly how the three red gate lines read
+   * once portals existed. A route leg passes it for the same reason: `advanceRoute` emits its own
+   * `leg-unreachable`, which says which leg, so the generic one is a duplicate.
+   */
+  quietFailure?: boolean;
+  /**
    * How far short of `to` the computed path may stop and still count as reaching it, in metres.
    * Defaults to `ENTITY_ARRIVAL_ALLOWANCE` when an `entityId` is given and to 0 otherwise — a
    * raw click on the ground means that spot, an entity means "close enough to use it".
@@ -250,6 +270,13 @@ interface Traversal {
   endsAtMs: number;
   exit: Vec3;
   obstacleId: EntityId | null;
+  /**
+   * Set only for a portal crossing: which region the player is standing in when it ends.
+   *
+   * Without it the player walks out of the Gravelmaw still tagged `gravelmaw`, and boot's interior
+   * filter (`playerInDungeon`) keeps the whole cavern drawn around them on the open moor.
+   */
+  regionId: RegionId | null;
 }
 
 export class Movement {
@@ -331,7 +358,9 @@ export class Movement {
       options.arrivalAllowance ?? (entityId !== null ? ENTITY_ARRIVAL_ALLOWANCE : 0),
     );
     if (!found || found.path.length === 0 || (found.partial && found.arrivalGap > allowance)) {
-      this.events.emit("navigation.failed", { reason: "unreachable", to }, entityId ?? undefined, atMs);
+      if (!options.quietFailure) {
+        this.events.emit("navigation.failed", { reason: "unreachable", to }, entityId ?? undefined, atMs);
+      }
       return null;
     }
 
@@ -361,11 +390,13 @@ export class Movement {
   }
 
   /**
-   * Walks a planned route leg by leg, including Agility shortcut traversals.
+   * Walks a planned route leg by leg, including Agility shortcut and portal traversals.
    *
    * This is the second half of architecture correction R2. `Navigation.planRoute` decides WHICH
-   * shortcuts are worth using; this walks the answer. A shortcut leg is a timed traversal followed
-   * by a placement at the obstacle's exit — a gameplay step, interruptible, not a Detour link.
+   * shortcuts and portals are worth using; this walks the answer. Both are a timed traversal
+   * followed by a placement at the far side — a gameplay step, interruptible, not a Detour link.
+   * A portal additionally re-tags the player's region, which is what makes leaving the Gravelmaw
+   * on foot a walk rather than a teleport.
    */
   startRoute(state: GameState, legs: readonly RouteLeg[], atMs: number, entityId: EntityId | null = null): boolean {
     if (legs.length === 0) return false;
@@ -655,6 +686,13 @@ export class Movement {
    * talking about the same surface. Keeps the navmesh authoritative for XZ.
    */
   private ground(state: GameState, point: Vec3): Vec3 {
+    // Resolve the region from the navmesh point before sampling height. Portal traversals already
+    // set their explicit destination region, but the walk after a portal can cross two more
+    // overworld borders. Without this, a route from Gravelmaw to the Bracken Pit completed in
+    // Fallowmarch while the semantic player still reported Karrowmoor.
+    const regionAt = this.ports.regionAt;
+    if (regionAt) state.player.regionId = regionAt(point, state.player.regionId);
+
     const heightAt = this.ports.heightAt;
     if (!heightAt) return point;
     const groundY = heightAt(state.player.regionId, point[0], point[2]);
@@ -791,22 +829,28 @@ export class Movement {
       return true;
     }
 
-    if (leg.kind === "shortcut") {
+    // A portal leg is executed as a traversal, not as a second mechanism: the player is already
+    // standing at the crossing (the leg before it walked them there), the crossing takes time, and
+    // then they are somewhere the navmesh could not have carried them. The one thing a shortcut
+    // does not do is change which region the player is in, so that rides on the leg.
+    if (leg.kind === "shortcut" || leg.kind === "portal") {
       const movement = state.player.movement;
+      const subjectId = leg.obstacleId ?? leg.portalId ?? null;
       movement.mode = "path";
       movement.path = null;
       movement.pathIndex = 0;
       movement.destination = leg.to;
-      movement.destinationEntityId = leg.obstacleId ?? null;
+      movement.destinationEntityId = subjectId;
       this.traversal = {
         endsAtMs: atMs + (leg.durationMs ?? 0),
         exit: leg.to,
-        obstacleId: leg.obstacleId ?? null,
+        obstacleId: subjectId,
+        regionId: leg.toRegionId ?? null,
       };
       this.events.emit(
         "activity.started",
-        { kind: "traversing", obstacleId: leg.obstacleId ?? null, durationMs: leg.durationMs ?? 0 },
-        leg.obstacleId,
+        { kind: "traversing", via: leg.kind, obstacleId: subjectId, durationMs: leg.durationMs ?? 0 },
+        subjectId ?? undefined,
         atMs,
       );
       return true;
@@ -816,6 +860,7 @@ export class Movement {
     // has arrived. Only a leg that cannot get near at all kills the route.
     const started = this.startPath(state, leg.to, null, atMs, {
       quiet: true,
+      quietFailure: true,
       arrivalAllowance: ENTITY_ARRIVAL_ALLOWANCE,
     });
     if (started) return true;
@@ -831,6 +876,10 @@ export class Movement {
     if (!traversal) return;
     if (atMs < traversal.endsAtMs) return;
 
+    // Region before position: `ground` passes `state.player.regionId` to the height port. The live
+    // sampler ignores that argument because the world is one continuous field, but the port's
+    // signature takes it, so this is the ordering that stays right if that ever stops being true.
+    if (traversal.regionId !== null) state.player.regionId = traversal.regionId;
     const landing = this.nav.closestPoint(traversal.exit) ?? traversal.exit;
     state.player.position = this.ground(state, landing);
     this.traversal = null;
@@ -888,7 +937,12 @@ export class Movement {
     if (this.recoveries < MAX_RECOVERIES) {
       this.recoveries += 1;
       const entityId = state.player.movement.destinationEntityId;
-      const replanned = this.startPath(state, destination, entityId, atMs, { quiet: true });
+      const replanned = this.startPath(state, destination, entityId, atMs, {
+        quiet: true,
+        // A route leg was started with this allowance, so a replan that demanded exact arrival
+        // could refuse a leg the route had already accepted and kill a journey that was working.
+        ...(this.route ? { arrivalAllowance: ENTITY_ARRIVAL_ALLOWANCE } : {}),
+      });
       if (replanned) return;
     }
 

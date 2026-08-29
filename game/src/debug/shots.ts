@@ -49,7 +49,12 @@ export const SHOTS: readonly CameraShot[] = [
   },
   {
     id: "bank", locationId: "bank_interior", regionId: "fallowmarch",
-    yaw: WEST, pitch: 0.55, distance: 14,
+    // South-west, not due west, and closer. The chest moved: it used to stand alone on grass at
+    // (-160, -88), which is the route node itself, so any yaw framed it. It now sits at
+    // (-163.75, -90.4) under the Vault Counter porch, four metres SW of where the player stands,
+    // and due west looked straight past it down the street. A pose that no longer contains its own
+    // subject is a broken pose, not a broken settlement.
+    yaw: SOUTH + Math.PI * 0.22, pitch: 0.62, distance: 19,
     intent: "The bank as a recognisable destination a player can navigate back to.",
   },
   {
@@ -89,7 +94,9 @@ export const SHOTS: readonly CameraShot[] = [
   },
   {
     id: "karrowmoor_terraces", locationId: "karrowmoor_terraces", regionId: "karrowmoor",
-    yaw: SOUTH, pitch: 0.38, distance: 34,
+    // The ramps climb southeast from the lower quarry. Camera yaw is the orbit position, so the
+    // camera belongs northwest of the player and looks back along that southeast ramp chain.
+    yaw: NORTH - 0.45, pitch: 0.36, distance: 34,
     intent: "The verticality read. Four terraces stacked, with the ramps between them visible.",
   },
   {
@@ -109,7 +116,9 @@ export const SHOTS: readonly CameraShot[] = [
   },
   {
     id: "gravelmaw_entrance", locationId: "gravelmaw_entrance", regionId: "karrowmoor",
-    yaw: SOUTH, pitch: 0.34, distance: 24,
+    // Match the mouth's authored 1.05-radian approach bearing. From any other side the camera
+    // looks through the arch toward daylight instead of into the rock mass behind it.
+    yaw: 1.05, pitch: 0.34, distance: 24,
     intent: "A dark opening in a rock face, readable as a dungeon mouth from across the terrace.",
   },
   {

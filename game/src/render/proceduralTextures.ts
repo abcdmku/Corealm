@@ -27,15 +27,22 @@
  *    6-34 m camera distances in shots.ts. Memory with mips: 1.4 MB, against the 5.6 MB a 1024
  *    atlas would cost.
  *
- * TWO textures, not one sampled twice. The first pass read this atlas again at 37 m tiling to break
- * the repeat, and that printed the atlas's OWN cell structure across the world at nine to fifteen
- * times its authored size: the gravel channel's Worley cells landed at 1.54 m and the rock
+ * TWO value textures, not one sampled twice. The first pass read this atlas again at 37 m tiling to
+ * break the repeat, and that printed the atlas's OWN cell structure across the world at nine to
+ * fifteen times its authored size: the gravel channel's Worley cells landed at 1.54 m and the rock
  * channel's ridges at 2.85 m, which is exactly the honeycomb / lizard-skin reported in
  * `wire-*.png` on stone and gravel. A texture authored for 2.5 m cannot also be a macro texture.
- * `createMacroVariation` is the far read now, and it contains nothing but low-frequency fbm — no
- * Worley, no ridges, nothing with an edge for the eye to lock onto. It is 256 px because at its
- * closest tiling, 9.5 m, that is 27 texels/m and its finest authored feature is 1.2 m, so more
- * resolution would store nothing.
+ * `createMacroVariation` is the far read now — three of them, at 6.3, 16 and 40 m — and it contains
+ * nothing but low-frequency fbm: no Worley, no ridges, nothing with an edge for the eye to lock
+ * onto. It is 256 px because at its closest tiling, 6.3 m, that is 41 texels/m and its finest
+ * authored feature is 26 cm, so more resolution would store nothing.
+ *
+ * PLUS two normal maps, added this round, which is the answer to "still look sparse... i think we
+ * need bump maps as well". They are not separately authored: `buildDetailFields` generates the four
+ * surface fields once and they are consumed twice, as albedo variation by `createDetailAtlas` and
+ * as relief by `createDetailNormals`. Central-differencing the SAME array is what makes a bright
+ * grain also a raised grain, rather than a surface that lights as though it were sandblasted in one
+ * direction and painted in another.
  */
 import * as THREE from "three";
 import { Rng } from "../core/rng.js";
@@ -292,17 +299,47 @@ function contrastStretch(field: Float32Array): void {
 // ---------------------------------------------------------- detail atlas
 
 let detailAtlas: THREE.DataTexture | null = null;
+let detailFields: DetailFields | null = null;
+let detailNormals: DetailNormals | null = null;
 
 /**
- * The one detail atlas: four value-only channels packed into one RGBA8 texture, authored for ONE
- * tiling rate — 2.5 m, which is roughly a footstep at the 6-34 m camera distances in shots.ts.
+ * Metres the detail atlas is authored to tile at.
  *
- *   R  grass    fine blade fbm from 12 cells (21 cm), with a soft tussock clump on top
+ * `materials.ts` reads this rather than repeating the number, because the normal maps below are
+ * derived in METRES: a central difference over two texels is only a slope if the generator and the
+ * shader agree on how wide a texel is.
+ */
+export const DETAIL_TILING_METRES = 2.5;
+
+/** The four raw 0..1 height fields the atlas and its normal maps are both built from. */
+interface DetailFields {
+  grass: Float32Array;
+  soil: Float32Array;
+  rock: Float32Array;
+  gravel: Float32Array;
+}
+
+/** Grass/soil normals in one texture, rock/gravel in the other. See `createDetailNormals`. */
+interface DetailNormals {
+  grassSoil: THREE.DataTexture;
+  rockGravel: THREE.DataTexture;
+}
+
+/**
+ * The four surface fields, generated once and used twice — as albedo variation and as relief.
+ *
+ * Splitting this out of `createDetailAtlas` is what makes the bump agree with the albedo instead
+ * of fighting it: the normal map is a central difference of the SAME array the value channel was
+ * encoded from, so a bright grain in the albedo is a raised grain in the relief by construction.
+ * Deriving the two from independently seeded noise is the classic way to get a surface that lights
+ * as though it were sandblasted in one direction and painted in another.
+ *
+ *   R  grass    fine blade fbm, a blade-clump swell, and a broad tussock patch
  *   G  soil/dry 1.6:1 drag along x, plus an isotropic grit octave so it is dirt, not corduroy
  *   B  rock     ridged fracture at 18 cells (14 cm) over a broad face term
  *   A  gravel   a field of stones that differ from each other, with dark joints between them
  *
- * Two things here are corrections of measured defects rather than taste.
+ * Three things here are corrections of measured defects rather than taste.
  *
  * The soil channel was stretched 3:1 (4 cells across x against 12 across z). Every splat weight
  * except grass, rock and cobble folds onto this channel, so that stretch was drawn over the whole
@@ -315,6 +352,82 @@ let detailAtlas: THREE.DataTexture | null = null;
  * boundary at one cell size, i.e. a honeycomb by construction. It is now the cell's own tone with
  * a dark joint, which is what a gravel bed and a cobbled square both actually are.
  *
+ * The grass channel carries TWO Worley terms rather than one, and that is this round's change.
+ * The single 26-cell term put a 9.6 cm swell on the sward; nothing in the channel had a feature
+ * between 9.6 cm and the 2.5 m tile edge, so a field seen from six metres averaged to one tone.
+ * The 7-cell term adds 36 cm patches, which is the size a tuft of field grass actually is, and it
+ * is most of what makes the near ground read as texture rather than as paint.
+ */
+function buildDetailFields(): DetailFields {
+  if (detailFields) return detailFields;
+
+  const size = DETAIL_ATLAS_SIZE;
+
+  // One named stream per channel, drawn in a fixed order, so the atlas is byte-identical across
+  // reloads and cannot be shifted by anything else in the frame that consumes randomness.
+  const grassNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x6a55) >>> 0));
+  const grassClump = makeWorley(new Rng((TEXTURE_SEED ^ 0xc10b) >>> 0), 26);
+  const grassPatch = makeWorley(new Rng((TEXTURE_SEED ^ 0xc10c) >>> 0), 7);
+  const soilNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x5011) >>> 0));
+  const gritNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x671f) >>> 0));
+  const rockNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x0c0c) >>> 0));
+  const gravelCells = makeWorley(new Rng((TEXTURE_SEED ^ 0x9a4e) >>> 0), 32);
+
+  // Fields first, encoded second, because `contrastStretch` needs the whole channel before it can
+  // know what its percentiles are. Four 512 x 512 Float32Arrays are 4 MB, and they are KEPT rather
+  // than released because `createDetailNormals` differentiates the same arrays.
+  const texels = size * size;
+  const grass = new Float32Array(texels);
+  const soil = new Float32Array(texels);
+  const rock = new Float32Array(texels);
+  const gravel = new Float32Array(texels);
+
+  for (let y = 0; y < size; y += 1) {
+    const v = y / size;
+    for (let x = 0; x < size; x += 1) {
+      const u = x / size;
+      const index = y * size + x;
+
+      // Grass. Neither Worley term is thresholded: `1 - f1` smoothed to its own midpoint is a soft
+      // dome per cell with no visible boundary between domes, so the clump and the patch read as
+      // swells in the sward rather than as cells.
+      const clump = grassClump(u, v);
+      const patch = grassPatch(u, v);
+      const blade = smoothstep01(0.25 + 0.75 * (1 - clump.f1)) * (0.72 + 0.28 * clump.tone);
+      const tuft = smoothstep01(0.18 + 0.82 * (1 - patch.f1)) * (0.6 + 0.4 * patch.tone);
+      grass[index] = fbm(grassNoise, u, v, 5, 12, 12) * 0.62 + blade * 0.2 + tuft * 0.18;
+
+      // Soil. 1.6:1 drag (10 cells across x against 16 across z), and a third of the signal is an
+      // isotropic grit octave so a road reads as worn dirt rather than as brushed metal.
+      const drag = fbm(soilNoise, u, v, 4, 10, 16);
+      const grit = fbm(gritNoise, u, v, 3, 40, 40);
+      soil[index] = drag * 0.66 + grit * 0.34;
+
+      // Rock. Ridged fracture over a broad face term, so a cliff has both a shape and a grain.
+      const face = fbm(rockNoise, u, v, 2, 5, 5);
+      const ridged = 1 - Math.abs(fbm(rockNoise, u, v, 3, 18, 18) * 2 - 1);
+      rock[index] = ridged * 0.62 + face * 0.38;
+
+      // Gravel and cobble. Per-stone tone, joints darkened where F2-F1 approaches zero, and a
+      // little grit inside each stone so a close-up face is not a flat chip.
+      const cell = gravelCells(u, v);
+      const joint = clamp(cell.edge / 0.09, 0, 1);
+      const stone = (0.3 + 0.7 * smoothstep01(joint)) * (0.62 + 0.5 * cell.tone);
+      gravel[index] = stone * 0.86 + grit * 0.14;
+    }
+  }
+
+  for (const field of [grass, soil, rock, gravel]) contrastStretch(field);
+
+  detailFields = { grass, soil, rock, gravel };
+  return detailFields;
+}
+
+/**
+ * The one detail atlas: four value-only channels packed into one RGBA8 texture, authored for ONE
+ * tiling rate — `DETAIL_TILING_METRES`, roughly a footstep at the 6-34 m camera distances in
+ * shots.ts. Channel order and content are documented on `buildDetailFields`.
+ *
  * One texture rather than four is what keeps the terrain on ONE atlas sampler and therefore one
  * draw call per chunk. Four channels of a single fetch cost what one channel costs.
  */
@@ -323,69 +436,18 @@ export function createDetailAtlas(): THREE.DataTexture {
 
   const size = DETAIL_ATLAS_SIZE;
   const data = new Uint8Array(size * size * 4);
+  const fields = buildDetailFields();
 
-  // One named stream per channel, drawn in a fixed order, so the atlas is byte-identical across
-  // reloads and cannot be shifted by anything else in the frame that consumes randomness.
-  const grassNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x6a55) >>> 0));
-  const grassClump = makeWorley(new Rng((TEXTURE_SEED ^ 0xc10b) >>> 0), 26);
-  const soilNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x5011) >>> 0));
-  const gritNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x671f) >>> 0));
-  const rockNoise = makePeriodicNoise(new Rng((TEXTURE_SEED ^ 0x0c0c) >>> 0));
-  const gravelCells = makeWorley(new Rng((TEXTURE_SEED ^ 0x9a4e) >>> 0), 32);
-
-  // Fields first, encoded second, because `contrastStretch` needs the whole channel before it can
-  // know what its percentiles are. Four 512 x 512 Float32Arrays are 4 MB of transient allocation
-  // against the 1.4 MB the finished atlas occupies with mips, and they are released on return.
-  const texels = size * size;
-  const grassField = new Float32Array(texels);
-  const soilField = new Float32Array(texels);
-  const rockField = new Float32Array(texels);
-  const gravelField = new Float32Array(texels);
-
-  for (let y = 0; y < size; y += 1) {
-    const v = y / size;
-    for (let x = 0; x < size; x += 1) {
-      const u = x / size;
-      const index = y * size + x;
-
-      // Grass. The clump is a broad tussock swell, NOT a thresholded cell: `1 - f1` smoothed to
-      // its own midpoint is a soft dome per cell with no visible boundary between domes.
-      const clump = grassClump(u, v);
-      const tussock = smoothstep01(0.25 + 0.75 * (1 - clump.f1)) * (0.72 + 0.28 * clump.tone);
-      grassField[index] = fbm(grassNoise, u, v, 5, 12, 12) * 0.82 + tussock * 0.18;
-
-      // Soil. 1.6:1 drag (10 cells across x against 16 across z), and a third of the signal is an
-      // isotropic grit octave so a road reads as worn dirt rather than as brushed metal.
-      const drag = fbm(soilNoise, u, v, 4, 10, 16);
-      const grit = fbm(gritNoise, u, v, 3, 40, 40);
-      soilField[index] = drag * 0.66 + grit * 0.34;
-
-      // Rock. Ridged fracture over a broad face term, so a cliff has both a shape and a grain.
-      const face = fbm(rockNoise, u, v, 2, 5, 5);
-      const ridged = 1 - Math.abs(fbm(rockNoise, u, v, 3, 18, 18) * 2 - 1);
-      rockField[index] = ridged * 0.62 + face * 0.38;
-
-      // Gravel and cobble. Per-stone tone, joints darkened where F2-F1 approaches zero, and a
-      // little grit inside each stone so a close-up face is not a flat chip.
-      const cell = gravelCells(u, v);
-      const joint = clamp(cell.edge / 0.09, 0, 1);
-      const stone = (0.30 + 0.70 * smoothstep01(joint)) * (0.62 + 0.50 * cell.tone);
-      gravelField[index] = stone * 0.86 + grit * 0.14;
-    }
-  }
-
-  for (const field of [grassField, soilField, rockField, gravelField]) contrastStretch(field);
-
-  for (let index = 0; index < texels; index += 1) {
+  for (let index = 0; index < size * size; index += 1) {
     const offset = index * 4;
     // Symmetric about 1.0, every one of them, so `contrastStretch`'s mean-centring makes each
     // channel's mean multiplier exactly 1.0 and the region palette keeps sole authority over how
     // light a surface is. The half-widths are the authored contrast per surface: grass and worn
     // soil are gentle, a fracture face and a gravel bed are not.
-    data[offset] = encode(grassField[index]!, 0.73, 1.27);
-    data[offset + 1] = encode(soilField[index]!, 0.75, 1.25);
-    data[offset + 2] = encode(rockField[index]!, 0.65, 1.35);
-    data[offset + 3] = encode(gravelField[index]!, 0.65, 1.35);
+    data[offset] = encode(fields.grass[index]!, 0.71, 1.29);
+    data[offset + 1] = encode(fields.soil[index]!, 0.75, 1.25);
+    data[offset + 2] = encode(fields.rock[index]!, 0.65, 1.35);
+    data[offset + 3] = encode(fields.gravel[index]!, 0.65, 1.35);
   }
 
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
@@ -393,6 +455,140 @@ export function createDetailAtlas(): THREE.DataTexture {
   applyGroundTextureSettings(texture, 8);
   detailAtlas = texture;
   return texture;
+}
+
+// -------------------------------------------------------- detail normals
+
+/**
+ * Metres of relief each surface is given, before the shader's own scale.
+ *
+ * This is the "per splat channel" part of the brief, and it is the reason the four surfaces stop
+ * reading as one tinted plane: relief is what a lit surface has instead of a printed picture of
+ * one, and a fracture face has five times as much of it as a worn track. Measured mean tilt off
+ * vertical at these values, over the whole atlas (`npx tsx runs/corealm/audit/gd-normals.ts`).
+ *
+ * Soil is deliberately the flattest of the four. It carries every road, every worn approach and
+ * every dirt square in the game through the splat fold in materials.ts, and a road with 6 cm of
+ * relief under a low sun stops reading as a road and starts reading as ploughed earth.
+ *
+ * Grass is not the strongest even though it is the largest surface in the world, because its
+ * relief is a blade swell rather than a hard edge and because the scatter layer puts real geometry
+ * on top of it.
+ */
+const DETAIL_RELIEF_METRES = { grass: 0.036, soil: 0.013, rock: 0.035, gravel: 0.022 } as const;
+
+/**
+ * Hard ceiling on how far off vertical any one texel of a channel may lean, in degrees.
+ *
+ * Needed because two of the four fields have step edges in them by design and a central difference
+ * across a step is a cliff. Measured before this clamp, at the first relief values tried:
+ *
+ * ```text
+ *   surface   mean tilt   p95 tilt   max tilt
+ *   grass         9.5        18.6       40.6
+ *   soil          4.7         9.5       18.8
+ *   rock         25.3        47.1       67.2
+ *   gravel       25.7        76.0       83.6   <- the joint term, one texel wide
+ * ```
+ *
+ * An 83-degree texel on a cobbled square is a normal pointing at the horizon: it catches the sun
+ * as a white spark on one mip level and vanishes on the next, which is a shimmering square rather
+ * than a paved one. Clamping the horizontal magnitude preserves the direction of every slope and
+ * only truncates the handful of texels that were never a surface to begin with — 0.4% of grass,
+ * none of soil, 2.1% of rock and 11.8% of gravel.
+ */
+const DETAIL_MAX_TILT_DEGREES = { grass: 30, soil: 22, rock: 34, gravel: 34 } as const;
+
+/**
+ * Encodes one field's central-difference slope into two bytes of an RGBA texture.
+ *
+ * The heightfield normal is `(-dh/dx, 1, -dh/dz)` normalised, and the two stored components are
+ * exactly the world X and Z of that normal, because the terrain samples this atlas planar in world
+ * XZ (`vGroundWorld.xz`). There is therefore no tangent frame to reconstruct and no tangent
+ * attribute to ship: the shader adds the two components to the world normal and is done. A
+ * conventional tangent-space map would need `getTangentFrame`, three more varyings and a
+ * `USE_TANGENT` program permutation for the identical result on a planar-mapped surface.
+ */
+function encodeFieldNormal(
+  field: Float32Array,
+  size: number,
+  reliefMetres: number,
+  maxTiltDegrees: number,
+  data: Uint8Array,
+  componentOffset: number,
+): void {
+  // The central difference spans two texels, and one texel is the tile width over the atlas edge.
+  const spanMetres = 2 * (DETAIL_TILING_METRES / size);
+  const maxHorizontal = Math.sin((maxTiltDegrees * Math.PI) / 180);
+  const wrap = (value: number): number => ((value % size) + size) % size;
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const left = field[y * size + wrap(x - 1)]!;
+      const right = field[y * size + wrap(x + 1)]!;
+      const down = field[wrap(y - 1) * size + x]!;
+      const up = field[wrap(y + 1) * size + x]!;
+      const nx = ((left - right) * reliefMetres) / spanMetres;
+      const nz = ((down - up) * reliefMetres) / spanMetres;
+      const length = Math.hypot(nx, nz, 1);
+      let hx = nx / length;
+      let hz = nz / length;
+      const horizontal = Math.hypot(hx, hz);
+      if (horizontal > maxHorizontal) {
+        hx = (hx / horizontal) * maxHorizontal;
+        hz = (hz / horizontal) * maxHorizontal;
+      }
+      const index = (y * size + x) * 4 + componentOffset;
+      data[index] = clamp(Math.round((hx * 0.5 + 0.5) * 255), 0, 255);
+      data[index + 1] = clamp(Math.round((hz * 0.5 + 0.5) * 255), 0, 255);
+    }
+  }
+}
+
+/**
+ * Two normal maps for the four ground surfaces, packed two surfaces per texture.
+ *
+ * Before these, the ground had NO normal map of any kind — grep for `normalMap` across game/src
+ * returned the water material and nothing else. The only relief the terrain had was
+ * `dFdx(gGroundShade)`, a screen-space derivative of the albedo multiplier, which has three
+ * problems a real map does not: it is quantised to the 2x2 fragment quad, so it aliases into
+ * blocky speckle wherever the albedo has a hard edge (every gravel joint); it cannot be
+ * anisotropically filtered, so it shimmers at the grazing angles where the ground fills most of
+ * the frame; and it is locked to albedo contrast, so a surface cannot be rough and evenly
+ * coloured, which is what soil and cobble both are.
+ *
+ * Two RGBA8 textures rather than one: four surfaces need eight components, two fetches is the
+ * minimum that carries them, and RGBA8 is the only format that mips and filters everywhere with no
+ * capability check. Cost is 2.8 MB with mips and two texture fetches per ground fragment.
+ *
+ * Z is not stored. It is `sqrt(1 - x^2 - y^2)`, and the shader does not even need that much: it
+ * adds the two tangential components to the world normal and renormalises, which is the standard
+ * cheap blend and is exact for the flat ground that dominates the frame.
+ */
+export function createDetailNormals(): DetailNormals {
+  if (detailNormals) return detailNormals;
+
+  const size = DETAIL_ATLAS_SIZE;
+  const fields = buildDetailFields();
+
+  const grassSoilData = new Uint8Array(size * size * 4);
+  const relief = DETAIL_RELIEF_METRES;
+  const tilt = DETAIL_MAX_TILT_DEGREES;
+  encodeFieldNormal(fields.grass, size, relief.grass, tilt.grass, grassSoilData, 0);
+  encodeFieldNormal(fields.soil, size, relief.soil, tilt.soil, grassSoilData, 2);
+
+  const rockGravelData = new Uint8Array(size * size * 4);
+  encodeFieldNormal(fields.rock, size, relief.rock, tilt.rock, rockGravelData, 0);
+  encodeFieldNormal(fields.gravel, size, relief.gravel, tilt.gravel, rockGravelData, 2);
+
+  const grassSoil = new THREE.DataTexture(grassSoilData, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
+  grassSoil.name = "detail-normal-grass-soil";
+  applyGroundTextureSettings(grassSoil, 8);
+  const rockGravel = new THREE.DataTexture(rockGravelData, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
+  rockGravel.name = "detail-normal-rock-gravel";
+  applyGroundTextureSettings(rockGravel, 8);
+
+  detailNormals = { grassSoil, rockGravel };
+  return detailNormals;
 }
 
 // ------------------------------------------------------- macro variation
@@ -403,9 +599,14 @@ let macroVariation: THREE.DataTexture | null = null;
  * The far read: four channels of low-frequency variation, sampled at 37 m so the 2.5 m detail tile
  * stops repeating visibly across a 700 x 400 m world.
  *
- * Sampled TWICE, at 9.5 m and at 37 m, so this one texture covers everything from 1.5 m features
- * up to 12 m ones. That range is where a 700 x 400 m world is actually looked at: measured, the
- * 2.5 m detail read has mipped away to its own mean by about 20 m.
+ * Sampled THREE times, at 6.3 m, 16 m and 40 m, so this one texture covers everything from 26 cm
+ * features up to 13 m ones. Two reads (9.5 m and 37 m) left a hole: the detail atlas's coarsest
+ * authored feature is one of its 12 base cells, i.e. 21 cm, and the 9.5 m read's finest was 40 cm,
+ * so the ground carried no signal at all between 40 cm and 1.2 m. That is the band the eye reads
+ * at 5-20 m, which in every open-field shot is most of the frame, and it is why the ground
+ * flattened toward one tone at exactly the distance the brief complains about. The three rates are
+ * a 2.5x geometric ladder from the detail read, so no two come back into phase inside the fog
+ * radius.
  *
  * Nothing in here has an edge. Four octaves of plain fbm per channel and no Worley, no ridge, no
  * threshold, because ANY repeated shape becomes a pattern once it is drawn 12 m across: that is
@@ -469,9 +670,10 @@ export function createMacroVariation(): THREE.DataTexture {
 
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
   texture.name = "macro-variation";
-  // Anisotropy 4 rather than 8: at 37 m tiling the macro read never reaches the grazing footprint
-  // that makes the detail read smear, so the extra taps would buy nothing.
-  applyGroundTextureSettings(texture, 4);
+  // 8, raised from 4 when the mid read moved from 9.5 m to 6.3 m. At 9.5 m this texture never
+  // reached the grazing footprint that makes the detail read smear; at 6.3 m it does, and it is
+  // now three of the four ground reads rather than two.
+  applyGroundTextureSettings(texture, 8);
   macroVariation = texture;
   return texture;
 }
@@ -610,6 +812,12 @@ export function createContactDecalTexture(): THREE.DataTexture {
 export function disposeGeneratedTextures(): void {
   detailAtlas?.dispose();
   detailAtlas = null;
+  detailNormals?.grassSoil.dispose();
+  detailNormals?.rockGravel.dispose();
+  detailNormals = null;
+  // The 4 MB of float fields go with them: a hot reload that re-creates the atlas has to
+  // re-generate it, and holding the source arrays past that point leaks them once per reload.
+  detailFields = null;
   macroVariation?.dispose();
   macroVariation = null;
   for (const texture of waterNormals.values()) texture.dispose();
