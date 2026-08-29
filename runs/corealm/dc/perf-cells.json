@@ -1,0 +1,43 @@
+{
+  "startedAt": "2026-08-29T02:02:24.821Z",
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "usedRealGpu": true,
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "targetFps": 60,
+  "maxDrawCalls": 400,
+  "shots": [
+    {
+      "shot": "spawn",
+      "frames": 436,
+      "medianFrameMs": 10.1,
+      "p95FrameMs": 31.4,
+      "worstFrameMs": 91.9,
+      "impliedFps": 99,
+      "drawCalls": 256,
+      "triangles": 5586105,
+      "programs": 71,
+      "heapMB": 169,
+      "meetsBudget": true
+    },
+    {
+      "shot": "town_entrance",
+      "frames": 445,
+      "medianFrameMs": 10.9,
+      "p95FrameMs": 30,
+      "worstFrameMs": 49.1,
+      "impliedFps": 92,
+      "drawCalls": 293,
+      "triangles": 5732057,
+      "programs": 71,
+      "heapMB": 169,
+      "meetsBudget": true
+    }
+  ],
+  "passed": false,
+  "errors": [
+    "page.evaluate: Execution context was destroyed, most likely because of a navigation.\n    at runPerfTest (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:160:36)\n    at async main (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:215:18)\n    at async <anonymous> (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:227:3)"
+  ]
+}

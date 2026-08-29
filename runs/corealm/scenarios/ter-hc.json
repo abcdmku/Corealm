@@ -1,0 +1,13 @@
+{
+  "name": "ter-hc",
+  "actions": [
+    { "inspect": "getNavigationState", "label": "navmesh" },
+    { "debug": "getNavPath", "args": [[-160, 1, -118], [134.6, 27, -60.5]], "label": "spawn -> Cairnkeeper Ode in Highcairn" },
+    { "debug": "getNavPath", "args": [[60, 17, -16], [144, 27, -66]], "label": "Lower Quarry -> Highcairn" },
+    { "debug": "getNavPath", "args": [[60, 17, -16], [140, 59, -176]], "label": "Lower Quarry -> Great Cairn" },
+    { "debug": "getNavPath", "args": [[-160, 1, -118], [-160, 3, 80]], "label": "spawn -> Bracken Pit" },
+    { "debug": "planRoute", "args": [{ "toLocationId": "highcairn_outpost" }], "label": "planRoute highcairn" },
+    { "debug": "planRoute", "args": [{ "toLocationId": "great_cairn" }], "label": "planRoute great cairn" },
+    { "debug": "planRoute", "args": [{ "toLocationId": "bracken_pit" }], "label": "planRoute bracken pit" }
+  ]
+}

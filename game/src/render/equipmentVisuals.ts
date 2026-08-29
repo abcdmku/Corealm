@@ -76,18 +76,40 @@ export const VISIBLE_EQUIP_SLOTS: readonly EquipSlot[] = [
 
 // ------------------------------------------------------------------------ tints
 
-/** Grithe: "dull grey". PRD-side flavour, but the number is chosen to sit under the Kaldite black. */
+/**
+ * ## What a tint can and cannot do here, measured
+ *
+ * Every asset in this ladder is textured AND vertex-coloured: parsing the GLBs, sword, axe and
+ * pickaxe are one `MI_Trim_Props_Vertex` primitive with a `baseColorTexture` and a `COLOR_0`
+ * attribute; shield has three trim materials, all textured and vertex-coloured; the ranger and
+ * peasant parts are `MI_Ranger` / `MI_Peasant`, both textured. `MeshStandardMaterial.color`
+ * MULTIPLIES both of those, so a tint can darken and it can shift hue, and it can never lighten.
+ *
+ * That was tested rather than assumed: dropping `map` on the bone-attached weapons and re-shooting
+ * the tier-1 kit turned the sword GOLD, not grey, because `COLOR_0` carries the bronze too
+ * (runs/corealm/screenshots/rig2-tier-t1-crop.png at that revision). Killing both would leave a
+ * flat, unlit-looking silhouette. So the ladder is a DARKENING ladder with a hue push, and the
+ * PRD's colour words are approximated in the only direction the assets allow.
+ *
+ * The numbers below were then re-picked from what the screenshots actually showed. The first pass
+ * had Corven 0x434a52 (29% luminance) against Kaldite 0x24222a (14%), and at gameplay light both
+ * kits read as one flat black — see the near-identical rig2-tier-t5-crop.png and
+ * rig2-tier-t10-crop.png at that revision. Tier 5 is now 43% and pushed to blue steel, which is
+ * three times Kaldite's luminance and a different hue family, so the two separate.
+ */
+
+/** Grithe: "dull grey". A near-neutral cool multiply — this is the undyed end of the ladder. */
 const GRITHE = 0x8d9298;
-/** Corven: "dark and slightly oily to the touch". */
-const CORVEN = 0x434a52;
+/** Corven: "dark and slightly oily to the touch". Blue steel, deliberately NOT black. */
+const CORVEN = 0x5a6b7c;
 /** Kaldite: "black Kaldite", garnet rivets. The accent is the garnet. */
 const KALDITE = 0x24222a;
 const KALDITE_GARNET = 0x5c1522;
 /** Marchhide: cured wolf hide. */
 const MARCHHIDE = 0x8a6a4a;
-/** Bramblehide: heavy hide, waxed. */
-const BRAMBLEHIDE = 0x4d3f2e;
-/** Wightshroud: shroud cloth that "does not take dye". */
+/** Bramblehide: heavy hide, waxed. Lifted off Wightshroud's black for the same separation reason. */
+const BRAMBLEHIDE = 0x6a5943;
+/** Wightshroud: shroud cloth that "does not take dye" — so the tint is close to a no-op, correctly. */
 const WIGHTSHROUD = 0xa9a89c;
 
 /** The three off-hand stones, so the magic line's shield-proxy focus is not three grey discs. */
@@ -266,6 +288,26 @@ const GEAR_VISUALS = buildTable();
 
 /** Every id this file covers. 57 today, and the test asserts it equals the content table exactly. */
 export const GEAR_APPEARANCE_IDS: readonly ItemId[] = [...GEAR_VISUALS.keys()];
+
+/**
+ * Every distinct asset the 57 rows can ask for, so a rig can warm them before the player equips.
+ *
+ * This exists because of a measured stall, not a hunch. Instrumenting `CharacterRig.attachBoneSlot`
+ * with `performance.now()` in a headless run: `applyEquipment` fired 1 ms after the equip landed in
+ * the store, and then `assets.load("sword")` took 3366 ms and `assets.load("shield")` 5918 ms on
+ * first request. For those seconds the player equips a sword and their hand stays empty, which
+ * reads exactly like the render seam still being unwired. Second request: 3 ms, from the cache.
+ *
+ * Eight ids for a male character, of which six (the ranger set) are already loaded for the NPCs and
+ * two (sword, shield) are not — 269 KB combined.
+ */
+export function gearAssetIds(body: CharacterBody = "male"): readonly string[] {
+  const ids = new Set<string>();
+  for (const visual of GEAR_VISUALS.values()) {
+    for (const spec of visual.parts) ids.add(resolve(spec, visual.slot, body).assetId);
+  }
+  return [...ids];
+}
 
 function resolve(spec: PartSpec, slot: EquipSlot, body: CharacterBody): GearAppearance {
   if (spec.kind === "weapon") {

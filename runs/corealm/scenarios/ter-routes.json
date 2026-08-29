@@ -1,0 +1,144 @@
+{
+ "name": "ter-routes",
+ "actions": [
+  {
+   "inspect": "getNavigationState",
+   "label": "navmesh"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "bracken_pit"
+    }
+   ],
+   "label": "planRoute bracken_pit"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "north_milestone"
+    }
+   ],
+   "label": "planRoute north_milestone"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "open_march_camp"
+    }
+   ],
+   "label": "planRoute open_march_camp"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "palewood_copse"
+    }
+   ],
+   "label": "planRoute palewood_copse"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "redsill_shallows"
+    }
+   ],
+   "label": "planRoute redsill_shallows"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "marchfield_farm"
+    }
+   ],
+   "label": "planRoute marchfield_farm"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "hollowcut_seam"
+    }
+   ],
+   "label": "planRoute hollowcut_seam"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "thornline_camp"
+    }
+   ],
+   "label": "planRoute thornline_camp"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "gorge_head"
+    }
+   ],
+   "label": "planRoute gorge_head"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "highcairn_outpost"
+    }
+   ],
+   "label": "planRoute highcairn_outpost"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "great_cairn"
+    }
+   ],
+   "label": "planRoute great_cairn"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "upper_karrow_seam"
+    }
+   ],
+   "label": "planRoute upper_karrow_seam"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "karrow_ramp_three"
+    }
+   ],
+   "label": "planRoute karrow_ramp_three"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "gravelmaw_entrance"
+    }
+   ],
+   "label": "planRoute gravelmaw_entrance"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "cairn_tarns"
+    }
+   ],
+   "label": "planRoute cairn_tarns"
+  }
+ ]
+}

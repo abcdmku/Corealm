@@ -17,11 +17,24 @@
  * for one frame makes the camera lurch back out; and vertical follow that tracks the player exactly
  * turns every terrace step into a visible bob because the horizon is now near the middle of frame.
  * All three are handled below.
+ *
+ * What changed in the second polish wave, and why. The occlusion probe is a PHYSICS raycast, and
+ * the physics world does not contain the roofs you walk under. `prefabCollision("porch")` emits a
+ * back wall and two 0.4 m posts and no canopy; `"arcade"` emits a back wall and nothing else;
+ * `"forge"` emits three walls and no roof; `"well"` emits a 1.6 m curb under a 3.3 m roof. That is
+ * deliberate — those five prefabs exist precisely because they have no doorway to erode — but it
+ * means the camera could not see the one thing it kept parking inside. Measured at the `bank`
+ * pose: the probe reported its first blocker at 5.865 m, which is the vault tower's east face at
+ * x = -165, and the camera settled at 5.415 m and y = 4.91, while the bank porch's canopy sits at
+ * y 3.87..4.25 across x -164.72..-162.28. 80% of the frame was the underside of a roof the camera
+ * had no way to know about. `OVERHEAD_COVER` below closes that hole analytically.
  */
 import * as THREE from "three";
 import type { Vec3 } from "../contracts.js";
 import { CAMERA } from "../app/config.js";
-import { clamp } from "../core/math.js";
+import { clamp, tierSilhouetteScale } from "../core/math.js";
+import { REGIONS, type PrefabId } from "../content/regions.js";
+import type { KitId } from "./buildings.js";
 
 /**
  * Line-of-sight query the camera uses to decide whether it can see the player.
@@ -34,12 +47,149 @@ import { clamp } from "../core/math.js";
  *    ignored, so a physics raycast that reports "no hit" as `Infinity` is safe to pass through.
  *  - The probe must exclude the player's own collider, or the camera will jam at the minimum
  *    distance permanently.
- *  - It is called five times when the requested pose is clear and fifteen at worst, and must not
- *    allocate. It was one call per frame until the centre ray proved insufficient at pitch 0.52:
- *    four of the five are parallel offsets that keep the camera's edges out of a wall the centre
- *    ray slips past, and the pose is re-probed once per pitch-climb candidate.
+ *  - It is called five times when the requested pose is usable and twenty-five at worst, and must
+ *    not allocate. It was one call per frame until the centre ray proved insufficient at pitch
+ *    0.52: four of the five are parallel offsets that keep the camera's edges out of a wall the
+ *    centre ray slips past, and the pose is re-probed once per `PITCH_STEPS` candidate. The worst
+ *    case only happens on a frame the authored pose cannot see the player from.
  */
 export type OcclusionProbe = (from: Vec3, to: Vec3) => number | null;
+
+// ------------------------------------------------------- overhead cover (walk-under roofs)
+
+/**
+ * One roof you can walk under, as an oriented box the camera treats as solid.
+ *
+ * Y is stored as metres ABOVE THE SETTLEMENT'S GROUND rather than as a world height, because this
+ * file cannot read the terrain: `render/camera.ts` is handed a `THREE.PerspectiveCamera` and a
+ * raycast closure and nothing else. The player's own feet supply the ground reference, which is
+ * exact inside a settlement — every one of them stands on a flattened pad, and the worst measured
+ * disagreement is 0.086 m (Coldbrace's pad reads 0.894 and the player at `bank_interior` stands at
+ * 0.980). `COVER_RANGE_METRES` keeps that assumption honest by ignoring anything further away.
+ */
+interface CoverSlab {
+  /** World centre of the covered rectangle, including the prefab's own local offset. */
+  readonly cx: number;
+  readonly cz: number;
+  /** Half extents along the building's local width and depth axes. */
+  readonly hx: number;
+  readonly hz: number;
+  /** The building's `rotationY`, precomputed. */
+  readonly cos: number;
+  readonly sin: number;
+  /** Underside and top of the canopy, metres above the pad. */
+  readonly soffit: number;
+  readonly top: number;
+}
+
+/**
+ * Only cover within this range of the player is considered.
+ *
+ * Two reasons, and both are real. The slab's Y band is relative to the player's own ground, so a
+ * canopy on a terrace 20 m below would be tested at the wrong height entirely. And the camera
+ * never sits further than `CAMERA.maxDistance` 34 m from the player, so a roof 26 m away can only
+ * be on the sight line when it is nearly behind the camera.
+ */
+const COVER_RANGE_METRES = 26;
+
+/**
+ * The world's walk-under roofs, in world space. Built once, from authored data, with no RNG.
+ *
+ * The bands below are measured, in the running game, with `__gameDebug.getDrawnBounds` on the
+ * emitted part entities minus `__gameDebug.groundHeight` at the building's own origin — see
+ * runs/corealm/audit/cam-cover2.ts. Building parts are drawn at `1 / tierSilhouetteScale(tier)`
+ * (world/regionBuilder.ts `emitParts`) while the layout grid is not scaled at all, so every height
+ * here is an asset-space number multiplied by that same factor, and the three settlements come out
+ * at 1.111x, 0.930x and 0.869x.
+ */
+let coverCache: readonly CoverSlab[] | null = null;
+
+function overheadCover(): readonly CoverSlab[] {
+  if (coverCache) return coverCache;
+  const slabs: CoverSlab[] = [];
+  for (const region of REGIONS) {
+    // The exact factor `emitParts` applies to every building part in this region.
+    const partScale = 1 / tierSilhouetteScale(region.tier);
+    const kit = region.settlement.kit;
+    for (const building of region.settlement.buildings) {
+      const rect = coverRect(building.prefab, building.footprint, kit, partScale);
+      if (!rect) continue;
+      const cos = Math.cos(building.rotationY);
+      const sin = Math.sin(building.rotationY);
+      // Local -> world is (x, z) => (cos*lx + sin*lz, -sin*lx + cos*lz), matching `emitParts`.
+      slabs.push({
+        cx: building.position[0] + sin * rect.dz,
+        cz: building.position[1] + cos * rect.dz,
+        hx: rect.hx,
+        hz: rect.hz,
+        cos,
+        sin,
+        soffit: rect.soffit,
+        top: rect.top,
+      });
+    }
+  }
+  coverCache = slabs;
+  return slabs;
+}
+
+/**
+ * The canopy of one walk-under prefab, in its own local frame. `null` for anything whose collision
+ * box already includes its roof volume, which is every other prefab.
+ *
+ * Measured bands, above the building's own ground:
+ *   porch/arcade, plaster (Coldbrace, 1.111x)  canopy mesh 0.00..3.36, soffit 2.68 * scale
+ *   porch/arcade, timber  (Rootfall,  0.930x)  canopy mesh 0.00..2.82, soffit 2.68 * scale
+ *   porch/arcade, stone   (Highcairn, 0.869x)  slab 3.17..3.40 over a separate 0.00..2.72 wall
+ *   well                  (Coldbrace only)     roof 2.26..3.30
+ * The 2.68 soffit is buildings.ts's own measurement of both canopy meshes ("both canopies soffit
+ * at 2.68 or higher"); the drawn bounds cannot supply it, because `overhang_plaster` is one mesh
+ * holding the wall and the canopy together and its box therefore starts at the ground.
+ *
+ * Two prefabs are deliberately absent, and both for the same reason: a box is only honest about a
+ * FLAT canopy.
+ *
+ * `forge` was in here and was taken back out after it was measured. Its roof is a gable — Coldbrace
+ * draws 2.40..8.28 m over a 7.66 x 10.52 m plan — and a box from eave to ridge claims 5.9 m of
+ * solid air that the tent shape does not occupy. Measured cost at the `highcairn` pose: the sight
+ * line crosses the forge at z = -70 and y = 31.35, which is under the 33.74 m ridge but well clear
+ * of the roof surface there, and the box cut the shot from 26 m to 2.6 m. The forge already
+ * collides on three walls at full height, so the only ray it misses is one that clears a 6.12 m
+ * wall and comes back down through the roof; that residual is much cheaper than the over-block.
+ *
+ * `market_row` has never been authored by any settlement, so there is nothing to measure, and its
+ * awnings are per-pitch with walkable gaps between them.
+ */
+function coverRect(
+  prefab: PrefabId,
+  footprint: readonly [number, number],
+  kit: KitId,
+  scale: number,
+): { dz: number; hx: number; hz: number; soffit: number; top: number } | null {
+  const width = footprint[0];
+  const depth = footprint[1];
+  switch (prefab) {
+    case "porch":
+    case "arcade": {
+      // The canopy hangs off the back wall and stops 2 m out (`CANOPY_DEPTH_METRES`), drawn at
+      // `scale`. On a 3 m footprint the front 0.8 m is open sky, and covering it would make the
+      // camera duck lower than the real eave needs.
+      const back = -depth / 2 - 0.25;
+      const front = -depth / 2 + 2 * scale + 0.25;
+      const band = kit === "stone"
+        // `coveredBay` puts `overhang_brick` at an UNSCALED dy of STOREY_METRES + 0.324 = 3.447 and
+        // the slab hangs below its own pivot, so only the hang scales. Solved against the Highcairn
+        // measurement of 3.17..3.40 at 0.869x.
+        ? { soffit: 3.447 - 0.318 * scale, top: 3.447 - 0.054 * scale }
+        : { soffit: 2.68 * scale, top: 3.03 * scale };
+      return { dz: (back + front) / 2, hx: width / 2 + 0.2, hz: (front - back) / 2, ...band };
+    }
+    case "well":
+      return { dz: 0, hx: width / 2 + 0.6, hz: depth / 2 + 0.6, soffit: 2.03 * scale, top: 2.97 * scale };
+    default:
+      return null;
+  }
+}
 
 /**
  * How close the camera may get when something is in the way. Deliberately below
@@ -64,9 +214,22 @@ const PROBE_OFFSETS: readonly (readonly [number, number])[] = [
   [1, 0], [-1, 0], [0, 1], [0, -1],
 ];
 
-/** Per-60 Hz-frame rates. Pull in fast enough to never lose the player, ease out slowly. */
+/**
+ * Per-60 Hz-frame rates. Pull in fast enough to never lose the player, ease out gently.
+ *
+ * Measured on the real class against a scripted blocker at 60 Hz (runs/corealm/audit/cam-spring.ts,
+ * which stubs `performance.now`): at 0.4 the camera covers 18 m -> 4.6 m in 150 ms, which is the
+ * requirement — a player who steps behind a wall must not spend a beat invisible.
+ *
+ * The ease-out was 0.05, and that is what made a fence RATCHET. Posts on 2 m centres at the 4.2 m/s
+ * walk speed present a blocker every 480 ms; the pull-in takes 150 ms, `EASE_OUT_HOLD_MS` then ate
+ * most of the gap, and at 0.05 the camera recovered 90% of the pull only after 950 ms — longer than
+ * the gap, so it never got back out along the whole fence. At 0.10 that recovery is 430 ms, which
+ * fits inside the gap, and the step response still shows exactly one direction reversal per
+ * blocker rather than an oscillation.
+ */
 const PULL_IN_RATE = 0.4;
-const EASE_OUT_RATE = 0.05;
+const EASE_OUT_RATE = 0.1;
 
 /**
  * Extra pitch the camera is allowed to climb when something blocks the shot, in radians.
@@ -83,8 +246,37 @@ const EASE_OUT_RATE = 0.05;
  * roof volume, so the probe reports blockers a rendered roofline does not have, and an unbounded
  * climb turns every one of those into a bird's-eye frame. 0.24 was enough for every pose measured:
  * `karrowmoor_terraces` recovers its full 34 m at +0.12.
+ *
+ * The last two entries are new, and they go DOWN. Climbing is the wrong answer under a roof you
+ * are standing beneath: over the Coldbrace bank porch the camera has to reach pitch 0.80 before a
+ * probe ray clears the 4.25 m canopy, and inside the forge no pitch clears the roof at all.
+ * Dropping under the eave is what a player would do with the mouse. -0.28 rad is 16 degrees, which
+ * at the authored pitches (0.34-0.62) still leaves the camera above `CAMERA.minPitch` 0.18.
+ *
+ * The second number is how bad the flat pose has to be, as a fraction of the requested distance,
+ * before that step is allowed at all: the worse the shot, the more freedom the camera gets. A
+ * mildly blocked pose is allowed one 7-degree nudge and nothing more, because a 14-degree jump on
+ * a shot that was already mostly working is how an authored frame becomes a plan drawing.
+ *
+ * Measured flat clearance at the four authored poses the probe actually fires on, as a fraction of
+ * the requested distance:
+ *
+ *   bank                 2.80 of 14  (0.20)   nothing clears; it stays flat and pulls in
+ *   highcairn            6.27 of 26  (0.24)   +0.24 recovers the full 26 m
+ *   town_center         10.12 of 26  (0.39)   climbs are found and the gain gate rejects them
+ *   karrowmoor_terraces 23.52 of 34  (0.69)   +0.12 recovers the full 34 m
+ *   gravelmaw_entrance  19.65 of 24  (0.82)   above the trigger; no search runs at all
+ *
+ * `karrowmoor_terraces` is why the trigger is 0.75 and not lower. At 0.65 that pose stopped
+ * searching, kept its authored 0.38 rad, and the frame came back 90% one tan boulder
+ * (runs/corealm/screenshots/camA-karrowmoor_terraces.png).
  */
-const PITCH_CLIMB_STEPS: readonly number[] = [0, 0.12, 0.24];
+const PITCH_STEPS: readonly (readonly [step: number, allowedBelow: number])[] = [
+  [0.12, 0.75], [-0.14, 0.75], [0.24, 0.45], [-0.28, 0.45],
+];
+
+/** The loosest entry in `PITCH_STEPS`. Above this no step is legal, so the search is skipped. */
+const PITCH_SEARCH_TRIGGER_FRACTION = 0.75;
 
 /** A climb only counts as having worked if it recovers this much of the requested distance. */
 const CLIMB_ACCEPT_FRACTION = 0.8;
@@ -106,12 +298,17 @@ const CLIMB_MIN_GAIN_METRES = 1.5;
 const CLIMB_MIN_GAIN_FRACTION = 0.25;
 
 /**
- * How long the camera stays pulled in after the blocker clears.
+ * How long the camera stays pulled in after the blocker clears, at most.
  *
  * Without it, walking past a fence post or a tree trunk at pitch 0.52 makes the spring fire and
  * release several times a second, and the resulting in-out breathing is more distracting than the
  * occlusion was. 220 ms is longer than any single-post transit at 4.2 m/s and short enough that
  * stepping out of a doorway does not feel sticky.
+ *
+ * "At most", because the hold is now capped by how long the blocker actually lasted. A flat 220 ms
+ * meant a 100 ms graze bought a 220 ms latch, so along a fence the latch covered more of each gap
+ * than the blocker did — the camera spent more time held in by posts it had already passed than by
+ * posts it was behind.
  */
 const EASE_OUT_HOLD_MS = 220;
 
@@ -129,6 +326,14 @@ const OCCLUSION_DEAD_ZONE = 0.05;
  */
 const VERTICAL_FOLLOW_SCALE = 0.55;
 
+/**
+ * Where the camera aims, above the player's feet. Roughly the head of a 1.8 m rig.
+ *
+ * Named because `resolveOcclusion` has to subtract it back off to recover the ground the player is
+ * standing on, which is the reference every `CoverSlab` height is stated against.
+ */
+const FOCUS_HEIGHT_METRES = 1.1;
+
 export class OrbitCamera {
   yaw = Math.PI * 0.15;
   pitch = CAMERA.defaultPitch;
@@ -142,6 +347,8 @@ export class OrbitCamera {
   private readonly probeUp = new THREE.Vector3();
   private readonly probeFrom: [number, number, number] = [0, 0, 0];
   private readonly probeTo: [number, number, number] = [0, 0, 0];
+  /** `[tMin, tMax]` for the overhead-cover slab test. Scratch, for the same no-allocation reason. */
+  private readonly slabRange: [number, number] = [0, 1];
   private initialised = false;
   private lastUpdateMs = 0;
   private occlusionProbe: OcclusionProbe | null = null;
@@ -151,8 +358,18 @@ export class OrbitCamera {
   private occluded = false;
   /** Milliseconds left on the ease-out hold. See `EASE_OUT_HOLD_MS`. */
   private holdMs = 0;
-  /** The pitch actually used this frame, after any climb over an occluder. */
+  /** How long the current unbroken run of occluded frames has lasted. Caps `holdMs`. */
+  private occludedMs = 0;
+  /** The pitch actually used this frame, after any climb over or duck under an occluder. */
   private effectivePitch = CAMERA.defaultPitch;
+  /**
+   * What the AUTHORED pitch could see this frame, before any pitch search.
+   *
+   * Reported in the debug snapshot because "the camera moved" and "the camera had to move" are
+   * different facts, and a snapshot that only carries the resolved pose cannot separate them —
+   * exactly the hole that hid the `highcairn` climb until a screenshot showed a plan view.
+   */
+  private flatClearance = CAMERA.defaultDistance;
 
   constructor(private readonly camera: THREE.PerspectiveCamera) {}
 
@@ -209,12 +426,13 @@ export class OrbitCamera {
     const deltaMs = this.lastUpdateMs === 0 ? 16.7 : clamp(now - this.lastUpdateMs, 0, 250);
     this.lastUpdateMs = now;
 
-    this.focus.set(targetX, targetY + 1.1, targetZ);
+    this.focus.set(targetX, targetY + FOCUS_HEIGHT_METRES, targetZ);
     if (!this.initialised || snap) {
       this.smoothed.copy(this.focus);
       this.effectiveDistance = this.distance;
       this.effectivePitch = this.pitch;
       this.holdMs = 0;
+      this.occludedMs = 0;
       this.initialised = true;
     } else {
       // CAMERA.followLerp is authored as "per 60 Hz frame"; convert it to a per-second rate so the
@@ -238,15 +456,27 @@ export class OrbitCamera {
       this.effectivePitch = resolved.pitch;
     } else {
       const pullingIn = resolved.distance < this.effectiveDistance;
-      if (this.occluded) this.holdMs = EASE_OUT_HOLD_MS;
-      else this.holdMs = Math.max(0, this.holdMs - deltaMs);
+      if (this.occluded) {
+        this.occludedMs += deltaMs;
+        this.holdMs = Math.min(EASE_OUT_HOLD_MS, this.occludedMs);
+      } else {
+        this.holdMs = Math.max(0, this.holdMs - deltaMs);
+        this.occludedMs = 0;
+      }
       if (pullingIn || this.holdMs <= 0) {
         if (Math.abs(resolved.distance - this.effectiveDistance) > OCCLUSION_DEAD_ZONE) {
           const rate = pullingIn ? PULL_IN_RATE : EASE_OUT_RATE;
           const alpha = 1 - Math.pow(1 - rate, deltaMs / 16.667);
           this.effectiveDistance += (resolved.distance - this.effectiveDistance) * alpha;
         }
-        const pitchRate = resolved.pitch > this.effectivePitch ? PULL_IN_RATE : EASE_OUT_RATE;
+        // Fast AWAY from the authored pitch, slow back TO it. The round-1 version keyed this on
+        // "is the target pitch higher", which was the same thing while the only correction was a
+        // climb. It stopped being the same thing when `PITCH_STEPS` gained negative entries: a duck
+        // under a porch eave is the camera solving an occlusion and has to be as urgent as a pull
+        // in, and at EASE_OUT_RATE it took 1.1 s to get under a roof the player walked under in one
+        // step.
+        const returning = Math.abs(resolved.pitch - this.pitch) < Math.abs(this.effectivePitch - this.pitch);
+        const pitchRate = returning ? EASE_OUT_RATE : PULL_IN_RATE;
         const pitchAlpha = 1 - Math.pow(1 - pitchRate, deltaMs / 16.667);
         this.effectivePitch += (resolved.pitch - this.effectivePitch) * pitchAlpha;
       }
@@ -262,43 +492,55 @@ export class OrbitCamera {
   }
 
   /**
-   * The pose the probe says is actually reachable: the requested zoom and pitch, or a climb over
-   * whatever is in the way, or a shortened distance when nothing clears it.
+   * The pose that is actually reachable: the requested zoom and pitch, or a climb over whatever is
+   * in the way, or a duck under it, or a shortened distance when nothing clears it.
    *
-   * Returns the request untouched when no probe is wired, so this is a no-op for any caller that
-   * has not opted in — the camera is exactly as it was before the probe exists.
+   * Returns the request untouched when neither a probe nor any overhead cover applies, so this is
+   * a no-op for a caller that has not opted in.
    *
    * Every candidate is scored on its FULL clearance, centre ray and offsets together. Scoring the
    * candidates on the centre ray alone and only then running the offsets is what produced the
    * measured `town_center` regression: the climbed pitch had a clear centre line at the full 26 m,
    * won on that, and then an offset ray grazing a roof edge cut it to 12.7 m — worse than the flat
-   * pose it beat. Cost: five probes when the requested pose is clear, fifteen worst case.
+   * pose it beat.
+   *
+   * Cost: five probes when the authored pose is usable, which is the overwhelmingly common case,
+   * and twenty-five when it is not. The flat pose is now measured FIRST and on its own, so the
+   * search only runs at all below `PITCH_SEARCH_TRIGGER_FRACTION`.
    */
   private resolveOcclusion(requested: number): { distance: number; pitch: number } {
     this.occluded = false;
-    if (!this.occlusionProbe) return { distance: requested, pitch: this.pitch };
-
-    let bestPitch = this.pitch;
-    let bestClear = -1;
-    let flatClear = -1;
-    for (const step of PITCH_CLIMB_STEPS) {
-      const pitch = Math.min(CAMERA.maxPitch, this.pitch + step);
-      this.aim(pitch, requested);
-      const clear = this.clearance(requested);
-      if (flatClear < 0) flatClear = clear;
-      if (clear > bestClear) {
-        bestClear = clear;
-        bestPitch = pitch;
-      }
-      if (clear >= requested * CLIMB_ACCEPT_FRACTION) break;
-      // The clamp can make two candidates the same pitch; stop rather than probe it twice.
-      if (pitch >= CAMERA.maxPitch) break;
+    if (!this.occlusionProbe && overheadCover().length === 0) {
+      this.flatClearance = requested;
+      return { distance: requested, pitch: this.pitch };
     }
 
-    const gainNeeded = Math.max(CLIMB_MIN_GAIN_METRES, requested * CLIMB_MIN_GAIN_FRACTION);
-    if (bestClear < flatClear + gainNeeded) {
-      bestPitch = this.pitch;
-      bestClear = flatClear;
+    this.aim(this.pitch, requested);
+    const flatClear = this.clearance(requested);
+    this.flatClearance = flatClear;
+
+    let bestPitch = this.pitch;
+    let bestClear = flatClear;
+    if (flatClear < requested * PITCH_SEARCH_TRIGGER_FRACTION) {
+      for (const [step, allowedBelow] of PITCH_STEPS) {
+        if (flatClear >= requested * allowedBelow) continue;
+        const pitch = clamp(this.pitch + step, CAMERA.minPitch, CAMERA.maxPitch);
+        // The clamp can land a candidate back on the pitch already measured; do not pay for it.
+        if (Math.abs(pitch - this.pitch) < 1e-4) continue;
+        this.aim(pitch, requested);
+        const clear = this.clearance(requested);
+        if (clear > bestClear) {
+          bestClear = clear;
+          bestPitch = pitch;
+        }
+        if (clear >= requested * CLIMB_ACCEPT_FRACTION) break;
+      }
+
+      const gainNeeded = Math.max(CLIMB_MIN_GAIN_METRES, requested * CLIMB_MIN_GAIN_FRACTION);
+      if (bestClear < flatClear + gainNeeded) {
+        bestPitch = this.pitch;
+        bestClear = flatClear;
+      }
     }
 
     this.occluded = bestClear < requested;
@@ -309,7 +551,8 @@ export class OrbitCamera {
    * How far the camera can sit along the current aim before anything is in the way.
    *
    * `requested` when the line is clear. The four offset rays are what stop the camera's edges
-   * burying themselves in a wall the centre ray slips past.
+   * burying themselves in a wall the centre ray slips past. Each ray answers against the physics
+   * world AND against `OVERHEAD_COVER`, whichever is nearer.
    */
   private clearance(requested: number): number {
     let nearest: number | null = this.probeSegment(0, 0, requested);
@@ -347,8 +590,6 @@ export class OrbitCamera {
    * notice in a screenshot than a clipped one.
    */
   private probeSegment(right: number, up: number, requested: number): number | null {
-    const probe = this.occlusionProbe;
-    if (!probe) return null;
     const dx = this.probeRight.x * right;
     const dz = this.probeRight.z * right;
     const dy = this.probeUp.y * up;
@@ -358,9 +599,87 @@ export class OrbitCamera {
     this.probeTo[0] = this.desired.x + dx;
     this.probeTo[1] = this.desired.y + dy;
     this.probeTo[2] = this.desired.z + dz;
-    const hit = probe(this.probeFrom, this.probeTo);
-    if (hit === null || !Number.isFinite(hit) || hit <= 0 || hit >= requested) return null;
-    return hit;
+
+    let nearest: number | null = null;
+    const probe = this.occlusionProbe;
+    if (probe) {
+      const hit = probe(this.probeFrom, this.probeTo);
+      if (hit !== null && Number.isFinite(hit) && hit > 0 && hit < requested) nearest = hit;
+    }
+    const roof = this.coverSegment(requested);
+    if (roof !== null && (nearest === null || roof < nearest)) nearest = roof;
+    return nearest;
+  }
+
+  /**
+   * The same segment, against the walk-under roofs the physics world does not carry.
+   *
+   * Runs in each slab's own local frame, which is a rotate-and-slab-test with no allocation. The
+   * candidate set is `OVERHEAD_COVER` filtered to `COVER_RANGE_METRES` of the player, which is 0-3
+   * slabs anywhere in the game and 13 in total, so the whole thing is cheaper than the one physics
+   * raycast it rides alongside.
+   *
+   * A segment that STARTS inside a slab reports 0, and `probeSegment`'s caller treats that as no
+   * hit — deliberately. The origin is the player's head; if it is genuinely inside a canopy the
+   * player is clipping through a roof, and jamming the camera at the floor would hide that rather
+   * than show it.
+   */
+  private coverSegment(requested: number): number | null {
+    const slabs = overheadCover();
+    if (slabs.length === 0) return null;
+    const ax = this.probeFrom[0];
+    const ay = this.probeFrom[1];
+    const az = this.probeFrom[2];
+    const dx = this.probeTo[0] - ax;
+    const dy = this.probeTo[1] - ay;
+    const dz = this.probeTo[2] - az;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 1e-4) return null;
+    // Every slab height is stated above the pad the player is standing on.
+    const groundY = this.smoothed.y - FOCUS_HEIGHT_METRES;
+
+    let nearest: number | null = null;
+    for (const slab of slabs) {
+      const ox = ax - slab.cx;
+      const oz = az - slab.cz;
+      if (ox * ox + oz * oz > COVER_RANGE_METRES * COVER_RANGE_METRES) continue;
+      // World -> local is the inverse of `emitParts`: lx = cos*X - sin*Z, lz = sin*X + cos*Z.
+      const lox = slab.cos * ox - slab.sin * oz;
+      const loz = slab.sin * ox + slab.cos * oz;
+      const ldx = slab.cos * dx - slab.sin * dz;
+      const ldz = slab.sin * dx + slab.cos * dz;
+
+      this.slabRange[0] = 0;
+      this.slabRange[1] = 1;
+      if (!this.narrow(lox, ldx, -slab.hx, slab.hx)) continue;
+      if (!this.narrow(ay, dy, groundY + slab.soffit, groundY + slab.top)) continue;
+      if (!this.narrow(loz, ldz, -slab.hz, slab.hz)) continue;
+
+      const hit = this.slabRange[0] * length;
+      if (hit > 0 && hit < requested && (nearest === null || hit < nearest)) nearest = hit;
+    }
+    return nearest;
+  }
+
+  /**
+   * One axis of the slab test, narrowing `slabRange` in place.
+   *
+   * Returns false the moment the interval empties, which is what makes 13 boxes cost nothing: a
+   * segment that misses on its first axis never touches the other two.
+   */
+  private narrow(origin: number, delta: number, low: number, high: number): boolean {
+    if (Math.abs(delta) < 1e-9) return origin >= low && origin <= high;
+    const inverse = 1 / delta;
+    let near = (low - origin) * inverse;
+    let far = (high - origin) * inverse;
+    if (near > far) {
+      const swap = near;
+      near = far;
+      far = swap;
+    }
+    if (near > this.slabRange[0]) this.slabRange[0] = near;
+    if (far < this.slabRange[1]) this.slabRange[1] = far;
+    return this.slabRange[0] <= this.slabRange[1];
   }
 
   /** Frames a point from a fixed pose, immediately. Screenshot poses use this. */
@@ -383,6 +702,7 @@ export class OrbitCamera {
     distance: number;
     requestedDistance: number;
     effectivePitch: number;
+    flatDistance: number;
     occluded: boolean;
     occlusionProbe: boolean;
   } {
@@ -396,8 +716,11 @@ export class OrbitCamera {
       pitch: Math.round(this.pitch * 1000) / 1000,
       distance: Math.round(this.effectiveDistance * 1000) / 1000,
       requestedDistance: Math.round(this.distance * 1000) / 1000,
-      // `pitch` is what the player asked for; this is what the occlusion climb actually used.
+      // `pitch` is what the player asked for; this is what the pitch search actually used.
       effectivePitch: Math.round(this.effectivePitch * 1000) / 1000,
+      // What the authored pitch could see. `flatDistance < distance` never happens; the gap
+      // between them is exactly what the pitch search bought, in metres.
+      flatDistance: Math.round(this.flatClearance * 1000) / 1000,
       occluded: this.occluded,
       occlusionProbe: this.occlusionProbe !== null,
     };
@@ -409,8 +732,10 @@ export class OrbitCamera {
     this.distance = CAMERA.defaultDistance;
     this.effectiveDistance = CAMERA.defaultDistance;
     this.effectivePitch = CAMERA.defaultPitch;
+    this.flatClearance = CAMERA.defaultDistance;
     this.occluded = false;
     this.holdMs = 0;
+    this.occludedMs = 0;
     this.initialised = false;
     this.lastUpdateMs = 0;
   }

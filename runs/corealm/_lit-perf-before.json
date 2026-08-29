@@ -1,0 +1,10 @@
+{
+  "renderer": "unknown",
+  "usedRealGpu": false,
+  "passed": false,
+  "shots": [],
+  "errors": [
+    "Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)",
+    "page.waitForFunction: Timeout 90000ms exceeded.\n    at runPerfTest (C:\\Users\\Borg\\Documents\\GitHub\\_corealm-lit\\tools\\perf-test.ts:125:16)\n    at async main (C:\\Users\\Borg\\Documents\\GitHub\\_corealm-lit\\tools\\perf-test.ts:215:18)\n    at async <anonymous> (C:\\Users\\Borg\\Documents\\GitHub\\_corealm-lit\\tools\\perf-test.ts:227:3)"
+  ]
+}

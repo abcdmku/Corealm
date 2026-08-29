@@ -1,0 +1,13 @@
+
+> 3d-game-harness@0.1.0 perf
+> tsx tools/perf-test.ts --run runs/corealm
+
+{
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "usedRealGpu": true,
+  "passed": false,
+  "shots": [],
+  "errors": [
+    "page.evaluate: Execution context was destroyed, most likely because of a navigation.\n    at runPerfTest (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:160:36)\n    at async main (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:215:18)\n    at async <anonymous> (C:\\Users\\Borg\\Documents\\GitHub\\Corealm\\tools\\perf-test.ts:227:3)"
+  ]
+}

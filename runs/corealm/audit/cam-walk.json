@@ -1,0 +1,205 @@
+{
+ "name": "camera-under-roofs",
+ "actions": [
+  {
+   "debug": "teleport",
+   "args": [
+    [
+     -162.9,
+     1,
+     -89.6
+    ]
+   ],
+   "label": "teleport porch"
+  },
+  {
+   "waitMs": 900
+  },
+  {
+   "inspect": "getCamera",
+   "label": "camera porch"
+  },
+  {
+   "inspect": "getPlayerPosition",
+   "label": "player porch"
+  },
+  {
+   "screenshot": "camwalk-porch"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    [
+     -146.5,
+     1,
+     -86
+    ]
+   ],
+   "label": "teleport forge"
+  },
+  {
+   "waitMs": 900
+  },
+  {
+   "inspect": "getCamera",
+   "label": "camera forge"
+  },
+  {
+   "inspect": "getPlayerPosition",
+   "label": "player forge"
+  },
+  {
+   "screenshot": "camwalk-forge"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    [
+     -171,
+     1,
+     -80
+    ]
+   ],
+   "label": "teleport arcade"
+  },
+  {
+   "waitMs": 900
+  },
+  {
+   "inspect": "getCamera",
+   "label": "camera arcade"
+  },
+  {
+   "inspect": "getPlayerPosition",
+   "label": "player arcade"
+  },
+  {
+   "screenshot": "camwalk-arcade"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    [
+     -164,
+     1,
+     -78.6
+    ]
+   ],
+   "label": "teleport well"
+  },
+  {
+   "waitMs": 900
+  },
+  {
+   "inspect": "getCamera",
+   "label": "camera well"
+  },
+  {
+   "inspect": "getPlayerPosition",
+   "label": "player well"
+  },
+  {
+   "screenshot": "camwalk-well"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    [
+     60,
+     8.4,
+     130
+    ]
+   ],
+   "label": "teleport rf_counter"
+  },
+  {
+   "waitMs": 900
+  },
+  {
+   "inspect": "getCamera",
+   "label": "camera rf_counter"
+  },
+  {
+   "inspect": "getPlayerPosition",
+   "label": "player rf_counter"
+  },
+  {
+   "screenshot": "camwalk-rf_counter"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    [
+     150.8,
+     27.2,
+     -68
+    ]
+   ],
+   "label": "teleport hc_porch"
+  },
+  {
+   "waitMs": 900
+  },
+  {
+   "inspect": "getCamera",
+   "label": "camera hc_porch"
+  },
+  {
+   "inspect": "getPlayerPosition",
+   "label": "player hc_porch"
+  },
+  {
+   "screenshot": "camwalk-hc_porch"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    [
+     40,
+     16,
+     -40
+    ]
+   ],
+   "label": "teleport dungeon1"
+  },
+  {
+   "waitMs": 900
+  },
+  {
+   "inspect": "getCamera",
+   "label": "camera dungeon1"
+  },
+  {
+   "inspect": "getPlayerPosition",
+   "label": "player dungeon1"
+  },
+  {
+   "screenshot": "camwalk-dungeon1"
+  },
+  {
+   "debug": "teleport",
+   "args": [
+    [
+     30,
+     12,
+     -58
+    ]
+   ],
+   "label": "teleport dungeon2"
+  },
+  {
+   "waitMs": 900
+  },
+  {
+   "inspect": "getCamera",
+   "label": "camera dungeon2"
+  },
+  {
+   "inspect": "getPlayerPosition",
+   "label": "player dungeon2"
+  },
+  {
+   "screenshot": "camwalk-dungeon2"
+  }
+ ]
+}

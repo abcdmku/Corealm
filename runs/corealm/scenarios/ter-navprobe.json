@@ -1,0 +1,787 @@
+{
+ "name": "ter-navprobe",
+ "actions": [
+  {
+   "inspect": "getNavigationState",
+   "label": "navmesh"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     60,
+     17,
+     -16
+    ]
+   ],
+   "label": "anchor lower quarry"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     50,
+     20,
+     0
+    ]
+   ],
+   "label": "grid 50,0"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     100,
+     20,
+     0
+    ]
+   ],
+   "label": "grid 100,0"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     150,
+     20,
+     0
+    ]
+   ],
+   "label": "grid 150,0"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     200,
+     20,
+     0
+    ]
+   ],
+   "label": "grid 200,0"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     250,
+     20,
+     0
+    ]
+   ],
+   "label": "grid 250,0"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     300,
+     20,
+     0
+    ]
+   ],
+   "label": "grid 300,0"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     50,
+     20,
+     -30
+    ]
+   ],
+   "label": "grid 50,-30"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     100,
+     20,
+     -30
+    ]
+   ],
+   "label": "grid 100,-30"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     150,
+     20,
+     -30
+    ]
+   ],
+   "label": "grid 150,-30"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     200,
+     20,
+     -30
+    ]
+   ],
+   "label": "grid 200,-30"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     250,
+     20,
+     -30
+    ]
+   ],
+   "label": "grid 250,-30"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     300,
+     20,
+     -30
+    ]
+   ],
+   "label": "grid 300,-30"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     50,
+     20,
+     -60
+    ]
+   ],
+   "label": "grid 50,-60"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     100,
+     20,
+     -60
+    ]
+   ],
+   "label": "grid 100,-60"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     150,
+     20,
+     -60
+    ]
+   ],
+   "label": "grid 150,-60"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     200,
+     20,
+     -60
+    ]
+   ],
+   "label": "grid 200,-60"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     250,
+     20,
+     -60
+    ]
+   ],
+   "label": "grid 250,-60"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     300,
+     20,
+     -60
+    ]
+   ],
+   "label": "grid 300,-60"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     50,
+     20,
+     -90
+    ]
+   ],
+   "label": "grid 50,-90"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     100,
+     20,
+     -90
+    ]
+   ],
+   "label": "grid 100,-90"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     150,
+     20,
+     -90
+    ]
+   ],
+   "label": "grid 150,-90"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     200,
+     20,
+     -90
+    ]
+   ],
+   "label": "grid 200,-90"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     250,
+     20,
+     -90
+    ]
+   ],
+   "label": "grid 250,-90"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     300,
+     20,
+     -90
+    ]
+   ],
+   "label": "grid 300,-90"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     50,
+     20,
+     -120
+    ]
+   ],
+   "label": "grid 50,-120"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     100,
+     20,
+     -120
+    ]
+   ],
+   "label": "grid 100,-120"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     150,
+     20,
+     -120
+    ]
+   ],
+   "label": "grid 150,-120"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     200,
+     20,
+     -120
+    ]
+   ],
+   "label": "grid 200,-120"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     250,
+     20,
+     -120
+    ]
+   ],
+   "label": "grid 250,-120"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     300,
+     20,
+     -120
+    ]
+   ],
+   "label": "grid 300,-120"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     50,
+     20,
+     -150
+    ]
+   ],
+   "label": "grid 50,-150"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     100,
+     20,
+     -150
+    ]
+   ],
+   "label": "grid 100,-150"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     150,
+     20,
+     -150
+    ]
+   ],
+   "label": "grid 150,-150"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     200,
+     20,
+     -150
+    ]
+   ],
+   "label": "grid 200,-150"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     250,
+     20,
+     -150
+    ]
+   ],
+   "label": "grid 250,-150"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     300,
+     20,
+     -150
+    ]
+   ],
+   "label": "grid 300,-150"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     50,
+     20,
+     -180
+    ]
+   ],
+   "label": "grid 50,-180"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     100,
+     20,
+     -180
+    ]
+   ],
+   "label": "grid 100,-180"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     150,
+     20,
+     -180
+    ]
+   ],
+   "label": "grid 150,-180"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     200,
+     20,
+     -180
+    ]
+   ],
+   "label": "grid 200,-180"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     250,
+     20,
+     -180
+    ]
+   ],
+   "label": "grid 250,-180"
+  },
+  {
+   "debug": "getNavPath",
+   "args": [
+    [
+     60,
+     17,
+     -16
+    ],
+    [
+     300,
+     20,
+     -180
+    ]
+   ],
+   "label": "grid 300,-180"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "bracken_pit"
+    }
+   ],
+   "label": "planRoute bracken_pit"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "north_milestone"
+    }
+   ],
+   "label": "planRoute north_milestone"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "town_center"
+    }
+   ],
+   "label": "planRoute town_center"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "highcairn_outpost"
+    }
+   ],
+   "label": "planRoute highcairn_outpost"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "great_cairn"
+    }
+   ],
+   "label": "planRoute great_cairn"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "upper_karrow_seam"
+    }
+   ],
+   "label": "planRoute upper_karrow_seam"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "karrow_ramp_three"
+    }
+   ],
+   "label": "planRoute karrow_ramp_three"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "gravelmaw_entrance"
+    }
+   ],
+   "label": "planRoute gravelmaw_entrance"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "hollowcut_seam"
+    }
+   ],
+   "label": "planRoute hollowcut_seam"
+  },
+  {
+   "debug": "planRoute",
+   "args": [
+    {
+     "toLocationId": "thornline_camp"
+    }
+   ],
+   "label": "planRoute thornline_camp"
+  }
+ ]
+}

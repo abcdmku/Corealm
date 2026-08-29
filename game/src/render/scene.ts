@@ -382,6 +382,46 @@ export class WorldScene {
   private roadGrid = new Map<number, number[]>();
   private paving: PavingStamp[] = [];
   private waters: WaterStamp[] = [];
+  /**
+   * The macro-variation field the surface weights are broken up with.
+   *
+   * Measured before it existed: on a settlement pad the terrain relief is EXACTLY 0.000 m, so the
+   * altitude ramp that decides grass-versus-dry returns one number over the whole 7,238 m2 disc
+   * and the square reads as a single flat swatch with a hard arc where it meets the hillside -
+   * visible as the pale grey plate filling the foreground of runs/corealm/screenshots/
+   * wire-town_entrance.png. Altitude is also the ONLY signal the weights had, and the height noise
+   * has no content below a 21 m wavelength, so the same flatness applies at every scale a player
+   * walks through. Two octaves of dedicated surface noise at 62 m and 19 m give the weights
+   * something to vary by that the height field does not have to provide.
+   */
+  private surfaceNoise: Noise2D | null = null;
+  /** Graded corridors joining flat pads the raw terrain cannot join. See `buildHaulRoads`. */
+  private hauls: HaulRoad[] = [];
+  private haulGrid = new Map<number, number[]>();
+  /**
+   * The pads that were authored with an explicit height — the fishing basins.
+   *
+   * They are holes, not places, so they are excluded from the haul-road graph: a corridor graded
+   * down to a basin floor is a drainage channel, and nobody asked for one.
+   */
+  private carvedPads = new Set<FlatSpot>();
+  /**
+   * The pads a haul road is not allowed to regrade: buildable ground and water basins.
+   *
+   * Measured pad inventory for the authored world (47 pads): 40 location markers at radius 7 /
+   * blend 9, three settlement pads at radius 26.1, 34.1 and 43, and four fishing basins carrying
+   * an explicit height. The two populations are 19 m apart in radius, so a radius threshold
+   * separates them cleanly and will keep separating them as settlements are re-authored.
+   *
+   * The distinction matters because the two kinds of pad want opposite things from a corridor. A
+   * settlement pad IS the buildable ground - the `building-footing` gate line measures 0.000 m of
+   * tilt across 46 footprints and a graded lane through it would be a trench across the town. A
+   * location pad is a 7 m marker that exists so an interaction does not happen on a broken slope,
+   * and `karrow_ramp_two` is literally named "Second Ramp": a road at road grade running through
+   * it is what the content asked for. Carved pads are basins, and a road draining one is not a
+   * road.
+   */
+  private protectedPads: FlatSpot[] = [];
   /** Set once stamps have been supplied, which is what retires the road ribbon path. */
   private stampsProvided = false;
 
@@ -427,7 +467,11 @@ export class WorldScene {
       };
     });
 
+    // Its own stream, drawn once, so adding it shifts nothing else in the world's rng order.
+    this.surfaceNoise = createValueNoise((spec.regions[0]?.seed ?? 0x5b0a11) ^ 0x51_7f_ac_e1);
+
     this.resolveFlatTargets();
+    this.buildHaulRoads();
     this.normaliseFlats();
     this.buildLattice();
 
@@ -482,6 +526,7 @@ export class WorldScene {
     };
     const field = makeRegionField(region);
     const range = sweepFieldRange(rect, field);
+    this.surfaceNoise ??= createValueNoise(spec.seed ^ 0x51_7f_ac_e1);
     this.fields.push({
       spec: region,
       height: field,
@@ -654,6 +699,7 @@ export class WorldScene {
     // through it, so a pad may carve at most MAX_PAD_CARVE below the natural ground at its centre.
     for (const flat of this.flats) {
       if (flat.height === undefined) continue;
+      this.carvedPads.add(flat);
       const natural = this.naturalHeight(flat.x, flat.z);
       flat.height = Math.max(flat.height, natural - MAX_PAD_CARVE);
     }
@@ -699,6 +745,240 @@ export class WorldScene {
     }
   }
 
+  /**
+   * Grades a walkable corridor between every pair of neighbouring flat pads the raw terrain cannot
+   * join - a haul road up a quarry face.
+   *
+   * THE DEFECT THIS CLOSES. Karrowmoor is four terraces and every flat place on it is a pad: the
+   * Moor Road Bend, Highcairn, the two ramps, the Upper Karrow Seam, the Great Cairn. Measured
+   * against `NAV_CONFIG.walkableSlopeAngle` of 48 degrees, the ground BETWEEN those pads was not
+   * walkable - the Moor Road Bend to Highcairn escarpment peaked at 1.38 (54 degrees) and the
+   * ramp-two to ramp-three riser at 1.02 (45.6 degrees). Recast therefore never connected terrace
+   * two, and an offline navmesh build over the authored 6x7 probe grid (x 50..300, z 0..-180 from
+   * the Lower Quarry at (60,-16)) reached 7 of 42 cells: only the z = 0 strip. Highcairn, its
+   * bank, its plots, both ramps, the Upper Karrow Seam and the Great Cairn were all NOT_REACHABLE,
+   * which is three red gate-check lines.
+   *
+   * WHY IT IS A TERRAIN FIX AND NOT A NAVIGATION ONE. Nothing about the navmesh is wrong. A
+   * terraced quarry with no way up its faces is a quarry nobody could have worked, and the way up
+   * a quarry face is a haul road: a graded cutting across the riser. So the ground grows one,
+   * rather than the slope limit being loosened to pretend the cliff is walkable.
+   *
+   * WHERE THE ROUTES COME FROM. The pads themselves. Every named location in `content/regions.ts`
+   * is a pad, and the authored road network joins locations, so the pad graph already contains
+   * every route the content asks for and this file does not have to know the content to find them.
+   * The graph is Gabriel-like: A and B are neighbours when no third pad sits inside the circle on
+   * AB as diameter, which keeps the edges local and drops the long chords that would cut a trench
+   * across a whole region. Only edges whose terrain measures too steep are graded at all, so
+   * Fallowmarch and Vellenwood, where the worst authored route measures 0.66, get none.
+   *
+   * The Agility distance ledger in `content/regions.ts` is unaffected: it is straight-line metres
+   * between authored coordinates and a haul road changes only y.
+   */
+  private buildHaulRoads(): void {
+    this.protectedPads = this.flats.filter(
+      (flat) => this.carvedPads.has(flat) || padReach(flat) >= HAUL_PROTECTED_PAD_REACH,
+    );
+    const pads = this.flats.filter((flat) => !this.carvedPads.has(flat));
+    if (pads.length < 2) return;
+
+    for (let i = 0; i < pads.length; i += 1) {
+      for (let j = i + 1; j < pads.length; j += 1) {
+        const a = pads[i]!;
+        const b = pads[j]!;
+        const span = Math.hypot(b.x - a.x, b.z - a.z);
+        if (span < HAUL_MIN_LINK || span > HAUL_MAX_LINK) continue;
+        if (!isGabrielNeighbour(pads, i, j)) continue;
+        const road = this.gradeHaulRoad(a, b, span);
+        if (!road) continue;
+        this.hauls.push(road);
+        this.indexHaulRoad(this.hauls.length - 1, road);
+      }
+    }
+  }
+
+  /**
+   * Samples the ground along one pad-to-pad link and, if it is too steep to walk, returns the
+   * graded profile that replaces it.
+   *
+   * Grading is repeated binomial smoothing with the two endpoints pinned. That is the cheapest
+   * operation that is local (a straight stretch is a fixed point of a blur, so only the riser
+   * moves) and guaranteed to converge - the limit of the blur is the straight line between the
+   * pins, whose gradient is the link's mean and therefore the gentlest any corridor between those
+   * two pads could be. It stops as soon as the profile is walkable, so the corridor keeps as much
+   * of the hill's shape as the grade allows.
+   */
+  private gradeHaulRoad(a: FlatSpot, b: FlatSpot, span: number): HaulRoad | null {
+    const count = Math.max(3, Math.round(span / HAUL_SAMPLE_METRES) + 1);
+    const xs = new Float64Array(count);
+    const zs = new Float64Array(count);
+    const natural = new Float64Array(count);
+    // A sample is pinned when the ground under it belongs to something the corridor may not move:
+    // the two pads it joins, and the core of any settlement pad or basin it crosses. Pinning is
+    // what makes `protectedAuthority` continuous rather than a step - the profile and the pad
+    // already agree where the corridor loses its authority, so switching it off changes nothing.
+    const pinned = new Array<boolean>(count).fill(false);
+    const spacing = span / (count - 1);
+
+    for (let index = 0; index < count; index += 1) {
+      const t = index / (count - 1);
+      const x = a.x + (b.x - a.x) * t;
+      const z = a.z + (b.z - a.z) * t;
+      xs[index] = x;
+      zs[index] = z;
+      natural[index] = this.heightAtXZ(x, z);
+      if (index === 0 || index === count - 1) pinned[index] = true;
+      else for (const flat of this.protectedPads) {
+        if (padDistance(flat, x, z) <= 0) { pinned[index] = true; break; }
+      }
+    }
+
+    if (worstRise(natural) <= HAUL_TRIGGER_GRADE * spacing) return null;
+
+    const limit = HAUL_ROAD_GRADE * spacing;
+    const graded = Float64Array.from(natural);
+    const previous = new Float64Array(count);
+    for (let pass = 0; pass < HAUL_SMOOTH_PASSES; pass += 1) {
+      if (worstRise(graded) <= limit) break;
+      previous.set(graded);
+      for (let index = 1; index < count - 1; index += 1) {
+        if (pinned[index]) continue;
+        graded[index] = (previous[index - 1]! + 2 * previous[index]! + previous[index + 1]!) / 4;
+      }
+    }
+
+    // Nothing moved far enough to be worth a corridor: the link measured steep because of a single
+    // 2 m sample, and ground that shifts by centimetres is not a road.
+    let deepest = 0;
+    for (let index = 0; index < count; index += 1) {
+      deepest = Math.max(deepest, Math.abs(graded[index]! - natural[index]!));
+    }
+    if (deepest < HAUL_MIN_CUT) return null;
+
+    // The cutting has to blend back into the hillside it was cut out of, and how far that takes is
+    // set by the ground at the collar's OWN outer edge, not by the ground on the centreline. Those
+    // are different numbers wherever a pad has already pulled the centreline down — measured at
+    // the ramp-two corridor, the centreline cut read 0.5 m while the hillside 6 m to the side stood
+    // 7 m higher, so a collar sized off the centreline left a slot with a 2.22 gradient wall. The
+    // probe distance depends on the collar width and the collar width depends on the probe, so it
+    // is a fixed point; four passes converge it to under 10 cm on every corridor in the world.
+    const nx = -(b.z - a.z) / span;
+    const nz = (b.x - a.x) / span;
+    const feather = new Float64Array(count);
+    feather.fill(HAUL_MIN_FEATHER);
+    for (let pass = 0; pass < 4; pass += 1) {
+      for (let index = 0; index < count; index += 1) {
+        const reach = HAUL_ROAD_HALF + feather[index]!;
+        const target = graded[index]!;
+        let drop = Math.abs(target - natural[index]!);
+        for (const side of [-1, 1]) {
+          const px = xs[index]! + nx * reach * side;
+          const pz = zs[index]! + nz * reach * side;
+          const ground = this.heightAtXZ(px, pz);
+          drop = Math.max(drop, Math.abs(ground - target));
+        }
+        feather[index] = clamp(drop / HAUL_FEATHER_GRADE, HAUL_MIN_FEATHER, HAUL_MAX_FEATHER);
+      }
+    }
+    // One smoothing pass on the collar width itself, so the corridor's edge is a line rather than
+    // a staircase of per-sample widths.
+    const collar = Float64Array.from(feather);
+    for (let index = 1; index < count - 1; index += 1) {
+      collar[index] = (feather[index - 1]! + 2 * feather[index]! + feather[index + 1]!) / 4;
+    }
+
+    return { xs, zs, heights: graded, feather: collar };
+  }
+
+  /** Buckets each corridor segment on the same grid scheme the road stamps use. */
+  private indexHaulRoad(roadIndex: number, road: HaulRoad): void {
+    for (let index = 0; index < road.xs.length - 1; index += 1) {
+      const reach = HAUL_ROAD_HALF + Math.max(road.feather[index]!, road.feather[index + 1]!);
+      const minX = Math.min(road.xs[index]!, road.xs[index + 1]!) - reach;
+      const maxX = Math.max(road.xs[index]!, road.xs[index + 1]!) + reach;
+      const minZ = Math.min(road.zs[index]!, road.zs[index + 1]!) - reach;
+      const maxZ = Math.max(road.zs[index]!, road.zs[index + 1]!) + reach;
+      for (let cz = Math.floor(minZ / HAUL_CELL); cz <= Math.floor(maxZ / HAUL_CELL); cz += 1) {
+        for (let cx = Math.floor(minX / HAUL_CELL); cx <= Math.floor(maxX / HAUL_CELL); cx += 1) {
+          const key = cellKey(cx, cz);
+          const packed = roadIndex * HAUL_INDEX_STRIDE + index;
+          const bucket = this.haulGrid.get(key);
+          if (bucket) bucket.push(packed);
+          else this.haulGrid.set(key, [packed]);
+        }
+      }
+    }
+  }
+
+  /**
+   * Blends a point toward whatever haul-road corridors reach it.
+   *
+   * Same weighted-mean-plus-influence shape as `applyFlats`, for the same reason: the mean decides
+   * WHAT the ground becomes where two corridors cross, and the separate influence decides HOW MUCH
+   * of it survives at the corridor's edge. Both terms use the same falloff, so a crossing is
+   * continuous rather than a seam.
+   */
+  private applyHaulRoads(x: number, z: number, height: number): number {
+    if (this.hauls.length === 0) return height;
+    const bucket = this.haulGrid.get(cellKey(Math.floor(x / HAUL_CELL), Math.floor(z / HAUL_CELL)));
+    if (!bucket) return height;
+
+    let accumulated = 0;
+    let weightSum = 0;
+    let influence = 0;
+
+    for (const packed of bucket) {
+      const road = this.hauls[Math.floor(packed / HAUL_INDEX_STRIDE)]!;
+      const index = packed % HAUL_INDEX_STRIDE;
+      const ax = road.xs[index]!;
+      const az = road.zs[index]!;
+      const ex = road.xs[index + 1]! - ax;
+      const ez = road.zs[index + 1]! - az;
+      const lengthSquared = ex * ex + ez * ez;
+      const t = lengthSquared <= 1e-9
+        ? 0
+        : clamp(((x - ax) * ex + (z - az) * ez) / lengthSquared, 0, 1);
+      const distance = Math.hypot(x - (ax + ex * t), z - (az + ez * t));
+      const feather = road.feather[index]! + (road.feather[index + 1]! - road.feather[index]!) * t;
+      if (distance > HAUL_ROAD_HALF + feather) continue;
+      const weight = 1 - smoothstep01((distance - HAUL_ROAD_HALF) / feather);
+      if (weight <= 0) continue;
+      const target = road.heights[index]! + (road.heights[index + 1]! - road.heights[index]!) * t;
+      influence = Math.max(influence, weight);
+      accumulated += target * weight;
+      weightSum += weight;
+    }
+
+    if (weightSum <= 0) return height;
+    const reach = influence * (1 - this.protectedAuthority(x, z));
+    if (reach <= 0) return height;
+    return height + (accumulated / weightSum - height) * reach;
+  }
+
+  /**
+   * How much of the ground at a point belongs to a pad a corridor may not move, 0..1.
+   *
+   * 1 inside a settlement pad or a basin core, falling to 0 across that pad's own blend, so a
+   * corridor hands the ground back to the settlement over the same distance the settlement is
+   * already using to meet the hillside. That is what lets the haul roads run LAST without a lane
+   * being cut across a town square: Coldbrace, Rootfall and Highcairn keep the 0.000 m of relief
+   * across their pads that `building-footing` measures, while the corridor keeps full authority on
+   * the open riser where the walkable-slope problem actually is.
+   *
+   * Only the protected pads are swept — seven of the world's 47 — and only when a corridor already
+   * reaches the point, so this costs nothing on the 99% of the lattice no haul road touches.
+   */
+  private protectedAuthority(x: number, z: number): number {
+    let authority = 0;
+    for (const flat of this.protectedPads) {
+      const distance = padDistance(flat, x, z);
+      if (distance >= flat.blend) continue;
+      const falloff = distance <= 0 ? 1 : 1 - smoothstep01(distance / Math.max(0.001, flat.blend));
+      if (falloff > authority) authority = falloff;
+    }
+    return authority;
+  }
+
   /** Adds a flattened building pad. Call before `buildWorld`; it changes the ground. */
   addFlatSpot(flat: FlatSpot): void {
     this.flats.push(flat);
@@ -719,9 +999,27 @@ export class WorldScene {
     return this.heightAtXZ(x, z);
   }
 
-  /** Blended world height at a point, in metres. */
+  /**
+   * Blended world height at a point, in metres.
+   *
+   * Three layers, in this order: the region fields, then the flat pads, then the haul roads cut
+   * through what those two leave.
+   *
+   * THE ROADS USED TO RUN SECOND AND IT COST THE WHOLE GRADE. `applyFlats` is affine in the height
+   * it is handed - `h + (padMean - h) * padInfluence` - so wherever a pad reached, the corridor
+   * underneath it had no say at all. Highcairn's pad blend is 26 m wide and the Moor Road Bend's
+   * is 9 m, which between them cover 40 of the 65.4 m from the bend to the outpost: the corridor
+   * spent its whole 0.30 allowance climbing ground the pads then flattened back down, and the
+   * climb it still owed was squeezed into what was left. Measured along that centreline the
+   * surface ran flat for 8 m and then hit 0.98 (44.4 degrees) at 13 m, against a 48-degree
+   * walkable limit - 3.6 degrees of margin on the one route into Highcairn.
+   *
+   * Running the roads last inverts that: the corridor is authoritative on the open riser, which is
+   * exactly where a haul road belongs. What protects the settlements is not the ordering but
+   * `protectedAuthority` - see `applyHaulRoads`.
+   */
   heightAtXZ(x: number, z: number): number {
-    return this.applyFlats(x, z, this.naturalHeight(x, z));
+    return this.applyHaulRoads(x, z, this.applyFlats(x, z, this.naturalHeight(x, z)));
   }
 
   private naturalHeight(x: number, z: number): number {
@@ -763,14 +1061,28 @@ export class WorldScene {
    * 10.37 m. That is a 32.75 m step in 1 m, and 3.4% of the world (1317 of 38332 samples) came out
    * steeper than 45 degrees with a maximum of 86.3.
    *
-   * The replacement is inverse-distance weighting. Every pad in range contributes
-   * `((1-t)/t)^3` where `t` is the fraction of the way through its falloff, so:
+   * The replacement is inverse-distance weighting, and the DISTANCE UNIT MATTERS. The first
+   * version weighted by `1/t^3` where `t` is the fraction of the way through a pad's own falloff.
+   * That keeps a core flat, but between two pads it concentrates the whole height change into the
+   * middle of the gap: differentiating `t_b^3 / (t_a^3 + t_b^3)` at the crossover gives 3x the
+   * mean gradient, so the 15.96 m between the Moor Road Bend pad and Highcairn's came out at 1.38
+   * (54 degrees) instead of the 0.58 the gap could have carried. Recast refused it, and half of
+   * Karrowmoor was unreachable on foot as a result.
    *
-   *  - the weight rises without bound toward a pad's core, which is what makes flat mean flat: at
-   *    Coldbrace's centre the settlement pad outweighs anything else that reaches it by 10^5, so
+   * Weighting by `falloff / distance` in METRES fixes that by construction: with `d_a + d_b`
+   * constant along the line between two cores, `d_b / (d_a + d_b)` is LINEAR in position, so two
+   * pads produce a constant-gradient ramp of exactly `height difference / gap`. The measured
+   * consequence, world-wide: samples with |mesh - field| > 0.5 m went 20 -> 4 and the worst
+   * disagreement 0.779 -> 0.633 m, because the field stopped having sub-2 m structure the mesh
+   * lattice cannot represent.
+   *
+   * The rest of the properties are unchanged:
+   *
+   *  - the weight still rises without bound toward a pad's core, which is what makes flat mean
+   *    flat: at Coldbrace's centre the settlement pad outweighs anything reaching it by 10^5, so
    *    the measured relief across the pad stays 0.000 m and buildings still assemble level;
-   *  - it is continuous everywhere, including across a core boundary, so two pads with different
-   *    targets produce a RAMP between them instead of a step;
+   *  - `falloff` in the numerator takes the weight continuously to zero at the blend edge, so a
+   *    pad entering or leaving the sum cannot step the surface;
    *  - cores weight by penetration depth, so where two cores overlap the deeper one wins smoothly
    *    rather than by list order.
    *
@@ -797,7 +1109,7 @@ export class WorldScene {
       const t = distance <= 0 ? 0 : distance / Math.max(0.001, flat.blend);
       const falloff = distance <= 0 ? 1 : 1 - smoothstep01(t);
       const depth = distance < 0 ? -distance : 0;
-      const weight = (1 + depth) / (t * t * t + PAD_CORE_EPSILON);
+      const weight = ((1 + depth) * falloff) / (Math.max(0, distance) + PAD_CORE_EPSILON);
       influence = Math.max(influence, falloff);
       accumulated += target * weight;
       weightSum += weight;
@@ -1125,6 +1437,8 @@ export class WorldScene {
       out.dirt = 0; out.mud = 0; out.cobble = 0; out.wet = 0;
       out.roadPerpendicular = 0.5;
       out.roadPresence = 0;
+      out.roadWear = 0;
+      out.macro = 0.5;
       return;
     }
 
@@ -1141,21 +1455,50 @@ export class WorldScene {
     // world this lands in roughly -0.35..0.35 m, so 0.10 is a pronounced hollow, not a wobble.
     const curvature = (hxp + hxm + hzp + hzm - 4 * height) / (step * step);
 
+    // Macro variation. Everything above this point is derived from the height field, and the
+    // height field is flat on every pad and smooth at 21 m and up everywhere else, so without an
+    // independent signal the ground has nothing to say between a hill and a texel. Two octaves:
+    // 62 m sets which parts of a meadow are dry and which are lush, 19 m breaks the boundary
+    // between them so it is not one soft gradient.
+    const noise = this.surfaceNoise;
+    const macro = noise
+      ? noise(x / 62, z / 62) * 0.62 + noise((x + 611) / 19, (z - 407) / 19) * 0.38
+      : 0;
+
+    // Altitude still leads, and the noise is a bias on it rather than a replacement, so the
+    // region's authored high/low swatches still land where the region author put them.
+    const dryness = clamp(local + macro * SURFACE_MACRO_RANGE, 0, 1);
+
     // Slope above ~23 degrees loses its soil and shows stone. Lowered from the old 0.5 threshold
-    // because at 0.5 only 12.71% of the world had any surface variation at all.
-    const rock = smoothstep01((slope - 0.42) / 0.5);
-    // Debris collects in hollows and washes off crests.
-    const gravel = smoothstep01((curvature - 0.05) / 0.14) * (1 - rock * 0.6);
+    // because at 0.5 only 12.71% of the world had any surface variation at all. The macro field
+    // moves the soil line by +/-3.5 degrees so it is a coastline rather than a contour.
+    const rock = smoothstep01((slope - 0.42 - macro * 0.07) / 0.5);
+    // Debris collects in hollows and washes off crests, and gathers in patches within that.
+    const gravel = smoothstep01((curvature - 0.05) / 0.14) * (1 - rock * 0.6)
+      * clamp(0.45 + macro * 0.8, 0, 1);
 
     // Stamps, in priority order: paving beats a road, a road beats a waterlogged bank.
+    //
+    // The corridor is deliberately narrow and hard-edged. The first stamped version feathered from
+    // a 1.9 m worn half-width out to 3.4 m, and 1.5 m of gradient either side of a 3.8 m track is
+    // most of what a player sees, so the road read as an airbrush smear rather than as a track
+    // with a verge. 1.5 m of full wear out to 2.5 m is a 3 m rut band with a 1 m shoulder, and the
+    // shoulder now carries GRAVEL rather than more dirt, so the edge is a material change instead
+    // of a fade to nothing.
     const road = this.roadAt(x, z);
     let dirt = 0;
+    let verge = 0;
     let roadPerpendicular = 0.5;
     let roadPresence = 0;
+    let roadWear = 0;
     if (road) {
       dirt = 1 - smoothstep01((road.distance - ROAD_WORN_HALF) / (ROAD_FADE_HALF - ROAD_WORN_HALF));
+      // A gravel shoulder peaking exactly where the dirt gives out, and gone by the time the
+      // untouched ground starts.
+      verge = (1 - dirt) * (1 - smoothstep01((road.distance - ROAD_FADE_HALF) / ROAD_VERGE_METRES));
       roadPerpendicular = clamp(road.perpendicular / (ROAD_PERP_RANGE * 2) + 0.5, 0, 1);
       roadPresence = dirt > 0.02 ? 1 : 0;
+      roadWear = dirt;
     }
 
     let cobble = 0;
@@ -1179,20 +1522,23 @@ export class WorldScene {
     dirt = Math.min(dirt, 1 - cobble);
     wet = Math.min(wet, 1 - cobble - dirt);
     mud = Math.min(mud, Math.max(0, 1 - cobble - dirt - wet));
+    verge = Math.min(verge, Math.max(0, 1 - cobble - dirt - wet - mud));
 
-    const stamped = clamp(cobble + dirt + wet + mud, 0, 1);
+    const stamped = clamp(cobble + dirt + wet + mud + verge, 0, 1);
     const natural = 1 - stamped;
     out.rock = rock * natural;
-    out.gravel = clamp(gravel, 0, 1) * (1 - rock) * natural;
-    const remaining = Math.max(0, natural - out.rock - out.gravel);
-    out.dry = remaining * local;
-    out.grass = remaining * (1 - local);
+    out.gravel = clamp(gravel, 0, 1) * (1 - rock) * natural + verge;
+    const remaining = Math.max(0, natural - rock * natural - clamp(gravel, 0, 1) * (1 - rock) * natural);
+    out.dry = remaining * dryness;
+    out.grass = remaining * (1 - dryness);
     out.cobble = cobble;
     out.dirt = dirt;
     out.wet = wet;
     out.mud = mud;
     out.roadPerpendicular = roadPerpendicular;
     out.roadPresence = roadPresence;
+    out.roadWear = roadWear;
+    out.macro = clamp(macro * 0.5 + 0.5, 0, 1);
 
     out.colour.setRGB(
       (lowR * out.grass + highR * out.dry + rockR * out.rock + gravelR * out.gravel
@@ -1304,8 +1650,15 @@ export class WorldScene {
     const centreZ = (rect.minZ + rect.maxZ) / 2;
     const maxRadius = Math.max(rect.maxX - rect.minX, rect.maxZ - rect.minZ) / 2;
 
-    // Shoreline distance per azimuth. Bisection rather than a linear walk because the bank is
-    // monotonic over the basin's own falloff and 18 samples resolve it to under a centimetre.
+    // Shoreline distance per azimuth: the FIRST radius at which the drawn ground crosses the
+    // surface, found by marching outward and then bisecting inside the metre it crossed in.
+    //
+    // This was a pure bisection with an early-out that returned `maxRadius` whenever the ground at
+    // maxRadius was below the level, on the stated reasoning that the bank is monotonic over the
+    // basin's falloff. Measured, it is not: on a 1 m grid, 11% of the Redsill and Cairn Tarn disc
+    // footprints stood ABOVE the surface by up to 2.12 m, because a spur crosses the plane at
+    // r = 21 and drops back under it by r = 23, and the early-out drew straight over the top of it.
+    // Marching finds the first crossing by construction, which is the definition of a shoreline.
     const shoreline = new Float64Array(WATER_SEGMENTS);
     for (let step = 0; step < WATER_SEGMENTS; step += 1) {
       const angle = (step / WATER_SEGMENTS) * Math.PI * 2;
@@ -1313,11 +1666,14 @@ export class WorldScene {
       const dz = Math.sin(angle);
       let low = 0;
       let high = maxRadius;
-      if (this.meshHeightAt(centreX + dx * high, centreZ + dz * high) < level) {
-        shoreline[step] = high;
-        continue;
+      for (let radius = WATER_MARCH_METRES; radius <= maxRadius; radius += WATER_MARCH_METRES) {
+        if (this.meshHeightAt(centreX + dx * radius, centreZ + dz * radius) >= level) {
+          high = radius;
+          break;
+        }
+        low = radius;
       }
-      for (let iteration = 0; iteration < 18; iteration += 1) {
+      for (let iteration = 0; iteration < 12; iteration += 1) {
         const mid = (low + high) / 2;
         if (this.meshHeightAt(centreX + dx * mid, centreZ + dz * mid) < level) low = mid;
         else high = mid;
@@ -1346,7 +1702,14 @@ export class WorldScene {
         const z = dz * radius;
         positions[index * 3] = x;
         positions[index * 3 + 2] = z;
-        depths[index] = Math.max(0, level - this.meshHeightAt(centreX + x, centreZ + z));
+        // The outer ring is the edge of the surface whether the terrain closed it or the caller's
+        // rect did. Writing zero depth there makes the material fade the last ring out in both
+        // cases, so a disc cut off by its rect ends as a haze rather than as a straight line
+        // across open water. Measured, that is 26 of 32 azimuths on the Redsill basin, where the
+        // ground under the rim is still 0.6-0.8 m below the surface.
+        depths[index] = ring === rings - 1
+          ? 0
+          : Math.max(0, level - this.meshHeightAt(centreX + x, centreZ + z));
       }
     }
 
@@ -1376,12 +1739,14 @@ export class WorldScene {
     mesh.castShadow = false;
     mesh.receiveShadow = false;
     this.scatterGroup.add(mesh);
-    // The bank treatment in the terrain splat needs to know where the waterline is. Registering
-    // here rather than requiring a separate call is what keeps the mud and the shoreline agreeing
-    // even when the caller only knows about the water.
-    this.waters.push({ centre: [centreX, centreZ], radius: maxRadius, level });
+    // The bank treatment in the terrain splat needs to know where the waterline is, so it is
+    // registered at the radius the SHORELINE reached rather than at the rect the caller guessed.
+    // Registering the guess put the mud and wet bands metres inside or outside the drawn edge.
+    let reached = WATER_MIN_RADIUS;
+    for (let step = 0; step < WATER_SEGMENTS; step += 1) reached = Math.max(reached, shoreline[step]!);
+    this.waters.push({ centre: [centreX, centreZ], radius: reached, level });
     if (this.chunks.length > 0) {
-      const reach = maxRadius + WATER_BANK_METRES;
+      const reach = reached + WATER_BANK_METRES;
       this.restampArea(centreX - reach, centreZ - reach, centreX + reach, centreZ + reach);
     }
     return mesh;
@@ -1630,6 +1995,7 @@ export class WorldScene {
     this.world = null;
     this.legacySamplers.clear();
     this.scatterByRegion.clear();
+    this.surfaceNoise = null;
     this.playerMesh = null;
     this.lastSyncMs = 0;
     this.lattice = null;
@@ -1639,6 +2005,9 @@ export class WorldScene {
     this.roadGrid.clear();
     this.paving = [];
     this.waters = [];
+    this.hauls = [];
+    this.haulGrid.clear();
+    this.carvedPads.clear();
     this.stampsProvided = false;
   }
 }
@@ -1697,16 +2066,37 @@ function makeRegionField(spec: RegionTerrainSpec): (x: number, z: number) => num
 
     case "highlands":
       return (x, z) => {
-        // Terraces climb along the authored axis. Every riser stays a walkable ramp, which is what
-        // keeps all terraces on one connected navmesh while still forcing a real switchback route.
+        // Terraces climb along the authored axis. The comment here used to claim every riser was a
+        // walkable ramp; measured against Karrowmoor's own numbers it was not, and that is why half
+        // the region was unreachable on foot. Karrowmoor is 210 m deep with four terraces, so a
+        // band is 52.5 m and a step is 62/4 = 15.5 m. At the old riser fraction of 0.55 the riser
+        // was 28.9 m wide, and `terrace`'s smoothstep peaks at 1.5x the mean, so the riser's own
+        // gradient was 0.80 (39 degrees) before anything else was added to it.
+        //
+        // Two terms were added to it, and both were larger than the riser they sat on:
+        //
+        //   `warp` at 0.18 shifts the terrace boundary by up to +/-38 m of ramp position, and its
+        //   own gradient (0.0019 per metre) is 43% of the ramp's 0.0045, so it inflated every riser
+        //   by nearly half again: 0.80 -> 1.14, past the 48-degree walkable limit on its own.
+        //
+        //   `rubble` was 3.7 m of relief at a 16 m feature size. Measured |grad| of that fbm is
+        //   0.16 per metre, so the rubble alone contributed 0.60 of gradient — 31 degrees of
+        //   noise stacked on top of a riser that had 0.31 of headroom left.
+        //
+        // The numbers below are chosen against that arithmetic: riser 0.62 (32.6 m wide, gradient
+        // 0.71), warp 0.10 (inflates it to 0.83), rubble 2.8 m at a 33 m feature (gradient 0.21).
+        // Measured world-wide the change took analytic samples steeper than 45 degrees from 901 to
+        // 720 and it is what lets the haul roads (see `buildHaulRoads`) start from ground that is
+        // already close to walkable. The terrace BENCHES are untouched: 38% of each band is still
+        // dead flat, which is what a quarry terrace is.
         const ramp = clamp(terraceRamp(spec, x, z, width, depth), 0, 1);
-        const warp = fbm(noise, x, z, 2, 190) * 0.18;
+        const warp = fbm(noise, x, z, 2, 190) * 0.10;
         const steps = spec.terraceSteps ?? 4;
-        const terraced = terrace(clamp(ramp * 0.94 + warp, 0, 0.999) * steps, 0.55) / steps;
+        const terraced = terrace(clamp(ramp * 0.94 + warp, 0, 0.999) * steps, 0.62) / steps;
 
         // Ridge spurs running across the slope. Ridged noise (1 - |n|) makes crests, not bumps.
         const spur = (1 - Math.abs(fbm(detail, x, z, 3, 105))) * 0.32;
-        const rubble = fbm(detail, x * 1.6, z * 1.6, 3, 26) * 0.06;
+        const rubble = fbm(detail, x * 0.9, z * 0.9, 3, 30) * 0.045;
 
         return spec.baseHeight + (terraced + spur * 0.22 + rubble) * spec.amplitude;
       };
@@ -1731,14 +2121,32 @@ function terraceRamp(spec: RegionTerrainSpec, x: number, z: number, width: numbe
  * The road corridor, in metres either side of the centreline.
  *
  * `ROAD_WORN_HALF` is fully worn track; from there the dirt weight feathers out to
- * `ROAD_FADE_HALF`. Wider than the old ribbon's 1.6 m half-width because a corridor written into a
- * 2 m vertex lattice needs to catch at least two vertices across to read as a track at all.
+ * `ROAD_FADE_HALF` and a gravel shoulder carries it the last `ROAD_VERGE_METRES`.
+ *
+ * The first stamped version used 1.9 m and 3.4 m, which put 1.5 m of pure gradient either side of
+ * a 3.8 m track, and a 6.8 m corridor that is more than half feather reads as an airbrush smear
+ * rather than as a road. 1.5 m and 2.5 m is a 3 m rut band with a 1 m shoulder: the boundary lands
+ * inside one 2 m lattice quad, which is as hard an edge as vertex weights on this lattice can
+ * make, and the shoulder is a MATERIAL change (gravel) rather than less of the same dirt.
+ *
  * `ROAD_PERP_RANGE` is only the encoding range of the perpendicular distance in `aGround.x`; at
- * 3.5 m it gives the fragment shader 2.7 cm of resolution, which is finer than the 16 cm rut band.
+ * 2.6 m it gives the fragment shader 2.0 cm of resolution, finer than any rut band worth drawing.
  */
-const ROAD_WORN_HALF = 1.9;
-const ROAD_FADE_HALF = 3.4;
-const ROAD_PERP_RANGE = 3.5;
+const ROAD_WORN_HALF = 1.5;
+const ROAD_FADE_HALF = 2.5;
+const ROAD_PERP_RANGE = 2.6;
+
+/** How far past the worn edge the gravel shoulder reaches, in metres. */
+const ROAD_VERGE_METRES = 1.1;
+
+/**
+ * How far the macro field may bias the grass/dry split, as a fraction of the whole ramp.
+ *
+ * 0.34 is enough that a flat settlement pad, whose altitude ramp is one constant number, still
+ * shows dry patches and lush patches; small enough that the region's authored altitude palette is
+ * still the thing you read when you walk uphill.
+ */
+const SURFACE_MACRO_RANGE = 0.34;
 
 /** Bucket size for the road segment grid, in metres. One bucket covers the whole fade width. */
 const ROAD_CELL = 8;
@@ -1757,6 +2165,17 @@ const WATER_RINGS = 10;
 
 /** Smallest shoreline radius a water body will draw, in metres. */
 const WATER_MIN_RADIUS = 2.5;
+
+/**
+ * Outward march step when solving for the shoreline, in metres.
+ *
+ * 1 m is half the terrain lattice's 2 m quad, so the march cannot step over a bank the drawn mesh
+ * is able to represent. 26 steps on the widest disc in the world, then 12 bisections inside the
+ * metre it crossed in, which resolves the waterline to 0.25 mm.
+ */
+const WATER_MARCH_METRES = 1;
+
+
 
 /**
  * Horizon-AO sampling: 8 azimuths at 12 / 25 / 50 m, and a floor of 0.62 at a fully blocked
@@ -1778,14 +2197,79 @@ const AO_FLOOR = 0.62;
 const MAX_PAD_CARVE = 2.6;
 
 /**
- * Softening term in the inverse-distance pad weight, which sets the weight at a pad's core edge.
+ * Softening term in the inverse-distance pad weight, in METRES, which sets the weight at a pad's
+ * core edge.
  *
- * 1e-5 puts the core-edge weight at 1e5 against about 8 for a pad halfway through its falloff, so
- * a settlement pad outweighs anything reaching into it by roughly four orders of magnitude. That
- * is what keeps the measured relief across the 7,238 m2 Coldbrace pad at 0.0000 m and lets a
- * building assemble level on it. Finite, so the field stays continuous across the core boundary.
+ * 1e-5 m puts the core-edge weight at 1e5 against about 0.05 for a pad 20 m away, so a settlement
+ * pad outweighs anything reaching into it by six orders of magnitude. That is what keeps the
+ * measured relief across the 7,238 m2 Coldbrace pad at 0.0000 m and lets a building assemble level
+ * on it. Finite, so the field stays continuous across the core boundary.
  */
 const PAD_CORE_EPSILON = 1e-5;
+
+/**
+ * Haul roads: the graded corridors `buildHaulRoads` cuts between flat pads. Every number here is
+ * measured against `NAV_CONFIG` in app/config.ts, which is cs 0.45 (large world), walkableRadius 2
+ * voxels = 0.90 m, walkableClimb 0.40 m, walkableSlopeAngle 48 degrees = a gradient of 1.111.
+ *
+ * HAUL_TRIGGER_GRADE 0.72 (36 degrees) is where a link stops being walkable in practice rather
+ * than in theory: recast rasterises at 0.45 m and the 2 m terrain lattice quantises the slope it
+ * sees, so ground measured at 0.72 has produced spans recast rejected. Everything under it is left
+ * exactly as the region field wrote it.
+ *
+ * HAUL_ROAD_GRADE 0.45 (24 degrees) is what a graded corridor aims for - two thirds of the limit,
+ * which leaves the slope headroom for the 2 m lattice's own quantisation and for whatever a pad
+ * collar adds on top.
+ *
+ * HAUL_ROAD_HALF 2.6 m of full regrade is 5.2 m of flat lane. Recast erodes walkableRadius 0.90 m
+ * from each side, so 3.4 m of walkable width survives - nearly four times the agent - and the
+ * collar outside it is graded too, so the usable corridor is wider still.
+ *
+ * HAUL_MIN_LINK 10 m was 18, which silently dropped the shortest authored ramp in the world: the
+ * Lower Quarry to the Gravelmaw mouth is 16.1 m apart with a 3.91 m step, so it got no corridor
+ * and measured 1.85 (61.6 degrees). The 16 m walk between them pathed 131.1 m round the outside.
+ * Nothing is lost by lowering it, because two pads at the same height never trip
+ * HAUL_TRIGGER_GRADE in the first place; HAUL_MAX_LINK 150 m is longer than the longest authored
+ * road link in the world (the 110.5 m Moor Road Bend to Lower Quarry) with margin.
+ */
+const HAUL_TRIGGER_GRADE = 0.50;
+const HAUL_ROAD_GRADE = 0.30;
+const HAUL_ROAD_HALF = 2.6;
+const HAUL_MIN_LINK = 10;
+const HAUL_MAX_LINK = 150;
+
+/** Spacing at which a haul road's profile is sampled and graded, in metres. Matches the lattice. */
+const HAUL_SAMPLE_METRES = 2;
+
+/**
+ * Cap on the grading blur. Each pass halves the profile's curvature over one sample, so spreading
+ * a 15 m step to a 0.45 gradient at 2 m spacing needs about 90 passes; 600 leaves room for the
+ * longest link in the world and the loop exits the moment the profile is walkable anyway.
+ */
+const HAUL_SMOOTH_PASSES = 600;
+
+/** Below this much movement a corridor is not worth cutting, in metres. */
+const HAUL_MIN_CUT = 0.35;
+
+/** Gradient of the corridor's own collar back into the hillside. */
+const HAUL_FEATHER_GRADE = 0.5;
+const HAUL_MIN_FEATHER = 3;
+const HAUL_MAX_FEATHER = 22;
+
+/** Bucket size for the haul-road segment grid, in metres. One bucket spans the widest collar. */
+const HAUL_CELL = 26;
+
+/** Segments per road in the packed grid key. Far more than any link can produce at 2 m spacing. */
+const HAUL_INDEX_STRIDE = 4096;
+
+/**
+ * Pad reach at or above which a pad is buildable ground rather than a location marker, in metres.
+ *
+ * Measured across the authored world's 47 pads: 40 location markers at radius 7, three settlement
+ * pads at 26.1, 34.1 and 43, four basins (protected by their explicit height instead). 20 m sits
+ * in the 19 m gap between the two populations.
+ */
+const HAUL_PROTECTED_PAD_REACH = 20;
 
 /** Vertical lift on a contact decal, in metres, on top of the material's polygon offset. */
 const CONTACT_DECAL_LIFT = 0.03;
@@ -1838,6 +2322,10 @@ interface SurfaceSample {
   roadPerpendicular: number;
   /** 1 where a road is close enough for wheel ruts to exist. */
   roadPresence: number;
+  /** How worn the track is here, 0 at the shoulder to 1 on the centreline. Drives rut depth. */
+  roadWear: number;
+  /** The macro-variation field, remapped onto 0..1 with 0.5 as its mean. */
+  macro: number;
 }
 
 function emptySurface(): SurfaceSample {
@@ -1845,7 +2333,7 @@ function emptySurface(): SurfaceSample {
     colour: new THREE.Color(),
     grass: 1, dry: 0, rock: 0, gravel: 0,
     dirt: 0, mud: 0, cobble: 0, wet: 0,
-    roadPerpendicular: 0.5, roadPresence: 0,
+    roadPerpendicular: 0.5, roadPresence: 0, roadWear: 0, macro: 0.5,
   };
 }
 
@@ -1871,8 +2359,8 @@ function writeSplat(
   splatB[index * 4 + 3] = toByte(surface.wet);
   extra[index * 4] = toByte(surface.roadPerpendicular);
   extra[index * 4 + 1] = toByte(surface.roadPresence);
-  extra[index * 4 + 2] = 0;
-  extra[index * 4 + 3] = 0;
+  extra[index * 4 + 2] = toByte(surface.roadWear);
+  extra[index * 4 + 3] = toByte(surface.macro);
 }
 
 interface GroundSwatches {
@@ -1926,6 +2414,49 @@ function sweepFieldRange(rect: Rect, height: (x: number, z: number) => number): 
   }
   if (!Number.isFinite(min) || !Number.isFinite(max) || max - min < 1e-3) return { min: 0, max: 1 };
   return { min, max };
+}
+
+/** One graded corridor, sampled at `HAUL_SAMPLE_METRES` along a pad-to-pad link. */
+interface HaulRoad {
+  xs: Float64Array;
+  zs: Float64Array;
+  /** The graded height at each sample, in metres. */
+  heights: Float64Array;
+  /** Collar width outside `HAUL_ROAD_HALF` at each sample, in metres. */
+  feather: Float64Array;
+}
+
+/** Largest height change between neighbouring profile samples, in metres. */
+function worstRise(profile: Float64Array): number {
+  let worst = 0;
+  for (let index = 1; index < profile.length; index += 1) {
+    const rise = Math.abs(profile[index]! - profile[index - 1]!);
+    if (rise > worst) worst = rise;
+  }
+  return worst;
+}
+
+/**
+ * True when no third pad sits inside the circle with AB as its diameter.
+ *
+ * The Gabriel graph is the right shape for "which pads are next to each other": it is local, it
+ * has no crossing edges, and it never joins two pads with a third standing between them - which is
+ * exactly the long chord that would otherwise cut a corridor straight through a settlement. The
+ * test is on pad CENTRES only, because a pad's core is flat and a corridor through flat ground
+ * costs nothing.
+ */
+function isGabrielNeighbour(pads: readonly FlatSpot[], i: number, j: number): boolean {
+  const a = pads[i]!;
+  const b = pads[j]!;
+  const midX = (a.x + b.x) / 2;
+  const midZ = (a.z + b.z) / 2;
+  const radiusSquared = ((a.x - b.x) ** 2 + (a.z - b.z) ** 2) / 4;
+  for (let k = 0; k < pads.length; k += 1) {
+    if (k === i || k === j) continue;
+    const other = pads[k]!;
+    if ((other.x - midX) ** 2 + (other.z - midZ) ** 2 < radiusSquared) return false;
+  }
+  return true;
 }
 
 /** How far a pad's core reaches from its centre, in metres. Half-diagonal for a rectangle. */

@@ -1,0 +1,8 @@
+{"name":"ramp-min3","actions":[
+{"debug":"teleport","args":[{"locationId":"gravelmaw_arena"}],"label":"tp_arena"},
+{"waitMs":600},
+{"debug":"getPlayerPosition","label":"pos_arena"},
+{"debug":"getState","label":"state_arena"},
+{"debug":"callTool","args":["corealm_move_to",{"locationId":"bracken_pit"}],"label":"mv_bracken"},
+{"debug":"callTool","args":["corealm_move_to",{"locationId":"great_cairn"}],"label":"mv_greatcairn"}
+]}

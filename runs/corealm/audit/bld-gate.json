@@ -1,0 +1,6 @@
+{
+  "name": "bld-gate-probe",
+  "actions": [
+    { "debug": "listEntities", "args": [{ "regionId": "fallowmarch" }], "label": "every fallowmarch entity" }
+  ]
+}

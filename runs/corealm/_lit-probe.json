@@ -1,0 +1,932 @@
+{
+ "blobs": [
+  {
+   "n": 6,
+   "x": 638,
+   "y": 103,
+   "sum": [
+    1.1,
+    1.02,
+    0.91
+   ],
+   "scale": 1.4,
+   "dist": 41.6
+  },
+  {
+   "n": 6,
+   "x": 1024,
+   "y": 116,
+   "sum": [
+    0.8,
+    0.74,
+    0.66
+   ],
+   "scale": 1.79,
+   "dist": 36.2
+  },
+  {
+   "n": 5,
+   "x": 1211,
+   "y": 252,
+   "sum": [
+    0.69,
+    0.64,
+    0.57
+   ],
+   "scale": 1.66,
+   "dist": 23.3
+  },
+  {
+   "n": 2,
+   "x": -325,
+   "y": 764,
+   "sum": [
+    0.54,
+    0.5,
+    0.45
+   ],
+   "scale": 0.72,
+   "dist": 14.3
+  },
+  {
+   "n": 2,
+   "x": 1210,
+   "y": 288,
+   "sum": [
+    0.51,
+    0.47,
+    0.42
+   ],
+   "scale": 0.99,
+   "dist": 23.8
+  },
+  {
+   "n": 2,
+   "x": 612,
+   "y": 643,
+   "sum": [
+    0.43,
+    0.39,
+    0.35
+   ],
+   "scale": 0.92,
+   "dist": 10.9
+  },
+  {
+   "n": 2,
+   "x": 1034,
+   "y": 158,
+   "sum": [
+    0.38,
+    0.35,
+    0.31
+   ],
+   "scale": 0.68,
+   "dist": 36.6
+  },
+  {
+   "n": 2,
+   "x": 60,
+   "y": 318,
+   "sum": [
+    0.33,
+    0.3,
+    0.27
+   ],
+   "scale": 1.04,
+   "dist": 23.8
+  },
+  {
+   "n": 5,
+   "x": 815,
+   "y": 564,
+   "sum": [
+    0.31,
+    0.28,
+    0.25
+   ],
+   "scale": 1.63,
+   "dist": 17.4
+  },
+  {
+   "n": 6,
+   "x": 244,
+   "y": 128,
+   "sum": [
+    0.3,
+    0.27,
+    0.25
+   ],
+   "scale": 1.94,
+   "dist": 31.9
+  }
+ ],
+ "hits": [
+  {
+   "px": 1189,
+   "py": 592,
+   "top": [
+    {
+     "path": "Scene/corealm-world/terrain/terrain-chunk-3-3",
+     "dist": 23.83,
+     "point": [
+      48.25,
+      8.29,
+      114.93
+     ],
+     "instanceColor": null,
+     "colorAttr": "0.025..0.361 mean 0.122 norm=false arr=Float32Array",
+     "material": {
+      "type": "MeshStandardMaterial",
+      "name": "ground",
+      "color": "#ffffff",
+      "vertexColors": true,
+      "map": null,
+      "emissive": "#000000",
+      "emissiveIntensity": 1,
+      "metalness": 0,
+      "roughness": 0.97,
+      "transparent": false,
+      "blending": 1,
+      "fog": true,
+      "toneMapped": true,
+      "envMapIntensity": 1,
+      "opacity": 1
+     }
+    }
+   ]
+  },
+  {
+   "px": 636,
+   "py": 80,
+   "top": []
+  },
+  {
+   "px": 60,
+   "py": 240,
+   "top": [
+    {
+     "path": "Scene/corealm-world/terrain/terrain-chunk-4-3",
+     "dist": 67.2,
+     "point": [
+      99.54,
+      5.47,
+      150.41
+     ],
+     "instanceColor": null,
+     "colorAttr": "0.017..0.235 mean 0.068 norm=false arr=Float32Array",
+     "material": {
+      "type": "MeshStandardMaterial",
+      "name": "ground",
+      "color": "#ffffff",
+      "vertexColors": true,
+      "map": null,
+      "emissive": "#000000",
+      "emissiveIntensity": 1,
+      "metalness": 0,
+      "roughness": 0.97,
+      "transparent": false,
+      "blending": 1,
+      "fog": true,
+      "toneMapped": true,
+      "envMapIntensity": 1,
+      "opacity": 1
+     }
+    }
+   ]
+  },
+  {
+   "px": 160,
+   "py": 235,
+   "top": [
+    {
+     "path": "Scene/corealm-world/terrain/terrain-chunk-4-3",
+     "dist": 64.89,
+     "point": [
+      94.03,
+      5.46,
+      151.42
+     ],
+     "instanceColor": null,
+     "colorAttr": "0.017..0.235 mean 0.068 norm=false arr=Float32Array",
+     "material": {
+      "type": "MeshStandardMaterial",
+      "name": "ground",
+      "color": "#ffffff",
+      "vertexColors": true,
+      "map": null,
+      "emissive": "#000000",
+      "emissiveIntensity": 1,
+      "metalness": 0,
+      "roughness": 0.97,
+      "transparent": false,
+      "blending": 1,
+      "fog": true,
+      "toneMapped": true,
+      "envMapIntensity": 1,
+      "opacity": 1
+     }
+    }
+   ]
+  },
+  {
+   "px": 100,
+   "py": 215,
+   "top": [
+    {
+     "path": "Scene/corealm-world/terrain/terrain-chunk-4-3",
+     "dist": 71.54,
+     "point": [
+      100.22,
+      5.51,
+      155.5
+     ],
+     "instanceColor": null,
+     "colorAttr": "0.017..0.235 mean 0.068 norm=false arr=Float32Array",
+     "material": {
+      "type": "MeshStandardMaterial",
+      "name": "ground",
+      "color": "#ffffff",
+      "vertexColors": true,
+      "map": null,
+      "emissive": "#000000",
+      "emissiveIntensity": 1,
+      "metalness": 0,
+      "roughness": 0.97,
+      "transparent": false,
+      "blending": 1,
+      "fog": true,
+      "toneMapped": true,
+      "envMapIntensity": 1,
+      "opacity": 1
+     }
+    }
+   ]
+  }
+ ],
+ "darkest": [
+  {
+   "mat": "MI_Peasant",
+   "color": "#ffffff",
+   "mapMean": "71,55,36",
+   "effLum": 0.0424,
+   "obj": "tities/character-rig/body/Armature/merged-part-outfit_male_peasant_chest-Male_Peasant_Body"
+  },
+  {
+   "mat": "Bark_DeadTree",
+   "color": "#ffffff",
+   "mapMean": "65,61,64",
+   "effLum": 0.048,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-tree_dead_5-0"
+  },
+  {
+   "mat": "Bark_TwistedTree",
+   "color": "#ffffff",
+   "mapMean": "84,77,72",
+   "effLum": 0.0765,
+   "obj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_twisted_2-0"
+  },
+  {
+   "mat": "Leaves_Pine",
+   "color": "#ffffff",
+   "mapMean": "51,88,1",
+   "effLum": 0.0774,
+   "obj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_pine_5-1"
+  },
+  {
+   "mat": "Leaves_TwistedTree",
+   "color": "#ffffff",
+   "mapMean": "165,25,25",
+   "effLum": 0.0873,
+   "obj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_twisted_2-1"
+  },
+  {
+   "mat": "PathRocks",
+   "color": "#ffffff",
+   "mapMean": "76,88,58",
+   "effLum": 0.0888,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-pebble_round_1-0"
+  },
+  {
+   "mat": "PathRocks",
+   "color": "#ffffff",
+   "mapMean": "76,88,58",
+   "effLum": 0.0888,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-rock_small_2-0"
+  },
+  {
+   "mat": "PathRocks",
+   "color": "#ffffff",
+   "mapMean": "76,88,58",
+   "effLum": 0.0888,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-path_rock_small_2-0"
+  },
+  {
+   "mat": "Bark_NormalTree",
+   "color": "#ffffff",
+   "mapMean": "140,89,67",
+   "effLum": 0.1305,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-tree_common_5-0"
+  },
+  {
+   "mat": "Bark_NormalTree",
+   "color": "#ffffff",
+   "mapMean": "140,89,67",
+   "effLum": 0.1305,
+   "obj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_common_3-0"
+  },
+  {
+   "mat": "Bark_NormalTree",
+   "color": "#ffffff",
+   "mapMean": "140,89,67",
+   "effLum": 0.1305,
+   "obj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_pine_5-0"
+  },
+  {
+   "mat": "Leaves_NormalTree",
+   "color": "#ffffff",
+   "mapMean": "87,122,2",
+   "effLum": 0.1603,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-tree_common_5-1"
+  },
+  {
+   "mat": "Leaves_NormalTree",
+   "color": "#ffffff",
+   "mapMean": "87,122,2",
+   "effLum": 0.1603,
+   "obj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_common_3-1"
+  },
+  {
+   "mat": "MI_Regular_Male",
+   "color": "#ffffff",
+   "mapMean": "156,109,78",
+   "effLum": 0.1858,
+   "obj": "d/entities/character-rig/body/Armature/part-outfit_male_peasant_gloves-Male_Peasant_Arms_2"
+  },
+  {
+   "mat": "MI_Superhero_Male",
+   "color": "#ffffff",
+   "mapMean": "156,110,78",
+   "effLum": 0.1875,
+   "obj": "Scene/corealm-world/entities/character-rig/body/Armature/SuperHero_Male"
+  },
+  {
+   "mat": "MI_Eyes",
+   "color": "#ffffff",
+   "mapMean": "157,108,97",
+   "effLum": 0.1888,
+   "obj": "Scene/corealm-world/entities/character-rig/body/Armature/Eyes"
+  },
+  {
+   "mat": "Leaves",
+   "color": "#ffffff",
+   "mapMean": "114,131,48",
+   "effLum": 0.2013,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-plant_leafy_large-0"
+  },
+  {
+   "mat": "Leaves",
+   "color": "#ffffff",
+   "mapMean": "114,131,48",
+   "effLum": 0.2013,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-plant_leafy_small-0"
+  },
+  {
+   "mat": "Leaves",
+   "color": "#ffffff",
+   "mapMean": "114,131,48",
+   "effLum": 0.2013,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-fern_1-0"
+  },
+  {
+   "mat": "Leaves",
+   "color": "#ffffff",
+   "mapMean": "114,131,48",
+   "effLum": 0.2013,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-flower_a_single-0"
+  },
+  {
+   "mat": "Rock",
+   "color": "#a77e5c",
+   "mapMean": null,
+   "effLum": 0.238,
+   "obj": "Scene/corealm-world/scatter/scatter-karrowmoor-boulder_medium-0"
+  },
+  {
+   "mat": "Rock",
+   "color": "#a77e5c",
+   "mapMean": null,
+   "effLum": 0.238,
+   "obj": "Scene/corealm-world/scatter/scatter-karrowmoor-cliff_tall-0"
+  },
+  {
+   "mat": "MI_Hair_1",
+   "color": "#ffffff",
+   "mapMean": "143,144,141",
+   "effLum": 0.2768,
+   "obj": "Scene/corealm-world/entities/character-rig/body/Armature/Eyebrows"
+  },
+  {
+   "mat": "MI_Hair_1",
+   "color": "#ffffff",
+   "mapMean": "143,144,141",
+   "effLum": 0.2768,
+   "obj": "Scene/corealm-world/entities/character-rig/body/Armature/part-hair_short-Hair_SimpleParted"
+  },
+  {
+   "mat": "Mushrooms",
+   "color": "#ffffff",
+   "mapMean": "169,140,107",
+   "effLum": 0.2835,
+   "obj": "Scene/corealm-world/scatter/scatter-vellenwood-mushroom_common-0"
+  },
+  {
+   "mat": "Flowers",
+   "color": "#ffffff",
+   "mapMean": "214,139,107",
+   "effLum": 0.3369,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-flower_a_single-1"
+  },
+  {
+   "mat": "Grass",
+   "color": "#ffffff",
+   "mapMean": "228,229,201",
+   "effLum": 0.7692,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-grass_wispy_short-0"
+  },
+  {
+   "mat": "Grass",
+   "color": "#ffffff",
+   "mapMean": "228,229,201",
+   "effLum": 0.7692,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-grass_common_short-0"
+  },
+  {
+   "mat": "Grass",
+   "color": "#ffffff",
+   "mapMean": "228,229,201",
+   "effLum": 0.7692,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-grass_wispy_tall-0"
+  },
+  {
+   "mat": "ground",
+   "color": "#ffffff",
+   "mapMean": null,
+   "effLum": 1,
+   "obj": "Scene/corealm-world/terrain/terrain-chunk-0-0"
+  }
+ ],
+ "brightest": [
+  {
+   "mat": "Grass",
+   "color": "#ffffff",
+   "mapMean": "228,229,201",
+   "effLum": 0.7692,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-grass_wispy_short-0"
+  },
+  {
+   "mat": "Grass",
+   "color": "#ffffff",
+   "mapMean": "228,229,201",
+   "effLum": 0.7692,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-grass_common_short-0"
+  },
+  {
+   "mat": "Grass",
+   "color": "#ffffff",
+   "mapMean": "228,229,201",
+   "effLum": 0.7692,
+   "obj": "Scene/corealm-world/scatter/scatter-fallowmarch-grass_wispy_tall-0"
+  },
+  {
+   "mat": "ground",
+   "color": "#ffffff",
+   "mapMean": null,
+   "effLum": 1,
+   "obj": "Scene/corealm-world/terrain/terrain-chunk-0-0"
+  },
+  {
+   "mat": "water-fallowmarch",
+   "color": "#ffffff",
+   "mapMean": null,
+   "effLum": 1,
+   "obj": "Scene/corealm-world/scatter/water-fallowmarch"
+  },
+  {
+   "mat": "water-vellenwood",
+   "color": "#ffffff",
+   "mapMean": null,
+   "effLum": 1,
+   "obj": "Scene/corealm-world/scatter/water-vellenwood"
+  },
+  {
+   "mat": "water-karrowmoor",
+   "color": "#ffffff",
+   "mapMean": null,
+   "effLum": 1,
+   "obj": "Scene/corealm-world/scatter/water-karrowmoor"
+  },
+  {
+   "mat": "MeshBasicMaterial",
+   "color": "#ffffff",
+   "mapMean": null,
+   "effLum": 1,
+   "obj": "Scene/corealm-world/overlays/ambience"
+  }
+ ],
+ "materials": 34,
+ "additive": [
+  {
+   "path": "Scene/corealm-world/overlays/ambience",
+   "visible": true,
+   "blending": 2,
+   "count": 68,
+   "capacity": 640,
+   "toneMapped": true,
+   "fog": false,
+   "opacity": 1,
+   "sampleColors": [
+    [
+     0.11,
+     0.1,
+     0.09
+    ],
+    [
+     0.09,
+     0.08,
+     0.08
+    ],
+    [
+     0.11,
+     0.11,
+     0.09
+    ],
+    [
+     0.04,
+     0.03,
+     0.03
+    ],
+    [
+     0.12,
+     0.12,
+     0.1
+    ],
+    [
+     0.24,
+     0.22,
+     0.2
+    ],
+    [
+     0.17,
+     0.16,
+     0.14
+    ],
+    [
+     0.29,
+     0.27,
+     0.24
+    ],
+    [
+     0.25,
+     0.23,
+     0.21
+    ],
+    [
+     0.15,
+     0.14,
+     0.13
+    ],
+    [
+     0.17,
+     0.16,
+     0.14
+    ],
+    [
+     0.17,
+     0.16,
+     0.14
+    ]
+   ]
+  }
+ ],
+ "emissive": [
+  {
+   "path": "Scene/corealm-world/entities/entity-views/entity-rock_medium_1|-|1|ore|0-live-1",
+   "visible": false,
+   "name": "",
+   "emissive": "#ed9300",
+   "intensity": 0.3,
+   "toneMapped": true
+  },
+  {
+   "path": "Scene/corealm-world/entities/entity-views/entity-rock_medium_3|-|1|ore|0-live-1",
+   "visible": false,
+   "name": "",
+   "emissive": "#ed9300",
+   "intensity": 0.3,
+   "toneMapped": true
+  },
+  {
+   "path": "Scene/corealm-world/entities/entity-views/entity-rock_medium_2|-|5|ore|0-live-1",
+   "visible": false,
+   "name": "",
+   "emissive": "#acc6dc",
+   "intensity": 0.3,
+   "toneMapped": true
+  },
+  {
+   "path": "Scene/corealm-world/entities/entity-views/entity-rock_medium_3|-|10|ore|0-live-1",
+   "visible": false,
+   "name": "",
+   "emissive": "#369ee1",
+   "intensity": 0.3,
+   "toneMapped": true
+  },
+  {
+   "path": "Scene/corealm-world/entities/entity-views/entity-rock_medium_1|-|10|ore|0-live-1",
+   "visible": false,
+   "name": "",
+   "emissive": "#369ee1",
+   "intensity": 0.3,
+   "toneMapped": true
+  }
+ ],
+ "emissiveCount": 5,
+ "census": {
+  "ground": {
+   "count": 28,
+   "mean": 0.224,
+   "arr": "Float32Array",
+   "norm": false,
+   "color": "#ffffff",
+   "map": false,
+   "sampleObj": "Scene/corealm-world/terrain/terrain-chunk-0-0",
+   "min": 0.01717960648238659,
+   "max": 0.3967552185058594
+  },
+  "Bark_NormalTree": {
+   "count": 8,
+   "mean": 0.873,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-fallowmarch-tree_common_5-0",
+   "min": 0.054901960784313725,
+   "max": 1
+  },
+  "Leaves_NormalTree": {
+   "count": 5,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-fallowmarch-tree_common_5-1",
+   "min": 1,
+   "max": 1
+  },
+  "Bark_DeadTree": {
+   "count": 3,
+   "mean": 0.933,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-fallowmarch-tree_dead_5-0",
+   "min": 0.11372549019607843,
+   "max": 1
+  },
+  "Grass": {
+   "count": 8,
+   "mean": 0.489,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-fallowmarch-grass_wispy_short-0",
+   "min": 0,
+   "max": 1
+  },
+  "Leaves": {
+   "count": 10,
+   "mean": 0.715,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-fallowmarch-plant_leafy_large-0",
+   "min": 0,
+   "max": 1
+  },
+  "Flowers": {
+   "count": 2,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-fallowmarch-flower_a_single-1",
+   "min": 1,
+   "max": 1
+  },
+  "Leaves_Pine": {
+   "count": 3,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_pine_5-1",
+   "min": 1,
+   "max": 1
+  },
+  "Bark_TwistedTree": {
+   "count": 3,
+   "mean": 0.929,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_twisted_2-0",
+   "min": 0.0392156862745098,
+   "max": 1
+  },
+  "Leaves_TwistedTree": {
+   "count": 2,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/scatter/scatter-vellenwood-tree_twisted_2-1",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Trim_Props_Vertex": {
+   "count": 8,
+   "mean": 0.182,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#d2d5cb",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-crop_carrot|-|1|farm_plot|0-live-0",
+   "min": 0,
+   "max": 1
+  },
+  "MI_Trim_Metal": {
+   "count": 15,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-chain_coil|-|-|landmark|0-live-0",
+   "min": 0,
+   "max": 1
+  },
+  "MI_Trim_Furniture": {
+   "count": 15,
+   "mean": 0.7,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-crate_wood|-|-|landmark|0-live-0",
+   "min": 0,
+   "max": 1
+  },
+  "MI_Banner": {
+   "count": 3,
+   "mean": 0.133,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-market_stall|-|-|shop|0-live-2",
+   "min": 0,
+   "max": 0.4235294117647059
+  },
+  "MI_Hair_2": {
+   "count": 4,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-base_female>outfit_female_peasant_chest+outfit_female_peasant_legs+outfit_female_peasant_boots+outfit_female_peasant_gloves+hair_buns|-|-|npc|0-live-0",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Eyes": {
+   "count": 10,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-base_female>outfit_female_peasant_chest+outfit_female_peasant_legs+outfit_female_peasant_boots+outfit_female_peasant_gloves+hair_buns|-|-|npc|0-live-1",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Superhero_Female": {
+   "count": 4,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-base_female>outfit_female_peasant_chest+outfit_female_peasant_legs+outfit_female_peasant_boots+outfit_female_peasant_gloves+hair_buns|-|-|npc|0-live-2",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Hair_1": {
+   "count": 6,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-base_male>outfit_male_ranger_chest+outfit_male_ranger_legs+outfit_male_ranger_boots+outfit_male_ranger_gloves+outfit_male_ranger_hood+outfit_male_ranger_pauldron|-|-|npc|0-live-0",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Superhero_Male": {
+   "count": 6,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-base_male>outfit_male_ranger_chest+outfit_male_ranger_legs+outfit_male_ranger_boots+outfit_male_ranger_gloves+outfit_male_ranger_hood+outfit_male_ranger_pauldron|-|-|npc|0-live-2",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Trim_Cloth": {
+   "count": 1,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-sack|-|-|landmark|0-live-0",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Ranger": {
+   "count": 8,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#bec6d1",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-base_male>outfit_male_ranger|-|10|boss|0-live-1",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Regular_Male": {
+   "count": 4,
+   "mean": 1,
+   "arr": "Uint8Array",
+   "norm": true,
+   "color": "#bec6d1",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/entity-base_male>outfit_male_ranger|-|10|boss|0-live-2",
+   "min": 1,
+   "max": 1
+  },
+  "MI_Peasant": {
+   "count": 2,
+   "mean": 1,
+   "arr": "Float32Array",
+   "norm": false,
+   "color": "#ffffff",
+   "map": true,
+   "sampleObj": "Scene/corealm-world/entities/entity-views/character-base_female>outfit_female_peasant_chest+outfit_female_peasant_legs+outfit_female_peasant_boots+outfit_female_peasant_gloves+hair_long/body/Armature/merged-Female_Peasant_Body",
+   "min": 1,
+   "max": 1
+  },
+  "dungeon-floor": {
+   "count": 1,
+   "mean": 0.013,
+   "arr": "Float32Array",
+   "norm": false,
+   "color": "#ffffff",
+   "map": false,
+   "sampleObj": "Scene/corealm-world/dungeon-gravelmaw/dungeon-floor",
+   "min": 0.008403687737882137,
+   "max": 0.023153366521000862
+  },
+  "dungeon-rock": {
+   "count": 2,
+   "mean": 0.038,
+   "arr": "Float32Array",
+   "norm": false,
+   "color": "#ffffff",
+   "map": false,
+   "sampleObj": "Scene/corealm-world/dungeon-gravelmaw/dungeon-ceiling",
+   "min": 0.024853283539414406,
+   "max": 0.06847816705703735
+  }
+ }
+}

@@ -38,6 +38,7 @@ import {
   collectBones,
   collectSkinnedMeshes,
   createSkeletonCache,
+  hairAssetFor,
   headCapHeightFor,
   mergeSkinnedMeshes,
   rebindSkinnedPart,
@@ -82,8 +83,27 @@ const POSE_CLIPS: Record<CharacterPose, readonly string[]> = {
   bank: ["Chest_Open", "Interact"],
 };
 
-/** Poses that play once and fall back to idle rather than looping. */
-const ONE_SHOT: ReadonlySet<CharacterPose> = new Set(["attack_melee", "cast", "hit", "eat", "climb", "bank"]);
+/**
+ * Poses that play once and fall back to idle rather than looping.
+ *
+ * `climb` used to be here and is not any more. `ClimbUp_1m` is 0.667 s (measured in
+ * animation_library_2.glb) against an authored Agility traversal of 2-4 s, so the player climbed
+ * once, snapped to idle, stood still for the remaining 1.3-3.3 s and then teleported to the exit —
+ * runs/corealm/diagnosis/animation-and-movement-feel.md finding 12. Looping it is that finding's
+ * own first recommendation.
+ */
+const ONE_SHOT: ReadonlySet<CharacterPose> = new Set(["attack_melee", "cast", "hit", "eat", "bank"]);
+
+/**
+ * Playback rate for a pose whose clip length does not match the event it stands for.
+ *
+ * The rig is not told how long a traversal lasts — `activity.started` carries `durationMs` but
+ * `PoseInput` does not — so `climb` runs at a fixed 0.5x, a 1.333 s cycle, which is 1.5 to 3 hauls
+ * across the authored 2-4 s leg. That reads as a scramble instead of as a stall. Everything not
+ * listed here plays at its authored rate; locomotion is scaled separately and per frame by
+ * `setLocomotionSpeed`.
+ */
+const POSE_TIME_SCALE: Partial<Record<CharacterPose, number>> = { climb: 0.5 };
 
 /**
  * Crossfade lengths, in seconds.
@@ -117,11 +137,38 @@ const IMPLIED_CLIP_SPEED: Readonly<Record<string, number>> = {
  * Clamp on the stride time scale.
  *
  * A player pinned against a wall reports ~0 m/s, and 0 would freeze the clip mid-stride, which
- * reads as a crash rather than as a stall. 1.6 is where `Walk_Loop` lands at the 1.6 m/s walk
- * speed (1.6 / 0.98 = 1.63), so the walk is at the ceiling by design and never above it.
+ * reads as a crash rather than as a stall. The floor is 0.6 because `Jog_Fwd_Loop` at half tempo
+ * is a 1.87 s stride cycle and reads as slow motion, not as a jog.
+ *
+ * The ceiling was 1.6, and that was measured to be wrong. Real ground speed under direct WASD
+ * input, sampled with `performance.now()` and `getPlayerPosition()` inside ONE in-page evaluate so
+ * the tool round-trip cancels: 1.727 m/s pressing W, 2.304 m/s pressing S, 1.702 m/s pressing D
+ * (runs/corealm/audit/rig2-slide.ts). At 1.727 m/s `Walk_Loop` wants 1.762 and got 1.6, so the feet
+ * ran 0.159 m/s slow. 2.2 covers the whole walk band up to 2.16 m/s; `Walk_Loop` is a 1.333 s
+ * cycle, so 2.2x is 1.65 strides per second, which is a power walk and not a scurry.
  */
 const MIN_TIME_SCALE = 0.6;
-const MAX_TIME_SCALE = 1.6;
+const MAX_TIME_SCALE = 2.2;
+
+/**
+ * The locomotion clips, and the band each can cover once the clamp is applied.
+ *
+ * There is a hole in the library between them: `Walk_Loop` tops out at 0.98 * 2.2 = 2.16 m/s and
+ * `Jog_Fwd_Loop` bottoms out at 5.92 * 0.6 = 3.55 m/s, so nothing plays honestly between those.
+ * Measured, that hole is exactly where the game runs — the S-key sample above is 2.304 m/s, which
+ * the old fixed mapping answered with `Jog_Fwd_Loop` clamped to 0.6, i.e. feet skating FORWARD at
+ * 1.248 m/s. Choosing the clip with the smaller residual instead answers it with a fast walk and a
+ * 0.14 m/s residual, and the worst case anywhere in the hole drops to (3.55 - 2.16) / 2 = 0.70 m/s.
+ */
+const LOCOMOTION_CLIPS: readonly string[] = ["Walk_Loop", "Jog_Fwd_Loop", "Sprint_Loop"];
+
+/**
+ * How much better a candidate clip has to be before the rig switches to it, in m/s of residual.
+ *
+ * Without it a speed sitting on a crossover flips clip every frame, and every flip is an
+ * `action.reset()`, which is a visible stutter rather than a gait.
+ */
+const CLIP_SWITCH_MARGIN = 0.25;
 
 /**
  * Where a bone-attached slot hangs.
@@ -166,6 +213,21 @@ const REGION_ORDER: readonly string[] = ["body", "legs", "feet", "hands", "shoul
 const HEAD_CAP_REQUIRES: readonly string[] = ["body", "legs", "feet", "hands"];
 
 /**
+ * How a modular outfit id decomposes. Measured across all 20 modular parts in
+ * game/public/assets/manifest.json: `outfit_<sex>_<kit>_<part>`, sex male|female, kit
+ * peasant|ranger, part chest|legs|boots|gloves for both kits plus hood|pauldron for ranger only.
+ */
+const OUTFIT_ID = /^outfit_(male|female)_(peasant|ranger)_(chest|legs|boots|gloves|hood|pauldron)$/;
+
+/** The part that dresses each region `HEAD_CAP_REQUIRES` counts, in the order they are appended. */
+const COVERAGE_PARTS: readonly (readonly [part: string, region: string])[] = [
+  ["chest", "body"],
+  ["legs", "legs"],
+  ["boots", "feet"],
+  ["gloves", "hands"],
+];
+
+/**
  * The shape `render/equipmentVisuals.ts` exports, restated here as a port.
  *
  * The rig cannot import that module directly: it is being written by another worker in the same
@@ -202,6 +264,8 @@ export interface GearVisualsPort {
   weaponAttachment?(appearance: GearAppearanceLike): WeaponSocketLike | null;
   /** Applies tint and accent by CLONING each material. The rig disposes those clones. */
   applyGearAppearance?(object: THREE.Object3D, appearance: GearAppearanceLike): void;
+  /** Every asset the item table can ask for, so the rig can warm them before the first equip. */
+  gearAssetIds?(body?: "male" | "female"): readonly string[];
 }
 
 /**
@@ -224,8 +288,28 @@ export interface CharacterRigOptions {
   bodyAssetId: string;
   /** Optional outfit part asset ids layered onto the same skeleton. */
   outfitAssetIds?: string[];
-  /** Optional hair asset, layered like any other part. See `skinning.hairAssetFor`. */
-  hairAssetId?: string;
+  /**
+   * Hair asset, layered like any other part.
+   *
+   * Undefined does NOT mean bald: it means "pick one", through `skinning.hairAssetFor` seeded on
+   * `hairSeed`. Bald was the old behaviour and it was a defect — the player was the only character
+   * in the world without hair, because every NPC goes through `skinning.loadDressedCharacter`
+   * which picks for itself and `boot.ts` passes no hair. Pass `null` for a genuinely bald head.
+   */
+  hairAssetId?: string | null;
+  /**
+   * Seed for the automatic hair pick. Defaults to the body asset id.
+   *
+   * Deterministic by construction: `hairAssetFor` is a pure function of this string, so the same
+   * seed gives the same hair across reloads, screenshots and processes.
+   */
+  hairSeed?: string;
+  /**
+   * Append the missing coverage parts of a partial outfit set. Default true.
+   *
+   * Set false only to look at exactly the parts you passed.
+   */
+  completeOutfit?: boolean;
   /**
    * Force the head cap on or off instead of deciding it from what the character is wearing.
    *
@@ -361,12 +445,17 @@ export class CharacterRig {
       }
 
       this.baseOutfitIds = [...(options.outfitAssetIds ?? [])];
-      if (options.hairAssetId) this.baseOutfitIds.push(options.hairAssetId);
+      if (options.completeOutfit !== false) this.completeOutfitSet();
+      const hair = options.hairAssetId === undefined
+        ? hairAssetFor(options.hairSeed ?? options.bodyAssetId, options.bodyAssetId.includes("female") ? "female" : "male")
+        : options.hairAssetId;
+      if (hair) this.baseOutfitIds.push(hair);
 
       this.mixer = new THREE.AnimationMixer(body);
       await this.rebuildLayers();
       this.ready = true;
       this.play("idle", true);
+      this.preloadGear();
       return true;
     } catch {
       return this.fail();
@@ -376,6 +465,79 @@ export class CharacterRig {
   private fail(): boolean {
     this.ready = false;
     return false;
+  }
+
+  /**
+   * Warms every asset worn gear can ask for, in the background.
+   *
+   * MEASURED, and this is the whole reason it exists: with `performance.now()` around
+   * `attachBoneSlot`, `applyEquipment` fired 1 ms after a `corealm_equip` landed in the store and
+   * then `assets.load("sword")` took 3366 ms and `assets.load("shield")` 5918 ms on first request.
+   * For those seconds the player equips a sword and their hand stays empty, which is
+   * indistinguishable on screen from the render seam never having been wired at all. The second
+   * request took 3 ms, so a warm cache is the entire fix.
+   *
+   * Deliberately not awaited: `build` is on the boot path and a stall there is worse than a stall
+   * at the first equip. `AssetRegistry.load` deduplicates in-flight requests, so racing it against
+   * the layer rebuild costs nothing.
+   */
+  private preloadGear(): void {
+    const ids = this.gear?.gearAssetIds?.(this.bodyAssetId.includes("female") ? "female" : "male");
+    if (!ids || ids.length === 0) return;
+    for (const assetId of ids) {
+      // Individually, not `loadMany`: one missing id must not refuse the other seven.
+      void this.assets.load(assetId).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Appends the coverage parts a partial outfit set is missing, from the same kit.
+   *
+   * `boot.ts` dresses the player in chest + legs + boots and no gloves, and that one absent part
+   * costs two separate visible defects — both of them in
+   * runs/corealm/screenshots/rig2-before-bank-crop.png, measured before this landed.
+   *
+   * First: the peasant `gloves` GLB is the one that carries `Male_Peasant_Arms`, which is the
+   * SLEEVES and not merely the hands (inspected: outfit_male_peasant_gloves.glb holds exactly one
+   * mesh, Male_Peasant_Arms). Without it the player has bare arms, and the only part of the tunic's
+   * sleeve that clears the naked bicep is its dark cuff — which is the "dark object at the
+   * chest/shoulder" the brief asks about. It is not a mis-socketed attachment and it is not an
+   * unbound part: it is the peasant sleeve's cuff trim, the only 2 cm of the sleeve wider than the
+   * arm inside it.
+   *
+   * Second: `HEAD_CAP_REQUIRES` counts `hands`, so with gloves missing the head cap never fires and
+   * the whole naked base body draws under the clothes. The outfit parts are authored to REPLACE the
+   * body, not cover it (skinning.applyHeadCap: 5.4 mm of bare thigh outside the trousers, 27.5 mm
+   * of bare foot outside the boot), so the bare chest reads through the tunic and the bare knee
+   * through the boot top.
+   *
+   * Only regions the caller did not already dress are added, and they are appended AFTER the
+   * caller's own ids, so nothing authored moves and the layer order stays deterministic.
+   */
+  private completeOutfitSet(): void {
+    let sex: string | null = null;
+    let kit: string | null = null;
+    const covered = new Set<string>();
+    for (const assetId of this.baseOutfitIds) {
+      const match = OUTFIT_ID.exec(assetId);
+      if (!match) continue;
+      sex ??= match[1] ?? null;
+      kit ??= match[2] ?? null;
+      const region = this.regionOf(assetId);
+      if (region) covered.add(region);
+    }
+    // Nothing to complete FROM. A character wearing a full-body GLB or nothing at all is left
+    // exactly as the caller asked for it.
+    if (!sex || !kit) return;
+    for (const [part, region] of COVERAGE_PARTS) {
+      if (covered.has(region)) continue;
+      const assetId = `outfit_${sex}_${kit}_${part}`;
+      // Refuse an id the manifest does not carry rather than queue a load that will throw: the
+      // ranger kit has hood and pauldron that the peasant kit does not, and a future kit may be
+      // missing one of these four.
+      if (!this.assets.entry(assetId)) continue;
+      this.baseOutfitIds.push(assetId);
+    }
   }
 
   isReady(): boolean {
@@ -430,7 +592,7 @@ export class CharacterRig {
 
     action.reset();
     action.enabled = true;
-    action.setEffectiveTimeScale(1);
+    action.setEffectiveTimeScale(POSE_TIME_SCALE[pose] ?? 1);
     action.setEffectiveWeight(1);
 
     if (ONE_SHOT.has(pose)) {
@@ -458,12 +620,71 @@ export class CharacterRig {
    * `play`, which resets the scale to 1.
    */
   setLocomotionSpeed(metresPerSecond: number): void {
+    if (!this.currentAction || !this.currentClipName) return;
+    if (IMPLIED_CLIP_SPEED[this.currentClipName] === undefined) return;
+
+    const better = this.betterLocomotionClip(this.currentClipName, metresPerSecond);
+    if (better) this.switchLocomotionClip(better);
+
     const action = this.currentAction;
-    if (!action || !this.currentClipName) return;
-    const implied = IMPLIED_CLIP_SPEED[this.currentClipName];
-    if (implied === undefined) return;
-    const scale = Math.min(MAX_TIME_SCALE, Math.max(MIN_TIME_SCALE, metresPerSecond / implied));
-    action.setEffectiveTimeScale(scale);
+    const implied = this.currentClipName ? IMPLIED_CLIP_SPEED[this.currentClipName] : undefined;
+    if (!action || implied === undefined) return;
+    action.setEffectiveTimeScale(strideScale(metresPerSecond, implied));
+  }
+
+  /** How far the planted foot slides at this speed if `clipName` is the clip playing, in m/s. */
+  private static residual(clipName: string, metresPerSecond: number): number {
+    const implied = IMPLIED_CLIP_SPEED[clipName];
+    if (implied === undefined) return Infinity;
+    return Math.abs(metresPerSecond - implied * strideScale(metresPerSecond, implied));
+  }
+
+  /** A locomotion clip that plants the feet better than the current one, or null to stay put. */
+  private betterLocomotionClip(currentClipName: string, metresPerSecond: number): string | null {
+    const current = CharacterRig.residual(currentClipName, metresPerSecond);
+    let best: string | null = null;
+    let bestResidual = current - CLIP_SWITCH_MARGIN;
+    for (const clipName of LOCOMOTION_CLIPS) {
+      if (clipName === currentClipName) continue;
+      const residual = CharacterRig.residual(clipName, metresPerSecond);
+      if (residual < bestResidual) {
+        best = clipName;
+        bestResidual = residual;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Crossfades to another locomotion clip without changing the pose.
+   *
+   * The pose stays whatever `poseFor` said — this is a gait choice inside "the character is
+   * moving", not a different thing to be doing — so `play()` still sees `pose === this.current` on
+   * the next frame and does not fight it.
+   */
+  private switchLocomotionClip(clipName: string): void {
+    if (!this.mixer) return;
+    let action = this.actions.get(clipName);
+    if (!action) {
+      const clip = this.assets.clip(clipName);
+      if (!clip) {
+        this.missingClips.add(clipName);
+        return;
+      }
+      action = this.mixer.clipAction(clip);
+      this.actions.set(clipName, action);
+    }
+    const previous = this.currentAction;
+    if (action === previous) return;
+    action.reset();
+    action.enabled = true;
+    action.setEffectiveWeight(1);
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    if (previous) action.crossFadeFrom(previous, CROSSFADE_SECONDS, false);
+    action.play();
+    this.currentAction = action;
+    this.currentClipName = clipName;
   }
 
   private resolveAction(pose: CharacterPose): { action: THREE.AnimationAction; clipName: string } | null {
@@ -876,6 +1097,11 @@ export class CharacterRig {
 export const VISIBLE_SLOTS: readonly EquipSlot[] = [
   "head", "body", "legs", "feet", "hands", "mainHand", "offHand",
 ] as const;
+
+/** The clamped time scale that plays `implied` m/s of stride at `metresPerSecond` of ground speed. */
+function strideScale(metresPerSecond: number, implied: number): number {
+  return Math.min(MAX_TIME_SCALE, Math.max(MIN_TIME_SCALE, metresPerSecond / implied));
+}
 
 /** A part drawn by rebinding it onto the body's skeleton rather than parenting it to a bone. */
 function isSkinPart(appearance: GearAppearanceLike): boolean {

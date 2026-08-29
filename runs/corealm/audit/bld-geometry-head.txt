@@ -1,0 +1,122 @@
+=== enclosure: fraction of the elevation you can see straight through
+    axis-parallel rays through the assembled prefab, real GLB triangles
+
+    prefab       footprint kit      throughX  throughZ  panels frames trims
+    cottage [6,4]         plaster      0.0%     21.7%      10      0    10
+    cottage [6,4]         timber      23.6%     15.2%      10      0    10
+    cottage [6,4]         stone        0.0%      2.7%      10      0    10
+    hall [12,6]           plaster     16.0%     20.0%      18      0    18
+    hall [12,6]           timber      26.7%     17.3%      18      0    18
+    hall [12,6]           stone       32.5%     27.4%      18      0    18
+    tower [6,6]           plaster      0.0%      0.0%      24      0    12
+    tower [6,6]           timber      19.8%     17.9%      24      0    12
+    tower [6,6]           stone        0.0%      0.0%      24      0    12
+    shed [4,4]            plaster      0.0%      0.0%       8      0     8
+    shed [4,4]            timber      30.0%     16.6%       8      0     8
+    shed [4,4]            stone        0.0%      0.0%       8      0     8
+    quarry_hut [5,4]      plaster     17.3%     14.1%      10      0    10
+    quarry_hut [5,4]      timber      24.9%     13.8%      10      0    10
+    quarry_hut [5,4]      stone       34.4%     29.7%      10      0    10
+    forge [6,5]           plaster      0.0%     21.7%       9      0     9
+    forge [6,5]           timber      26.4%     30.4%       9      0     9
+    forge [6,5]           stone       13.1%     10.8%       9      0     9
+    forge [4,4]           plaster      0.0%     34.4%       6      0     6
+    forge [4,4]           timber      17.3%     34.4%       6      0     6
+    forge [4,4]           stone        0.0%     17.2%       6      0     6
+    arcade [6,3]          plaster     86.8%      0.0%       0      0     3
+    arcade [6,3]          timber      86.8%      0.0%       0      0     3
+    arcade [6,3]          stone       74.4%      0.0%       3      0     3
+    porch [4,3]           plaster     81.9%      0.0%       0      0     2
+    porch [4,3]           timber      81.9%      0.0%       0      0     2
+    porch [4,3]           stone       75.8%      0.0%       2      0     2
+    gatehouse [8,3]       plaster    100.0%     50.0%      12      0     4
+    gatehouse [8,3]       timber      96.0%     67.5%      12      0     4
+    gatehouse [8,3]       stone       88.1%     50.0%      12      0     4
+    gatehouse [6,3]       plaster    100.0%     35.0%      10      0     4
+    gatehouse [6,3]       timber      96.0%     52.5%      10      0     4
+    gatehouse [6,3]       stone       88.1%     35.0%      10      0     4
+    well [2,2]            plaster     80.2%     80.2%       0      0     4
+    well [2,2]            timber      80.2%     80.2%       0      0     4
+    well [2,2]            stone       64.2%     64.2%       0      0     4
+    market_row [9,3]      plaster    100.0%    100.0%       0      0     0
+    market_row [9,3]      timber     100.0%    100.0%       0      0     0
+    market_row [9,3]      stone      100.0%    100.0%       0      0     0
+    ruin [6,4]            plaster     42.5%      0.0%       4      0     3
+    ruin [6,4]            timber      59.9%     26.3%       4      0     3
+    ruin [6,4]            stone       42.5%      0.0%       4      0     3
+    stall [3,2]           plaster    100.0%    100.0%       0      0     0
+    stall [3,2]           timber     100.0%    100.0%       0      0     0
+    stall [3,2]           stone      100.0%    100.0%       0      0     0
+
+=== gatehouse: what the passage is made of
+    width 6: 8 pier panels of wall_plaster_straight, 2 head panels, 8 corner_wood jambs, 2 apertures
+    width 8: 8 pier panels of wall_plaster_straight, 4 head panels, 8 corner_wood jambs, 2 apertures
+    width 10: 8 pier panels of wall_plaster_straight, 6 head panels, 8 corner_wood jambs, 2 apertures
+    width 12: 16 pier panels of wall_plaster_straight, 4 head panels, 8 corner_wood jambs, 2 apertures
+
+=== wall runs, as the three replacement layouts author them
+    coldbrace W                L= 52 22 panels (44.0 m of 52 m), 4 posts
+    coldbrace N                L= 52 26 panels (52.0 m of 52 m), 2 posts
+    coldbrace E                L= 52 22 panels (44.0 m of 52 m), 4 posts
+    coldbrace S                L= 52 22 panels (44.0 m of 52 m), 4 posts
+    rootfall W                 L= 42 17 panels (34.0 m of 42 m), 4 posts
+    rootfall N                 L= 34 13 panels (26.0 m of 34 m), 4 posts
+    rootfall E                 L= 42 15 panels (30.0 m of 42 m), 6 posts
+    rootfall S                 L= 34 13 panels (26.0 m of 34 m), 4 posts
+    highcairn S                L= 40 20 panels (40.0 m of 40 m), 2 posts
+    highcairn E                L= 26  9 panels (18.0 m of 26 m), 4 posts
+    highcairn N                L= 40 20 panels (40.0 m of 40 m), 2 posts
+    highcairn W                L= 26  9 panels (18.0 m of 26 m), 4 posts
+    opening at the very start  L= 42 20 panels (40.0 m of 42 m), 2 posts
+    opening past the end       L= 42 20 panels (40.0 m of 42 m), 2 posts
+    every module cut           L=  6  0 panels (0.0 m of 6 m), 0 posts
+    off-grid length            L= 25  8 panels (15.4 m of 25 m), 4 posts
+
+=== for the settlement authors: openings that cannot hold their gatehouse
+    rootfall N: a 6 m opening against a [8,3] gatehouse leaves 1.0 m of wall standing inside each pier
+    rootfall E postern: a 4 m opening against a [8,3] gatehouse leaves 2.0 m of wall standing inside each pier
+    rootfall S: a 6 m opening against a [8,3] gatehouse leaves 1.0 m of wall standing inside each pier
+
+=== the tier scale regionBuilder still cancels (not fixable in buildings.ts)
+    Coldbrace  tier  1: a 2 m module draws 2.222 m, so two modules on 2 m centres leave -0.222 m
+    Rootfall   tier  5: a 2 m module draws 1.860 m, so two modules on 2 m centres leave 0.140 m
+    Highcairn  tier 10: a 2 m module draws 1.738 m, so two modules on 2 m centres leave 0.262 m
+
+37 PROBLEMS
+  ! cottage[6,4]/plaster: 21.7% see-through across Z
+  ! cottage[6,4]/timber: 23.6% see-through across X
+  ! cottage[6,4]/timber: 15.2% see-through across Z
+  ! hall[12,6]/plaster: 16.0% see-through across X
+  ! hall[12,6]/plaster: 20.0% see-through across Z
+  ! hall[12,6]/timber: 26.7% see-through across X
+  ! hall[12,6]/timber: 17.3% see-through across Z
+  ! hall[12,6]/stone: 32.5% see-through across X
+  ! hall[12,6]/stone: 27.4% see-through across Z
+  ! tower[6,6]/timber: 19.8% see-through across X
+  ! tower[6,6]/timber: 17.9% see-through across Z
+  ! shed[4,4]/timber: 30.0% see-through across X
+  ! shed[4,4]/timber: 16.6% see-through across Z
+  ! quarry_hut[5,4]/plaster: 17.3% see-through across X
+  ! quarry_hut[5,4]/plaster: 14.1% see-through across Z
+  ! quarry_hut[5,4]/timber: 24.9% see-through across X
+  ! quarry_hut[5,4]/timber: 13.8% see-through across Z
+  ! quarry_hut[5,4]/stone: 34.4% see-through across X
+  ! quarry_hut[5,4]/stone: 29.7% see-through across Z
+  ! forge[6,5]/timber: 26.4% see-through across X
+  ! forge[6,5]/stone: 13.1% see-through across X
+  ! forge[4,4]/timber: 17.3% see-through across X
+  ! ruin[6,4]/plaster: 4 ground panels but 3 plinths
+  ! ruin[6,4]/timber: 4 ground panels but 3 plinths
+  ! ruin[6,4]/stone: 4 ground panels but 3 plinths
+  ! gatehouse 6/plaster: 2 apertured panels (hf_0,hb_0)
+  ! gatehouse 6/timber: 2 apertured panels (hf_0,hb_0)
+  ! gatehouse 6/stone: 2 apertured panels (hf_0,hb_0)
+  ! gatehouse 8/plaster: 2 apertured panels (hf_1,hb_1)
+  ! gatehouse 8/timber: 2 apertured panels (hf_1,hb_1)
+  ! gatehouse 8/stone: 2 apertured panels (hf_1,hb_1)
+  ! gatehouse 10/plaster: 2 apertured panels (hf_1,hb_1)
+  ! gatehouse 10/timber: 2 apertured panels (hf_1,hb_1)
+  ! gatehouse 10/stone: 2 apertured panels (hf_1,hb_1)
+  ! gatehouse 12/plaster: 2 apertured panels (hf_1,hb_1)
+  ! gatehouse 12/timber: 2 apertured panels (hf_1,hb_1)
+  ! gatehouse 12/stone: 2 apertured panels (hf_1,hb_1)

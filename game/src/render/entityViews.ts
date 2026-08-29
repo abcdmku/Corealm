@@ -71,6 +71,8 @@ const SCRATCH_SCALE = new THREE.Vector3();
 const SCRATCH_NORMAL = new THREE.Vector3();
 const SCRATCH_TILT = new THREE.Quaternion();
 const SCRATCH_BLEND = new THREE.Quaternion();
+const SCRATCH_PLACEMENT = new THREE.Matrix4();
+const SCRATCH_TRANSFORM = new THREE.Matrix4();
 
 /** States that render with the spent treatment. Everything else renders live. */
 const SPENT_STATES = new Set(["depleted", "dead", "empty", "harvested", "closed", "spent"]);
@@ -112,6 +114,42 @@ const APPEARANCE: Partial<Record<Archetype, Appearance>> = {
 };
 
 const NEUTRAL: Appearance = { swatch: "metal", strength: 0 };
+
+/**
+ * Edge of the square an instance group is allowed to cover, in metres.
+ *
+ * An `InstancedMesh` is frustum-culled as ONE object, against a bounding sphere that has to contain
+ * every occupied slot. A group keyed only by (asset, tier, archetype) holds every copy of that
+ * asset in the world, so its sphere spans the map and the renderer can never drop it — measured, by
+ * hiding this layer's root and diffing: at `bracken_pit`, a clearing with five nodes in it, the
+ * entity layer was still submitting 196 of its 244 meshes.
+ *
+ * Splitting the group key by a 128 m cell is what gives the sphere something to be smaller than.
+ * 128 m is wider than any settlement here (Coldbrace's wall runs span 78 m), so a town's dressing
+ * stays in one or two cells and the near view does not pay for the split.
+ */
+const GROUP_CELL_SIZE = 128;
+
+/**
+ * Archetypes that keep out of the cell split, because they walk.
+ *
+ * The cell is part of the group key, so an enemy crossing a boundary would release its slot and
+ * re-acquire in a different group mid-stride. There are ~60 of them against ~3,300 static props, so
+ * parking them in one world-wide cell costs a handful of unculled meshes and buys a mover that
+ * never pops.
+ */
+const CELL_FREE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>([
+  "enemy", "boss", "npc",
+]);
+
+/**
+ * Archetypes whose tier is kept out of the instance-group key without looking at the art at all.
+ *
+ * `npc` and nothing else. It is a shortcut, not a separate rule: `EntityViews.groupTier` would
+ * reach the same answer from the materials, and this only saves it the traverse on the one
+ * archetype whose "materials" are six separately loaded part GLBs.
+ */
+const TIER_BLIND_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc"]);
 
 /** Canopy materials follow the tier ACCENT, not the rock body a trunk shares its swatch with. */
 const LEAF_MATERIAL = /leaf|leaves|foliage|canopy/i;
@@ -236,34 +274,49 @@ const HOODED_PARTS: ReadonlySet<string> = new Set([
 const HAIR_PART = /^hair_/;
 
 /**
- * How far each archetype beds into the terrain normal, 0..1, when the world layer supplies one.
+ * How far each archetype beds into the terrain normal, 0..1, when the world layer supplies a normal
+ * but no `view.tiltStrength`.
  *
- * `contracts.ts` deliberately leaves this table to `render/` because it is a look decision, not a
- * fact about the world. The numbers:
+ * THIS IS THE FALLBACK, NOT THE LIVE TABLE. `world/regionBuilder.ts:476` authors `tiltStrength` on
+ * every tilt-eligible entity it emits, so in the shipped world this table is consulted for nothing:
+ * measured live, ore reads 0.85, tree 0.12, obstacle 0.5, fishing_spot 1 and landmark 0.25 straight
+ * off `view`. The numbers below are therefore kept EQUAL to the authored ones — two tables that
+ * disagree is how a look silently changes the day one of them stops being written.
  *
- *   tree 0.10       A tree grows toward the light, not perpendicular to the hill. The measured
- *                   problem was 2.74 m of daylight under duskoak_stand_trees_5 on a 42.4-degree
- *                   slope, and a tenth of the normal closes most of that without laying the trunk
- *                   over.
- *   ore 0.75        A rock IS bedded into the hill it came out of. lower_quarry_kaldite_3 is 5.3 m
- *                   wide on 48.9-degree ground with 3.02 m of daylight — the worst case in the
- *                   world and the one this number is set by.
- *   obstacle 0.55   Fallen logs and boulders: same argument as ore, less of it, because several are
+ *   tree 0.12       A tree grows toward the light, not perpendicular to the hill.
+ *   ore 0.85        A rock IS bedded into the hill it came out of.
+ *   obstacle 0.50   Fallen logs and boulders: same argument as ore, less of it, because several are
  *                   authored as climbable and a hard tilt moves the climb line.
  *   fishing_spot,
  *   farm_plot 1.0   Flat things. A lily pad or a furrow that does not lie in the ground is not a
  *                   lily pad. This is the "flat plants and pebbles" row.
  *
+ * Verified by measurement, not by argument (runs/corealm/audit/ev2-sink.ts). The world layer clamps
+ * the normal it hands over to 20 degrees off vertical, so the applied tilt is
+ * `min(slope, 20 deg) * strength` and is ALWAYS shallower than the ground the object stands on. At
+ * footprint radius r the tilted base plane drops `r * sin(tilt)` while the terrain drops
+ * `r * tan(slope)`, and the second is larger for every one of the eleven steepest-standing entities
+ * in the world: lower_quarry_kaldite_5 0.97 m against 3.01 m, scree_slide 1.00 against 1.04,
+ * fallen_duskoak 1.59 against 1.65, duskoak_stand_trees_9 1.20 against 1.27, ridge_pines_trees_6
+ * 1.36 against 1.44. Nothing this table produces can put an object below the terrain under its own
+ * footprint, and a tree at 0.12 leans by at most 2.4 degrees.
+ *
+ * That is also the whole of what `checkGrounding` is reporting when it flags these rows. It scores
+ * `drawnBounds().min.y` — the DOWNHILL corner of a tilted AABB — against `groundHeight` sampled at
+ * the entity's CENTRE, so on a slope a correctly bedded object must score negative. All 20 negative
+ * over-tolerance rows are this; the remaining two are enemy_bee, which flies.
+ *
  * Everything absent resolves to 0. That includes `landmark`, and it is not an oversight: building
  * parts are emitted as `landmark` entities (world/regionBuilder.ts:530), 36 buildings' worth of
  * them, and `checkBuildingFooting()` already returns worst 0 for every one. Tilting a wall segment
  * toward the ground normal would break the only part of the grounding audit that was already clean.
- * A genuine standalone landmark can still opt in per entity with `view.tiltStrength`.
+ * The world layer authors 0.25 on the standalone landmarks it does want tilted and hands building
+ * parts no normal at all, so the fallback never has to make that distinction.
  */
 const DEFAULT_TILT: Partial<Record<Archetype, number>> = {
-  tree: 0.1,
-  ore: 0.75,
-  obstacle: 0.55,
+  tree: 0.12,
+  ore: 0.85,
+  obstacle: 0.5,
   fishing_spot: 1,
   farm_plot: 1,
 };
@@ -342,6 +395,48 @@ const BAKE_PHASES: Record<CharacterMotion, number> = {
  * classes therefore get two independent counters below, and the split is a hard one.
  */
 const NAMED_CHARACTER_SHARE = 0.6;
+
+/**
+ * How much further than `animationRadius` a character may drift before it gives its rig back.
+ *
+ * Two pools with hard ceilings fixed "no enemy can ever animate", and left a second bug behind it
+ * that is just as visible: the pools are spent FIRST-COME in entity order, and entity order is
+ * region order. Measured at f692015 with `maxUniqueDrawCalls: 96`, the named pool (58) went
+ * entirely to the four Coldbrace NPCs and the other pool (38) to rill_skitterlings_1..3 plus
+ * cairnwights_fields_1 — four of fifty enemies, picked by where they sit in the array. Stand in
+ * Highcairn and all five of its characters are statues; fight anything but those four enemies and
+ * `playAction` returns false, so no swing, no flinch and no death animation ever plays.
+ *
+ * So the pools are now allocated by DISTANCE from the camera, not by array order:
+ * `canAffordUnique` refuses anything past `animationRadius`, `update` hands back the rigs of
+ * characters that have drifted past `animationRadius * this`, and the same pass promotes instanced
+ * characters that have come close enough. The budget is unchanged — the same 96 draw calls, spent
+ * on the characters the player is actually standing in front of.
+ *
+ * 1.75 rather than 1.0 because a boundary with no hysteresis thrashes: a character parked at
+ * exactly the radius would rebuild its skeleton and re-merge its geometry every frame. 40 m in,
+ * 70 m out. Between the two it keeps its rig but stops being ticked (`update` already cuts at
+ * `animationRadius`), so it holds its pose and costs nothing but its draw calls.
+ */
+const UNIQUE_RELEASE_FACTOR = 1.75;
+
+/**
+ * Characters promoted from their instanced pose to a live rig per frame.
+ *
+ * Capped at all because promoting a dressed NPC runs `assembleDressedCharacter` — a head cap cut
+ * out of the body mesh, four to six outfit parts rebound to its bones, and a merge — and doing a
+ * whole settlement roster in the frame the player crosses into it is a hitch.
+ *
+ * Four rather than one, measured: the named pool at `maxUniqueDrawCalls: 96` affords exactly four
+ * dressed NPCs, so four per frame is "one frame of work when you walk into a town" rather than a
+ * queue. One was tried first and is wrong in the harness, where headless GL runs the world at a few
+ * frames a second: Highcairn took 4 seconds of wall clock to light its four NPCs, so every
+ * screenshot and every 700 ms perf settle caught the town half animated.
+ *
+ * Demotion is deliberately NOT capped: it is a dispose, it is what frees the pool, and a promotion
+ * that waits a frame for its budget is a character that stands still for a frame.
+ */
+const UNIQUE_PROMOTIONS_PER_FRAME = 4;
 
 interface SourcePart {
   geometry: THREE.BufferGeometry;
@@ -430,6 +525,12 @@ interface ViewRecord {
   named: boolean;
   /** Set when a rigged entity was built before its skeleton source was available. */
   awaitingRig: boolean;
+  /**
+   * True when this entity's asset is skinned, so it is eligible for a mixer if the budget and the
+   * camera distance ever allow one. Cached because `rebalanceUniques` asks it every frame and
+   * `isRigged` walks a scene graph on a miss.
+   */
+  rigCandidate: boolean;
   /** Cheap change detection so a steady frame writes nothing. */
   signature: string;
   /** Where this entity is DRAWN. Equal to `target` unless `syncMotion` is interpolating. */
@@ -464,13 +565,30 @@ export interface EntityViewStats {
   /** Rigged assets whose instanced fallback runs from a baked idle pose, not bind pose. */
   bakedPoses: number;
   highlights: number;
+  /** Of `instancedMeshes`, the ones with at least one occupied slot. The rest submit nothing. */
+  drawnInstancedMeshes: number;
   /**
-   * Draw calls this layer is responsible for, INCLUDING the shadow pass.
+   * Draw calls this layer would submit if the WHOLE WORLD were inside the camera frustum, shadow
+   * pass included.
    *
-   * Round 1 excluded the shadow pass and assumed 10 meshes per character. Both were wrong in the
-   * expensive direction: every instanced entity mesh casts, so it draws twice, and the base NPCs
-   * Phase 1 uses are 3-4 meshes, not 10. A budget you cannot compare against
-   * `renderer.info.render.calls` is not a budget.
+   * CORRECTION, and it matters because the previous comment here made a promise this number cannot
+   * keep: it said "a budget you cannot compare against `renderer.info.render.calls` is not a
+   * budget", implying the two are comparable. They are not, and reading 636 against a measured 324
+   * as a 236-call overspend was reading two different quantities. `renderer.info.render.calls` is
+   * ONE FRAME of the WHOLE SCENE after frustum and shadow-frustum culling — terrain chunks, scatter,
+   * buildings, water, sky and the UI pass included, entity views a minority share of it. This is
+   * every entity in a 700x400 m world at once, this layer only, nothing culled. Measured at
+   * f692015 across seven poses: this read a flat 636 while the renderer read 107 at bracken_pit and
+   * 321 at highcairn. The world-wide figure being nearly double the on-screen one is what you
+   * expect when three quarters of the world is behind you or in fog.
+   *
+   * It also over-counted, which IS fixed: it charged for every `InstancedMesh` the layer had
+   * allocated, and a group whose entities all took non-instanced rigs keeps a full set of meshes
+   * with `count` 0. Only variants with an occupied slot are charged now.
+   *
+   * Nothing is budgeted off this. `canAffordUnique` spends `namedDrawCalls` and `otherDrawCalls`
+   * against `maxUniqueDrawCalls`, which are counted from real merged mesh counts at the moment each
+   * character is built. This number has never been an input to a decision, only a report.
    */
   estimatedDrawCalls: number;
   /** Draw calls currently spent on the non-instanced character path, against its own budget. */
@@ -537,6 +655,8 @@ export class EntityViews {
   private sourcesChanged = false;
 
   private readonly riggedAssets = new Map<string, boolean>();
+  /** `(assetKey, archetype)` -> does tier belong in the group key. See `groupTier`. */
+  private readonly tierKeyed = new Map<string, boolean>();
   private readonly seamGeometries = new Map<string, THREE.BufferGeometry>();
   private readonly bakedGeometries: THREE.BufferGeometry[] = [];
   /** Rigged records with a mixer. Kept as its own set so `update` never walks 600 ore nodes. */
@@ -558,12 +678,25 @@ export class EntityViews {
   private uniqueDrawCalls = 0;
   private namedDrawCalls = 0;
   private otherDrawCalls = 0;
+  /** Records currently holding a non-instanced object. See `countUnique`. */
+  private uniqueViewCount = 0;
 
   private readonly maxUniqueDrawCalls: number;
   private readonly maxUniqueViews: number;
   private readonly maxAnimatedViews: number;
   private readonly animationRadiusSq: number;
+  private readonly uniqueReleaseRadiusSq: number;
   private readonly minHighlightRadius: number;
+  /**
+   * Last camera position `update` was given, or null before the first frame.
+   *
+   * The unique/rig pools are allocated against this. Null means "nobody has told us where the
+   * camera is", and the pools then behave exactly as they did before — first-come — which is what
+   * the very first `sync` (boot runs one before the loop starts) needs.
+   */
+  private viewer: THREE.Vector3 | null = null;
+  /** Records whose asset is skinned, instanced or not. Kept apart so the rebalance is ~60 rows. */
+  private readonly rigCandidates = new Set<ViewRecord>();
   private ringGeometry: THREE.BufferGeometry | null = null;
   private pipGeometry: THREE.BufferGeometry | null = null;
 
@@ -576,7 +709,9 @@ export class EntityViews {
     this.maxUniqueDrawCalls = options.maxUniqueDrawCalls ?? 96;
     this.maxUniqueViews = options.maxUniqueViews ?? 24;
     this.maxAnimatedViews = options.maxAnimatedViews ?? 10;
-    this.animationRadiusSq = (options.animationRadius ?? 40) ** 2;
+    const animationRadius = options.animationRadius ?? 40;
+    this.animationRadiusSq = animationRadius ** 2;
+    this.uniqueReleaseRadiusSq = (animationRadius * UNIQUE_RELEASE_FACTOR) ** 2;
     this.minHighlightRadius = options.minHighlightRadius ?? 0.9;
     this.group.name = "entity-views";
     this.highlightGroup.name = "entity-highlights";
@@ -698,6 +833,12 @@ export class EntityViews {
    */
   update(deltaSeconds: number, viewer?: THREE.Vector3): void {
     this.animatedLastFrame = 0;
+    if (viewer) {
+      this.viewer = (this.viewer ?? new THREE.Vector3()).copy(viewer);
+      // Before the tick, not after: a character promoted this frame should be ticked this frame,
+      // or it renders one frame of its baked pose at the exact moment the player walks up to it.
+      this.rebalanceUniques();
+    }
     if (this.animated.size === 0) return;
 
     // A backgrounded tab hands back a delta of seconds. Fast-forwarding a crowd through 40 loops
@@ -725,12 +866,12 @@ export class EntityViews {
   /**
    * Position-and-facing refresh for the archetypes that move, cheap enough to call every frame.
    *
-   * OPT-IN and currently uncalled; `app/loop.ts` owns the decision to call it. `sync` runs at 4 Hz
-   * (loop.ts:266 returns early until 250 ms have passed) while `EnemyAI.stepToward` writes a
-   * position every 100 ms sim tick, so three of every four enemy movement steps are invisible and
-   * the fourth is a 40 cm jump. This closes that: pass the same entity list every render frame plus
-   * `alpha = accumulator / SIM_TICK_MS`, and a moving entity is drawn between the last two ticks
-   * instead of at the last one.
+   * CORRECTION: this said "OPT-IN and currently uncalled". `app/loop.ts:381` now calls it every
+   * render frame with `this.renderAlpha`, and that is what the numbers below are measured against.
+   * `sync` runs at 4 Hz (loop.ts:266 returns early until 250 ms have passed) while
+   * `EnemyAI.stepToward` writes a position every 100 ms sim tick, so three of every four enemy
+   * movement steps used to be invisible and the fourth a 40 cm jump. A moving entity is now drawn
+   * between the last two ticks instead of at the last one.
    *
    * Structure — asset, tier, state, add and remove — is still `sync`'s job at whatever cadence the
    * loop likes. This only moves things that already exist, so calling it is always safe and never
@@ -788,7 +929,7 @@ export class EntityViews {
     const tier = view.materialTier ?? entity.tier;
     const clip = view.clipFraction ?? 0;
     const character = this.characterFor(entity.id, view.assetId, view.partAssetIds);
-    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${groupTier(entity.archetype, tier)}|${entity.archetype}|${clip}`;
+    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${entity.archetype}|${clip}|${groupCell(entity.archetype, entity.position)}`;
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
@@ -895,59 +1036,26 @@ export class EntityViews {
     // of the baked idle pose, which is cheap and — unlike bind pose — looks like a person.
     const rigged = group.liveParts.length === 0 || this.isRigged(view.assetId);
     const ready = rigged && this.characterReady(view.assetId, character);
-    const source = ready ? this.sourceOf(view.assetId) : null;
-    const named = entity.archetype === "npc" || entity.archetype === "boss";
-    let unique: THREE.Object3D | null = null;
-    let dressed: DressedCharacter | null = null;
-    let rig: RigState | null = null;
-    let uniqueMeshes = 0;
-    let uniqueCost = 0;
-
-    if (source && this.canAffordUnique(entity.archetype, view.assetId, source, character)) {
-      dressed = character ? this.assembleCharacter(character) : null;
-      unique = dressed ? dressed.group : cloneRigged(source);
-      uniqueMeshes = dressed ? dressed.drawCalls : this.meshesIn(view.assetId, source);
-      uniqueCost = uniqueMeshes * 2;
-      unique.userData.entityId = entity.id;
-      unique.traverse((child) => {
-        child.userData.entityId = entity.id;
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        // Characters ground themselves with their own shadow. It is the second draw the budget
-        // above is counting, and a floating shadowless NPC reads as unfinished on its own.
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        // Keep the authored material, so a live -> dead -> respawned entity re-derives its look
-        // from the ART rather than from its own previous variant. Compounding variants is how a
-        // node that respawns after being mined comes back permanently grey.
-        mesh.userData.baseMaterial = mesh.material;
-      });
-      this.group.add(unique);
-      this.spend(named, uniqueCost);
-      rig = this.attachRig(entity, dressed?.animationRoot ?? unique, view.assetId);
-    }
-
-    const slot = unique ? -1 : this.takeSlot(group, entity.id);
-    if (!unique && slot < 0) {
-      dressed?.dispose();
-      return null;
-    }
 
     const record: ViewRecord = {
       entityId: entity.id,
       archetype: entity.archetype,
       groupKey,
-      slot,
-      unique,
-      dressed,
-      rig,
-      uniqueMeshes,
-      uniqueCost,
-      named,
+      slot: -1,
+      unique: null,
+      dressed: null,
+      rig: null,
+      uniqueMeshes: 0,
+      uniqueCost: 0,
+      named: entity.archetype === "npc" || entity.archetype === "boss",
       // A rigged entity built before its skeleton source arrived is re-acquired on the next sync.
       awaitingRig: rigged && !ready,
+      rigCandidate: rigged,
       signature: "",
-      position: new THREE.Vector3(),
+      // Seeded from the entity rather than left at the origin: `buildUnique` allocates the rig pool
+      // by distance from the camera, and a record reading (0,0,0) until `syncOne` writes it back
+      // would be measured from the middle of the world.
+      position: new THREE.Vector3(entity.position[0], entity.position[1], entity.position[2]),
       target: new THREE.Vector3(entity.position[0], entity.position[1], entity.position[2]),
       previous: new THREE.Vector3(entity.position[0], entity.position[1], entity.position[2]),
       rotationY: view.rotationY ?? 0,
@@ -961,15 +1069,144 @@ export class EntityViews {
       labelHeight: view.labelHeight ?? 1.6,
       radius: this.minHighlightRadius,
     };
-    this.records.set(entity.id, record);
-    if (rig) {
-      this.animated.add(record);
-      this.bindRigEvents(record);
+
+    if (!ready || !this.buildUnique(record, group)) {
+      const slot = this.takeSlot(group, entity.id);
+      if (slot < 0) return null;
+      record.slot = slot;
     }
+
+    this.records.set(entity.id, record);
+    if (rigged) this.rigCandidates.add(record);
     return record;
   }
 
+  /**
+   * Gives one record the non-instanced, mixer-driven copy of its character, if it can have one.
+   *
+   * Split out of `acquire` because `rebalanceUniques` needs the identical construction when a
+   * character walks into range long after its group was built. Returns false and leaves the record
+   * untouched when the source is not in, the budget is spent, or the entity is too far from the
+   * camera to be worth a skeleton.
+   */
+  private buildUnique(record: ViewRecord, group: InstanceGroup): boolean {
+    const assetId = group.assetId;
+    const character = group.character;
+    const source = this.sourceOf(assetId);
+    if (!source) return false;
+    if (!this.canAffordUnique(record.archetype, assetId, source, character, record.position)) {
+      return false;
+    }
+
+    const dressed = character ? this.assembleCharacter(character) : null;
+    const unique = dressed ? dressed.group : cloneRigged(source);
+    const uniqueMeshes = dressed ? dressed.drawCalls : this.meshesIn(assetId, source);
+    const entityId = record.entityId;
+    unique.userData.entityId = entityId;
+    unique.traverse((child) => {
+      child.userData.entityId = entityId;
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      // Characters ground themselves with their own shadow. It is the second draw the budget is
+      // counting, and a floating shadowless NPC reads as unfinished on its own.
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      // Keep the authored material, so a live -> dead -> respawned entity re-derives its look
+      // from the ART rather than from its own previous variant. Compounding variants is how a
+      // node that respawns after being mined comes back permanently grey.
+      mesh.userData.baseMaterial = mesh.material;
+    });
+    this.group.add(unique);
+
+    record.unique = unique;
+    record.dressed = dressed;
+    record.uniqueMeshes = uniqueMeshes;
+    record.uniqueCost = uniqueMeshes * 2;
+    record.awaitingRig = false;
+    this.uniqueViewCount += 1;
+    this.spend(record.named, record.uniqueCost);
+
+    record.rig = this.attachRig(entityId, dressed?.animationRoot ?? unique, assetId);
+    if (record.rig) {
+      this.animated.add(record);
+      this.bindRigEvents(record);
+    }
+    return true;
+  }
+
+  /**
+   * Moves the rig pools to whoever is standing in front of the camera, once per frame.
+   *
+   * Demote first, then promote, and in that order for a reason: the pool is what gates promotion,
+   * so walking from Coldbrace to Highcairn can only light up Highcairn NPCs after the four in
+   * Coldbrace have handed their 48 draw calls back. Both halves are no-ops until `update` has been
+   * given a camera position, which is what makes the boot-time first sync behave as it always did.
+   *
+   * A demoted character does NOT vanish for the quarter second until the next `sync`: it takes an
+   * instance slot in the same pass and is written into its group baked pose immediately.
+   */
+  private rebalanceUniques(): void {
+    const viewer = this.viewer;
+    if (!viewer || this.rigCandidates.size === 0) return;
+    let changed = false;
+
+    for (const record of this.rigCandidates) {
+      // The boss is exempt in both directions. There is one of them, the fight is the climax of its
+      // region, and an instanced boss is a rig frozen on one baked frame through a two-phase fight.
+      if (!record.unique || record.archetype === "boss") continue;
+      if (record.position.distanceToSquared(viewer) <= this.uniqueReleaseRadiusSq) continue;
+      const group = this.groups.get(record.groupKey);
+      if (!group) continue;
+      const slot = this.takeSlot(group, record.entityId);
+      if (slot < 0) continue;
+      this.releaseUnique(record);
+      record.slot = slot;
+      this.writeSlot(group, record);
+      group.dirty = true;
+      changed = true;
+    }
+
+    let promoted = 0;
+    for (const record of this.rigCandidates) {
+      if (promoted >= UNIQUE_PROMOTIONS_PER_FRAME) break;
+      if (record.unique || record.slot < 0) continue;
+      if (record.position.distanceToSquared(viewer) > this.animationRadiusSq) continue;
+      const group = this.groups.get(record.groupKey);
+      if (!group || !this.characterReady(group.assetId, group.character)) continue;
+      const slot = record.slot;
+      if (!this.buildUnique(record, group)) continue;
+      promoted += 1;
+      this.freeSlot(group, record.entityId, slot);
+      record.slot = -1;
+      this.placeUnique(record);
+      this.applyUniqueState(record, group.tier);
+      this.setMotion(record, record.spent ? "death" : record.movingTicks > 0 ? "walk" : "idle");
+      changed = true;
+    }
+
+    if (changed) this.flush();
+  }
+
   private release(record: ViewRecord): void {
+    this.rigCandidates.delete(record);
+    if (record.unique) {
+      this.releaseUnique(record);
+      return;
+    }
+    const group = this.groups.get(record.groupKey);
+    if (!group || record.slot < 0) return;
+    this.freeSlot(group, record.entityId, record.slot);
+    record.slot = -1;
+  }
+
+  /**
+   * Tears down one non-instanced character: mixer, scene node, owned geometry, pooled draw calls.
+   *
+   * Separate from `release` because `rebalanceUniques` demotes a character to its instanced pose
+   * without the record going away, and that path must not drop the record out of `rigCandidates`
+   * (it is exactly the record that has to be promoted again when the player walks back).
+   */
+  private releaseUnique(record: ViewRecord): void {
     if (record.rig) {
       record.rig.action.stop();
       record.rig.mixer.stopAllAction();
@@ -977,26 +1214,28 @@ export class EntityViews {
       this.animated.delete(record);
       record.rig = null;
     }
-    if (record.unique) {
-      record.unique.removeFromParent();
-      // `DressedCharacter.dispose` frees the head-cap and merged geometries this assembly allocated
-      // and nothing else owns. The source geometries and materials are shared with the loaded asset
-      // and are deliberately left alone.
-      record.dressed?.dispose();
-      record.dressed = null;
-      record.unique = null;
-      this.refund(record.named, record.uniqueCost);
-      record.uniqueCost = 0;
-      record.uniqueMeshes = 0;
-      return;
-    }
-    const group = this.groups.get(record.groupKey);
-    if (!group || record.slot < 0) return;
-    group.slots[record.slot] = null;
-    group.free.push(record.slot);
-    for (const mesh of group.live) mesh.setMatrixAt(record.slot, HIDDEN);
-    for (const mesh of group.spent) mesh.setMatrixAt(record.slot, HIDDEN);
-    for (const mesh of group.moving) mesh.setMatrixAt(record.slot, HIDDEN);
+    if (!record.unique) return;
+    this.uniqueViewCount = Math.max(0, this.uniqueViewCount - 1);
+    record.unique.removeFromParent();
+    // `DressedCharacter.dispose` frees the head-cap and merged geometries this assembly allocated
+    // and nothing else owns. The source geometries and materials are shared with the loaded asset
+    // and are deliberately left alone.
+    record.dressed?.dispose();
+    record.dressed = null;
+    record.unique = null;
+    this.refund(record.named, record.uniqueCost);
+    record.uniqueCost = 0;
+    record.uniqueMeshes = 0;
+  }
+
+  /** Hands one instance slot back to its group and hides it in every pose variant. */
+  private freeSlot(group: InstanceGroup, entityId: EntityId, slot: number): void {
+    if (slot < 0 || group.slots[slot] !== entityId) return;
+    group.slots[slot] = null;
+    group.free.push(slot);
+    for (const mesh of group.live) mesh.setMatrixAt(slot, HIDDEN);
+    for (const mesh of group.spent) mesh.setMatrixAt(slot, HIDDEN);
+    for (const mesh of group.moving) mesh.setMatrixAt(slot, HIDDEN);
     group.dirty = true;
   }
 
@@ -1485,6 +1724,65 @@ export class EntityViews {
     return APPEARANCE[archetype] ?? NEUTRAL;
   }
 
+  /**
+   * The tier component of the instance-group key: the real tier when tier changes what this asset
+   * draws, and `"-"` when it provably does not.
+   *
+   * This is the draw-call fix for wave 2. The three settlements added 156 props and 10 buildings,
+   * and every (asset, tier) pair was its own group even when the two groups held byte-identical
+   * geometry under the identical material OBJECT. Measured over the shipped world: 184 groups /
+   * 356 `InstancedMesh`es keyed by tier, against 119 groups / 244 meshes keyed this way — 112
+   * fewer meshes, i.e. 224 fewer world-wide submitted draws with the shadow pass counted.
+   *
+   * It is safe because it asks the same question the renderer does. `MaterialLibrary.variant`
+   * returns the SOURCE material instance, not a clone, whenever strength, glow and state are all
+   * zero/normal — so a group whose every material resolves to `strength === 0` under
+   * `appearanceFor` draws the same objects at tier 1 and tier 10. The tier's other two effects are
+   * both accounted for: `tierSilhouetteScale` is a per-SLOT scale and only applies to
+   * `TIERED_ARCHETYPES`, all six of which have a non-zero `APPEARANCE` row and are rejected on the
+   * first line below; and the spent variant's `applyDepletion` clone is derived from the source
+   * colour with no palette term in it, so it too is tier-independent at strength 0.
+   *
+   * `ore` is the one archetype the material scan cannot answer, because its seam is GENERATED in
+   * `materials.oreRock(tier)` rather than shipped in the GLB.
+   */
+  private groupTier(
+    archetype: Archetype,
+    tier: number,
+    assetId: string,
+    character: CharacterSpec | null,
+  ): number | string {
+    if (archetype === "ore") return tier;
+    if ((APPEARANCE[archetype]?.strength ?? 0) > 0) return tier;
+    if (TIER_BLIND_ARCHETYPES.has(archetype)) return "-";
+
+    const cacheKey = `${character?.key ?? assetId}|${archetype}`;
+    const cached = this.tierKeyed.get(cacheKey);
+    if (cached !== undefined) return cached ? tier : "-";
+
+    const ids = character ? [character.bodyAssetId, ...character.partAssetIds] : [assetId];
+    let keyed = false;
+    let materials = 0;
+    for (const id of ids) {
+      // Undecidable until the GLB is in. Keep the tier in the key for now rather than caching a
+      // guess: an asset that turns out to be roof tiles must not have been merged first.
+      if (!this.assets.isLoaded(id)) return tier;
+      const source = this.sources.get(id) ?? this.assets.instance(id);
+      source.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh || !mesh.geometry) return;
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          if (!material) continue;
+          materials += 1;
+          if (this.appearanceFor(archetype, material).strength > 0) keyed = true;
+        }
+      });
+    }
+    if (materials === 0) return tier;
+    this.tierKeyed.set(cacheKey, keyed);
+    return keyed ? tier : "-";
+  }
+
   // -------------------------------------------------------------- seams
 
   /**
@@ -1565,9 +1863,9 @@ export class EntityViews {
    * in the clip it starts (so the two who did land on the same clip are not in lockstep). Timescale
    * is nudged +/-12% for the same reason — identical loop lengths resynchronise within a minute.
    */
-  private attachRig(entity: SemanticEntity, root: THREE.Object3D, assetId: string): RigState | null {
-    const rng = new Rng(hashString(entity.id));
-    const clip = this.firstFittingClip(assetId, this.clipCandidates(assetId, entity.id, "idle"), root);
+  private attachRig(entityId: EntityId, root: THREE.Object3D, assetId: string): RigState | null {
+    const rng = new Rng(hashString(entityId));
+    const clip = this.firstFittingClip(assetId, this.clipCandidates(assetId, entityId, "idle"), root);
     if (!clip) return null;
 
     const mixer = new THREE.AnimationMixer(root);
@@ -1678,11 +1976,18 @@ export class EntityViews {
   /**
    * Plays a one-shot on an entity's rig: a swing, or a flinch when it takes one.
    *
-   * OPT-IN and currently uncalled. `app/loop.ts` already drains `CombatSystem.consumeHits()` for the
-   * floating damage numbers; feeding the same stream in here is what makes an enemy react to being
-   * hit. Returns false when the entity has no live mixer, which is the common case — an instanced
-   * character cannot play a one-shot at all, and pretending otherwise would make the caller think
-   * it worked.
+   * CORRECTION: this said "OPT-IN and currently uncalled". `app/loop.ts:493` calls it with
+   * `("attack")` on the swinger and `:497` with `("hit")` on whatever it landed on, both off the
+   * `CombatSystem.consumeHits()` stream that already drives the floating damage numbers. Verified
+   * live against rill_skitterlings_1 (runs/corealm/audit/ev2-combat.ts): `getDrawnBounds` reports
+   * `animated:Idle` at rest, `animated:HitRecieve` within 700 ms of the first swing and
+   * `animated:Death` once it dies.
+   *
+   * Returns false when the entity has no live mixer. Before the rig pools were allocated by camera
+   * distance that was the answer for 46 of the world's 50 enemies whatever you did to them; it is
+   * now the answer only for enemies further away than `animationRadius`, which cannot be the one
+   * you are fighting. An instanced character cannot play a one-shot at all, and pretending
+   * otherwise would make the caller think it worked.
    */
   playAction(entityId: EntityId, motion: "attack" | "hit"): boolean {
     const record = this.records.get(entityId);
@@ -1760,6 +2065,7 @@ export class EntityViews {
     assetId: string,
     source: THREE.Object3D,
     character: CharacterSpec | null,
+    position: THREE.Vector3,
   ): boolean {
     const cost = this.uniqueCostOf(assetId, source, character);
     if (cost === 0) return false;
@@ -1770,6 +2076,11 @@ export class EntityViews {
     // budget with eighty to spare at the worst dungeon pose is the right trade.
     if (archetype === "boss") return true;
     if (this.countUnique() >= this.maxUniqueViews) return false;
+    // Distance before budget. Both pools used to be spent first-come in entity order, which is
+    // region order, so the four Coldbrace NPCs took the whole named pool and rill_skitterlings_1..3
+    // took the whole other pool — measured, four of the world's fifty enemies, and none of them
+    // necessarily anywhere near the player. See `UNIQUE_RELEASE_FACTOR`.
+    if (this.viewer && position.distanceToSquared(this.viewer) > this.animationRadiusSq) return false;
 
     const named = archetype === "npc";
     const namedBudget = Math.round(this.maxUniqueDrawCalls * NAMED_CHARACTER_SHARE);
@@ -1906,12 +2217,15 @@ export class EntityViews {
     if (record.spent) this.ensureSpent(group);
     else if (moving) this.ensureMoving(group);
 
-    const placement = new THREE.Matrix4().compose(
+    // Module scratch, for the reason the quaternions above are: `syncMotion` calls this once per
+    // moving entity per RENDER frame, and `resize` calls it once per record in the group. Two fresh
+    // Matrix4s per call is garbage allocated in exactly the frames that are already the tightest.
+    const placement = SCRATCH_PLACEMENT.compose(
       record.position,
       orientation(record.rotationY, record.normal, record.tilt, SCRATCH_QUATERNION),
       SCRATCH_SCALE.setScalar(record.scale),
     );
-    const transform = new THREE.Matrix4();
+    const transform = SCRATCH_TRANSFORM;
 
     // A spent group with no geometry of its own falls back to the live meshes rather than to
     // nothing. Hiding the live instance without drawing a replacement is how a worked-out node
@@ -2117,10 +2431,15 @@ export class EntityViews {
     return Math.max(entry.size.x, entry.size.z) * 0.55;
   }
 
+  /**
+   * Kept as a counter rather than a walk of `this.records`.
+   *
+   * `canAffordUnique` asks for it, and `rebalanceUniques` asks `canAffordUnique` once per character
+   * record per frame. Walking 1,203 records inside a loop over 62 candidates is 75,000 property
+   * reads a frame to answer a question the layer already knows the answer to.
+   */
   private countUnique(): number {
-    let count = 0;
-    for (const record of this.records.values()) if (record.unique) count += 1;
-    return count;
+    return this.uniqueViewCount;
   }
 
   /**
@@ -2171,12 +2490,36 @@ export class EntityViews {
   }
 
   stats(): EntityViewStats {
+    // Which pose variant each group actually has something in. A group whose entities all took a
+    // non-instanced rig keeps a full set of `InstancedMesh`es at `count` 0, and an unused spent or
+    // walk variant is the same: allocated, never submitted. Charging for them is what put 636 on a
+    // report next to a renderer reading 321.
+    const occupied = new Map<string, { live: boolean; spent: boolean; moving: boolean }>();
+    for (const record of this.records.values()) {
+      if (record.slot < 0) continue;
+      const group = this.groups.get(record.groupKey);
+      if (!group) continue;
+      const flags = occupied.get(group.key) ?? { live: false, spent: false, moving: false };
+      const moving = record.movingTicks > 0 && !record.spent;
+      if (record.spent && group.spent.length > 0) flags.spent = true;
+      else if (moving && group.moving.length > 0) flags.moving = true;
+      else flags.live = true;
+      occupied.set(group.key, flags);
+    }
+
     let instancedMeshes = 0;
+    let drawnInstancedMeshes = 0;
     let triangles = 0;
     let bakedPoses = 0;
     let dressedGroups = 0;
     for (const group of this.groups.values()) {
       instancedMeshes += group.live.length + group.spent.length + group.moving.length;
+      const flags = occupied.get(group.key);
+      if (flags) {
+        if (flags.live) drawnInstancedMeshes += group.live.length;
+        if (flags.spent) drawnInstancedMeshes += group.spent.length;
+        if (flags.moving) drawnInstancedMeshes += group.moving.length;
+      }
       if (group.posed) bakedPoses += 1;
       if (group.character) dressedGroups += 1;
       const active = group.slots.filter((slot) => slot !== null).length;
@@ -2204,6 +2547,7 @@ export class EntityViews {
       entities: this.records.size,
       groups: this.groups.size,
       instancedMeshes,
+      drawnInstancedMeshes,
       uniqueViews: unique,
       riggedViews: this.animated.size,
       animatedLastFrame: this.animatedLastFrame,
@@ -2211,8 +2555,8 @@ export class EntityViews {
       highlights: this.highlights.size,
       // Counted, not guessed, and with the shadow pass in it. Every instanced entity mesh and every
       // unique character mesh casts, so each is two submitted draws; highlights are unlit overlays
-      // and are not, so a ring plus a pip is two.
-      estimatedDrawCalls: instancedMeshes * 2 + uniqueMeshes * 2 + this.highlights.size * 2,
+      // and are not, so a ring plus a pip is two. World-wide and unculled — see the field doc.
+      estimatedDrawCalls: drawnInstancedMeshes * 2 + uniqueMeshes * 2 + this.highlights.size * 2,
       uniqueDrawCalls: this.uniqueDrawCalls,
       namedDrawCalls: this.namedDrawCalls,
       otherDrawCalls: this.otherDrawCalls,
@@ -2231,12 +2575,15 @@ export class EntityViews {
     this.groups.clear();
     this.records.clear();
     this.animated.clear();
+    this.rigCandidates.clear();
+    this.viewer = null;
     this.meshCounts.clear();
     this.characterCosts.clear();
     this.characterSpecs.clear();
     this.uniqueDrawCalls = 0;
     this.namedDrawCalls = 0;
     this.otherDrawCalls = 0;
+    this.uniqueViewCount = 0;
     for (const geometry of this.seamGeometries.values()) geometry.dispose();
     for (const geometry of this.bakedGeometries) geometry.dispose();
     this.seamGeometries.clear();
@@ -2244,11 +2591,24 @@ export class EntityViews {
     this.sources.clear();
     this.sourceRequests.clear();
     this.riggedAssets.clear();
+    this.tierKeyed.clear();
     this.ringGeometry?.dispose();
     this.pipGeometry?.dispose();
     this.ringGeometry = null;
     this.pipGeometry = null;
   }
+}
+
+/**
+ * Which `GROUP_CELL_SIZE` cell an entity's instance group lives in.
+ *
+ * `Math.floor` on a negative coordinate still lands in a consistent cell, and the cell only has to
+ * be CONSISTENT — nothing reads it back, it exists so that two props 400 m apart cannot end up
+ * sharing one bounding sphere.
+ */
+function groupCell(archetype: Archetype, position: Vec3): string {
+  if (CELL_FREE_ARCHETYPES.has(archetype)) return "*";
+  return `${Math.floor(position[0] / GROUP_CELL_SIZE)}_${Math.floor(position[2] / GROUP_CELL_SIZE)}`;
 }
 
 function round(value: number): number {
@@ -2294,29 +2654,6 @@ function characterSpecFor(
   }
 
   return { bodyAssetId, partAssetIds: parts, key: `${bodyAssetId}>${parts.join("+")}` };
-}
-
-/**
- * Archetypes whose tier stays out of the instance-group key, because it changes nothing they draw.
- *
- * `npc` and nothing else, and the two guards below say why it is safe rather than assuming it. An
- * NPC's tier feeds exactly two things: `tierSilhouetteScale`, which only applies to
- * `TIERED_ARCHETYPES`, and `MaterialLibrary.variant`, which returns the SOURCE material instance
- * unchanged at strength 0 — and `APPEARANCE` has no `npc` row. So `outfit X at tier 1` and
- * `outfit X at tier 10` were two groups holding byte-identical geometry and the identical material
- * objects. Measured: 10 NPC groups collapse to 6, which is 24 fewer `InstancedMesh`es and 48 fewer
- * world-wide draw calls for no visible change.
- *
- * `landmark` deliberately stays out of this, even though `APPEARANCE` has no row for it either:
- * `appearanceFor` gives any material matching `ROOF_MATERIAL` a 0.42 tier tint, which is how
- * Karrowmoor's roofs weather toward its blue-grey, and building parts are landmark entities.
- */
-const TIER_BLIND_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc"]);
-
-function groupTier(archetype: Archetype, tier: number): number | string {
-  if (!TIER_BLIND_ARCHETYPES.has(archetype)) return tier;
-  if (TIERED_ARCHETYPES.has(archetype)) return tier;
-  return (APPEARANCE[archetype]?.strength ?? 0) > 0 ? tier : "-";
 }
 
 /**

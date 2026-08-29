@@ -25,6 +25,49 @@
  *   roof_wood_plank   2.258 x 1.560 mono-pitch, high at its own z 0, low at z 1.56
  *   kerb_straight     2.000 x 0.134 x 0.700, body entirely on the +Z side of the pivot
  *
+ * WHY THE TOWNS READ AS OPEN SHELLS, in order of how much daylight each leak is worth. Measured on
+ * the shipped data with runs/corealm/audit/shell-audit.ts:
+ *
+ *   1. THE GABLES WERE OPEN. 415 m2 of it, which is the whole answer. A `roof_tiles_*` is a prism
+ *      of tiles - two primitives, MI_WoodTrim and MI_RoundTiles, and no end face in either - and
+ *      the wall ring stops at 3.123 m, so every pitched roof in the game had a triangle of nothing
+ *      at each end: 9.00 m2 per end on a 6 x 4 cottage, 17.39 on the March Company Hall, 5.76 on
+ *      the drying shed. You looked in one gable, through the house, and out the other. Only the
+ *      stone kit closed its gables at all, and it sized them off the footprint rather than off the
+ *      roof, so they fell 0.36 m short of the ridge and one of each pair faced backwards.
+ *      `gableEnds` closes all of them; the audit puts what is left at 0.054 m2 per end.
+ *   2. THE MODULE JOINTS ARE SLOTS, and this one is not fixable here. `world/regionBuilder.ts`
+ *      emits every building part at `1 / tierSilhouetteScale(tier)` on the unscaled 2 m grid, so a
+ *      2 m panel draws 1.860 m at Rootfall and 1.738 m at Highcairn: a full-height 0.140 m and
+ *      0.262 m slot at every joint of every building. `jointStuds` puts a post in each joint, which
+ *      closes it and is also what half-timbering looks like, but the fix is dropping `compensation`
+ *      in `emitParts`.
+ *   3. APERTURED AND HALF-TIMBERED PANELS USED AS WALLS. Fixed in the previous pass; the panel
+ *      table below is why.
+ *
+ * WHICH PANELS ARE ACTUALLY SOLID. A bounding box says every `wall_*` is 2.000 x 3.123 x 0.406.
+ * Per-primitive material spans, measured off the GLBs with @gltf-transform/core
+ * (runs/corealm/audit/bld-prims.mjs):
+ *
+ *   wall_plaster_straight  MI_Plaster covers y 0.00-3.00 on both faces. Solid.
+ *   wall_plaster_base      MI_Plaster y 0.00-3.00 plus an MI_Brick apron y 0.00-0.88. Solid.
+ *   wall_brick_straight    MI_UnevenBrick y 0.00-3.00 outside, MI_Plaster y 0.00-3.00 inside. Solid.
+ *   wall_plaster_timber    MI_Plaster covers ONLY y 0.00-0.84. The other 2.28 m is 386 verts of
+ *                          MI_WoodTrim - studs and braces with NOTHING BETWEEN THEM. It is
+ *                          half-timbering to lay OVER a wall, not a wall. Used as `wall` by the
+ *                          timber kit and as `wallFeature` by the plaster kit, it is why both
+ *                          flanking houses in runs/corealm/screenshots/w1-rootfall.png and the
+ *                          March Company Hall are see-through.
+ *   wall_*_window          the aperture is a hole in the mesh; there is no glass primitive. One
+ *                          window is fine because the far wall behind it is opaque. A prefab whose
+ *                          DEFAULT panel is a window - `quarry_hut` took `kit.wallFeature`, and the
+ *                          stone kit's was `wall_brick_window` - is a building with holes on every
+ *                          side, which is w1-highcairn.png's "open pavilions".
+ *   wall_plaster_window    also carries a loose MI_Brick apron quad at y 0.00-0.88, z = 0. On a
+ *                          panel standing on the ground it is the sill course; on the gatehouse's
+ *                          head course, three metres up over an open passage, it is the floating
+ *                          framed panel in the middle of wire-town_entrance.png.
+ *
  * Nothing in here invents an asset id. Every id below appears in game/public/assets/manifest.json
  * and was measured with @gltf-transform/core, not guessed. `prefabPartAssetIds()` and
  * `compositionPartAssetIds()` are the lists `content/regions.ts` validates against a real manifest.
@@ -43,7 +86,22 @@ import { Rng } from "../core/rng.js";
 
 // ------------------------------------------------------------------ constants
 
-/** The kit's horizontal module. Snap to this or pieces do not meet. */
+/**
+ * The kit's horizontal module. Snap to this or pieces do not meet.
+ *
+ * KNOWN BREAK, NOT IN THIS FILE. `world/regionBuilder.ts` emits every prefab part at
+ * `scale * (1 / tierSilhouetteScale(tier))` while placing it on this unscaled grid. That
+ * compensation was correct in round 1, when `render/entityViews.ts` scaled every archetype by
+ * tier; entityViews now applies it only to `TIERED_ARCHETYPES` (ore, tree, fishing_spot,
+ * farm_plot, enemy, boss) and a building part's archetype is `landmark`, so nothing cancels it any
+ * more. Measured with `getDrawnBounds` on the live game: a 2 m panel draws 2.222 m in Coldbrace
+ * (tier 1), 1.860 m in Rootfall (tier 5) and 1.738 m in Highcairn (tier 10). On a 4 m side, which
+ * is two modules on exactly 2 m centres, that leaves a full-height slot between the two panels -
+ * 0.262 m on every 4 m side of all six Highcairn huts (`highcairn_hut_1#w1_0` z[-57.869,-56.131]
+ * against `#w1_1` z[-59.869,-58.131]) and 0.140 m at Rootfall. It also narrows the gate: the
+ * Coldbrace south arch collides 2.000 m and draws 1.778 m. Nothing in this file can see the tier,
+ * so the fix is one line in `emitParts`: drop `compensation`.
+ */
 export const MODULE_METRES = 2;
 
 /** Measured wall height. Stack storeys on this exactly. */
@@ -76,16 +134,30 @@ const DOOR_LEAF_OFFSET = -0.55;
 export const GATE_GAP_METRES = 4;
 
 /**
- * How far a tiled roof overhangs the footprint it covers, per side, at the scale `roofFit` returns.
+ * How far a tiled roof overhangs the footprint it covers, per side, in the worst case any authored
+ * settlement footprint reaches.
  *
- * Measured off `roof_tiles_4x6`: the asset's bbox is 5.513 x 7.572 for a nominal 4 x 6 building, so
- * the eaves are (5.513 - 4) / 2 = 0.757 m in X and (7.572 - 6) / 2 = 0.786 m in Z, and they are
- * part of the mesh rather than something the fit adds. That is why Coldbrace houses 5 and 6, placed
- * corner to corner with gapX = gapZ = 0.00, interpenetrate over 1.57 x 1.51 m of tile: two roofs
- * each reaching 0.79 m past their own walls. Author neighbouring buildings at least
- * `footprint + 2 * ROOF_EAVE_METRES` apart, and round up.
+ * 0.79 was measured off `roof_tiles_4x6` alone - bbox 5.513 x 7.572 over a nominal 4 x 6 building,
+ * so eaves of (5.513 - 4) / 2 = 0.757 m and (7.572 - 6) / 2 = 0.786 m - and it is only right for a
+ * 6 x 4 cottage in the plaster or timber kit. It is wrong everywhere else, in two ways that matter
+ * to whoever is spacing buildings right now:
+ *
+ *   - The stone kit roofs with `roof_tiles_6x8`, bbox 8.250 x 9.683 over a nominal 6 x 8, so its
+ *     eaves are 1.125 m and 0.842 m at scale 1. Highcairn is 43% deeper in the eaves than 0.79.
+ *   - `roofFit` scales uniformly off the tighter of the two ratios, so any plan squarer than the
+ *     asset's own aspect over-runs on the other axis. A 6 x 5 forge in the plaster kit fits at
+ *     1.25 and therefore draws a roof 9.47 m along the 6 m axis: an eave of 1.73 m, not 0.79.
+ *
+ * Use `roofOverhang(prefab, footprint, kitId)` for the real per-axis number; `ROOF_EAVE_BY_KIT`
+ * for a single safe number per vernacular; this constant only for "no roof in the game reaches
+ * further than this". Author neighbouring buildings at least `footprint + 2 * overhang` apart.
+ *
+ * All three are the authored scale. The game currently draws every building part at
+ * `1 / tierSilhouetteScale(tier)` (regionBuilder.ts `emitParts`), so the eave a player sees is
+ * 1.111x these numbers in Coldbrace, 0.930x in Rootfall and 0.869x in Highcairn - see the note on
+ * `MODULE_METRES`.
  */
-export const ROOF_EAVE_METRES = 0.79;
+export const ROOF_EAVE_METRES = 1.79;
 
 /**
  * How far a covered bay's canopy reaches out from the wall it hangs on.
@@ -289,6 +361,69 @@ function trimUnder(
   out.push(part(tag, "wall_bottom_trim", onSide(side, count, index, 0, 0.01), side.yaw));
 }
 
+/**
+ * One module of a ring wall: the panel, its plinth, and the kit's half-timbering over it.
+ *
+ * The frame goes on 0.02 m proud of the panel face rather than coplanar with it - both meshes
+ * carry MI_WoodTrim between z -0.31 and +0.09, and drawn at the same z the two frames z-fight
+ * along every stud. It is only laid over SOLID panels: `wall_plaster_timber`'s braces cross the
+ * middle of the module, which would put an X through a window or a door.
+ */
+function wallModule(
+  out: PartPlacement[],
+  tag: string,
+  assetId: string,
+  side: Side,
+  count: number,
+  index: number,
+  kit: BuildingKit,
+  y = 0,
+  // The tower's plinth predates the storey prefix on its panels, and a part tag is an entity id.
+  trimTag = tag,
+): void {
+  out.push(part(`w${tag}`, assetId, onSide(side, count, index, y, 0), side.yaw));
+  if (y === 0) trimUnder(out, `t${trimTag}`, side, count, index);
+  if (kit.frame !== null && assetId !== kit.wallWindow && assetId !== kit.wallDoor) {
+    out.push(part(`f${tag}`, kit.frame, onSide(side, count, index, y, 0.02), side.yaw));
+  }
+}
+
+/**
+ * Which modules of a four-sided ring get a window, with the one rule that keeps the building
+ * opaque: never a window opposite a window.
+ *
+ * A `wall_*_window` aperture is a hole in the mesh and the kit ships no glass, so a single window
+ * is only ever as transparent as whatever stands behind it - and what stands behind it is the far
+ * wall, from the inside. Two windows on opposite faces at the same offset line up, and the player
+ * sees the terrain through the house. On a 6 x 4 cottage at the old flat 45% chance that happened
+ * on about one building in three; on a 6 x 6 tower it happened every time, because the storey-1
+ * window was `floor(count / 2)` on all four sides and `floor(3 / 2) = 1` faces itself.
+ *
+ * `onSide` runs side 0 along +X and side 2 along -X, so module `i` of side 0 faces module
+ * `count - 1 - i` of side 2; sides 1 and 3 pair the same way. Sides 0 and 1 are drawn first and
+ * freely, and 2 and 3 give way to them. The rng is consumed once per module in a fixed order
+ * whatever the answer, so the plan is the same for the same building seed.
+ */
+function ringWindows(
+  sides: readonly Side[],
+  rng: Rng,
+  chance: number,
+  forced: (side: number, index: number) => boolean = () => false,
+): boolean[][] {
+  const plan: boolean[][] = sides.map((side) => new Array<boolean>(moduleCount(side.length)).fill(false));
+  for (const [s, side] of sides.entries()) {
+    const count = moduleCount(side.length);
+    const facing = plan[(s + 2) % 4]!;
+    for (let index = 0; index < count; index += 1) {
+      const roll = rng.chance(chance);
+      if (forced(s, index)) continue;
+      const opposite = facing[count - 1 - index] === true;
+      plan[s]![index] = roll && !opposite;
+    }
+  }
+  return plan;
+}
+
 /** Corner posts at the four footprint corners, each turned to face its diagonal. */
 function corners(
   out: PartPlacement[],
@@ -323,10 +458,12 @@ function corners(
  * is spacing, in the settlement data, not scale here.
  *
  * What IS worth knowing before authoring a footprint: because the scale is uniform and takes the
- * larger of the two ratios, a plan squarer than the asset's own 4:6 over-runs on the long side. A
- * 6x5 forge in the plaster kit scales to 1.25 to cover its 5 m width and therefore draws a roof
- * 7.5 m long over a 6 m building. Author open structures nearer the asset's aspect, or accept the
- * extra 0.75 m per end as deep eaves.
+ * larger of the two ratios, a plan squarer than the asset's own 4:6 over-runs on the other axis. A
+ * 6x5 forge in the plaster kit scales to 1.25 to cover its 5 m depth and therefore draws a roof
+ * 9.47 m long over a 6 m building - an eave of 1.73 m per end, not the 0.79 the constant used to
+ * claim, and this comment used to say 7.5 m, which is the covered span and not the drawn bbox.
+ * Author open structures nearer the asset's aspect, or budget for it: `roofOverhang` returns the
+ * real per-axis number for any (prefab, footprint, kit).
  */
 function roofFit(
   width: number,
@@ -338,6 +475,153 @@ function roofFit(
   const short = Math.min(width, depth);
   const scale = Math.max(short / coversShort, long / coversLong);
   return { scale, rotationY: width >= depth ? Math.PI / 2 : 0 };
+}
+
+/**
+ * A tiled roof once it has been placed: the cross-section a gable has to close.
+ *
+ * `roofFit` returns a scale and a quarter turn; on its own that is not enough to fit anything to
+ * the roof, because the asset's ridge height, eave drop and half-span are three different numbers
+ * and only the first was ever exported. All three are metres at the placement height.
+ */
+interface PlacedRoof {
+  scale: number;
+  rotationY: number;
+  /** True when the ridge runs along local Z, i.e. `roofFit` did NOT turn the asset. */
+  alongZ: boolean;
+  /** Metres from the placement height up to the ridge. */
+  apex: number;
+  /** Metres the eave hangs below the placement height. */
+  drop: number;
+  /** Half the roof's span ACROSS the ridge, measured at the eave. */
+  acrossHalf: number;
+}
+
+function placeRoof(
+  fit: { scale: number; rotationY: number },
+  box: readonly [number, number],
+  apex: number,
+  drop: number,
+): PlacedRoof {
+  // box[0] is the asset's X bbox, which is always the across-ridge span; the quarter turn swaps
+  // which world axis that lands on but not which of the asset's own axes it is.
+  return {
+    scale: fit.scale,
+    rotationY: fit.rotationY,
+    alongZ: fit.rotationY === 0,
+    apex: apex * fit.scale,
+    drop: drop * fit.scale,
+    acrossHalf: (box[0] / 2) * fit.scale,
+  };
+}
+
+/** The 4x6-class roof fitted to a footprint. `tighten` is the quarry hut's deliberate 0.98. */
+function smallRoof(kit: BuildingKit, width: number, depth: number, tighten = 1): PlacedRoof {
+  const fit = roofFit(width, depth, kit.roofSmallCovers[0], kit.roofSmallCovers[1]);
+  return placeRoof(
+    { scale: fit.scale * tighten, rotationY: fit.rotationY },
+    kit.roofSmallBox, kit.roofSmallApex, kit.roofSmallDrop,
+  );
+}
+
+/** The hall roof fitted to a footprint. */
+function largeRoof(kit: BuildingKit, width: number, depth: number): PlacedRoof {
+  const fit = roofFit(width, depth, kit.roofLargeCovers[0], kit.roofLargeCovers[1]);
+  return placeRoof(fit, kit.roofLargeBox, kit.roofLargeApex, kit.roofLargeDrop);
+}
+
+/**
+ * `roof_gable_brick` rasterised (runs/corealm/audit/gable-silhouette.mjs): a SOLID triangle, not a
+ * frame. Its apex is 4.384 m above its pivot and its raking edges extrapolate to |x| = 3.35 at the
+ * pivot height, where a bottom rail runs the full 3.347 m. Despite the id the materials are
+ * MI_Plaster and MI_WoodTrim - a plastered, timber-framed gable - which is why all three kits can
+ * close their gables with it and only the region tint tells them apart.
+ */
+const GABLE_APEX_METRES = 4.384;
+const GABLE_HALF_AT_BASE = 3.35;
+
+/**
+ * Close both ends of a pitched roof.
+ *
+ * THIS IS WHY THE TOWNS WERE SEE-THROUGH. A `roof_tiles_*` is a prism of tiles and wood trim with
+ * nothing at its ends (bld-prims.mjs: two primitives, MI_WoodTrim and MI_RoundTiles, and no gable
+ * face in either), and the wall ring stops dead at 3.123 m. Measured with
+ * runs/corealm/audit/shell-audit.ts before this existed: 9.00 m2 of open triangle per end on a
+ * 6 x 4 cottage, 17.39 on the March Company Hall, 5.76 on the drying shed - 415 m2 of daylight
+ * across the three settlements, which is exactly the hole you look through in
+ * runs/corealm/screenshots/w2-rootfall.png. Only the stone kit closed its gables at all, and it
+ * sized them off the footprint (`span / 6.694 * 1.08`) rather than off the roof, so they were
+ * 0.36 m short of the ridge AND one of each pair faced backwards.
+ *
+ * SIZING. A part carries one uniform scale, and the gable's own pitch (4.384 / 3.35 = 1.309) is
+ * not the roofs' (1.348 on roof_tiles_4x6, 1.185 on roof_tiles_6x8), so the two cannot both be
+ * matched. Take the smaller of:
+ *   - the scale that puts the gable's apex exactly on the ridge, and
+ *   - the scale that keeps the gable inside the roof's own across-ridge silhouette,
+ * because a gable taller than the ridge spikes through the tiles and one wider than the eave
+ * changes `roofOverhang`, which is the number all three settlements are spaced by. What is left
+ * over is at most a 0.07 m slot at the very apex - shell-audit measures 0.053 m2 per end on a
+ * plaster cottage against the 9.00 it started at.
+ *
+ * ORIENTATION. The asset's plaster face looks down its own local -Z, so the two ends need
+ * different yaws. They had the same one, so half of Highcairn's gables were inside out.
+ */
+function gableEnds(
+  out: PartPlacement[],
+  width: number,
+  depth: number,
+  roof: PlacedRoof,
+): void {
+  // Where the roof crosses the wall head, which is what has to be closed - not the eave, which is
+  // out over open air, and not the footprint, which the roof already over-sails.
+  const headHalf = roof.acrossHalf * roof.apex / (roof.apex + roof.drop);
+  const scale = Math.min(roof.apex / GABLE_APEX_METRES, roof.acrossHalf / GABLE_HALF_AT_BASE);
+  const ridgeLength = roof.alongZ ? depth : width;
+  for (const [index, sign] of [-1, 1].entries()) {
+    out.push(loose(
+      `gable${index}`, "roof_gable_brick",
+      roof.alongZ ? 0 : (ridgeLength / 2) * sign,
+      STOREY_METRES,
+      roof.alongZ ? (ridgeLength / 2) * sign : 0,
+      roof.alongZ ? (sign < 0 ? 0 : Math.PI) : (sign < 0 ? Math.PI / 2 : -Math.PI / 2),
+      scale,
+    ));
+  }
+  // A gable that does not reach the wall head leaves a band of daylight the audit would catch, so
+  // assert the relationship the sizing rule is supposed to guarantee rather than trusting it.
+  if (GABLE_HALF_AT_BASE * scale < headHalf - 0.35) {
+    throw new Error(`gable half ${(GABLE_HALF_AT_BASE * scale).toFixed(3)} cannot reach the wall head at ${headHalf.toFixed(3)}`);
+  }
+}
+
+/**
+ * A post at every joint between two wall modules of one side.
+ *
+ * A ring side is `length / count` metres per slot and a panel is 2 m, so the joints meet exactly
+ * only when the side is a whole number of modules AND the panel is drawn at its authored size.
+ * It is not: `world/regionBuilder.ts` emits every building part at `1 / tierSilhouetteScale(tier)`,
+ * so a 2 m panel draws 1.860 m at Rootfall and 1.738 m at Highcairn on 2 m centres. Measured with
+ * shell-audit.ts: a full-height 0.140 m slot at every joint of every Rootfall building and 0.262 m
+ * at Highcairn - four of them per quarry hut. The real fix is one line in `emitParts` and is not in
+ * this file; a stud in the joint closes it either way, and a post where two panels meet is what
+ * half-timbering actually looks like.
+ *
+ * Scaled to the storey so it reaches the wall head: `corner_wood` is 3.000 m and `corner_brick`
+ * 3.016 against a 3.123 m wall. One instance per joint of an asset the building already draws four
+ * of, so no new draw call.
+ */
+function jointStuds(
+  out: PartPlacement[], tagPrefix: string, side: Side, count: number, kit: BuildingKit, y = 0,
+): void {
+  const spacing = side.length / count;
+  for (let index = 0; index + 1 < count; index += 1) {
+    out.push(part(
+      `${tagPrefix}${index}`, kit.corner,
+      onSide(side, count, index, y, 0, spacing / 2),
+      side.yaw,
+      STOREY_METRES / kit.cornerHeight,
+    ));
+  }
 }
 
 // -------------------------------------------------------------- building kits
@@ -362,11 +646,38 @@ function roofFit(
  */
 export interface BuildingKit {
   id: KitId;
+  /**
+   * The default body panel. MUST be a panel whose plaster or brick primitive spans the full
+   * 3.123 m storey - see the panel table at the top of this file. A frame (`wall_plaster_timber`)
+   * or an apertured panel (`wall_*_window`) here makes every building in the settlement
+   * see-through, which is what it did.
+   */
   wall: string;
   wallWindow: string;
   wallDoor: string;
-  /** The richer wall used on halls and civic buildings. */
+  /** The richer wall used on halls and civic buildings. Same solidity rule as `wall`. */
   wallFeature: string;
+  /**
+   * Half-timbering laid 0.02 m proud of a solid panel, or null.
+   *
+   * `wall_plaster_timber` is the only asset in the kit that is a frame rather than a wall: its
+   * plaster infill stops at y 0.84 and the studs above it enclose nothing. Drawn ON a solid panel
+   * it is exactly what it looks like - a timber frame on a wall - and it is the whole of
+   * Rootfall's vernacular, so the logging town keeps its exposed frame and stops being
+   * transparent. One extra instance per solid module, in an asset the settlement already draws.
+   */
+  frame: string | null;
+  /**
+   * The pier and jamb masonry of a gatehouse, whatever the houses are made of.
+   *
+   * In runs/corealm/screenshots/baseline-town_entrance.png the gate is grey masonry piers under a
+   * timber arch; threading the house kit through `gatehouse()` turned it into pale plaster infill
+   * with timber framing, which reads as a house facade with a hole in it. A town gate is the
+   * heaviest thing in the wall and the kit's only full-height masonry wall family is brick, so all
+   * three vernaculars build their gate out of the same stone and differ in what hangs on it.
+   */
+  gatePier: string;
+  gateJamb: string;
   corner: string;
   door: string;
   /** The 4x6-class roof, for cottages, sheds and huts. */
@@ -374,17 +685,49 @@ export interface BuildingKit {
   /** Metres the small roof covers, short side then long. */
   roofSmallCovers: readonly [number, number];
   /**
+   * The small roof's own bbox in X then Z at scale 1, eaves included.
+   *
+   * `roofSmallCovers` is the building it is meant to sit on; this is the tile the asset actually
+   * draws, and the difference between the two is the eave. They are not proportional across the
+   * kits - `roof_tiles_4x6` is 1.38x its cover in X and 1.26x in Z, `roof_tiles_6x8` is 1.38x and
+   * 1.21x - so `roofOverhang` needs both numbers and cannot derive one from the other.
+   */
+  roofSmallBox: readonly [number, number];
+  /**
    * Metres from the small roof's placement height to its ridge, at scale 1.
    *
-   * Measured, not derived: these roofs pivot above their own eaves, so the bbox height is not the
-   * distance from where the part is placed to where its ridge is. `roof_tiles_4x6` is 4.234 tall
-   * and pivots 0.52 above its base, giving 3.71; `roof_tiles_6x8` is 5.672 and pivots 0.70,
-   * giving 4.97. Anything that has to sit ON the ridge — a log, a finial — needs this number.
+   * Measured off the manifest bounds, not derived: these roofs pivot above their own eaves, so the
+   * bbox height is not the distance from where the part is placed to where its ridge is.
+   * `roof_tiles_4x6` is base y -0.516 + height 4.234, so its ridge is 3.718 above the pivot;
+   * `roof_tiles_6x8` is -0.782 + 5.672, so 4.890. (This field said 4.97 for the stone kit, which is
+   * 0.08 m of nothing.) Anything that has to sit ON the ridge — a log, a finial, a gable — needs it.
    */
   roofSmallApex: number;
+  /**
+   * Metres the small roof's lowest point hangs BELOW its placement height, at scale 1.
+   *
+   * The other half of the roof's cross-section, and the reason a gable can be fitted at all: the
+   * roof is a triangle from `-roofSmallDrop` at the eave to `+roofSmallApex` at the ridge over
+   * `roofSmallBox[0] / 2` of half-span, so its width where it crosses the wall head is
+   * `acrossHalf * apex / (apex + drop)` and NOT the eave half-span. On a 6 x 4 plaster cottage
+   * that is 2.421 m against an eave of 2.757 m: sizing a gable to the eave would stand it 0.34 m
+   * proud of the tiles.
+   */
+  roofSmallDrop: number;
   /** The long roof, for halls. */
   roofLarge: string;
   roofLargeCovers: readonly [number, number];
+  /** The long roof's own bbox in X then Z at scale 1, eaves included. */
+  roofLargeBox: readonly [number, number];
+  /** Metres from the long roof's placement height to its ridge, at scale 1. */
+  roofLargeApex: number;
+  /** Metres the long roof's lowest point hangs below its placement height, at scale 1. */
+  roofLargeDrop: number;
+  /**
+   * Height of `corner`, at scale 1. `corner_wood` is 3.000 and `corner_brick` 3.016 against a
+   * 3.123 m storey, so a post has to be scaled to reach the wall head rather than left 0.12 m short.
+   */
+  cornerHeight: number;
   /** Trim laid along the ridge line. Empty when the kit has none. */
   ridge: string | null;
   /** A dormer or gable end that changes the roofline. Empty when the kit has none. */
@@ -401,14 +744,27 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
     wall: "wall_plaster_straight",
     wallWindow: "wall_plaster_window",
     wallDoor: "wall_plaster_door",
-    wallFeature: "wall_plaster_timber",
+    // Was `wall_plaster_timber`, which has no infill above y 0.84, so the March Company Hall - the
+    // 12 x 6 building in the middle of the square - was a frame you could see the far side of.
+    // `wall_plaster_base` is the same plaster panel with a brick apron course, solid top to bottom,
+    // and it was sitting unused in the manifest.
+    wallFeature: "wall_plaster_base",
+    frame: null,
+    gatePier: "wall_brick_straight",
+    gateJamb: "corner_brick",
     corner: "corner_wood",
     door: "door_round_1",
     roofSmall: "roof_tiles_4x6",
     roofSmallCovers: [4, 6],
-    roofSmallApex: 3.71,
+    roofSmallBox: [5.513, 7.572],
+    roofSmallApex: 3.718,
+    roofSmallDrop: 0.516,
     roofLarge: "roof_tiles_6x12",
     roofLargeCovers: [6, 12],
+    roofLargeBox: [8.25, 13.658],
+    roofLargeApex: 4.89,
+    roofLargeDrop: 0.782,
+    cornerHeight: 3,
     ridge: null,
     roofFeature: null,
   },
@@ -417,17 +773,30 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
   // the roofline, which is what makes Rootfall read as a different place from the ridge above it.
   timber: {
     id: "timber",
-    wall: "wall_plaster_timber",
+    // The exposed frame is now the `frame` overlay, not the wall itself: `wall_plaster_timber`
+    // encloses nothing above y 0.84, so every house in Rootfall was a lantern. The body is the
+    // plain plaster panel and the frame goes on top of it, which is both what half-timbering is
+    // and what the screenshot needed.
+    wall: "wall_plaster_straight",
     wallWindow: "wall_plaster_window",
     wallDoor: "wall_plaster_door",
-    wallFeature: "wall_plaster_timber",
+    wallFeature: "wall_plaster_base",
+    frame: "wall_plaster_timber",
+    gatePier: "wall_brick_straight",
+    gateJamb: "corner_brick",
     corner: "corner_wood",
     door: "door_round_2",
     roofSmall: "roof_tiles_4x6",
     roofSmallCovers: [4, 6],
-    roofSmallApex: 3.71,
+    roofSmallBox: [5.513, 7.572],
+    roofSmallApex: 3.718,
+    roofSmallDrop: 0.516,
     roofLarge: "roof_tiles_6x12",
     roofLargeCovers: [6, 12],
+    roofLargeBox: [8.25, 13.658],
+    roofLargeApex: 4.89,
+    roofLargeDrop: 0.782,
+    cornerHeight: 3,
     ridge: "roof_log",
     roofFeature: "roof_dormer",
   },
@@ -439,16 +808,34 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
     wall: "wall_brick_straight",
     wallWindow: "wall_brick_window",
     wallDoor: "wall_brick_door",
-    wallFeature: "wall_brick_window",
+    // Was `wall_brick_window`. `quarry_hut` and `hall` take `wallFeature` as their DEFAULT panel,
+    // so the stone kit's feature wall being an apertured one meant every side of every Highcairn
+    // hut was a window and you looked straight through the hut. The kit ships no second solid
+    // brick panel, so the feature wall is the same masonry and the huts are differentiated by the
+    // brick gable ends and the props, which is what already carried them at 40 m.
+    wallFeature: "wall_brick_straight",
+    frame: null,
+    gatePier: "wall_brick_straight",
+    gateJamb: "corner_brick",
     corner: "corner_brick",
     door: "door_flat_1",
     roofSmall: "roof_tiles_6x8",
     roofSmallCovers: [6, 8],
-    roofSmallApex: 4.97,
+    roofSmallBox: [8.25, 9.683],
+    roofSmallApex: 4.89,
+    roofSmallDrop: 0.782,
     roofLarge: "roof_tiles_6x12",
     roofLargeCovers: [6, 12],
+    roofLargeBox: [8.25, 13.658],
+    roofLargeApex: 4.89,
+    roofLargeDrop: 0.782,
+    cornerHeight: 3.016,
     ridge: null,
-    roofFeature: "roof_gable_brick",
+    // Was "roof_gable_brick". Closing the gable is no longer a stone-kit FEATURE, it is what every
+    // pitched roof in the game now does (`gableEnds`), because leaving it open is what made the
+    // towns see-through. What still separates Highcairn's roofline is the shallower 6-wide roof and
+    // the region's own material tint.
+    roofFeature: null,
   },
 };
 
@@ -457,6 +844,87 @@ export const KIT_IDS: readonly KitId[] = ["plaster", "timber", "stone"] as const
 export function isKitId(value: string): value is KitId {
   return (KIT_IDS as readonly string[]).includes(value);
 }
+
+/**
+ * How far this prefab's roof projects past its own footprint, per local axis, at this kit.
+ *
+ * The number a settlement author actually needs. Two buildings clear each other when the gap
+ * between their footprints is at least the sum of the overhangs facing each other; Coldbrace
+ * houses 5 and 6 were placed corner to corner with gapX = gapZ = 0.00 and interpenetrate over
+ * 1.57 x 1.51 m of tile, which is exactly 2 x 0.786 and 2 x 0.757.
+ *
+ * Local axes: X is the footprint's width, Z its depth, before the building's own `rotationY`.
+ * Anything without a tiled roof - a gatehouse, a wall segment, a ruin, a stall, a market row, a
+ * porch, an arcade, a wellhead - answers zero, because what those draw above the footprint is a
+ * canopy the caller already sized (`CANOPY_DEPTH_METRES`) or nothing at all.
+ */
+export function roofOverhang(
+  prefab: PrefabId,
+  footprint: readonly [number, number],
+  kitId: KitId = "plaster",
+): { x: number; z: number } {
+  const width = Math.max(MODULE_METRES, footprint[0]);
+  const depth = Math.max(MODULE_METRES, footprint[1]);
+  const kit = BUILDING_KITS[kitId];
+  const beyond = (
+    box: readonly [number, number],
+    fit: { scale: number; rotationY: number },
+  ): { x: number; z: number } => {
+    // `roofFit` turns the asset a quarter when the plan is wider than it is deep, which swaps
+    // which of the asset's axes covers the width.
+    const spanX = (fit.rotationY === 0 ? box[0] : box[1]) * fit.scale;
+    const spanZ = (fit.rotationY === 0 ? box[1] : box[0]) * fit.scale;
+    return { x: r3(Math.max(0, (spanX - width) / 2)), z: r3(Math.max(0, (spanZ - depth) / 2)) };
+  };
+  const small = (): { scale: number; rotationY: number } =>
+    roofFit(width, depth, kit.roofSmallCovers[0], kit.roofSmallCovers[1]);
+
+  switch (prefab) {
+    case "cottage":
+    case "forge":
+      return beyond(kit.roofSmallBox, small());
+    case "quarry_hut": {
+      const fit = small();
+      return beyond(kit.roofSmallBox, { scale: fit.scale * 0.98, rotationY: fit.rotationY });
+    }
+    case "hall":
+      return beyond(kit.roofLargeBox, roofFit(width, depth, kit.roofLargeCovers[0], kit.roofLargeCovers[1]));
+    case "shed":
+      return beyond(kit.roofSmallBox, {
+        scale: 0.8 * (4 / kit.roofSmallCovers[0]),
+        rotationY: width >= depth ? Math.PI / 2 : 0,
+      });
+    // roof_tower is 5.651 x 7.361 x 5.427 and `tower` oversizes it by 0.6 m so the eaves clear the
+    // walls, so its overhang is 0.30 m in X and less in Z whatever the footprint.
+    case "tower":
+      return beyond([5.651, 5.427], { scale: (Math.max(width, depth) + 0.6) / 5.651, rotationY: 0 });
+    default:
+      return { x: 0, z: 0 };
+  }
+}
+
+/**
+ * The single number to space buildings by in each vernacular: the deepest eave any prefab reaches
+ * at the footprints the three settlements are authored with.
+ *
+ * Computed, not typed in, so it cannot drift from `roofOverhang`. Measured today: plaster and
+ * timber 1.733 m (the 6 x 5 forge), stone 1.213 m (the 6 x 4 cottage). The 0.79 that
+ * `ROOF_EAVE_METRES` used to be is the 6 x 4 plaster cottage and nothing else.
+ */
+export const ROOF_EAVE_BY_KIT: Record<KitId, number> = (() => {
+  const authored: readonly (readonly [PrefabId, readonly [number, number]])[] = [
+    ["cottage", [6, 4]], ["hall", [12, 6]], ["tower", [6, 6]], ["shed", [4, 4]],
+    ["quarry_hut", [5, 4]], ["forge", [6, 5]], ["forge", [4, 4]],
+  ];
+  const worst = {} as Record<KitId, number>;
+  for (const kitId of KIT_IDS) {
+    worst[kitId] = authored.reduce((acc, [prefab, footprint]) => {
+      const over = roofOverhang(prefab, footprint, kitId);
+      return Math.max(acc, over.x, over.z);
+    }, 0);
+  }
+  return worst;
+})();
 
 // ------------------------------------------------------------------ prefabs
 
@@ -527,21 +995,20 @@ function cottage(width: number, depth: number, rng: Rng, kit: BuildingKit): Part
   const entryCount = moduleCount(entry.length);
   const doorIndex = Math.floor(entryCount / 2);
 
+  const windows = ringWindows(sides, rng, 0.45, (s, index) => s === 2 && index === doorIndex);
   for (const [s, side] of sides.entries()) {
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
       const isDoor = s === 2 && index === doorIndex;
-      let assetId = kit.wall;
-      if (isDoor) assetId = kit.wallDoor;
-      else if (rng.chance(0.45)) assetId = kit.wallWindow;
-      out.push(part(`w${s}_${index}`, assetId, onSide(side, count, index, 0, 0), side.yaw));
-      trimUnder(out, `t${s}_${index}`, side, count, index);
+      const assetId = isDoor ? kit.wallDoor : windows[s]![index] === true ? kit.wallWindow : kit.wall;
+      wallModule(out, `${s}_${index}`, assetId, side, count, index, kit);
     }
+    jointStuds(out, `j${s}_`, side, count, kit);
   }
 
   corners(out, width, depth, kit.corner, 0, 1, "c");
 
-  const roof = roofFit(width, depth, kit.roofSmallCovers[0], kit.roofSmallCovers[1]);
+  const roof = smallRoof(kit, width, depth);
   out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
   addRoofline(out, width, depth, roof, kit);
 
@@ -565,26 +1032,26 @@ function cottage(width: number, depth: number, rng: Rng, kit: BuildingKit): Part
 }
 
 /**
- * The thing that makes a roof belong to a region rather than to a kit-bash.
+ * Close the roof and then give it the region's own line.
  *
  * The library ships one tiled covering at two pitches and nothing else — `roof_wood_plank` is a
- * single 2.3 m board and `roof_gable_brick` is a gable END — so the ROOFLINE is where a settlement
- * gets its silhouette. Rootfall lays a felled log along the ridge and breaks the slope with a
- * dormer; Highcairn closes the gable ends in brick; Coldbrace does neither. Seen from the hillside
- * above, that is the difference between "a village" and "this village".
+ * single 2.3 m board — so the ROOFLINE is where a settlement gets its silhouette. Every roof is
+ * closed at both ends now (`gableEnds`, which is the see-through fix); on top of that Rootfall
+ * lays a felled log along the ridge and breaks the slope with a dormer, and Highcairn is the
+ * shallower 6-wide pitch. Seen from the hillside above, that is the difference between "a village"
+ * and "this village".
  */
 function addRoofline(
   out: PartPlacement[],
   width: number,
   depth: number,
-  roof: { scale: number; rotationY: number },
+  roof: PlacedRoof,
   kit: BuildingKit,
 ): void {
-  // `roofFit` rotates the roof by PI/2 when the building is wider than it is deep, so the ridge
-  // runs along local Z exactly when it did not rotate.
-  const alongZ = roof.rotationY === 0;
+  gableEnds(out, width, depth, roof);
+  const alongZ = roof.alongZ;
   const ridgeLength = alongZ ? depth : width;
-  const ridgeY = STOREY_METRES + kit.roofSmallApex * roof.scale;
+  const ridgeY = STOREY_METRES + roof.apex;
 
   if (kit.ridge === "roof_log") {
     // roof_log's pivot is 3.85 m below the beam, and the beam runs along local Z for +-5.35 m, so
@@ -613,21 +1080,6 @@ function addRoofline(
     ));
   }
 
-  if (kit.roofFeature === "roof_gable_brick") {
-    // 6.694 x 4.516 x 1.129: a gable end. One at each end of the ridge closes the roof in stone,
-    // which is what a town that owns a quarry would actually build.
-    const gableScale = ((alongZ ? width : depth) / 6.694) * 1.08;
-    for (const [index, sign] of [-1, 1].entries()) {
-      out.push(loose(
-        `gable${index}`, "roof_gable_brick",
-        alongZ ? 0 : (ridgeLength / 2) * sign,
-        STOREY_METRES - 0.1,
-        alongZ ? (ridgeLength / 2) * sign : 0,
-        alongZ ? 0 : Math.PI / 2,
-        gableScale,
-      ));
-    }
-  }
 }
 
 /** Twelve by six timber-framed hall: the biggest thing in Coldbrace after the vault tower. */
@@ -638,26 +1090,35 @@ function hall(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
   const entryCount = moduleCount(entry.length);
   const doorIndex = Math.floor(entryCount / 2);
 
+  // A window band on alternate modules, which is the hall's elevation, minus any that would line
+  // up with one across the building. On the 12 m faces `i` and `count - 1 - i` are always opposite
+  // parities so the band survives intact; on the 6 m gable ends they are the same parity, so the
+  // rule takes the two windows out of the second gable and the hall stops being a colonnade.
+  const band = rng.chance(0.5) ? 0 : 1;
+  const windows = ringWindows(sides, rng, 1, (s, index) => (s === 2 && index === doorIndex) || index % 2 !== band);
   for (const [s, side] of sides.entries()) {
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
       const isDoor = s === 2 && index === doorIndex;
-      let assetId = kit.wallFeature;
-      if (isDoor) assetId = kit.wallDoor;
-      else if (index % 2 === (rng.chance(0.5) ? 0 : 1)) assetId = kit.wallWindow;
-      out.push(part(`w${s}_${index}`, assetId, onSide(side, count, index, 0, 0), side.yaw));
-      // Was long faces only, on the theory that the gable ends are not where the player walks.
-      // Wrong on the measurement: the hall is 12 x 6 in the middle of an open square, so both
-      // gable ends are seen from 8 m away, and the four modules saved were four modules of
+      const assetId = isDoor
+        ? kit.wallDoor
+        : windows[s]![index] === true ? kit.wallWindow : kit.wallFeature;
+      // Trim was long faces only, on the theory that the gable ends are not where the player
+      // walks. Wrong on the measurement: the hall is 12 x 6 in the middle of an open square, so
+      // both gable ends are seen from 8 m away, and the four modules saved were four modules of
       // untrimmed wall next to trimmed wall on the same building.
-      trimUnder(out, `t${s}_${index}`, side, count, index);
+      wallModule(out, `${s}_${index}`, assetId, side, count, index, kit);
     }
+    jointStuds(out, `j${s}_`, side, count, kit);
   }
 
   corners(out, width, depth, kit.corner, 0, 1, "c");
 
-  const roof = roofFit(width, depth, kit.roofLargeCovers[0], kit.roofLargeCovers[1]);
+  const roof = largeRoof(kit, width, depth);
   out.push(loose("roof", kit.roofLarge, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
+  // The hall never had a roofline at all, so the biggest building in Coldbrace was the biggest
+  // hole: 17.39 m2 of open gable per end, seen from the middle of the square.
+  addRoofline(out, width, depth, roof, kit);
   out.push(loose("chimney", "chimney", width * 0.3, STOREY_METRES - 0.3, depth / 2 - 0.55, 0, 1.1));
 
   out.push(part(
@@ -689,19 +1150,27 @@ function tower(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPl
   const entryCount = moduleCount(entry.length);
   const doorIndex = Math.floor(entryCount / 2);
 
+  // Storey 1's lookout window used to be `floor(count / 2)` on all four sides. On the authored
+  // 6 x 6 vault that is module 1 of 3 on every side, and module 1 faces module 1, so the tower had
+  // two clear lines of sight straight through its belfry. Both storeys go through `ringWindows`,
+  // which will not put a window opposite one.
+  const plans = [
+    ringWindows(sides, rng, 0.25, (s, index) => s === 2 && index === doorIndex),
+    ringWindows(sides, rng, 1, (_s, index) => index !== Math.floor(moduleCount(sides[0]!.length) / 2)),
+  ];
   for (let storey = 0; storey < 2; storey += 1) {
     const y = storey * STOREY_METRES;
+    const windows = plans[storey]!;
     for (const [s, side] of sides.entries()) {
       const count = moduleCount(side.length);
       for (let index = 0; index < count; index += 1) {
         const isDoor = storey === 0 && s === 2 && index === doorIndex;
-        let assetId = kit.wall;
-        if (isDoor) assetId = kit.wallDoor;
-        else if (storey === 1 && index === Math.floor(count / 2)) assetId = kit.wallWindow;
-        else if (storey === 0 && rng.chance(0.25)) assetId = kit.wallWindow;
-        out.push(part(`w${storey}_${s}_${index}`, assetId, onSide(side, count, index, y, 0), side.yaw));
-        if (storey === 0) trimUnder(out, `t${s}_${index}`, side, count, index);
+        const assetId = isDoor
+          ? kit.wallDoor
+          : windows[s]![index] === true ? kit.wallWindow : kit.wall;
+        wallModule(out, `${storey}_${s}_${index}`, assetId, side, count, index, kit, y, `${s}_${index}`);
       }
+      jointStuds(out, `j${storey}_${s}_`, side, count, kit, y);
     }
     corners(out, width, depth, kit.corner, y, 1, `c${storey}_`);
   }
@@ -732,14 +1201,9 @@ function shed(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
       const isDoor = s === 2 && index === doorIndex;
-      out.push(part(
-        `w${s}_${index}`,
-        isDoor ? kit.wallDoor : kit.wall,
-        onSide(side, count, index, 0, 0),
-        side.yaw,
-      ));
-      trimUnder(out, `t${s}_${index}`, side, count, index);
+      wallModule(out, `${s}_${index}`, isDoor ? kit.wallDoor : kit.wall, side, count, index, kit);
     }
+    jointStuds(out, `j${s}_`, side, count, kit);
   }
 
   corners(out, width, depth, kit.corner, 0, 1, "c");
@@ -747,7 +1211,13 @@ function shed(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
   // gaps. The ratio is against the kit's own coverage, so the stone kit's wider roof does not
   // swallow the shed it sits on.
   const shedScale = 0.8 * (4 / kit.roofSmallCovers[0]);
-  out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, width >= depth ? Math.PI / 2 : 0, shedScale));
+  const shedRoof = placeRoof(
+    { scale: shedScale, rotationY: width >= depth ? Math.PI / 2 : 0 },
+    kit.roofSmallBox, kit.roofSmallApex, kit.roofSmallDrop,
+  );
+  out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, shedRoof.rotationY, shedRoof.scale));
+  // Gables only: a ridge log and a dormer on a 4 m store shed would out-dress the houses around it.
+  gableEnds(out, width, depth, shedRoof);
   out.push(part("door", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
   out.push(loose("crate", "crate_village", width * 0.3, 0, -depth / 2 - 0.65, rng.float(0, Math.PI), 1));
 
@@ -762,21 +1232,25 @@ function quarryHut(width: number, depth: number, rng: Rng, kit: BuildingKit): Pa
   const entryCount = moduleCount(entry.length);
   const doorIndex = Math.floor(entryCount / 2);
 
+  // The body was `kit.wallFeature`, which in the stone kit was `wall_brick_window`: every module of
+  // every Highcairn hut was an aperture, which is why the huts read as open pavilions from the
+  // plateau. The body is the kit's solid wall now and the windows are the seeded exception.
+  const windows = ringWindows(sides, rng, 0.35, (s, index) => s === 2 && index === doorIndex);
   for (const [s, side] of sides.entries()) {
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
       const isDoor = s === 2 && index === doorIndex;
-      let assetId = kit.wallFeature;
-      if (isDoor) assetId = kit.wallDoor;
-      else if (rng.chance(0.35)) assetId = kit.wallWindow;
-      out.push(part(`w${s}_${index}`, assetId, onSide(side, count, index, 0, 0), side.yaw));
-      trimUnder(out, `t${s}_${index}`, side, count, index);
+      const assetId = isDoor ? kit.wallDoor : windows[s]![index] === true ? kit.wallWindow : kit.wall;
+      wallModule(out, `${s}_${index}`, assetId, side, count, index, kit);
     }
+    jointStuds(out, `j${s}_`, side, count, kit);
   }
 
   corners(out, width, depth, kit.corner, 0, 1, "c");
-  const hutRoof = roofFit(width, depth, kit.roofSmallCovers[0], kit.roofSmallCovers[1]);
-  out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, hutRoof.rotationY, hutRoof.scale * 0.98));
+  // The 0.98 is the hut's own tightened roof, and `addRoofline` used to be handed the UNtightened
+  // fit, so every gable and ridge on a quarry hut was sized to a roof 2% bigger than the one drawn.
+  const hutRoof = smallRoof(kit, width, depth, 0.98);
+  out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, hutRoof.rotationY, hutRoof.scale));
   addRoofline(out, width, depth, hutRoof, kit);
   out.push(part("door", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
 
@@ -824,7 +1298,20 @@ function gateGeometry(width: number): { pierWidth: number; gap: number } {
  * 2.1 m above a two-storey gatehouse; scaled to fit the height instead it shows a 3.0 m opening in
  * front of a 4 m gap, so the player's shoulder passes through the jamb. There is no scale at which
  * the arch's opening, the pier gap and the collision box agree. A kit head course over an open gap
- * makes all three exactly GATE_GAP_METRES, and it threads the kit, which the brick arch never did.
+ * makes all three exactly GATE_GAP_METRES.
+ *
+ * WHY THE GATE IS MASONRY IN ALL THREE KITS. Threading the house kit through this prefab - which is
+ * finding 7 of the settlement diagnosis, and correct as far as the walls and the tower go - turned
+ * the Coldbrace south gate into plaster infill in a timber frame, i.e. a house facade with a hole
+ * punched in it, against a baseline (baseline-town_entrance.png) of grey piers under a timber arch.
+ * A gate is the heaviest thing in a wall and it is the first building a player ever sees. It is
+ * still per-kit data - `kit.gatePier` and `kit.gateJamb` - so a fourth vernacular can build its
+ * gate out of something else; all three today name the kit's only full-height masonry.
+ *
+ * The head course is masonry too, and deliberately has no window in it. The middle head panel used
+ * to be `kit.wallWindow`, and `wall_plaster_window` carries a loose brick apron quad across its own
+ * bottom 0.88 m: on a panel standing on the ground that is the sill, and three metres up over an
+ * open passage it is the small framed panel floating in the arch in wire-town_entrance.png.
  */
 function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacement[] {
   const out: PartPlacement[] = [];
@@ -843,7 +1330,7 @@ function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacemen
       for (const [index, sx] of [-1, 1].entries()) {
         for (let m = 0; m < pierModules; m += 1) {
           const x = sx * (usable / 2 - (m + 0.5) * MODULE_METRES);
-          out.push(loose(`p${name}${storey}_${index}_${m}`, kit.wall, x, y, z, yaw));
+          out.push(loose(`p${name}${storey}_${index}_${m}`, kit.gatePier, x, y, z, yaw));
           if (storey === 0) {
             out.push(loose(`q${name}${index}_${m}`, "wall_bottom_trim", x, 0, z + outward * 0.01, yaw));
           }
@@ -857,12 +1344,23 @@ function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacemen
         const headModules = Math.max(1, Math.round(gap / MODULE_METRES));
         for (let m = 0; m < headModules; m += 1) {
           const x = (m + 0.5) * MODULE_METRES - gap / 2;
-          const mid = m === Math.floor(headModules / 2);
-          out.push(loose(`h${name}_${m}`, mid ? kit.wallWindow : kit.wall, x, y, z, yaw));
+          out.push(loose(`h${name}_${m}`, kit.gatePier, x, y, z, yaw));
+        }
+        // The parapet. Two storeys of panel stop dead at 6.246 m with nothing on top, which is why
+        // the gate in runs/corealm/screenshots/w2-town_entrance.png reads as a flat cut-out; the
+        // same `kerb_straight` coping the wall runs carry, laid across the whole elevation, gives
+        // the head a line and a shadow. 0.46 m centres the 0.700 m kerb on the 0.406 m panel.
+        const capModules = Math.round(usable / MODULE_METRES);
+        for (let m = 0; m < capModules; m += 1) {
+          const x = (m + 0.5) * MODULE_METRES - usable / 2;
+          out.push(loose(
+            `k${name}_${m}`, "kerb_straight",
+            x, 2 * STOREY_METRES - 0.134, z - outward * 0.46, yaw,
+          ));
         }
       }
     }
-    corners(out, usable, depth, kit.corner, y, 1, `c${storey}_`);
+    corners(out, usable, depth, kit.gateJamb, y, 1, `c${storey}_`);
   }
 
   for (const [index, sx] of [-1, 1].entries()) {
@@ -894,6 +1392,7 @@ function wallSegment(width: number, kit: BuildingKit): PartPlacement[] {
     const x = (index + 0.5) * spacing - width / 2;
     out.push(loose(`w${index}`, kit.wall, x, 0, 0, 0));
     out.push(loose(`t${index}`, "wall_bottom_trim", x, 0, 0.01, 0));
+    if (kit.frame !== null) out.push(loose(`f${index}`, kit.frame, x, 0, 0.02, 0));
   }
   out.push(loose("end_l", kit.corner, -width / 2, 0, 0, -Math.PI / 4));
   out.push(loose("end_r", kit.corner, width / 2, 0, 0, Math.PI / 4));
@@ -925,6 +1424,10 @@ function ruin(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
     out.push(loose(`t${index}`, "wall_bottom_trim", x, 0, depth / 2 + 0.01, lean));
   }
   out.push(loose("side", kit.wall, -width / 2, 0, 0, -Math.PI / 2));
+  // The returning wall had no plinth, so one of the ruin's two standing panels came out of the
+  // ground and the other was stuck in it. Same yaw as the panel it sits under, pushed 0.01 out
+  // along that panel's own outward normal (-X) so the two faces do not z-fight.
+  out.push(loose("side_trim", "wall_bottom_trim", -width / 2 - 0.01, 0, 0, -Math.PI / 2));
   out.push(loose("post", kit.corner, width / 2, 0, depth / 2, Math.PI / 4));
   out.push(loose("rub1", "rubble_brick_1", rng.float(-1.5, 1.5), 0, rng.float(-2, 0), rng.float(0, Math.PI), 2.4));
   out.push(loose("rub2", "rubble_brick_2", rng.float(-1.5, 1.5), 0, rng.float(-2, 0), rng.float(0, Math.PI), 2.2));
@@ -984,20 +1487,25 @@ function forge(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPl
   const sides = ringSides(width, depth);
 
   // Sides 1, 2, 3 only. Side 0 is +Z and stays open.
+  //
+  // The back centre used to be forced to `kit.wallWindow`, which put a hole straight through the
+  // wall the anvil stands against - the one face of a forge the player looks at from the square.
+  // Windows are the seeded exception on the two side walls, and `ringWindows` keeps the left and
+  // right walls from lining up a pair.
+  const windows = ringWindows(sides, rng, 0.3, (s) => s === 0 || s === 2);
   for (const s of [1, 2, 3]) {
     const side = sides[s]!;
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
-      const back = s === 2 && index === Math.floor(count / 2);
-      const assetId = back || rng.chance(0.3) ? kit.wallWindow : kit.wall;
-      out.push(part(`w${s}_${index}`, assetId, onSide(side, count, index, 0, 0), side.yaw));
-      trimUnder(out, `t${s}_${index}`, side, count, index);
+      const assetId = windows[s]![index] === true ? kit.wallWindow : kit.wall;
+      wallModule(out, `${s}_${index}`, assetId, side, count, index, kit);
     }
+    jointStuds(out, `j${s}_`, side, count, kit);
   }
 
   corners(out, width, depth, kit.corner, 0, 1, "c");
 
-  const roof = roofFit(width, depth, kit.roofSmallCovers[0], kit.roofSmallCovers[1]);
+  const roof = smallRoof(kit, width, depth);
   out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
   addRoofline(out, width, depth, roof, kit);
 
@@ -1180,10 +1688,18 @@ function well(kit: BuildingKit): PartPlacement[] {
  * damage, not as a gate - and both ends of the run get one so two runs meeting at a corner share a
  * post instead of leaving a hole.
  *
- * The panel choice is seeded so a long run is not one texture repeated: roughly one module in five
- * is `kit.wallWindow`, and every fourth module carries a second course of trim as a string course
- * at 1.55 m. Both are drawn from the run's own `variantSeed`, so adding a run cannot shift
- * anything else's randomness.
+ * WHAT BREAKS UP A 52 M RUN. It used to be one asset with one overlay on every module and a string
+ * course on every fourth, which at 50 m is `wall_plaster_timber`'s brace repeated 21 times - the
+ * "repeating timber Z that reads as wallpaper". Four seeded things now vary along a run: the panel
+ * (plain, the kit's richer panel, or an arrow loop), the half-timbering, the string course, and a
+ * buttress post at the module joints. All four come out of the run's own `variantSeed`, so adding a
+ * run cannot shift anything else's randomness.
+ *
+ * AND IT IS CAPPED. `kerb_straight` is 2.000 x 0.134 x 0.700 with its body entirely on the +Z side
+ * of its pivot; laid along the wall head it overhangs the 0.406 m panel by 0.147 m on each face,
+ * which is a coping course with a shadow line under it. Without one the head is a straight cut and
+ * the wall reads as a strip of cardboard on edge, which is what runs/corealm/screenshots/
+ * w2-rootfall.png shows along the whole east palisade.
  */
 export function buildWallRun(
   length: number,
@@ -1198,23 +1714,47 @@ export function buildWallRun(
   for (const [index, module] of modules.entries()) {
     const centre = (module.from + module.to) / 2;
     const scale = (module.to - module.from) / MODULE_METRES;
-    const assetId = rng.chance(0.2) ? kit.wallWindow : kit.wall;
+    // One roll, three outcomes, so the stream advances the same way whatever it picks.
+    const roll = rng.float(0, 1);
+    const assetId = roll < 0.16 ? kit.wallWindow : roll < 0.44 ? kit.wallFeature : kit.wall;
     out.push(loose(`w${index}`, assetId, centre, 0, 0, 0, scale));
     out.push(loose(`t${index}`, "wall_bottom_trim", centre, 0, 0.01, 0, scale));
+    // The coping. Its own y and z are unscaled by the module's length scale in everything but the
+    // asset's uniform scale, so a short end module still gets a proportionate cap.
+    out.push(loose(`k${index}`, "kerb_straight", centre, STOREY_METRES - 0.134 * scale, -0.11 - 0.35 * scale, 0, scale));
+    // Half-timbering on the solid modules only, same rule as a building's ring wall: the frame's
+    // braces cross the middle of the module and would draw an X over an arrow loop.
+    if (kit.frame !== null && assetId !== kit.wallWindow && rng.chance(0.8)) {
+      out.push(loose(`f${index}`, kit.frame, centre, 0, 0.02, 0, scale));
+    }
     // A string course two thirds up. Cheap (one more instance of an asset the run already draws)
     // and it is what stops a long wall reading as one flat panel repeated.
-    if (index % 4 === 3) out.push(loose(`s${index}`, "wall_bottom_trim", centre, 1.55, 0.02, 0, scale));
+    if (rng.chance(0.3)) out.push(loose(`s${index}`, "wall_bottom_trim", centre, 1.55, 0.02, 0, scale));
   }
 
   // Jambs at both sides of every opening and posts at both ends of the run, in run order so the
   // tags are stable.
+  const spans = mergeSpans(modules);
   const posts = new Set<number>();
-  for (const span of mergeSpans(modules)) {
+  for (const span of spans) {
     posts.add(r3(span.from));
     posts.add(r3(span.to));
   }
   for (const [postIndex, x] of [...posts].sort((a, b) => a - b).entries()) {
     out.push(loose(`p${postIndex}`, kit.corner, x, 0, 0, Math.PI / 4));
+  }
+
+  // A buttress on every joint between two modules. It is the vertical rhythm the run had none of,
+  // and it plugs the joint: `world/regionBuilder.ts` draws every part at 1/tierSilhouetteScale(tier)
+  // on unscaled centres, so a 2 m panel is 1.860 m at Rootfall and 1.738 m at Highcairn and each
+  // joint is a full-height slot of daylight (measured: 0.140 m and 0.262 m, shell-audit.ts). Scaled
+  // to the storey because corner_wood is 3.000 m and corner_brick 3.016 against a 3.123 m wall.
+  let buttress = 0;
+  for (const [index, module] of modules.entries()) {
+    const next = modules[index + 1];
+    if (next === undefined || Math.abs(next.from - module.to) > 1e-6) continue;
+    out.push(loose(`b${buttress}`, kit.corner, r3(module.to), 0, 0, 0, STOREY_METRES / kit.cornerHeight));
+    buttress += 1;
   }
 
   return out;

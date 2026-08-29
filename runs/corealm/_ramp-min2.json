@@ -1,0 +1,1 @@
+{"name":"ramp-min2","actions":[{"debug":"teleport","args":[{"locationId":"karrowmoor_terraces"}],"label":"tp"},{"waitMs":400},{"debug":"getPlayerPosition","label":"pos"},{"debug":"callTool","args":["corealm_move_to",{"locationId":"great_cairn"}],"label":"mv"}]}

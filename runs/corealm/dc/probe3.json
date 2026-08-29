@@ -1,0 +1,1473 @@
+{
+ "stats": {
+  "entities": 3425,
+  "groups": 121,
+  "instancedMeshes": 251,
+  "drawnInstancedMeshes": 246,
+  "uniqueViews": 1,
+  "riggedViews": 1,
+  "animatedLastFrame": 1,
+  "bakedPoses": 0,
+  "highlights": 0,
+  "batches": 96,
+  "drawnBatches": 94,
+  "estimatedDrawCalls": 200,
+  "uniqueDrawCalls": 12,
+  "namedDrawCalls": 12,
+  "otherDrawCalls": 0,
+  "dressedCharacters": 1,
+  "dressedGroups": 7,
+  "movingViews": 0,
+  "triangles": 1884213,
+  "missingAssets": []
+ },
+ "scene": {
+  "totalObjects": 715,
+  "counts": {
+   "Scene": 1,
+   "DirectionalLight": 1,
+   "Object3D": 1,
+   "HemisphereLight": 1,
+   "corealm-world": 1,
+   "terrain": 1,
+   "terrain-chunk-0": 4,
+   "terrain-chunk-1": 4,
+   "terrain-chunk-2": 4,
+   "terrain-chunk-3": 4,
+   "terrain-chunk-4": 4,
+   "terrain-chunk-5": 4,
+   "terrain-chunk-6": 4,
+   "scatter": 1,
+   "water-fallowmarch": 1,
+   "water-vellenwood": 1,
+   "water-karrowmoor": 2,
+   "scatter-fallowmarch-tree_common_5-t0": 2,
+   "scatter-fallowmarch-tree_dead_5-t0": 1,
+   "scatter-fallowmarch-grass_wispy_short-t0": 1,
+   "scatter-fallowmarch-plant_leafy_large-t0": 1,
+   "scatter-fallowmarch-pebble_round_1-t4294901760": 1,
+   "scatter-fallowmarch-pebble_round_1-t4294836224": 1,
+   "scatter-fallowmarch-pebble_round_1-t4294967295": 1,
+   "scatter-fallowmarch-pebble_round_1-t4294901759": 1,
+   "scatter-fallowmarch-pebble_round_1-t4294836225": 1,
+   "scatter-fallowmarch-pebble_round_1-t4294901758": 1,
+   "scatter-fallowmarch-pebble_round_1-t4294967294": 1,
+   "scatter-fallowmarch-pebble_round_1-t4294901761": 1,
+   "scatter-fallowmarch-rock_small_2-t4294836224": 1,
+   "scatter-fallowmarch-rock_small_2-t4294967295": 1,
+   "scatter-fallowmarch-rock_small_2-t4294901759": 1,
+   "scatter-fallowmarch-rock_small_2-t4294901760": 1,
+   "scatter-fallowmarch-rock_small_2-t4294836225": 1,
+   "scatter-fallowmarch-rock_small_2-t4294901758": 1,
+   "scatter-fallowmarch-rock_small_2-t4294901761": 1,
+   "scatter-fallowmarch-rock_small_2-t4294967294": 1,
+   "scatter-fallowmarch-path_rock_small_2-t0": 1,
+   "scatter-fallowmarch-grass_common_short-t4294836224": 1,
+   "scatter-fallowmarch-grass_common_short-t4294901760": 1,
+   "scatter-fallowmarch-grass_common_short-t4294967295": 1,
+   "scatter-fallowmarch-grass_common_short-t4294967294": 1,
+   "scatter-fallowmarch-grass_common_short-t4294901759": 1,
+   "scatter-fallowmarch-grass_common_short-t4294901758": 1,
+   "scatter-fallowmarch-grass_common_short-t4294901761": 1,
+   "scatter-fallowmarch-grass_common_short-t4294836225": 1,
+   "scatter-fallowmarch-grass_common_short-t65534": 1,
+   "scatter-fallowmarch-grass_common_short-t65535": 1,
+   "scatter-fallowmarch-plant_leafy_small-t4294836224": 1,
+   "scatter-fallowmarch-plant_leafy_small-t4294901760": 1,
+   "scatter-fallowmarch-plant_leafy_small-t4294967295": 1,
+   "scatter-fallowmarch-plant_leafy_small-t4294967294": 1,
+   "scatter-fallowmarch-plant_leafy_small-t4294901759": 1,
+   "scatter-fallowmarch-plant_leafy_small-t4294901758": 1,
+   "scatter-fallowmarch-plant_leafy_small-t4294901761": 1,
+   "scatter-fallowmarch-plant_leafy_small-t4294836225": 1,
+   "scatter-fallowmarch-fern_1-t0": 1,
+   "scatter-fallowmarch-grass_wispy_tall-t0": 1,
+   "scatter-fallowmarch-flower_a_single-t0": 2,
+   "scatter-vellenwood-tree_common_3-t0": 2,
+   "scatter-vellenwood-tree_common_5-t0": 2,
+   "scatter-vellenwood-tree_pine_5-t0": 2,
+   "scatter-vellenwood-tree_twisted_2-t0": 2,
+   "scatter-vellenwood-plant_leafy_small-t0": 1,
+   "scatter-vellenwood-plant_leafy_small-t65536": 1,
+   "scatter-vellenwood-plant_leafy_small-t4294901761": 1,
+   "scatter-vellenwood-plant_leafy_small-t65537": 1,
+   "scatter-vellenwood-plant_leafy_small-t1": 1,
+   "scatter-vellenwood-plant_leafy_small-t4294901760": 1,
+   "scatter-vellenwood-plant_leafy_small-t4294967295": 1,
+   "scatter-vellenwood-plant_leafy_small-t65535": 1,
+   "scatter-vellenwood-plant_leafy_large-t0": 1,
+   "scatter-vellenwood-fern_1-t0": 1,
+   "scatter-vellenwood-fern_1-t65536": 1,
+   "scatter-vellenwood-fern_1-t4294901761": 1,
+   "scatter-vellenwood-fern_1-t4294901760": 1,
+   "scatter-vellenwood-fern_1-t65537": 1,
+   "scatter-vellenwood-fern_1-t1": 1,
+   "scatter-vellenwood-mushroom_common-t0": 1,
+   "scatter-vellenwood-rock_small_2-t65536": 1,
+   "scatter-vellenwood-rock_small_2-t131071": 1,
+   "scatter-vellenwood-rock_small_2-t65537": 1,
+   "scatter-vellenwood-rock_small_2-t0": 1,
+   "scatter-vellenwood-rock_small_2-t65535": 1,
+   "scatter-vellenwood-rock_small_2-t1": 1,
+   "scatter-vellenwood-rock_small_2-t4294901760": 1,
+   "scatter-vellenwood-rock_small_2-t4294967295": 1,
+   "scatter-vellenwood-rock_small_2-t4294901761": 1,
+   "scatter-vellenwood-pebble_round_1-t65536": 1,
+   "scatter-vellenwood-pebble_round_1-t65537": 1,
+   "scatter-vellenwood-pebble_round_1-t0": 1,
+   "scatter-vellenwood-pebble_round_1-t65535": 1,
+   "scatter-vellenwood-pebble_round_1-t1": 1,
+   "scatter-vellenwood-pebble_round_1-t4294901760": 1,
+   "scatter-vellenwood-pebble_round_1-t4294967295": 1,
+   "scatter-vellenwood-path_rock_small_2-t0": 1,
+   "scatter-vellenwood-grass_common_short-t65536": 1,
+   "scatter-vellenwood-grass_common_short-t0": 1,
+   "scatter-vellenwood-grass_common_short-t1": 1,
+   "scatter-vellenwood-grass_common_short-t4294901760": 1,
+   "scatter-vellenwood-grass_common_short-t65537": 1,
+   "scatter-vellenwood-grass_common_short-t4294967295": 1,
+   "scatter-vellenwood-grass_common_short-t4294901761": 1,
+   "scatter-vellenwood-grass_common_short-t65535": 1,
+   "scatter-vellenwood-grass_wispy_tall-t0": 1,
+   "scatter-karrowmoor-boulder_medium-t0": 1,
+   "scatter-karrowmoor-cliff_tall-t0": 1,
+   "scatter-karrowmoor-tree_pine_5-t0": 2,
+   "scatter-karrowmoor-tree_dead_5-t0": 1,
+   "scatter-karrowmoor-pebble_round_1-t131071": 1,
+   "scatter-karrowmoor-pebble_round_1-t65535": 1,
+   "scatter-karrowmoor-pebble_round_1-t65534": 1,
+   "scatter-karrowmoor-pebble_round_1-t65536": 1,
+   "scatter-karrowmoor-pebble_round_1-t4294967295": 1,
+   "scatter-karrowmoor-pebble_round_1-t131070": 1,
+   "scatter-karrowmoor-pebble_round_1-t0": 1,
+   "scatter-karrowmoor-rock_small_2-t131071": 1,
+   "scatter-karrowmoor-rock_small_2-t65535": 1,
+   "scatter-karrowmoor-rock_small_2-t65536": 1,
+   "scatter-karrowmoor-rock_small_2-t4294967294": 1,
+   "scatter-karrowmoor-rock_small_2-t65534": 1,
+   "scatter-karrowmoor-rock_small_2-t4294967295": 1,
+   "scatter-karrowmoor-rock_small_2-t131070": 1,
+   "scatter-karrowmoor-rock_small_2-t0": 1,
+   "scatter-karrowmoor-rock_small_2-t4294901760": 1,
+   "scatter-karrowmoor-path_rock_small_2-t0": 1,
+   "scatter-karrowmoor-grass_wispy_short-t0": 1,
+   "scatter-karrowmoor-plant_leafy_small-t0": 1,
+   "scatter-karrowmoor-plant_leafy_small-t65534": 1,
+   "scatter-karrowmoor-plant_leafy_small-t65535": 1,
+   "scatter-karrowmoor-plant_leafy_small-t131070": 1,
+   "scatter-karrowmoor-plant_leafy_small-t65536": 1,
+   "scatter-karrowmoor-plant_leafy_small-t131071": 1,
+   "scatter-karrowmoor-plant_leafy_small-t4294967295": 1,
+   "scatter-karrowmoor-plant_leafy_small-t4294967294": 1,
+   "scatter-karrowmoor-plant_leafy_small-t4294901760": 1,
+   "scatter-karrowmoor-grass_common_short-t131071": 1,
+   "scatter-karrowmoor-grass_common_short-t65535": 1,
+   "scatter-karrowmoor-grass_common_short-t131070": 1,
+   "scatter-karrowmoor-grass_common_short-t65536": 1,
+   "scatter-karrowmoor-grass_common_short-t65534": 1,
+   "scatter-karrowmoor-grass_common_short-t4294967295": 1,
+   "scatter-karrowmoor-grass_common_short-t0": 1,
+   "scatter-karrowmoor-grass_common_short-t4294967294": 1,
+   "scatter-karrowmoor-grass_common_short-t4294901760": 1,
+   "scatter-karrowmoor-fern_1-t0": 1,
+   "scatter-karrowmoor-grass_wispy_tall-t0": 1,
+   "entities": 1,
+   "entity-views": 1,
+   "entity-batch": 96,
+   "character-base_male>outfit_male_peasant_chest+outfit_male_peasant_legs+outfit_male_peasant_boots+outfit_male_peasant_gloves+hair_short": 1,
+   "body": 2,
+   "Armature": 2,
+   "Eyebrows": 2,
+   "Eyes": 2,
+   "SuperHero_Male": 2,
+   "root": 2,
+   "pelvis": 2,
+   "spine": 6,
+   "neck": 2,
+   "Head": 2,
+   "clavicle_l": 2,
+   "upperarm_l": 2,
+   "lowerarm_l": 2,
+   "hand_l": 2,
+   "index_01_l": 2,
+   "index_02_l": 2,
+   "index_03_l": 2,
+   "index_04_leaf_l": 2,
+   "middle_01_l": 2,
+   "middle_02_l": 2,
+   "middle_03_l": 2,
+   "middle_04_leaf_l": 2,
+   "pinky_01_l": 2,
+   "pinky_02_l": 2,
+   "pinky_03_l": 2,
+   "pinky_04_leaf_l": 2,
+   "ring_01_l": 2,
+   "ring_02_l": 2,
+   "ring_03_l": 2,
+   "ring_04_leaf_l": 2,
+   "thumb_01_l": 2,
+   "thumb_02_l": 2,
+   "thumb_03_l": 2,
+   "thumb_04_leaf_l": 2,
+   "clavicle_r": 2,
+   "upperarm_r": 2,
+   "lowerarm_r": 2,
+   "hand_r": 2,
+   "index_01_r": 2,
+   "index_02_r": 2,
+   "index_03_r": 2,
+   "index_04_leaf_r": 2,
+   "middle_01_r": 2,
+   "middle_02_r": 2,
+   "middle_03_r": 2,
+   "middle_04_leaf_r": 2,
+   "pinky_01_r": 2,
+   "pinky_02_r": 2,
+   "pinky_03_r": 2,
+   "pinky_04_leaf_r": 2,
+   "ring_01_r": 2,
+   "ring_02_r": 2,
+   "ring_03_r": 2,
+   "ring_04_leaf_r": 2,
+   "thumb_01_r": 2,
+   "thumb_02_r": 2,
+   "thumb_03_r": 2,
+   "thumb_04_leaf_r": 2,
+   "thigh_l": 2,
+   "calf_l": 2,
+   "foot_l": 2,
+   "ball_l": 2,
+   "ball_leaf_l": 2,
+   "thigh_r": 2,
+   "calf_r": 2,
+   "foot_r": 2,
+   "ball_r": 2,
+   "ball_leaf_r": 2,
+   "Male_Peasant_Arms": 1,
+   "Hair_SimpleParted": 1,
+   "merged-Male_Peasant_Body": 1,
+   "character-rig": 1,
+   "part-outfit_male_peasant_gloves-Male_Peasant_Arms": 1,
+   "part-hair_short-Hair_SimpleParted": 1,
+   "merged-part-outfit_male_peasant_chest-Male_Peasant_Body": 1,
+   "overlays": 2,
+   "entity-highlights": 1,
+   "vfx": 1,
+   "ambience": 1,
+   "dungeon-gravelmaw": 1,
+   "dungeon-floor": 1,
+   "dungeon-ceiling": 1,
+   "dungeon-wall": 1,
+   "dungeon-ambient": 1,
+   "dungeon-light-gravelmaw_chamber": 3,
+   "dungeon-light-gravelmaw_arena": 1,
+   "nav-obstacles": 1,
+   "solid-carve-bracken_pit_grithe": 6,
+   "solid-carve-bracken_pit_stone": 2,
+   "solid-carve-palewood_copse_trees": 8,
+   "solid-carve-coldbrace_gate_south#pier_l": 1,
+   "solid-carve-coldbrace_gate_south#pier_r": 1,
+   "solid-carve-coldbrace_gate_east#pier_l": 1,
+   "solid-carve-coldbrace_gate_east#pier_r": 1,
+   "solid-carve-coldbrace_gate_west#pier_l": 1,
+   "solid-carve-coldbrace_gate_west#pier_r": 1,
+   "solid-carve-coldbrace_vault#body": 1,
+   "solid-carve-coldbrace_bank_porch#back": 1,
+   "solid-carve-coldbrace_bank_porch#post_l": 1,
+   "solid-carve-coldbrace_bank_porch#post_r": 1,
+   "solid-carve-coldbrace_hall#body": 1,
+   "solid-carve-coldbrace_forge_shed#back": 1,
+   "solid-carve-coldbrace_forge_shed#left": 1,
+   "solid-carve-coldbrace_forge_shed#right": 1,
+   "solid-carve-coldbrace_workshed#back": 1,
+   "solid-carve-coldbrace_workshed#post_l": 1,
+   "solid-carve-coldbrace_workshed#post_r": 1,
+   "solid-carve-coldbrace_cookhouse#back": 1,
+   "solid-carve-coldbrace_cookhouse#post_l": 1,
+   "solid-carve-coldbrace_cookhouse#post_r": 1,
+   "solid-carve-coldbrace_market#back": 1,
+   "solid-carve-coldbrace_well#curb": 1,
+   "solid-carve-coldbrace_house_1#body": 1,
+   "solid-carve-coldbrace_house_2#body": 1,
+   "solid-carve-coldbrace_house_3#body": 1,
+   "solid-carve-coldbrace_house_4#body": 1,
+   "solid-carve-coldbrace_house_5#body": 1,
+   "solid-carve-coldbrace_house_6#body": 1,
+   "solid-carve-coldbrace_house_7#body": 1,
+   "solid-carve-coldbrace_house_8#body": 1,
+   "solid-carve-coldbrace_wall_s#run": 2,
+   "solid-carve-coldbrace_wall_e#run": 2,
+   "solid-carve-coldbrace_wall_n#run": 1,
+   "solid-carve-coldbrace_wall_w#run": 2,
+   "solid-carve-coldbrace_prop_wagon": 1,
+   "solid-carve-coldbrace_prop_gate_crate": 2,
+   "solid-carve-coldbrace_prop_gate_barrel": 1,
+   "solid-carve-coldbrace_prop_market_apples": 1,
+   "solid-carve-coldbrace_prop_market_crate": 1,
+   "solid-carve-coldbrace_prop_whetstone": 1,
+   "solid-carve-coldbrace_prop_forge_barrel_n": 1,
+   "solid-carve-coldbrace_prop_forge_barrel_s": 1,
+   "solid-carve-coldbrace_prop_forge_crate": 1,
+   "solid-carve-coldbrace_prop_dummy": 1,
+   "solid-carve-coldbrace_prop_bank_counter": 1,
+   "solid-carve-coldbrace_prop_vault_crate": 1,
+   "solid-carve-coldbrace_prop_vault_barrel": 1,
+   "solid-carve-coldbrace_prop_lane_crate": 1,
+   "solid-carve-coldbrace_prop_lane_barrel": 1,
+   "solid-carve-coldbrace_bank": 1,
+   "solid-carve-coldbrace_general": 1,
+   "solid-carve-coldbrace_smith": 1,
+   "solid-carve-coldbrace_furnace": 1,
+   "solid-carve-coldbrace_anvil": 1,
+   "solid-carve-coldbrace_range": 1,
+   "solid-carve-coldbrace_crafting": 1,
+   "solid-carve-coldbrace_fletching": 1,
+   "solid-carve-brookvault_planks": 1,
+   "solid-carve-wall_vault": 1,
+   "solid-carve-march_vault_tower": 1,
+   "solid-carve-march_vault_tower#torch_l": 1,
+   "solid-carve-march_vault_tower#torch_r": 1,
+   "solid-carve-march_vault_tower#banner_l": 1,
+   "solid-carve-march_vault_tower#banner_r": 1,
+   "solid-carve-march_vault_tower#kerb_l": 1,
+   "solid-carve-march_vault_tower#kerb_r": 1,
+   "solid-carve-broken_milestone": 1,
+   "solid-carve-broken_milestone#top": 1,
+   "solid-carve-broken_milestone#stone": 1,
+   "solid-carve-broken_milestone#kerb_l": 1,
+   "solid-carve-broken_milestone#kerb_r": 1,
+   "solid-carve-lone_dead_palewood": 1,
+   "solid-carve-fallowmarch_north_gate#wall_l": 1,
+   "solid-carve-fallowmarch_north_gate#wall_r": 1,
+   "solid-carve-fallowmarch_north_gate#post_l": 1,
+   "solid-carve-fallowmarch_north_gate#post_r": 1,
+   "solid-carve-fallowmarch_north_gate#lamp_l": 1,
+   "solid-carve-fallowmarch_north_gate#lamp_r": 1,
+   "solid-carve-hollowcut_corven": 5,
+   "solid-carve-duskoak_stand_trees": 10,
+   "solid-carve-rootfall_house_1#body": 1,
+   "solid-carve-rootfall_house_2#body": 1,
+   "solid-carve-rootfall_house_3#body": 1,
+   "solid-carve-rootfall_house_4#body": 1,
+   "solid-carve-rootfall_house_5#body": 1,
+   "solid-carve-rootfall_house_6#body": 1,
+   "solid-carve-rootfall_house_7#body": 1,
+   "solid-carve-rootfall_house_8#body": 1,
+   "solid-carve-rootfall_shed#body": 1,
+   "solid-carve-rootfall_forge#back": 1,
+   "solid-carve-rootfall_forge#left": 1,
+   "solid-carve-rootfall_forge#right": 1,
+   "solid-carve-rootfall_sawpit#back": 1,
+   "solid-carve-rootfall_counter#back": 1,
+   "solid-carve-rootfall_counter#post_l": 1,
+   "solid-carve-rootfall_counter#post_r": 1,
+   "solid-carve-rootfall_cookhouse#back": 1,
+   "solid-carve-rootfall_cookhouse#post_l": 1,
+   "solid-carve-rootfall_cookhouse#post_r": 1,
+   "solid-carve-rootfall_gate_west#pier_l": 1,
+   "solid-carve-rootfall_gate_west#pier_r": 1,
+   "solid-carve-rootfall_gate_east#pier_l": 1,
+   "solid-carve-rootfall_gate_east#pier_r": 1,
+   "solid-carve-rootfall_gate_north#pier_l": 1,
+   "solid-carve-rootfall_gate_north#pier_r": 1,
+   "solid-carve-rootfall_wall_west#run": 2,
+   "solid-carve-rootfall_wall_north#run": 2,
+   "solid-carve-rootfall_wall_east#run": 3,
+   "solid-carve-rootfall_wall_south#run": 1,
+   "solid-carve-rootfall_prop_whetstone": 1,
+   "solid-carve-rootfall_prop_forge_barrel": 2,
+   "solid-carve-rootfall_prop_forge_crate": 1,
+   "solid-carve-rootfall_prop_log": 2,
+   "solid-carve-rootfall_prop_saw_crate": 1,
+   "solid-carve-rootfall_prop_counter_table": 1,
+   "solid-carve-rootfall_prop_bench": 2,
+   "solid-carve-rootfall_prop_green_barrel": 1,
+   "solid-carve-rootfall_prop_green_crate": 1,
+   "solid-carve-rootfall_prop_cauldron": 1,
+   "solid-carve-rootfall_prop_wagon": 1,
+   "solid-carve-rootfall_prop_cart_crate": 1,
+   "solid-carve-rootfall_prop_cart_barrel": 1,
+   "solid-carve-rootfall_prop_yard_crate": 1,
+   "solid-carve-rootfall_bank_chest": 1,
+   "solid-carve-rootfall_general": 1,
+   "solid-carve-rootfall_range": 1,
+   "solid-carve-rootfall_anvil": 1,
+   "solid-carve-rootfall_crafting": 1,
+   "solid-carve-rootfall_fletching": 1,
+   "solid-carve-canopy_walk": 1,
+   "solid-carve-fallen_duskoak": 1,
+   "solid-carve-root_tunnel": 1,
+   "solid-carve-rootfall_stump#step": 2,
+   "solid-carve-rootfall_stump#shelf": 2,
+   "solid-carve-rootfall_stump#vine": 1,
+   "solid-carve-split_duskoak": 1,
+   "solid-carve-thornline_stones": 1,
+   "solid-carve-thornline_stones#stone": 4,
+   "solid-carve-thornline_stones#low": 2,
+   "solid-carve-vellenwood_marchgate#wall_l": 1,
+   "solid-carve-vellenwood_marchgate#wall_r": 1,
+   "solid-carve-vellenwood_marchgate#post_l": 1,
+   "solid-carve-vellenwood_marchgate#post_r": 1,
+   "solid-carve-vellenwood_marchgate#lamp_l": 1,
+   "solid-carve-vellenwood_marchgate#lamp_r": 1,
+   "solid-carve-vellenwood_east_gate#wall_l": 1,
+   "solid-carve-vellenwood_east_gate#wall_r": 1,
+   "solid-carve-vellenwood_east_gate#post_l": 1,
+   "solid-carve-vellenwood_east_gate#post_r": 1,
+   "solid-carve-vellenwood_east_gate#lamp_l": 1,
+   "solid-carve-vellenwood_east_gate#lamp_r": 1,
+   "solid-carve-lower_quarry_kaldite": 5,
+   "solid-carve-upper_karrow_kaldite": 3,
+   "solid-carve-ridge_pines_trees": 8,
+   "solid-carve-highcairn_hut_1#body": 1,
+   "solid-carve-highcairn_hut_3#body": 1,
+   "solid-carve-highcairn_hut_4#body": 1,
+   "solid-carve-highcairn_hut_6#body": 1,
+   "solid-carve-highcairn_hut_5#body": 1,
+   "solid-carve-highcairn_forge#back": 1,
+   "solid-carve-highcairn_forge#left": 1,
+   "solid-carve-highcairn_forge#right": 1,
+   "solid-carve-highcairn_bank_porch#back": 1,
+   "solid-carve-highcairn_bank_porch#post_l": 1,
+   "solid-carve-highcairn_bank_porch#post_r": 1,
+   "solid-carve-highcairn_hut_2#body": 1,
+   "solid-carve-highcairn_market#back": 1,
+   "solid-carve-highcairn_gate#pier_l": 1,
+   "solid-carve-highcairn_gate#pier_r": 1,
+   "solid-carve-highcairn_postern#pier_l": 1,
+   "solid-carve-highcairn_postern#pier_r": 1,
+   "solid-carve-highcairn_wall_s#run": 1,
+   "solid-carve-highcairn_wall_e#run": 2,
+   "solid-carve-highcairn_wall_n#run": 1,
+   "solid-carve-highcairn_wall_w#run": 2,
+   "solid-carve-highcairn_spoil": 2,
+   "solid-carve-highcairn_wagon": 1,
+   "solid-carve-highcairn_bank_counter": 1,
+   "solid-carve-highcairn_general": 1,
+   "solid-carve-highcairn_smith": 1,
+   "solid-carve-highcairn_furnace": 1,
+   "solid-carve-highcairn_anvil": 1,
+   "solid-carve-highcairn_range": 1,
+   "solid-carve-sunder_ledge": 1,
+   "solid-carve-scree_slide": 1,
+   "solid-carve-cairn_leap": 1,
+   "solid-carve-highcairn_crane": 1,
+   "solid-carve-highcairn_crane#jib": 1,
+   "solid-carve-highcairn_crane#brace_l": 1,
+   "solid-carve-highcairn_crane#brace_r": 1,
+   "solid-carve-highcairn_crane#drum": 1,
+   "solid-carve-highcairn_crane#rope": 1,
+   "solid-carve-highcairn_crane#crate": 1,
+   "solid-carve-highcairn_crane#barrel": 1,
+   "solid-carve-great_cairn_stone": 1,
+   "solid-carve-great_cairn_stone#flank_l": 1,
+   "solid-carve-great_cairn_stone#flank_r": 1,
+   "solid-carve-great_cairn_stone#crown": 1,
+   "solid-carve-great_cairn_stone#skirt": 1,
+   "solid-carve-karrowmoor_north_gate#wall_l": 1,
+   "solid-carve-karrowmoor_north_gate#wall_r": 1,
+   "solid-carve-karrowmoor_north_gate#post_l": 1,
+   "solid-carve-karrowmoor_north_gate#post_r": 1,
+   "solid-carve-karrowmoor_north_gate#lamp_l": 1,
+   "solid-carve-karrowmoor_north_gate#lamp_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#jaw_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#jaw_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#shoulder_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#shoulder_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#brow": 1,
+   "solid-carve-gravelmaw_mouth_portal#spoil_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#spoil_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#rock_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#rock_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#brazier_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#brazier_r": 1
+  },
+  "hidden": {
+   "dungeon-gravelmaw": 1,
+   "dungeon-floor": 1,
+   "dungeon-ceiling": 1,
+   "dungeon-wall": 1,
+   "dungeon-ambient": 1,
+   "dungeon-light-gravelmaw_chamber": 3,
+   "dungeon-light-gravelmaw_arena": 1,
+   "nav-obstacles": 1,
+   "solid-carve-bracken_pit_grithe": 6,
+   "solid-carve-bracken_pit_stone": 2,
+   "solid-carve-palewood_copse_trees": 8,
+   "solid-carve-coldbrace_gate_south#pier_l": 1,
+   "solid-carve-coldbrace_gate_south#pier_r": 1,
+   "solid-carve-coldbrace_gate_east#pier_l": 1,
+   "solid-carve-coldbrace_gate_east#pier_r": 1,
+   "solid-carve-coldbrace_gate_west#pier_l": 1,
+   "solid-carve-coldbrace_gate_west#pier_r": 1,
+   "solid-carve-coldbrace_vault#body": 1,
+   "solid-carve-coldbrace_bank_porch#back": 1,
+   "solid-carve-coldbrace_bank_porch#post_l": 1,
+   "solid-carve-coldbrace_bank_porch#post_r": 1,
+   "solid-carve-coldbrace_hall#body": 1,
+   "solid-carve-coldbrace_forge_shed#back": 1,
+   "solid-carve-coldbrace_forge_shed#left": 1,
+   "solid-carve-coldbrace_forge_shed#right": 1,
+   "solid-carve-coldbrace_workshed#back": 1,
+   "solid-carve-coldbrace_workshed#post_l": 1,
+   "solid-carve-coldbrace_workshed#post_r": 1,
+   "solid-carve-coldbrace_cookhouse#back": 1,
+   "solid-carve-coldbrace_cookhouse#post_l": 1,
+   "solid-carve-coldbrace_cookhouse#post_r": 1,
+   "solid-carve-coldbrace_market#back": 1,
+   "solid-carve-coldbrace_well#curb": 1,
+   "solid-carve-coldbrace_house_1#body": 1,
+   "solid-carve-coldbrace_house_2#body": 1,
+   "solid-carve-coldbrace_house_3#body": 1,
+   "solid-carve-coldbrace_house_4#body": 1,
+   "solid-carve-coldbrace_house_5#body": 1,
+   "solid-carve-coldbrace_house_6#body": 1,
+   "solid-carve-coldbrace_house_7#body": 1,
+   "solid-carve-coldbrace_house_8#body": 1,
+   "solid-carve-coldbrace_wall_s#run": 2,
+   "solid-carve-coldbrace_wall_e#run": 2,
+   "solid-carve-coldbrace_wall_n#run": 1,
+   "solid-carve-coldbrace_wall_w#run": 2,
+   "solid-carve-coldbrace_prop_wagon": 1,
+   "solid-carve-coldbrace_prop_gate_crate": 2,
+   "solid-carve-coldbrace_prop_gate_barrel": 1,
+   "solid-carve-coldbrace_prop_market_apples": 1,
+   "solid-carve-coldbrace_prop_market_crate": 1,
+   "solid-carve-coldbrace_prop_whetstone": 1,
+   "solid-carve-coldbrace_prop_forge_barrel_n": 1,
+   "solid-carve-coldbrace_prop_forge_barrel_s": 1,
+   "solid-carve-coldbrace_prop_forge_crate": 1,
+   "solid-carve-coldbrace_prop_dummy": 1,
+   "solid-carve-coldbrace_prop_bank_counter": 1,
+   "solid-carve-coldbrace_prop_vault_crate": 1,
+   "solid-carve-coldbrace_prop_vault_barrel": 1,
+   "solid-carve-coldbrace_prop_lane_crate": 1,
+   "solid-carve-coldbrace_prop_lane_barrel": 1,
+   "solid-carve-coldbrace_bank": 1,
+   "solid-carve-coldbrace_general": 1,
+   "solid-carve-coldbrace_smith": 1,
+   "solid-carve-coldbrace_furnace": 1,
+   "solid-carve-coldbrace_anvil": 1,
+   "solid-carve-coldbrace_range": 1,
+   "solid-carve-coldbrace_crafting": 1,
+   "solid-carve-coldbrace_fletching": 1,
+   "solid-carve-brookvault_planks": 1,
+   "solid-carve-wall_vault": 1,
+   "solid-carve-march_vault_tower": 1,
+   "solid-carve-march_vault_tower#torch_l": 1,
+   "solid-carve-march_vault_tower#torch_r": 1,
+   "solid-carve-march_vault_tower#banner_l": 1,
+   "solid-carve-march_vault_tower#banner_r": 1,
+   "solid-carve-march_vault_tower#kerb_l": 1,
+   "solid-carve-march_vault_tower#kerb_r": 1,
+   "solid-carve-broken_milestone": 1,
+   "solid-carve-broken_milestone#top": 1,
+   "solid-carve-broken_milestone#stone": 1,
+   "solid-carve-broken_milestone#kerb_l": 1,
+   "solid-carve-broken_milestone#kerb_r": 1,
+   "solid-carve-lone_dead_palewood": 1,
+   "solid-carve-fallowmarch_north_gate#wall_l": 1,
+   "solid-carve-fallowmarch_north_gate#wall_r": 1,
+   "solid-carve-fallowmarch_north_gate#post_l": 1,
+   "solid-carve-fallowmarch_north_gate#post_r": 1,
+   "solid-carve-fallowmarch_north_gate#lamp_l": 1,
+   "solid-carve-fallowmarch_north_gate#lamp_r": 1,
+   "solid-carve-hollowcut_corven": 5,
+   "solid-carve-duskoak_stand_trees": 10,
+   "solid-carve-rootfall_house_1#body": 1,
+   "solid-carve-rootfall_house_2#body": 1,
+   "solid-carve-rootfall_house_3#body": 1,
+   "solid-carve-rootfall_house_4#body": 1,
+   "solid-carve-rootfall_house_5#body": 1,
+   "solid-carve-rootfall_house_6#body": 1,
+   "solid-carve-rootfall_house_7#body": 1,
+   "solid-carve-rootfall_house_8#body": 1,
+   "solid-carve-rootfall_shed#body": 1,
+   "solid-carve-rootfall_forge#back": 1,
+   "solid-carve-rootfall_forge#left": 1,
+   "solid-carve-rootfall_forge#right": 1,
+   "solid-carve-rootfall_sawpit#back": 1,
+   "solid-carve-rootfall_counter#back": 1,
+   "solid-carve-rootfall_counter#post_l": 1,
+   "solid-carve-rootfall_counter#post_r": 1,
+   "solid-carve-rootfall_cookhouse#back": 1,
+   "solid-carve-rootfall_cookhouse#post_l": 1,
+   "solid-carve-rootfall_cookhouse#post_r": 1,
+   "solid-carve-rootfall_gate_west#pier_l": 1,
+   "solid-carve-rootfall_gate_west#pier_r": 1,
+   "solid-carve-rootfall_gate_east#pier_l": 1,
+   "solid-carve-rootfall_gate_east#pier_r": 1,
+   "solid-carve-rootfall_gate_north#pier_l": 1,
+   "solid-carve-rootfall_gate_north#pier_r": 1,
+   "solid-carve-rootfall_wall_west#run": 2,
+   "solid-carve-rootfall_wall_north#run": 2,
+   "solid-carve-rootfall_wall_east#run": 3,
+   "solid-carve-rootfall_wall_south#run": 1,
+   "solid-carve-rootfall_prop_whetstone": 1,
+   "solid-carve-rootfall_prop_forge_barrel": 2,
+   "solid-carve-rootfall_prop_forge_crate": 1,
+   "solid-carve-rootfall_prop_log": 2,
+   "solid-carve-rootfall_prop_saw_crate": 1,
+   "solid-carve-rootfall_prop_counter_table": 1,
+   "solid-carve-rootfall_prop_bench": 2,
+   "solid-carve-rootfall_prop_green_barrel": 1,
+   "solid-carve-rootfall_prop_green_crate": 1,
+   "solid-carve-rootfall_prop_cauldron": 1,
+   "solid-carve-rootfall_prop_wagon": 1,
+   "solid-carve-rootfall_prop_cart_crate": 1,
+   "solid-carve-rootfall_prop_cart_barrel": 1,
+   "solid-carve-rootfall_prop_yard_crate": 1,
+   "solid-carve-rootfall_bank_chest": 1,
+   "solid-carve-rootfall_general": 1,
+   "solid-carve-rootfall_range": 1,
+   "solid-carve-rootfall_anvil": 1,
+   "solid-carve-rootfall_crafting": 1,
+   "solid-carve-rootfall_fletching": 1,
+   "solid-carve-canopy_walk": 1,
+   "solid-carve-fallen_duskoak": 1,
+   "solid-carve-root_tunnel": 1,
+   "solid-carve-rootfall_stump#step": 2,
+   "solid-carve-rootfall_stump#shelf": 2,
+   "solid-carve-rootfall_stump#vine": 1,
+   "solid-carve-split_duskoak": 1,
+   "solid-carve-thornline_stones": 1,
+   "solid-carve-thornline_stones#stone": 4,
+   "solid-carve-thornline_stones#low": 2,
+   "solid-carve-vellenwood_marchgate#wall_l": 1,
+   "solid-carve-vellenwood_marchgate#wall_r": 1,
+   "solid-carve-vellenwood_marchgate#post_l": 1,
+   "solid-carve-vellenwood_marchgate#post_r": 1,
+   "solid-carve-vellenwood_marchgate#lamp_l": 1,
+   "solid-carve-vellenwood_marchgate#lamp_r": 1,
+   "solid-carve-vellenwood_east_gate#wall_l": 1,
+   "solid-carve-vellenwood_east_gate#wall_r": 1,
+   "solid-carve-vellenwood_east_gate#post_l": 1,
+   "solid-carve-vellenwood_east_gate#post_r": 1,
+   "solid-carve-vellenwood_east_gate#lamp_l": 1,
+   "solid-carve-vellenwood_east_gate#lamp_r": 1,
+   "solid-carve-lower_quarry_kaldite": 5,
+   "solid-carve-upper_karrow_kaldite": 3,
+   "solid-carve-ridge_pines_trees": 8,
+   "solid-carve-highcairn_hut_1#body": 1,
+   "solid-carve-highcairn_hut_3#body": 1,
+   "solid-carve-highcairn_hut_4#body": 1,
+   "solid-carve-highcairn_hut_6#body": 1,
+   "solid-carve-highcairn_hut_5#body": 1,
+   "solid-carve-highcairn_forge#back": 1,
+   "solid-carve-highcairn_forge#left": 1,
+   "solid-carve-highcairn_forge#right": 1,
+   "solid-carve-highcairn_bank_porch#back": 1,
+   "solid-carve-highcairn_bank_porch#post_l": 1,
+   "solid-carve-highcairn_bank_porch#post_r": 1,
+   "solid-carve-highcairn_hut_2#body": 1,
+   "solid-carve-highcairn_market#back": 1,
+   "solid-carve-highcairn_gate#pier_l": 1,
+   "solid-carve-highcairn_gate#pier_r": 1,
+   "solid-carve-highcairn_postern#pier_l": 1,
+   "solid-carve-highcairn_postern#pier_r": 1,
+   "solid-carve-highcairn_wall_s#run": 1,
+   "solid-carve-highcairn_wall_e#run": 2,
+   "solid-carve-highcairn_wall_n#run": 1,
+   "solid-carve-highcairn_wall_w#run": 2,
+   "solid-carve-highcairn_spoil": 2,
+   "solid-carve-highcairn_wagon": 1,
+   "solid-carve-highcairn_bank_counter": 1,
+   "solid-carve-highcairn_general": 1,
+   "solid-carve-highcairn_smith": 1,
+   "solid-carve-highcairn_furnace": 1,
+   "solid-carve-highcairn_anvil": 1,
+   "solid-carve-highcairn_range": 1,
+   "solid-carve-sunder_ledge": 1,
+   "solid-carve-scree_slide": 1,
+   "solid-carve-cairn_leap": 1,
+   "solid-carve-highcairn_crane": 1,
+   "solid-carve-highcairn_crane#jib": 1,
+   "solid-carve-highcairn_crane#brace_l": 1,
+   "solid-carve-highcairn_crane#brace_r": 1,
+   "solid-carve-highcairn_crane#drum": 1,
+   "solid-carve-highcairn_crane#rope": 1,
+   "solid-carve-highcairn_crane#crate": 1,
+   "solid-carve-highcairn_crane#barrel": 1,
+   "solid-carve-great_cairn_stone": 1,
+   "solid-carve-great_cairn_stone#flank_l": 1,
+   "solid-carve-great_cairn_stone#flank_r": 1,
+   "solid-carve-great_cairn_stone#crown": 1,
+   "solid-carve-great_cairn_stone#skirt": 1,
+   "solid-carve-karrowmoor_north_gate#wall_l": 1,
+   "solid-carve-karrowmoor_north_gate#wall_r": 1,
+   "solid-carve-karrowmoor_north_gate#post_l": 1,
+   "solid-carve-karrowmoor_north_gate#post_r": 1,
+   "solid-carve-karrowmoor_north_gate#lamp_l": 1,
+   "solid-carve-karrowmoor_north_gate#lamp_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#jaw_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#jaw_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#shoulder_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#shoulder_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#brow": 1,
+   "solid-carve-gravelmaw_mouth_portal#spoil_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#spoil_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#rock_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#rock_r": 1,
+   "solid-carve-gravelmaw_mouth_portal#brazier_l": 1,
+   "solid-carve-gravelmaw_mouth_portal#brazier_r": 1
+  }
+ },
+ "byAsset": {
+  "rock_medium_1": {
+   "n": 13,
+   "arch": "ore",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "rock_medium_3": {
+   "n": 10,
+   "arch": "ore",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "tree_common_1": {
+   "n": 8,
+   "arch": "tree",
+   "tiers": [
+    1
+   ]
+  },
+  "rope_coil": {
+   "n": 17,
+   "arch": "fishing_spot",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "crop_carrot": {
+   "n": 10,
+   "arch": "farm_plot",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "floor_brick": {
+   "n": 107,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "fence_wood_single": {
+   "n": 76,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "wall_brick_straight": {
+   "n": 202,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "wall_bottom_trim": {
+   "n": 627,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "corner_brick": {
+   "n": 215,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "kerb_straight": {
+   "n": 346,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "lamp_wall": {
+   "n": 60,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "banner_1": {
+   "n": 27,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "wall_plaster_straight": {
+   "n": 209,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "corner_wood": {
+   "n": 425,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "wall_plaster_window": {
+   "n": 100,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "wall_plaster_door": {
+   "n": 19,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "roof_tower": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "door_round_1": {
+   "n": 10,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "overhang_plaster": {
+   "n": 20,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "wall_plaster_base": {
+   "n": 53,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "roof_tiles_6x12": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "roof_gable_brick": {
+   "n": 54,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "chimney": {
+   "n": 17,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "roof_tiles_4x6": {
+   "n": 19,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "support_beam": {
+   "n": 24,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "roof_wood_plank": {
+   "n": 2,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "bucket_wood": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "chain_coil": {
+   "n": 2,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "floor_cobble": {
+   "n": 208,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "kerb_corner": {
+   "n": 8,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "wagon": {
+   "n": 3,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "crate_village": {
+   "n": 9,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "barrel": {
+   "n": 14,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "sack": {
+   "n": 14,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "crate_wood": {
+   "n": 6,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "bench": {
+   "n": 8,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "flower_a_group": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "barrel_apples": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "farm_crate_carrot": {
+   "n": 4,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "farm_crate_apple": {
+   "n": 2,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "whetstone": {
+   "n": 3,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "weapon_rack": {
+   "n": 4,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "crate_metal": {
+   "n": 8,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "training_dummy": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "table_large": {
+   "n": 4,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "roof_log": {
+   "n": 20,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "chest_wood": {
+   "n": 3,
+   "arch": "bank",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "market_stall": {
+   "n": 3,
+   "arch": "shop",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "market_stall_cart": {
+   "n": 2,
+   "arch": "shop",
+   "tiers": [
+    1,
+    10
+   ]
+  },
+  "cauldron": {
+   "n": 3,
+   "arch": "station",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "anvil": {
+   "n": 3,
+   "arch": "station",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "cooking_pot": {
+   "n": 3,
+   "arch": "station",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "workbench": {
+   "n": 2,
+   "arch": "station",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "base_female": {
+   "n": 5,
+   "arch": "npc",
+   "tiers": [
+    1,
+    5,
+    10
+   ],
+   "parts": [
+    "outfit_female_peasant_chest",
+    "outfit_female_peasant_legs",
+    "outfit_female_peasant_boots",
+    "outfit_female_peasant_gloves"
+   ]
+  },
+  "base_male": {
+   "n": 7,
+   "arch": "npc",
+   "tiers": [
+    1,
+    5,
+    10
+   ],
+   "parts": [
+    "outfit_male_ranger_chest",
+    "outfit_male_ranger_legs",
+    "outfit_male_ranger_boots",
+    "outfit_male_ranger_gloves",
+    "outfit_male_ranger_hood",
+    "outfit_male_ranger_pauldron"
+   ]
+  },
+  "floor_wood": {
+   "n": 100,
+   "arch": "obstacle",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "enemy_crab": {
+   "n": 23,
+   "arch": "enemy",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "enemy_blob": {
+   "n": 8,
+   "arch": "enemy",
+   "tiers": [
+    1,
+    5
+   ]
+  },
+  "door_frame_round": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "torch": {
+   "n": 18,
+   "arch": "landmark",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "rubble_brick_1": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "rubble_brick_2": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "tree_dead_3": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    1
+   ]
+  },
+  "wall_arch": {
+   "n": 6,
+   "arch": "portal",
+   "tiers": [
+    1,
+    5,
+    10
+   ]
+  },
+  "rock_medium_2": {
+   "n": 8,
+   "arch": "ore",
+   "tiers": [
+    5,
+    10
+   ]
+  },
+  "tree_common_2": {
+   "n": 10,
+   "arch": "tree",
+   "tiers": [
+    5
+   ]
+  },
+  "wall_plaster_timber": {
+   "n": 91,
+   "arch": "landmark",
+   "tiers": [
+    5
+   ]
+  },
+  "roof_dormer": {
+   "n": 9,
+   "arch": "landmark",
+   "tiers": [
+    5
+   ]
+  },
+  "door_round_2": {
+   "n": 9,
+   "arch": "landmark",
+   "tiers": [
+    5
+   ]
+  },
+  "workbench_drawers": {
+   "n": 1,
+   "arch": "station",
+   "tiers": [
+    5
+   ]
+  },
+  "balcony_straight": {
+   "n": 1,
+   "arch": "obstacle",
+   "tiers": [
+    5
+   ]
+  },
+  "enemy_bee": {
+   "n": 10,
+   "arch": "enemy",
+   "tiers": [
+    5,
+    10
+   ]
+  },
+  "tree_twisted_2": {
+   "n": 2,
+   "arch": "landmark",
+   "tiers": [
+    5
+   ]
+  },
+  "stairs_exterior": {
+   "n": 3,
+   "arch": "landmark",
+   "tiers": [
+    5
+   ]
+  },
+  "mushroom_bracket": {
+   "n": 2,
+   "arch": "landmark",
+   "tiers": [
+    5
+   ]
+  },
+  "vine_1": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    5
+   ]
+  },
+  "boulder_medium": {
+   "n": 6,
+   "arch": "landmark",
+   "tiers": [
+    5,
+    10
+   ]
+  },
+  "cliff_tall": {
+   "n": 6,
+   "arch": "landmark",
+   "tiers": [
+    5,
+    10
+   ]
+  },
+  "tree_pine_2": {
+   "n": 8,
+   "arch": "tree",
+   "tiers": [
+    10
+   ]
+  },
+  "wall_brick_window": {
+   "n": 29,
+   "arch": "landmark",
+   "tiers": [
+    10
+   ]
+  },
+  "wall_brick_door": {
+   "n": 6,
+   "arch": "landmark",
+   "tiers": [
+    10
+   ]
+  },
+  "roof_tiles_6x8": {
+   "n": 7,
+   "arch": "landmark",
+   "tiers": [
+    10
+   ]
+  },
+  "door_flat_1": {
+   "n": 6,
+   "arch": "landmark",
+   "tiers": [
+    10
+   ]
+  },
+  "overhang_brick": {
+   "n": 5,
+   "arch": "landmark",
+   "tiers": [
+    10
+   ]
+  },
+  "path_rock_square_wide": {
+   "n": 3,
+   "arch": "landmark",
+   "tiers": [
+    10
+   ]
+  },
+  "cliff_step_2": {
+   "n": 2,
+   "arch": "obstacle",
+   "tiers": [
+    10
+   ]
+  },
+  "cliff_step_3": {
+   "n": 1,
+   "arch": "obstacle",
+   "tiers": [
+    10
+   ]
+  },
+  "enemy_skull": {
+   "n": 9,
+   "arch": "enemy",
+   "tiers": [
+    10
+   ]
+  },
+  "boulder_large": {
+   "n": 1,
+   "arch": "landmark",
+   "tiers": [
+    10
+   ]
+  },
+  "cliff_step_1": {
+   "n": 2,
+   "arch": "landmark",
+   "tiers": [
+    10
+   ]
+  },
+  "cage": {
+   "n": 2,
+   "arch": "door",
+   "tiers": [
+    10
+   ]
+  },
+  "stairs_stone": {
+   "n": 1,
+   "arch": "obstacle",
+   "tiers": [
+    10
+   ]
+  },
+  "outfit_male_ranger": {
+   "n": 1,
+   "arch": "boss",
+   "tiers": [
+    10
+   ]
+  }
+ },
+ "entities": 3425
+}

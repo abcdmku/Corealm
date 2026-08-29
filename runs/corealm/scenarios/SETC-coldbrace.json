@@ -1,0 +1,27 @@
+{
+  "name": "setc-coldbrace-reachability",
+  "actions": [
+    { "inspect": "getNavigationState", "label": "navmesh ready" },
+    { "debug": "getNavPath", "args": [[-160, 1, -114], [-160, 1, -100]], "label": "SOUTH GATE straight through the arch: must not detour past |x| 2 m off the line" },
+    { "debug": "getNavPath", "args": [[-128, 1, -80], [-142, 1, -80]], "label": "EAST GATE straight through the arch" },
+    { "debug": "getNavPath", "args": [[-192, 1, -74], [-178, 1, -74]], "label": "WEST GATE straight through the new arch" },
+    { "debug": "getNavPath", "args": [[-160, 1, -80], [-144.8, 1, -84.6]], "label": "square -> ANVIL inside the forge" },
+    { "debug": "getNavPath", "args": [[-160, 1, -80], [-144.6, 1, -87]], "label": "square -> FURNACE at the forge back wall" },
+    { "debug": "getNavPath", "args": [[-160, 1, -88], [-163.75, 1, -90.4]], "label": "bank_interior -> BANK CHEST under the porch" },
+    { "debug": "getNavPath", "args": [[-160, 1, -80], [-174.4, 1, -93.4]], "label": "square -> CRAFTING TABLE under the work shed" },
+    { "debug": "getNavPath", "args": [[-160, 1, -80], [-174.4, 1, -90.6]], "label": "square -> FLETCHING BENCH under the work shed" },
+    { "debug": "getNavPath", "args": [[-160, 1, -80], [-149, 1, -72.3]], "label": "square -> COOKING RANGE under the cookhouse" },
+    { "debug": "getNavPath", "args": [[-160, 1, -80], [-171, 1, -81]], "label": "square -> GENERAL STALL under the arcade" },
+    { "debug": "getNavPath", "args": [[-160, 1, -80], [-160, 1, -58]], "label": "square -> inside the north wall (wall_vault take-off must be reachable)" },
+    { "debug": "getNavPath", "args": [[-160, 1, -80], [-160, 1, -50]], "label": "square -> OUTSIDE the north wall: must go round through a gate, not through the wall" },
+    { "debug": "groundHeight", "args": [-160, -80], "label": "square ground height" },
+    { "debug": "groundHeight", "args": [-186, -108], "label": "SW wall corner ground height" },
+    { "debug": "groundHeight", "args": [-134, -56], "label": "NE wall corner ground height" },
+    { "debug": "getDrawnBounds", "args": ["coldbrace_bank"], "label": "bank chest drawn bounds" },
+    { "debug": "getDrawnBounds", "args": ["coldbrace_anvil"], "label": "anvil drawn bounds" },
+    { "debug": "getDrawnBounds", "args": ["coldbrace_prop_log_1"], "label": "woodpile log drawn bounds: must sit ON the ground at dy 0" },
+    { "debug": "getDrawnBounds", "args": ["coldbrace_prop_lamp_house_1"], "label": "wall lamp drawn bounds at dy 1.5" },
+    { "debug": "checkGrounding", "label": "worst grounding gaps after the relayout" },
+    { "debug": "getEntityViewStats", "label": "instanced groups and draw cost" }
+  ]
+}
