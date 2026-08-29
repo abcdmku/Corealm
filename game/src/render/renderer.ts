@@ -179,6 +179,12 @@ const FOG_HORIZON_ELEVATION = -0.09;
 const FOG_NEAR = 26;
 const FOG_FAR = 210;
 
+const DRAW_DISTANCE = {
+  near: { cameraFar: 130, fogNear: 18, fogFar: 105 },
+  medium: { cameraFar: 210, fogNear: 22, fogFar: 165 },
+  far: { cameraFar: CAMERA.far, fogNear: FOG_NEAR, fogFar: FOG_FAR },
+} as const;
+
 /** Rows in the gradient. 256 is smooth enough that no banding survives the 8-bit output. */
 const SKY_TEXTURE_HEIGHT = 256;
 
@@ -242,6 +248,7 @@ export class Renderer {
    */
   private readonly warmupMaterials: THREE.Material[] = [];
 
+  private renderScale = 1;
   private frameTimes: number[] = [];
   private lastFrameAt = 0;
   private stats: RenderStats = { fps: 0, frameMs: 0, drawCalls: 0, triangles: 0, programs: 0, overBudget: false };
@@ -253,7 +260,6 @@ export class Renderer {
       powerPreference: "high-performance",
       alpha: false,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -384,20 +390,51 @@ export class Renderer {
   resize(): void {
     const width = window.innerWidth;
     const height = window.innerHeight;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * this.renderScale);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / Math.max(1, height);
     this.camera.updateProjectionMatrix();
   }
 
+  /** Changes the drawing-buffer resolution without changing the canvas's CSS size. */
+  setRenderScale(scale: number): void {
+    const next = THREE.MathUtils.clamp(scale, 0.5, 1);
+    if (next === this.renderScale) return;
+    this.renderScale = next;
+    this.resize();
+  }
+
   /**
-   * Turns real-time shadows on or off, as a player preference.
-   *
-   * Flips the light rather than `shadowMap.enabled`: toggling the renderer flag at runtime
-   * invalidates every material in the scene and costs a full shader recompile, which on this world
-   * is a visible stall. Dropping the sun's cast has the same visual result for free.
+   * Changes real-time shadow cost. Low uses a 1024 px map, high uses 2048 px, and off stops the
+   * sun from casting. The renderer's shadow flag stays on because toggling it recompiles every lit
+   * material in the scene.
    */
-  setShadows(enabled: boolean): void {
+  setShadowQuality(quality: "off" | "low" | "high"): void {
+    const enabled = quality !== "off";
+    const mapSize = quality === "low" ? 1024 : 2048;
+
+    if (enabled && this.sun.shadow.mapSize.x !== mapSize) {
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.mapPass?.dispose();
+      this.sun.shadow.map = null;
+      this.sun.shadow.mapPass = null;
+      this.sun.shadow.mapSize.set(mapSize, mapSize);
+      this.sun.shadow.needsUpdate = true;
+    }
     this.sun.castShadow = enabled;
+  }
+
+  /** Keeps the far clip behind the fog so reduced draw distance never exposes a hard world edge. */
+  setDrawDistance(distance: "near" | "medium" | "far"): void {
+    const preset = DRAW_DISTANCE[distance];
+    this.camera.far = preset.cameraFar;
+    this.camera.updateProjectionMatrix();
+
+    const fog = this.scene.fog;
+    if (fog instanceof THREE.Fog) {
+      fog.near = preset.fogNear;
+      fog.far = preset.fogFar;
+    }
   }
 
   /** Keeps the shadow frustum tight around the player so 2048px of shadow map stays sharp. */

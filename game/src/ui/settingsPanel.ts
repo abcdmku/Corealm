@@ -12,14 +12,14 @@
  * The panel also subscribes to the store, so a setting changed anywhere else (the debug surface,
  * a second panel, "reset") shows up here without the panel being reopened.
  */
-import type { SettingsStore, UiSettings } from "./settings.js";
+import type { DrawDistance, RenderScale, SettingsStore, ShadowQuality, UiSettings } from "./settings.js";
 import type { ManagedPanel, UiContext } from "./panels.js";
 import { PanelFrame } from "./panels.js";
 import { notify } from "./contextMenu.js";
 
-/** The three booleans, in the order they are shown. */
+/** The two non-renderer booleans, in the order they are shown. */
 interface ToggleSpec {
-  key: "shadows" | "damageNumbers" | "invertCameraY";
+  key: "damageNumbers" | "invertCameraY";
   group: string;
   label: string;
   /** What changes on screen. Not a restatement of the label. */
@@ -30,15 +30,8 @@ interface ToggleSpec {
 
 const TOGGLES: readonly ToggleSpec[] = [
   {
-    key: "shadows",
-    group: "Picture",
-    label: "Shadows",
-    hint: "The sun casts. Turn it off first on a machine that is struggling — nothing else here buys as many frames.",
-    states: ["On", "Off"],
-  },
-  {
     key: "damageNumbers",
-    group: "Picture",
+    group: "Effects",
     label: "Damage numbers",
     hint: "Hits and misses float over whoever took them. Off means they are never drawn, not drawn and hidden.",
     states: ["On", "Off"],
@@ -52,6 +45,24 @@ const TOGGLES: readonly ToggleSpec[] = [
   },
 ];
 
+const RENDER_SCALES: readonly { value: RenderScale; label: string; accessibleLabel: string }[] = [
+  { value: 0.7, label: "70%", accessibleLabel: "70 percent" },
+  { value: 0.85, label: "85%", accessibleLabel: "85 percent" },
+  { value: 1, label: "100%", accessibleLabel: "100 percent" },
+];
+
+const SHADOW_QUALITIES: readonly { value: ShadowQuality; label: string }[] = [
+  { value: "off", label: "Off" },
+  { value: "low", label: "Low" },
+  { value: "high", label: "High" },
+];
+
+const DRAW_DISTANCES: readonly { value: DrawDistance; label: string }[] = [
+  { value: "near", label: "Near" },
+  { value: "medium", label: "Medium" },
+  { value: "far", label: "Far" },
+];
+
 const DENSITY: readonly { value: UiSettings["uiScale"]; label: string }[] = [
   { value: "normal", label: "Normal" },
   { value: "compact", label: "Compact" },
@@ -62,18 +73,21 @@ export class SettingsPanel implements ManagedPanel {
   private readonly body: HTMLElement;
   private readonly switches = new Map<ToggleSpec["key"], HTMLButtonElement>();
   private readonly stateLabels = new Map<ToggleSpec["key"], HTMLElement>();
+  private readonly renderScaleButtons = new Map<RenderScale, HTMLButtonElement>();
+  private readonly shadowQualityButtons = new Map<ShadowQuality, HTMLButtonElement>();
+  private readonly drawDistanceButtons = new Map<DrawDistance, HTMLButtonElement>();
   private readonly densityButtons = new Map<UiSettings["uiScale"], HTMLButtonElement>();
   private readonly unsubscribe: () => void;
 
   constructor(ctx: UiContext, private readonly settings: SettingsStore) {
     this.frame = new PanelFrame({
       id: "settings",
-      title: "Settings",
+      title: "Graphics settings",
       registry: ctx.registry,
-      placement: { top: "120px", left: "50%", width: "380px" },
+      placement: { top: "64px", left: "50%", width: "480px" },
       onOpen: () => this.refresh(true),
     });
-    this.frame.setSubtitle("Kept on this device");
+    this.frame.setSubtitle("Changes apply instantly");
 
     this.body = document.createElement("div");
     this.body.className = "settings";
@@ -99,6 +113,34 @@ export class SettingsPanel implements ManagedPanel {
   private build(): void {
     this.body.replaceChildren();
 
+    const graphics = this.group("Graphics");
+    graphics.append(
+      this.choiceRow(
+        "Render resolution",
+        "Lower values draw fewer pixels, which helps the GPU at the cost of a softer picture.",
+        "Render resolution",
+        RENDER_SCALES,
+        this.renderScaleButtons,
+        (value) => { this.settings.set({ renderScale: value }); },
+      ),
+      this.choiceRow(
+        "Shadow quality",
+        "Low uses a smaller shadow map. Off removes moving sun shadows and saves the most work.",
+        "Shadow quality",
+        SHADOW_QUALITIES,
+        this.shadowQualityButtons,
+        (value) => { this.settings.set({ shadowQuality: value }); },
+      ),
+      this.choiceRow(
+        "Draw distance",
+        "Near hides distant terrain and buildings sooner. Far keeps the full 280 metre view.",
+        "Draw distance",
+        DRAW_DISTANCES,
+        this.drawDistanceButtons,
+        (value) => { this.settings.set({ drawDistance: value }); },
+      ),
+    );
+
     let openGroup: HTMLElement | null = null;
     let openGroupName = "";
     for (const spec of TOGGLES) {
@@ -113,7 +155,7 @@ export class SettingsPanel implements ManagedPanel {
 
     const note = document.createElement("p");
     note.className = "settings__note";
-    note.textContent = "These live on this device, not in your save. Starting a new game leaves them alone.";
+    note.textContent = "These stay on this device. Starting a new game does not reset them.";
 
     const footer = document.createElement("div");
     footer.className = "settings__footer";
@@ -191,6 +233,24 @@ export class SettingsPanel implements ManagedPanel {
   }
 
   private densityRow(): HTMLElement {
+    return this.choiceRow(
+      "Density",
+      "Compact shrinks type and padding across the HUD and panels.",
+      "Interface density",
+      DENSITY,
+      this.densityButtons,
+      (value) => { this.settings.set({ uiScale: value }); },
+    );
+  }
+
+  private choiceRow<T extends string | number>(
+    labelText: string,
+    hintText: string,
+    ariaLabel: string,
+    options: readonly { value: T; label: string; accessibleLabel?: string }[],
+    buttons: Map<T, HTMLButtonElement>,
+    onChoose: (value: T) => void,
+  ): HTMLElement {
     const row = document.createElement("div");
     row.className = "settings__row";
 
@@ -199,27 +259,28 @@ export class SettingsPanel implements ManagedPanel {
 
     const label = document.createElement("span");
     label.className = "settings__label";
-    label.textContent = "Density";
+    label.textContent = labelText;
 
     const hint = document.createElement("span");
     hint.className = "settings__hint";
-    hint.textContent = "Compact shrinks the type and the padding across the HUD and every panel, and narrows the side panels.";
+    hint.textContent = hintText;
 
     text.append(label, hint);
 
     const group = document.createElement("div");
     group.className = "seg";
     group.setAttribute("role", "radiogroup");
-    group.setAttribute("aria-label", "Density");
+    group.setAttribute("aria-label", ariaLabel);
 
-    for (const option of DENSITY) {
+    for (const option of options) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "btn btn--ghost seg__btn";
       button.textContent = option.label;
       button.setAttribute("role", "radio");
-      button.addEventListener("click", () => { this.settings.set({ uiScale: option.value }); });
-      this.densityButtons.set(option.value, button);
+      button.setAttribute("aria-label", `${ariaLabel}: ${option.accessibleLabel ?? option.label}`);
+      button.addEventListener("click", () => { onChoose(option.value); });
+      buttons.set(option.value, button);
       group.appendChild(button);
     }
 
@@ -242,6 +303,24 @@ export class SettingsPanel implements ManagedPanel {
       const state = this.stateLabels.get(spec.key);
       const word = on ? spec.states[0] : spec.states[1];
       if (state && state.textContent !== word) state.textContent = word;
+    }
+
+    for (const [value, button] of this.renderScaleButtons) {
+      const on = current.renderScale === value;
+      button.classList.toggle("is-active", on);
+      button.setAttribute("aria-checked", on ? "true" : "false");
+    }
+
+    for (const [value, button] of this.shadowQualityButtons) {
+      const on = current.shadowQuality === value;
+      button.classList.toggle("is-active", on);
+      button.setAttribute("aria-checked", on ? "true" : "false");
+    }
+
+    for (const [value, button] of this.drawDistanceButtons) {
+      const on = current.drawDistance === value;
+      button.classList.toggle("is-active", on);
+      button.setAttribute("aria-checked", on ? "true" : "false");
     }
 
     for (const [value, button] of this.densityButtons) {

@@ -34,8 +34,8 @@ export interface TitleScreenOptions {
   hasSave(): boolean;
   /** Clears the save and rebuilds the world. Wired by the root to `resetWorld`. */
   onNewGame(): void;
-  /** Opens the settings panel. */
-  onSettings(): void;
+  /** Opens the graphics settings panel. */
+  onGraphics(): void;
   /** Dismisses. Called on Continue and on Escape. */
   onClose(): void;
 }
@@ -218,7 +218,7 @@ export class TitleScreen {
     resume.dataset["autofocus"] = "true";
 
     const fresh = this.button("New game", "btn title__action", () => this.setView("confirm"));
-    const settings = this.button("Settings", "btn title__action", () => this.options.onSettings());
+    const settings = this.button("Graphics settings", "btn title__action", () => this.options.onGraphics());
 
     actions.append(resume, fresh, settings);
 

@@ -194,6 +194,9 @@
  */
 #panel-settings { z-index: calc(var(--z-boot) + 60) !important; }
 
+/* The graphics window replaces the pause card while it is open. The dark pause backdrop stays. */
+#panel-settings:not([hidden]) ~ .title .title__card { visibility: hidden; }
+
 /*
  * ...and opaque, for the same reason. `.panel` is 92% alpha, which is right for a window over the
  * world and wrong for a window over the pause card: at 92% the mark and the menu buttons ghost
@@ -309,11 +312,12 @@
 }
 
 .switch:hover .switch__track { border-color: var(--accent-dim); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .switch.is-on .switch__track { background: linear-gradient(180deg, #6d5615, #4a3a0e); border-color: var(--accent-dim); }
 .switch.is-on .switch__knob { transform: translateX(18px); background: linear-gradient(180deg, #f0d475, var(--accent)); }
 .switch.is-on .switch__state { color: var(--accent); }
 
-/* ---- the two-way choice, following .qty__btn */
+/* ---- segmented choices, following .qty__btn */
 
 .seg { display: flex; flex: 0 0 auto; gap: 2px; }
 
@@ -411,4 +415,11 @@
   .title__action { min-height: 34px; }
   .settings__row { padding: 5px 0; }
   .settings { gap: var(--space-3); }
+}
+
+@media (max-width: 620px) {
+  #panel-settings { width: calc(100vw - 32px) !important; }
+  .settings__row { grid-template-columns: 1fr; }
+  .seg { justify-content: stretch; }
+  .seg__btn { flex: 1 1 0; }
 }

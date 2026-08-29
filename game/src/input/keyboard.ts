@@ -268,8 +268,9 @@ export class KeyboardController {
           reportResult(result);
           return true;
         }
-        // Nothing was running. Let a lower-priority binding have it (there is none today).
-        return result.value.stopped.length > 0;
+        // Cancelling an action and opening the pause menu are one Escape press. Falling through
+        // lets `ui.menu` run after the stop, while an open panel still consumes the key above.
+        return false;
       },
     }));
 

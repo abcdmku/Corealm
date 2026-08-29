@@ -800,7 +800,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // Client preferences. Each one is applied here, and each one changes something on the next frame
   // — see the note in ui/settings.ts about why a setting that does nothing is worse than none.
   ui.settings.subscribe((preferences) => {
-    renderer.setShadows(preferences.shadows);
+    renderer.setRenderScale(preferences.renderScale);
+    renderer.setShadowQuality(preferences.shadowQuality);
+    renderer.setDrawDistance(preferences.drawDistance);
     camera.invertPitch = preferences.invertCameraY;
     vfx.damageNumbers = preferences.damageNumbers;
     labelRoot.classList.toggle("is-compact", preferences.uiScale === "compact");
@@ -840,10 +842,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   // The pause menu, on the last Escape.
   //
-  // Priority 950 puts it after `input.cancel` at 900, which is what makes this the pause menu
-  // rather than a nuisance: Escape closes the top panel if one is open, then cancels the current
-  // activity if one is running, and only reaches here when it had nothing else to do. It therefore
-  // never fires at boot and never interrupts anything.
+  // Priority 950 puts it after `input.cancel` at 900. Escape closes the top panel if one is open.
+  // Otherwise it cancels the current activity and continues here, so one press always reaches the
+  // pause menu from ordinary play.
   keybindings.register({
     id: "ui.menu",
     keys: ["escape"],

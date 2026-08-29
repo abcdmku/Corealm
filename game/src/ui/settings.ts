@@ -12,17 +12,25 @@
  * character, so "New Game" must not reset them and a save transferred between browsers must not
  * carry them.
  *
- * The four here are the four that are applied. `boot.ts` subscribes once and wires each of them:
- * shadows flip the sun's cast, inversion lands on the camera, damage numbers are never created
- * rather than created-and-hidden, and compact density puts `.is-compact` on `#ui-root`, which
- * `ui/styles/title.css` answers with smaller type, tighter padding and narrower side panels.
+ * `boot.ts` subscribes once and wires each value. Render scale changes the WebGL drawing buffer,
+ * shadow quality changes both the shadow-map size and whether the sun casts one, inversion lands
+ * on the camera, damage numbers are never created rather than created-and-hidden, and compact
+ * density puts `.is-compact` on `#ui-root`.
  */
 
+export type RenderScale = 0.7 | 0.85 | 1;
+export type ShadowQuality = "off" | "low" | "high";
+export type DrawDistance = "near" | "medium" | "far";
+
 export interface UiSettings {
+  /** Fraction of the native drawing-buffer resolution. */
+  renderScale: RenderScale;
+  /** Off, a 1024 px map, or a 2048 px map. */
+  shadowQuality: ShadowQuality;
+  /** Camera and fog range preset. */
+  drawDistance: DrawDistance;
   /** Floating damage numbers over combat. */
   damageNumbers: boolean;
-  /** Real-time shadows. The first thing to turn off on a weak GPU. */
-  shadows: boolean;
   /** Invert the vertical axis while orbiting the camera. */
   invertCameraY: boolean;
   /** Panel and HUD density. */
@@ -30,8 +38,10 @@ export interface UiSettings {
 }
 
 export const DEFAULT_SETTINGS: UiSettings = {
+  renderScale: 1,
+  shadowQuality: "high",
+  drawDistance: "far",
   damageNumbers: true,
-  shadows: true,
   invertCameraY: false,
   uiScale: "normal",
 };
@@ -100,8 +110,19 @@ function readStored(): Partial<UiSettings> {
 
   const source = parsed as Record<string, unknown>;
   const out: Partial<UiSettings> = {};
+  if (source["renderScale"] === 0.7 || source["renderScale"] === 0.85 || source["renderScale"] === 1) {
+    out.renderScale = source["renderScale"];
+  }
+  if (source["shadowQuality"] === "off" || source["shadowQuality"] === "low" || source["shadowQuality"] === "high") {
+    out.shadowQuality = source["shadowQuality"];
+  } else if (source["shadows"] === false) {
+    // Migration from the original on/off setting. An old "on" value keeps the new high default.
+    out.shadowQuality = "off";
+  }
+  if (source["drawDistance"] === "near" || source["drawDistance"] === "medium" || source["drawDistance"] === "far") {
+    out.drawDistance = source["drawDistance"];
+  }
   if (typeof source["damageNumbers"] === "boolean") out.damageNumbers = source["damageNumbers"];
-  if (typeof source["shadows"] === "boolean") out.shadows = source["shadows"];
   if (typeof source["invertCameraY"] === "boolean") out.invertCameraY = source["invertCameraY"];
   if (source["uiScale"] === "compact" || source["uiScale"] === "normal") out.uiScale = source["uiScale"];
   return out;
