@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "source": "actual-game-scene",
+  "width": 2800,
+  "height": 1600,
+  "metresPerPixel": 0.25,
+  "bounds": {
+    "minX": -350,
+    "maxX": 350,
+    "minZ": -200,
+    "maxZ": 200
+  },
+  "north": "+z",
+  "seed": 1337,
+  "sha256": "eed56615ed2cc5e544335a1120b90fac78a5db3a6a5de81c5537c38f25a1a194",
+  "renderFingerprint": "eed56615ed2cc5e544335a1120b90fac78a5db3a6a5de81c5537c38f25a1a194",
+  "tiles": {
+    "columns": 14,
+    "rows": 8,
+    "metres": 50,
+    "pixels": 200,
+    "bleedPixels": 128
+  },
+  "layers": [
+    "terrain",
+    "stamped-ground",
+    "water",
+    "buildings",
+    "props",
+    "trees",
+    "grass",
+    "entities"
+  ],
+  "overlays": "none"
+}

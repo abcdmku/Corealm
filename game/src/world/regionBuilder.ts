@@ -213,6 +213,11 @@ export interface AssetSize {
   z: number;
 }
 
+export interface AssetCenterXZ {
+  x: number;
+  z: number;
+}
+
 /**
  * Measurements the world layer needs and is not allowed to go and read for itself.
  *
@@ -232,6 +237,10 @@ export interface WorldPorts {
    * boxes (whose size comes from the authored footprint) are emitted.
    */
   assetSize?: (assetId: string) => AssetSize | null;
+  /** Local centre of the measured mesh bounds, for GLBs whose pivot is not centred. */
+  assetCenterXZ?: (assetId: string) => AssetCenterXZ | null;
+  /** Distance to the resolved visible road centreline; used to keep solid resources off roads. */
+  roadDistance?: (x: number, z: number) => number;
 }
 
 // ------------------------------------------------------------------- build
@@ -255,9 +264,12 @@ export function buildWorld(seed: number, heightAt: HeightAt, ports?: WorldPorts)
     heightAt,
     baseY: ports?.baseY ?? (() => 0),
     assetSize: ports?.assetSize ?? (() => null),
+    assetCenterXZ: ports?.assetCenterXZ ?? (() => null),
+    roadDistance: ports?.roadDistance ?? (() => Infinity),
     out: entities,
     buildings,
     solids,
+    wallPostKeys: new Set<string>(),
     locationEntity: new Map<string, EntityId>(),
     portalLinks,
   };
@@ -472,9 +484,13 @@ interface BuildContext {
   readonly baseY: (assetId: string) => number;
   /** Falls back to null with no port, which emits no per-entity solids at all. */
   readonly assetSize: (assetId: string) => AssetSize | null;
+  readonly assetCenterXZ: (assetId: string) => AssetCenterXZ | null;
+  readonly roadDistance: (x: number, z: number) => number;
   readonly out: SemanticEntity[];
   readonly buildings: BuildingBox[];
   readonly solids: SolidVolume[];
+  /** Prevents two independently-authored wall runs from drawing the same shared corner post. */
+  readonly wallPostKeys: Set<string>;
   readonly locationEntity: Map<string, EntityId>;
   /** Filled by the dungeon builder in pass 2, drained into route edges in pass 3. */
   readonly portalLinks: PortalLinkOut[];
@@ -621,8 +637,30 @@ const SOLID_REACH_METRES = Math.max(0.4, INTERACT_RANGE - APPROACH_CLEARANCE_MET
  */
 const SOLID_MIN_FOOTPRINT_AREA = 0.15;
 
+/** Dressing that should never become a full-height navigation carve. */
+const NON_BLOCKING_COMPOSITION_ASSET = /^(?:banner|chain|flower|kerb|lamp|mushroom|rope|rubble|sack|stairs_|torch|vine)/;
+
 /** Composition parts nearer than this to their owner's origin are where the hero mesh already is. */
 const COMPOSITION_CLEARANCE_METRES = 1;
+
+function compositionPartBlocks(
+  composition: CompositionId,
+  part: PartPlacement,
+  size: AssetSize | null,
+): boolean {
+  // These compositions are route dressing around an already-semantic anchor. In particular, the
+  // Rootfall stump's visible stair flight is the road into the hamlet, not three invisible walls.
+  if (composition === "milestone" || composition === "rootfall_stump" ||
+      composition === "vault_door" || composition === "highcairn_crane") return false;
+  if (!size || part.dy > 0.45 || size.y * part.scale <= 0.45) return false;
+  if (NON_BLOCKING_COMPOSITION_ASSET.test(part.assetId)) return false;
+  // The farm's building and fence are structural. Loose yard clutter should not carve a metre-wide
+  // hole in a plot the player reads as open ground.
+  if (composition === "farm_yard" &&
+      !part.tag.startsWith("barn_") && !part.tag.startsWith("fence") &&
+      !part.tag.startsWith("post")) return false;
+  return true;
+}
 
 /**
  * Fraction of a tree's mean CANOPY radius used as its collider radius.
@@ -681,11 +719,10 @@ function emitBuildingCollision(
 /**
  * A box volume the size of the asset's own manifest bbox.
  *
- * The box is centred on the entity's XZ, which assumes the mesh is centred on its own origin in XZ
- * as well. Measured on the assets this is used for, that holds to a few centimetres
- * (`chest_wood` base.x -0.638 of a 1.276 m width, `anvil` -0.479 of 1.082); the exceptions are
- * `market_stall_cart` (-2.107 of 3.021) and `workbench_drawers`, and neither is worth a second
- * port to correct for. `position.y` is the BASE, per `SolidVolume`.
+ * The manifest's measured local centre is rotated into world space. This matters for carts,
+ * drawers, workbenches and rock compositions whose geometry sits well away from the GLB pivot;
+ * centring collision on the pivot created both invisible blockers and walk-through mesh.
+ * `position.y` is the BASE, per `SolidVolume`.
  */
 function pushAssetSolid(
   ctx: BuildContext,
@@ -706,10 +743,20 @@ function pushAssetSolid(
     sizeX *= factor;
     sizeZ *= factor;
   }
+  const centre = ctx.assetCenterXZ(assetId) ?? { x: 0, z: 0 };
+  const cos = Math.cos(rotationY);
+  const sin = Math.sin(rotationY);
+  const offsetX = centre.x * scale;
+  const offsetZ = centre.z * scale;
+  const solidPosition: Vec3 = [
+    round2(position[0] + offsetX * cos + offsetZ * sin),
+    position[1],
+    round2(position[2] - offsetX * sin + offsetZ * cos),
+  ];
   ctx.solids.push({
     kind: "box",
     id,
-    position,
+    position: solidPosition,
     size: [round2(sizeX), round2(Math.max(0.3, size.y * scale)), round2(sizeZ)],
     rotationY: round4(rotationY),
   });
@@ -1051,8 +1098,19 @@ function emitWallRun(
   const origin = ground(run.from);
   const openings = run.openings ?? [];
 
+  const parts = buildWallRun(length, openings, kit, variantSeed(run.id)).filter((part) => {
+    if (!part.tag.startsWith("p")) return true;
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    const x = round2(origin[0] + part.dx * cos + part.dz * sin);
+    const z = round2(origin[2] - part.dx * sin + part.dz * cos);
+    const key = `${regionId}:${part.assetId}:${x}:${z}`;
+    if (ctx.wallPostKeys.has(key)) return false;
+    ctx.wallPostKeys.add(key);
+    return true;
+  });
   emitParts(
-    buildWallRun(length, openings, kit, variantSeed(run.id)),
+    parts,
     origin, yaw, regionId, tier, run.id, run.name,
     { settlementId: settlement.id, wallRunId: run.id, scenery: true },
     ctx.out,
@@ -1207,20 +1265,11 @@ function sceneryEntity(
  *  - Every part of one building shares the origin's ground height. Buildings are level; following
  *    the terrain per part would shear a 12 m hall. Settlement pads are flattened for exactly this
  *    (`app/worldSpec.ts` puts a 34 m flat spot under each settlement centre).
- *  - `compensation` cancels a silhouette scale that `render/entityViews.ts` NO LONGER APPLIES to
- *    these parts, and the comment that used to sit here got both halves of that wrong.
- *
- *    What is actually true, read off entityViews.ts:460: `silhouette = TIERED_ARCHETYPES.has(
- *    archetype) ? tierSilhouetteScale(tier) : 1`, and `TIERED_ARCHETYPES` is
- *    {ore, tree, fishing_spot, farm_plot, enemy, boss}. Every part emitted here is archetype
- *    "landmark", so its silhouette factor is 1 and there is nothing to cancel. The old comment
- *    also mis-stated the constant: `tierSilhouetteScale(1)` is 0.90, not 0.92 (materials.ts:75,
- *    `0.9 + 0.5 * log(tier)/log(99)`; 1.0751 at tier 5, 1.1505 at tier 10).
- *
- *    Net effect today: a 2 m kit module is drawn 2.22 m wide at Coldbrace and 1.74 m at Highcairn.
- *    Removing `compensation` is the correct fix and is deliberately NOT done in this change - it
- *    resizes all 36 buildings at once, and `render/buildings.ts` is being re-cut in the same wave,
- *    so the two must not move together or neither can be attributed. Flagged for the root.
+ *  - Building and composition parts are landmarks. `render/entityViews.ts` does not apply the
+ *    tier silhouette scale to landmarks, so their authored module dimensions must pass through
+ *    unchanged. Scaling them inversely here once made Coldbrace modules overlap while leaving
+ *    full-height cracks through Rootfall and Highcairn, and made their collision disagree with
+ *    what the player saw.
  */
 function emitParts(
   parts: readonly PartPlacement[],
@@ -1235,8 +1284,6 @@ function emitParts(
 ): void {
   const cos = Math.cos(rotationY);
   const sin = Math.sin(rotationY);
-  const compensation = 1 / tierSilhouetteScale(tier);
-
   for (const part of parts) {
     out.push({
       id: `${ownerId}#${part.tag}`,
@@ -1255,7 +1302,7 @@ function emitParts(
       interactions: [],
       view: {
         assetId: part.assetId,
-        scale: round4(part.scale * compensation),
+        scale: round4(part.scale),
         rotationY: round4(rotationY + part.rotationY),
         materialTier: tier,
         labelHeight: 2,
@@ -1269,10 +1316,10 @@ function emitParts(
  * A landmark's or gate's surrounding parts, plus a solid volume for the ones with real mass.
  *
  * Buildings get their collision from `prefabCollision`, which knows where the doorway is.
- * Compositions have no such function, so mass is inferred from each part's own manifest footprint:
- * anything under `SOLID_MIN_FOOTPRINT_AREA` (a torch is 0.086 m2, a banner less) is dressing and
- * stays walk-through, and anything within `COMPOSITION_CLEARANCE_METRES` of the origin is skipped
- * because that is where the hero mesh and its own volume already are.
+ * Composition mass is conservative: only grounded structural pieces are eligible. Low kerbs,
+ * stairs, trim and elevated dressing do not become one-metre navigation carves, while grounded
+ * walls, fences, rocks and counters retain physical mass. Anything within
+ * `COMPOSITION_CLEARANCE_METRES` of the origin is also skipped because the hero mesh owns it.
  *
  * A part is only reach-capped when its full volume could actually foul the owner's approach ring -
  * `distance - halfDiagonal < INTERACT_RANGE`. That matters: the Gravelmaw mouth's `cliff_step_2`
@@ -1299,16 +1346,16 @@ function emitComposition(
 
   const cos = Math.cos(rotationY);
   const sin = Math.sin(rotationY);
-  const compensation = 1 / tierSilhouetteScale(tier);
   for (const part of parts) {
     if (Math.hypot(part.dx, part.dz) < COMPOSITION_CLEARANCE_METRES) continue;
+    const size = ctx.assetSize(part.assetId);
+    if (!compositionPartBlocks(composition, part, size)) continue;
     const position: Vec3 = [
       round2(origin[0] + part.dx * cos + part.dz * sin),
       round2(origin[1] + part.dy),
       round2(origin[2] - part.dx * sin + part.dz * cos),
     ];
-    const scale = part.scale * compensation;
-    const size = ctx.assetSize(part.assetId);
+    const scale = part.scale;
     const halfDiagonal = size ? Math.hypot(size.x * scale / 2, size.z * scale / 2) : 0;
     const capped = Math.hypot(part.dx, part.dz) - halfDiagonal < INTERACT_RANGE;
     pushAssetSolid(
@@ -1519,7 +1566,17 @@ function buildCluster(
   const out = ctx.out;
 
   for (let index = 0; index < cluster.count; index += 1) {
-    const spot = spiralSpot(cluster.centre, cluster.radius, index, cluster.count, rng);
+    let spot = spiralSpot(cluster.centre, cluster.radius, index, cluster.count, rng);
+    if (cluster.archetype === "tree" || cluster.archetype === "ore") {
+      // Resource clusters are semantic content rather than procedural scatter, so the scatter
+      // exclusion registry cannot move them. Retry the same deterministic spiral at finer phases
+      // until the solid node clears the worn road and its shoulders.
+      for (let attempt = 1; attempt <= 16 && ctx.roadDistance(spot[0], spot[1]) < 3.4; attempt += 1) {
+        spot = spiralSpot(
+          cluster.centre, cluster.radius, index + attempt * cluster.count, cluster.count * 17, rng,
+        );
+      }
+    }
     const position = place(spot, cluster.assetId, scale);
     const id = `${cluster.id}_${index + 1}`;
 
@@ -1798,17 +1855,12 @@ function round4(value: number): number {
 }
 
 /**
- * `render/entityViews.ts` multiplies every `view.scale` by `tierSilhouetteScale(materialTier)`.
- * That rule exists to make an ore tier readable at 12 m; it has no business resizing architecture,
- * and it breaks the modular kit outright - the same 2 m wall would be 1.8 m in Fallowmarch and
- * 2.3 m in Karrowmoor, so nothing would meet and no composition would line up with the mesh it is
- * built around.
- *
- * Landmarks, gates, the dungeon mouth and every assembled building therefore cancel it, and their
- * authored `scale` means true metres. Resource nodes and enemies keep the tier rule.
+ * Architecture and landmarks use authored metres. EntityViews only applies tier silhouette
+ * scaling to resources and living combatants, so compensating these rows would shrink Rootfall
+ * and Highcairn props while their placement and collision stayed at the authored size.
  */
-function trueScale(authored: number | undefined, tier: number): number {
-  return round4((authored ?? 1) / tierSilhouetteScale(tier));
+function trueScale(authored: number | undefined, _tier: number): number {
+  return round4(authored ?? 1);
 }
 
 /** The bank's route node id differs per settlement; this keeps the mapping in one place. */

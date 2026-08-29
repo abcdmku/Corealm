@@ -32,6 +32,7 @@ import { MaterialLibrary, REGION_PALETTES, surfaceColour } from "./materials.js"
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from "../app/config.js";
 import { Rng } from "../core/rng.js";
 import { clamp } from "../core/math.js";
+import type { WaterBasinSpec } from "../world/waterBodies.js";
 
 // ----------------------------------------------------------------- specs
 
@@ -117,6 +118,15 @@ export interface WorldTerrainSpec {
   blendMetres: number;
   regions: RegionTerrainSpec[];
   flats?: FlatSpot[];
+  /** Closed recessed profiles for authored water. Applied after flats and haul roads. */
+  basins?: WaterBasinSpec[];
+}
+
+interface ResolvedWaterBasin extends WaterBasinSpec {
+  /** Terrain height at the centre before this basin is applied. */
+  baseY: number;
+  floorY: number;
+  level: number;
 }
 
 /**
@@ -232,6 +242,12 @@ function smoothstep01(t: number): number {
   return x * x * (3 - 2 * x);
 }
 
+/** Node probes count as development; Vite production explicitly supplies `DEV: false`. */
+function isDevelopmentBuild(): boolean {
+  const environment = (import.meta as ImportMeta & { readonly env?: { readonly DEV?: boolean } }).env;
+  return environment?.DEV !== false;
+}
+
 /** Positive inside the rect, negative outside, in metres. */
 function signedDepth(rect: Rect, x: number, z: number): number {
   const qx = Math.max(rect.minX - x, x - rect.maxX);
@@ -303,6 +319,25 @@ export interface WaterStamp {
   level: number;
 }
 
+/** Read-only proof of the basin and shoreline the renderer actually built. */
+export interface WaterBodySnapshot {
+  id: string;
+  centre: [number, number];
+  level: number;
+  floorY: number;
+  depth: number;
+  radii: {
+    floor: number;
+    shore: number;
+    crest: number;
+    outer: number;
+  };
+  /** Closed shoreline points in world x/z order. */
+  contour: [number, number][];
+  closed: boolean;
+  error?: string;
+}
+
 export interface GroundStamps {
   roads?: readonly RoadStamp[];
   paving?: readonly PavingStamp[];
@@ -321,6 +356,48 @@ export interface ScatterPlacement {
   normal?: Vec3;
   /** 0..1 fraction of the way from upright to fully aligned with `normal`. */
   tilt?: number;
+}
+
+/** One low-poly grass tuft rendered by `scatterGrassSprites`. */
+export interface GrassSpritePlacement {
+  position: Vec3;
+  rotationY: number;
+  /** Drawn width across either crossed card, in world metres. */
+  width: number;
+  /** Drawn height from the grounded base, in world metres. */
+  height: number;
+  /** Packed sRGB instance tint. The shared texture itself is white. */
+  colour: number;
+  normal?: Vec3;
+  tilt?: number;
+}
+
+/**
+ * Two upright quads crossing at 90 degrees, both rooted at local y = 0.
+ *
+ * Four triangles replace 155-622 triangles in one source grass GLB. A crossed card is used rather
+ * than `THREE.Sprite`: sprites do not batch through `InstancedMesh`, always face the full camera
+ * pitch, and would collapse into screen-facing stamps in the overhead map. The crossed silhouette
+ * reads from ground level and from above with no per-frame camera work.
+ */
+function createGrassSpriteGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute([
+    -0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0,
+    0, 0, 0.5, 0, 0, -0.5, 0, 1, -0.5, 0, 1, 0.5,
+  ], 3));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute([
+    0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+    1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
+  ], 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute([
+    0, 0, 1, 0, 1, 1, 0, 1,
+    0, 0, 1, 0, 1, 1, 0, 1,
+  ], 2));
+  geometry.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
 }
 
 /** One contact patch. `radius` is the half-width of the darkening, in metres. */
@@ -355,11 +432,15 @@ export class WorldScene {
   readonly overlayGroup = new THREE.Group();
 
   readonly materials = new MaterialLibrary();
+  /** Shared by every grass tile for this scene and retained across `clear()` rebuilds. */
+  private readonly grassSpriteGeometry = createGrassSpriteGeometry();
 
   /** The meshes recast builds the navmesh from. Ground only — never scatter, never props. */
   private walkable: THREE.Mesh[] = [];
   private fields: RegionField[] = [];
   private flats: FlatSpot[] = [];
+  private basinSpecs: WaterBasinSpec[] = [];
+  private basins: ResolvedWaterBasin[] = [];
   private world: WorldTerrainSpec | null = null;
   /** Round-0 fallback for single-region builds. */
   private legacySamplers = new Map<RegionId, (x: number, z: number) => number>();
@@ -382,6 +463,7 @@ export class WorldScene {
   private roadGrid = new Map<number, number[]>();
   private paving: PavingStamp[] = [];
   private waters: WaterStamp[] = [];
+  private builtWaterBodies: WaterBodySnapshot[] = [];
   /**
    * The macro-variation field the surface weights are broken up with.
    *
@@ -455,6 +537,9 @@ export class WorldScene {
     // Flats registered through `addFlatSpot` before the build are kept: settlement pads are
     // registered by whoever knows where the settlement is, which is not this file.
     this.flats = [...this.flats, ...(spec.flats ?? [])].map((flat) => ({ ...flat }));
+    this.basinSpecs = (spec.basins ?? []).map((basin) => ({ ...basin }));
+    this.basins = [];
+    this.builtWaterBodies = [];
     this.fields = spec.regions.map((region) => {
       const height = makeRegionField(region);
       const range = sweepFieldRange(region.rect, height);
@@ -473,6 +558,7 @@ export class WorldScene {
     this.resolveFlatTargets();
     this.buildHaulRoads();
     this.normaliseFlats();
+    this.resolveBasins();
     this.buildLattice();
 
     const { bounds, chunkSize } = spec;
@@ -743,6 +829,57 @@ export class WorldScene {
         flat.blend = Math.min(needed, Math.max(flat.blend, reach * 3));
       }
     }
+  }
+
+  /**
+   * Resolves authored basin depths against the finished dry terrain.
+   *
+   * The old fishing pads stored an absolute height relative to the region floor, then competed in
+   * the same weighted mean as ordinary location pads. Redsill was consequently carved only 0.22 m
+   * despite asking for 0.9 m, while the two Karrowmoor tarns first aimed more than 30 m through
+   * their terraces and had to be clamped. A basin is local: its floor is exactly `depth` below the
+   * dry terrain at its own centre, regardless of the region's nominal floor.
+   */
+  private resolveBasins(): void {
+    for (const basin of this.basinSpecs) {
+      const numbers = [
+        basin.x, basin.z, basin.floorRadius, basin.shoreRadius, basin.crestRadius,
+        basin.outerRadius, basin.depth, basin.fillFraction, basin.freeboard,
+      ];
+      if (numbers.some((value) => !Number.isFinite(value))) {
+        throw new Error(`Water basin "${basin.id}" contains a non-finite parameter.`);
+      }
+      if (!(basin.floorRadius > 0
+        && basin.floorRadius < basin.shoreRadius
+        && basin.shoreRadius < basin.crestRadius
+        && basin.crestRadius < basin.outerRadius)) {
+        throw new Error(`Water basin "${basin.id}" radii must increase from floor to outer bank.`);
+      }
+      if (!(basin.depth > 0 && basin.fillFraction > 0 && basin.fillFraction < 1 && basin.freeboard > 0)) {
+        throw new Error(`Water basin "${basin.id}" needs positive depth/freeboard and a fill fraction between 0 and 1.`);
+      }
+    }
+
+    for (let first = 0; first < this.basinSpecs.length; first += 1) {
+      const a = this.basinSpecs[first]!;
+      for (let second = first + 1; second < this.basinSpecs.length; second += 1) {
+        const b = this.basinSpecs[second]!;
+        if (Math.hypot(a.x - b.x, a.z - b.z) < a.outerRadius + b.outerRadius) {
+          throw new Error(`Water basins "${a.id}" and "${b.id}" overlap; their closed banks would disagree.`);
+        }
+      }
+    }
+
+    this.basins = this.basinSpecs.map((basin) => {
+      const baseY = this.preBasinHeight(basin.x, basin.z);
+      const floorY = baseY - basin.depth;
+      return {
+        ...basin,
+        baseY,
+        floorY,
+        level: floorY + basin.depth * basin.fillFraction,
+      };
+    });
   }
 
   /**
@@ -1046,8 +1183,9 @@ export class WorldScene {
   /**
    * Blended world height at a point, in metres.
    *
-   * Three layers, in this order: the region fields, then the flat pads, then the haul roads cut
-   * through what those two leave.
+   * Four layers, in this order: the region fields, the flat pads, haul roads, then water basins.
+   * Basins run last because their floor and closed bank are authored terrain, not a suggestion an
+   * overlapping location pad or road may average away.
    *
    * THE ROADS USED TO RUN SECOND AND IT COST THE WHOLE GRADE. `applyFlats` is affine in the height
    * it is handed - `h + (padMean - h) * padInfluence` - so wherever a pad reached, the corridor
@@ -1063,7 +1201,56 @@ export class WorldScene {
    * `protectedAuthority` - see `applyHaulRoads`.
    */
   heightAtXZ(x: number, z: number): number {
+    return this.applyBasins(x, z, this.preBasinHeight(x, z));
+  }
+
+  private preBasinHeight(x: number, z: number): number {
     return this.applyHaulRoads(x, z, this.applyFlats(x, z, this.naturalHeight(x, z)));
+  }
+
+  /**
+   * Carves a flat floor, raises it to the waterline, closes it with a dry crest, then returns to the
+   * original terrain. Basin outer circles are validated as disjoint, so at most one profile can
+   * own a point and the result cannot depend on list order.
+   */
+  private applyBasins(x: number, z: number, height: number): number {
+    for (const basin of this.basins) {
+      const radius = Math.hypot(x - basin.x, z - basin.z);
+      if (radius >= basin.outerRadius) continue;
+      if (radius <= basin.floorRadius) return basin.floorY;
+
+      let bankProfile: number;
+      if (radius <= basin.shoreRadius) {
+        const t = smoothstep01((radius - basin.floorRadius) / (basin.shoreRadius - basin.floorRadius));
+        bankProfile = basin.floorY + (basin.level - basin.floorY) * t;
+      } else {
+        const crestY = basin.level + basin.freeboard;
+        const crestRiseRadius = (basin.shoreRadius + basin.crestRadius) / 2;
+        if (radius <= crestRiseRadius) {
+          const t = smoothstep01((radius - basin.shoreRadius) / (crestRiseRadius - basin.shoreRadius));
+          bankProfile = basin.level + (crestY - basin.level) * t;
+        } else if (radius <= basin.crestRadius) {
+          bankProfile = crestY;
+        } else {
+          // This is a MINIMUM bank, not another full terrain blend. On a high side the broad
+          // `terrainReturn` below climbs back to the hillside; pulling the crest directly to a
+          // 23 m hill over ten metres is what made Redsill's first closed version a 74-degree cut.
+          const target = Math.min(height, crestY);
+          const t = smoothstep01((radius - basin.crestRadius) / (basin.outerRadius - basin.crestRadius));
+          bankProfile = crestY + (target - crestY) * t;
+        }
+      }
+
+      // Blend the dry terrain back from the FLOOR edge over the full available width. This keeps a
+      // naturally high bank high enough to close early without asking the narrow crest collar to
+      // climb the entire hillside. The zero derivative at both ends matters: a linear blend adds
+      // `height delta / width` to the original terrain slope right up to the outer boundary.
+      const terrainT = (radius - basin.floorRadius) / (basin.outerRadius - basin.floorRadius);
+      const terrainBlend = smoothstep01(terrainT);
+      const terrainReturn = basin.floorY + (height - basin.floorY) * terrainBlend;
+      return Math.max(bankProfile, terrainReturn);
+    }
+    return height;
   }
 
   private naturalHeight(x: number, z: number): number {
@@ -1379,6 +1566,22 @@ export class WorldScene {
     return this.roadPolylines.map((line) => line.map((point) => [point[0], point[1], point[2]] as Vec3));
   }
 
+  /** A defensive copy for acceptance diagnostics and downstream shoreline consumers. */
+  getWaterBodies(): WaterBodySnapshot[] {
+    return this.builtWaterBodies.map((body) => ({
+      ...body,
+      centre: [...body.centre] as [number, number],
+      radii: { ...body.radii },
+      contour: body.contour.map((point) => [...point] as [number, number]),
+    }));
+  }
+
+  private rememberWaterBody(snapshot: WaterBodySnapshot): void {
+    const existing = this.builtWaterBodies.findIndex((body) => body.id === snapshot.id);
+    if (existing >= 0) this.builtWaterBodies[existing] = snapshot;
+    else this.builtWaterBodies.push(snapshot);
+  }
+
   private rebuildRoadGrid(): void {
     this.roadGrid.clear();
     for (const [index, segment] of this.roads.entries()) {
@@ -1683,16 +1886,56 @@ export class WorldScene {
    * no relationship to the basin, so 55-56% of the tarn footprints had dry hillside above the
    * surface by up to 7.3 m.
    *
-   * Instead: 32 azimuths, and along each one a bisection for the exact distance at which the DRAWN
-   * ground crosses the surface height. Ten rings out to that distance. Per-vertex depth into an
+   * Instead: a size-dependent number of azimuths, and along each one a bisection for the exact
+   * distance at which the DRAWN ground crosses the surface height. Per-vertex depth into an
    * `aWaterDepth` attribute, which the material turns into a shallow-to-deep tint and an alpha
    * that reaches zero exactly at the bank. The shoreline is then a property of the geometry rather
    * than something the shader has to guess at.
    */
-  buildWater(rect: Rect, level: number, regionId: RegionId): THREE.Mesh {
+  buildWater(rect: Rect, level: number, regionId: RegionId): THREE.Mesh | null {
     const centreX = (rect.minX + rect.maxX) / 2;
     const centreZ = (rect.minZ + rect.maxZ) / 2;
     const maxRadius = Math.max(rect.maxX - rect.minX, rect.maxZ - rect.minZ) / 2;
+    const basin = this.basins.find((candidate) => Math.hypot(candidate.x - centreX, candidate.z - centreZ) < 0.1);
+    const bodyId = basin?.id ?? `water-${regionId}-${centreX.toFixed(1)}-${centreZ.toFixed(1)}`;
+    const radii = basin
+      ? {
+          floor: basin.floorRadius,
+          shore: basin.shoreRadius,
+          crest: basin.crestRadius,
+          outer: basin.outerRadius,
+        }
+      : { floor: 0, shore: maxRadius, crest: maxRadius, outer: maxRadius };
+    const reject = (reason: string): null => {
+      this.rememberWaterBody({
+        id: bodyId,
+        centre: [centreX, centreZ],
+        level,
+        floorY: this.meshHeightAt(centreX, centreZ),
+        depth: 0,
+        radii,
+        contour: [],
+        closed: false,
+        error: reason,
+      });
+      const message = `Water body "${bodyId}" is not enclosed: ${reason}`;
+      if (isDevelopmentBuild()) throw new Error(message);
+      console.error(message);
+      return null;
+    };
+
+    if (!basin) return reject("no matching terrain basin was built");
+    if (Math.abs(maxRadius - basin.crestRadius) > 0.1) {
+      return reject(`mesh search radius ${maxRadius.toFixed(2)} m does not reach crest radius ${basin.crestRadius.toFixed(2)} m`);
+    }
+    if (Math.abs(level - basin.level) > 0.02) {
+      return reject(`surface level ${level.toFixed(3)} m disagrees with basin level ${basin.level.toFixed(3)} m`);
+    }
+    const centreDepth = level - this.meshHeightAt(centreX, centreZ);
+    if (centreDepth < WATER_MIN_CENTRE_DEPTH) {
+      return reject(`centre depth is ${centreDepth.toFixed(3)} m, below the ${WATER_MIN_CENTRE_DEPTH.toFixed(2)} m minimum`);
+    }
+
     // See `WATER_SHORE_ARC`: the spoke count follows the body, so the shoreline is always solved
     // at the terrain lattice's own 2 m spacing rather than at a fixed 32 azimuths.
     const segments = clamp(
@@ -1710,6 +1953,9 @@ export class WorldScene {
     // footprints stood ABOVE the surface by up to 2.12 m, because a spur crosses the plane at
     // r = 21 and drops back under it by r = 23, and the early-out drew straight over the top of it.
     // Marching finds the first crossing by construction, which is the definition of a shoreline.
+    // A spoke that never crosses is rejected. The old code left `high = maxRadius`, bisected two
+    // equal values, and faded that unsupported edge to zero alpha. Every authored body had open
+    // spokes, and Cairn Tarn's fake rim floated 4.28 m above the ground on its low side.
     const shoreline = new Float64Array(segments);
     for (let step = 0; step < segments; step += 1) {
       const angle = (step / segments) * Math.PI * 2;
@@ -1717,21 +1963,26 @@ export class WorldScene {
       const dz = Math.sin(angle);
       let low = 0;
       let high = maxRadius;
+      let found = false;
       for (let radius = WATER_MARCH_METRES; radius <= maxRadius; radius += WATER_MARCH_METRES) {
         if (this.meshHeightAt(centreX + dx * radius, centreZ + dz * radius) >= level) {
           high = radius;
+          found = true;
           break;
         }
         low = radius;
+      }
+      if (!found) {
+        return reject(`spoke ${step + 1}/${segments} never reaches dry ground within ${maxRadius.toFixed(2)} m`);
       }
       for (let iteration = 0; iteration < 12; iteration += 1) {
         const mid = (low + high) / 2;
         if (this.meshHeightAt(centreX + dx * mid, centreZ + dz * mid) < level) low = mid;
         else high = mid;
       }
-      // A floor, so a basin that was carved too shallow still draws something a player can see is
-      // water rather than collapsing to a point.
-      shoreline[step] = Math.max(WATER_MIN_RADIUS, low);
+      // Use the dry side of the bracket. It buries the last sub-millimetre under the bank instead
+      // of leaving the outer ring unsupported on the wet side.
+      shoreline[step] = high;
     }
 
     const rings = WATER_RINGS;
@@ -1754,15 +2005,10 @@ export class WorldScene {
         const z = dz * radius;
         positions[index * 3] = x;
         positions[index * 3 + 2] = z;
-        // The outer ring is the edge of the surface whether the terrain closed it or the caller's
-        // rect did, so it carries zero depth in both cases and the material fades it out; measured,
-        // that is 26 of 32 azimuths on the Redsill basin, where the ground under the rim is still
-        // 0.6-0.8 m below the surface.
-        //
         // The taper inside it is `WATER_EDGE_METRES` of real bank rather than one ring, because a
         // ring is `reach / rings` metres wide and that is 1.9 m at Redsill against 0.21 m at a pool
-        // that only cleared `WATER_MIN_RADIUS` — the wet edge used to be eight times wider on a big
-        // pond than on a small one for no reason but the tessellation.
+        // near the minimum size. The wet edge used to be eight times wider on a big pond than on a
+        // small one for no reason but the tessellation.
         const trueDepth = Math.max(0, level - this.meshHeightAt(centreX + x, centreZ + z));
         depths[index] = ring === rings - 1
           ? 0
@@ -1799,9 +2045,22 @@ export class WorldScene {
     // The bank treatment in the terrain splat needs to know where the waterline is, so it is
     // registered at the radius the SHORELINE reached rather than at the rect the caller guessed.
     // Registering the guess put the mud and wet bands metres inside or outside the drawn edge.
-    let reached = WATER_MIN_RADIUS;
+    let reached = 0;
     for (let step = 0; step < segments; step += 1) reached = Math.max(reached, shoreline[step]!);
     this.waters.push({ centre: [centreX, centreZ], radius: reached, level });
+    this.rememberWaterBody({
+      id: bodyId,
+      centre: [centreX, centreZ],
+      level,
+      floorY: basin.floorY,
+      depth: centreDepth,
+      radii,
+      contour: Array.from(shoreline, (radius, step) => {
+        const angle = (step / segments) * Math.PI * 2;
+        return [centreX + Math.cos(angle) * radius, centreZ + Math.sin(angle) * radius];
+      }),
+      closed: true,
+    });
     if (this.chunks.length > 0) {
       const reach = reached + WATER_BANK_METRES;
       this.restampArea(centreX - reach, centreZ - reach, centreX + reach, centreZ + reach);
@@ -1887,6 +2146,63 @@ export class WorldScene {
       if (options.regionId) this.registerScatter(options.regionId, instanced);
     }
     return created;
+  }
+
+  /**
+   * Draws a spatial tile of grass as one alpha-tested `InstancedMesh`.
+   *
+   * The caller merges all four former grass asset ids before reaching this method, so common,
+   * tall, green and dry-gold grass differ only in matrix and instance colour. Density changes
+   * therefore change matrix count and four-triangle submissions, never material or draw count.
+   */
+  scatterGrassSprites(
+    placements: readonly GrassSpritePlacement[],
+    name: string,
+    options: { regionId?: RegionId } = {},
+  ): THREE.InstancedMesh[] {
+    if (placements.length === 0) return [];
+
+    const instanced = new THREE.InstancedMesh(
+      this.grassSpriteGeometry,
+      this.materials.grassSprite(),
+      placements.length,
+    );
+    instanced.name = name;
+    instanced.castShadow = false;
+    instanced.receiveShadow = true;
+    instanced.frustumCulled = true;
+
+    const matrix = new THREE.Matrix4();
+    const quaternion = new THREE.Quaternion();
+    const tiltQuaternion = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    const normal = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const position = new THREE.Vector3();
+    const colour = new THREE.Color();
+
+    for (const [slot, entry] of placements.entries()) {
+      position.set(entry.position[0], entry.position[1], entry.position[2]);
+      quaternion.setFromAxisAngle(up, entry.rotationY);
+      if (entry.normal && (entry.tilt ?? 1) > 0) {
+        normal.set(entry.normal[0], entry.normal[1], entry.normal[2]).normalize();
+        tiltQuaternion.setFromUnitVectors(up, normal);
+        const amount = clamp(entry.tilt ?? 1, 0, 1);
+        if (amount < 1) tiltQuaternion.slerp(IDENTITY_QUATERNION, 1 - amount);
+        quaternion.premultiply(tiltQuaternion);
+      }
+      scale.set(entry.width, entry.height, entry.width);
+      matrix.compose(position, quaternion, scale);
+      instanced.setMatrixAt(slot, matrix);
+      instanced.setColorAt(slot, colour.setHex(entry.colour));
+    }
+
+    instanced.instanceMatrix.needsUpdate = true;
+    if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
+    instanced.computeBoundingSphere();
+    this.scatterGroup.add(instanced);
+    if (options.regionId) this.registerScatter(options.regionId, instanced);
+    return [instanced];
   }
 
   /**
@@ -2068,6 +2384,9 @@ export class WorldScene {
     this.roadGrid.clear();
     this.paving = [];
     this.waters = [];
+    this.builtWaterBodies = [];
+    this.basinSpecs = [];
+    this.basins = [];
     this.hauls = [];
     this.haulGrid.clear();
     this.carvedPads.clear();
@@ -2407,12 +2726,12 @@ const WATER_RING_BIAS = 0.6;
  * The depth attribute drives the material's colour ramp AND its alpha (`materials.water`, alpha =
  * smoothstep(0, 0.25 m, depth)), so this is the width of the wet edge. It used to be "the outer
  * ring", which is a resolution-dependent distance: reach/10, or 2.3 m at Redsill and 0.25 m at a
- * pool that only cleared `WATER_MIN_RADIUS`. A metre and a bit is a bank, at any size of pond.
+ * small pool. A metre and a bit is a bank, at any size of pond.
  */
 const WATER_EDGE_METRES = 1.4;
 
-/** Smallest shoreline radius a water body will draw, in metres. */
-const WATER_MIN_RADIUS = 2.5;
+/** An authored body shallower than this is rejected instead of drawing a film over dry ground. */
+const WATER_MIN_CENTRE_DEPTH = 0.25;
 
 /**
  * Outward march step when solving for the shoreline, in metres.
@@ -2539,8 +2858,8 @@ const CONTACT_DECAL_LIFT = 0.03;
 /** Spacing at which a stamped road polyline is resampled into segments, in metres. */
 const ROAD_SEGMENT_SPACING = 4;
 
-/** How far a road may bow away from its straight line, in metres. */
-const ROAD_MAX_SWAY = 7;
+/** How far one authored road leg may bow away from its centreline, in metres. */
+const ROAD_MAX_SWAY = 3;
 
 /** Reused in the scatter tilt slerp. Allocating one per instance showed up in the profile. */
 const IDENTITY_QUATERNION = new THREE.Quaternion();
@@ -2802,42 +3121,57 @@ function appendRoadSegments(into: RoadSegment[], points: readonly Vec3[]): void 
 }
 
 /**
- * Bends a straight authored link into a route.
+ * Bends each authored leg into a route while preserving every supplied waypoint.
  *
- * Roads were interpolated linearly between two location positions, so there was not one curve in
- * the world's road network: terrain-march_road is four dead-straight gradients radiating from a
- * point. The two interior control points are offset perpendicular to the link by up to 9% of its
- * length and the result is resampled through a Catmull-Rom, which reads as a route that went
- * around something without ever wandering far enough to leave the corridor that scatter is
- * already excluded from.
+ * Roads used to discard every interior waypoint and bend only the first-to-last chord. That made
+ * settlement routes ignore their gate controls and visibly run through walls. Each leg now gets
+ * its own small Catmull-Rom bow. The shared endpoint is copied exactly before the next leg starts,
+ * so a gate, bridge or other authored control remains on the stamped road.
  *
  * The route graph is unaffected. It works on node ids, and both endpoints here are untouched, so
  * the distance ledger the Agility route flip is measured against does not move.
  */
 export function curveRoadPolyline(points: readonly Vec3[], seed: number): Vec3[] {
   if (points.length < 2) return points.map((point) => [point[0], point[1], point[2]] as Vec3);
-  const start = points[0]!;
-  const end = points[points.length - 1]!;
-  const dx = end[0] - start[0];
-  const dz = end[2] - start[2];
-  const length = Math.hypot(dx, dz);
-  if (length < 12) return points.map((point) => [point[0], point[1], point[2]] as Vec3);
-
   const rng = new Rng(seed);
-  const nx = -dz / length;
-  const nz = dx / length;
-  const sway = Math.min(ROAD_MAX_SWAY, length * 0.09);
-  const control: THREE.Vector3[] = [new THREE.Vector3(start[0], 0, start[2])];
-  for (let i = 1; i <= 2; i += 1) {
-    const t = i / 3;
-    const offset = rng.float(-sway, sway);
-    control.push(new THREE.Vector3(start[0] + dx * t + nx * offset, 0, start[2] + dz * t + nz * offset));
-  }
-  control.push(new THREE.Vector3(end[0], 0, end[2]));
+  const output: Vec3[] = [];
 
-  const curve = new THREE.CatmullRomCurve3(control, false, "catmullrom", 0.5);
-  const divisions = Math.max(4, Math.round(length / ROAD_SEGMENT_SPACING));
-  return curve.getSpacedPoints(divisions).map((point) => [point.x, 0, point.z] as Vec3);
+  for (let leg = 0; leg < points.length - 1; leg += 1) {
+    const start = points[leg]!;
+    const end = points[leg + 1]!;
+    const dx = end[0] - start[0];
+    const dz = end[2] - start[2];
+    const length = Math.hypot(dx, dz);
+    let legPoints: Vec3[];
+
+    if (length < 12) {
+      legPoints = [
+        [start[0], start[1], start[2]],
+        [end[0], end[1], end[2]],
+      ];
+    } else {
+      const nx = -dz / length;
+      const nz = dx / length;
+      const sway = Math.min(ROAD_MAX_SWAY, length * 0.05);
+      const control: THREE.Vector3[] = [new THREE.Vector3(start[0], 0, start[2])];
+      for (let i = 1; i <= 2; i += 1) {
+        const t = i / 3;
+        const offset = rng.float(-sway, sway);
+        control.push(new THREE.Vector3(start[0] + dx * t + nx * offset, 0, start[2] + dz * t + nz * offset));
+      }
+      control.push(new THREE.Vector3(end[0], 0, end[2]));
+
+      const curve = new THREE.CatmullRomCurve3(control, false, "catmullrom", 0.5);
+      const divisions = Math.max(4, Math.round(length / ROAD_SEGMENT_SPACING));
+      legPoints = curve.getSpacedPoints(divisions).map((point) => [point.x, 0, point.z] as Vec3);
+      legPoints[0] = [start[0], start[1], start[2]];
+      legPoints[legPoints.length - 1] = [end[0], end[1], end[2]];
+    }
+
+    output.push(...(leg === 0 ? legPoints : legPoints.slice(1)));
+  }
+
+  return output;
 }
 
 /** Even-ish resampling of a polyline, so road corridors do not stretch across long segments. */

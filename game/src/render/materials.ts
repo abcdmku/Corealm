@@ -21,6 +21,7 @@ import {
   createContactDecalTexture,
   createDetailAtlas,
   createDetailNormals,
+  createGrassSpriteTexture,
   createMacroVariation,
   createWaterNormalMap,
   disposeGeneratedTextures,
@@ -129,7 +130,7 @@ export interface RegionPalette {
 }
 
 export const REGION_PALETTES: Record<RegionId, RegionPalette> = {
-  // Bleached grass greens, weathered grey-brown timber, one copper-orange accent on Coldbrace roofs.
+  // Bleached grass greens, weathered grey-brown timber, and a restrained dried-clay accent.
   fallowmarch: {
     id: "fallowmarch", name: "Fallowmarch",
     groundLow: 0x76854f, groundHigh: 0xa3a978, soil: 0x8a7a5c, rock: 0x8d8579,
@@ -153,6 +154,98 @@ export const REGION_PALETTES: Record<RegionId, RegionPalette> = {
     groundLow: 0x2a2723, groundHigh: 0x3b3730, soil: 0x2f2a25, rock: 0x3f434a,
     foliage: 0x3a4436, timber: 0x36302a, water: 0x22302f, accent: 0xc65a2a,
   },
+};
+
+/** The stable material families exported by the Medieval Village Megakit. */
+export type ArchitectureMaterialRole = "roof" | "plaster" | "stone" | "timber" | "moss";
+
+/**
+ * Architecture has its own palette rather than borrowing gameplay tier or terrain colours.
+ *
+ * The same `MI_RoundTiles` image is embedded in every tiled-roof GLB, and the same plaster, stone
+ * and wood images repeat across all three building kits. Region-specific colour therefore belongs
+ * at the material layer. Keeping it out of `TIER_PALETTES` prevents a roof adjustment from changing
+ * ore and equipment, while keeping it out of `REGION_PALETTES` prevents it from moving terrain,
+ * water or foliage.
+ */
+export interface ArchitecturePalette {
+  roof: number;
+  plaster: number;
+  stone: number;
+  timber: number;
+  moss: number;
+}
+
+export const ARCHITECTURE_PALETTES: Record<RegionId, ArchitecturePalette> = {
+  fallowmarch: {
+    roof: 0x69504a,
+    plaster: 0x89908e,
+    stone: 0x6f787c,
+    timber: 0x4a403a,
+    moss: 0x53613d,
+  },
+  vellenwood: {
+    roof: 0x4b403b,
+    plaster: 0x85897f,
+    stone: 0x59615d,
+    timber: 0x302d2a,
+    moss: 0x3c5234,
+  },
+  karrowmoor: {
+    roof: 0x505861,
+    plaster: 0x97958c,
+    stone: 0x626a73,
+    timber: 0x403d39,
+    moss: 0x566047,
+  },
+  gravelmaw: {
+    roof: 0x3d3430,
+    plaster: 0x716b61,
+    stone: 0x494e52,
+    timber: 0x2c2926,
+    moss: 0x394532,
+  },
+};
+
+/**
+ * Resolves the kit's stable `MI_*` names to an architectural surface.
+ *
+ * Architecture variants append an `@architecture:*` suffix so the batch key can never merge two
+ * region styles. Splitting before that suffix lets the same classifier serve source and derived
+ * materials without accepting vague words such as "wood" from unrelated packs.
+ */
+export function architectureMaterialRole(materialName: string): ArchitectureMaterialRole | null {
+  const sourceName = materialName.split("@architecture:", 1)[0];
+  switch (sourceName) {
+    case "MI_RoundTiles": return "roof";
+    case "MI_Plaster": return "plaster";
+    case "MI_Brick":
+    case "MI_UnevenBrick":
+    case "MI_RockTrim": return "stone";
+    case "MI_WoodTrim": return "timber";
+    case "MI_Vine": return "moss";
+    default: return null;
+  }
+}
+
+/**
+ * How strongly each source image takes the regional hue, plus its final value and contrast.
+ *
+ * Roof needs the strongest move because its source image averages RGB 178/84/48 and a simple
+ * multiply cannot turn that orange into Karrowmoor slate. Contrast is applied around linear
+ * middle grey so tile joints and wood grain remain legible after the hue replacement. Plaster and
+ * timber use stronger replacement than the source assets to remove their sandstone/orange cast.
+ */
+const ARCHITECTURE_TREATMENT: Record<ArchitectureMaterialRole, {
+  strength: number;
+  brightness: number;
+  contrast: number;
+}> = {
+  roof: { strength: 0.88, brightness: 0.88, contrast: 1.20 },
+  plaster: { strength: 0.86, brightness: 0.82, contrast: 1.08 },
+  stone: { strength: 0.58, brightness: 0.86, contrast: 1.06 },
+  timber: { strength: 0.82, brightness: 0.72, contrast: 1.12 },
+  moss: { strength: 0.68, brightness: 0.84, contrast: 1.04 },
 };
 
 /** Back-compatible flat lookup. Round 0 callers used this; keep it working. */
@@ -709,6 +802,38 @@ export class MaterialLibrary {
   }
 
   /**
+   * The shared cutout material for every grass card.
+   *
+   * Alpha testing keeps the cards in the opaque queue, writes depth, and avoids sorting hundreds
+   * of thousands of overlapping tufts. `alphaToCoverage` softens that hard cut on the renderer's
+   * multisampled canvas without changing the material to transparent. The map is white, so each
+   * `InstancedMesh` can carry green, gold and small value shifts through `instanceColor` while all
+   * regions and all four former grass assets keep one program and one material.
+   */
+  grassSprite(): THREE.MeshStandardMaterial {
+    return this.remember("grass-sprite", () => {
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: createGrassSpriteTexture(),
+        alphaTest: 0.38,
+        alphaToCoverage: true,
+        transparent: false,
+        depthWrite: true,
+        // `InstancedMesh.instanceColor` enables Three's instancing-colour shader path by itself.
+        // Enabling `vertexColors` as well would make the shader multiply by a geometry `color`
+        // attribute; the shared crossed-card geometry intentionally has no such attribute, and
+        // WebGL supplies zero for that missing input, turning every instance black.
+        vertexColors: false,
+        roughness: 0.98,
+        metalness: 0,
+        side: THREE.DoubleSide,
+      });
+      material.name = "grass-sprite";
+      return material;
+    });
+  }
+
+  /**
    * Standing water: depth-tinted, alpha driven by depth, and two generated normal maps scrolling
    * across each other.
    *
@@ -738,7 +863,9 @@ export class MaterialLibrary {
         metalness: 0,
         transparent: true,
         opacity: 0.94,
-        side: THREE.DoubleSide,
+        // The basin owns a closed bank. Rendering the back face would make an invalid or clipped
+        // water plane visible from below, which is the exact defect the basin closure prevents.
+        side: THREE.FrontSide,
         depthWrite: false,
         normalMap: createWaterNormalMap("fine"),
         normalScale: new THREE.Vector2(0.55, 0.55),
@@ -851,6 +978,62 @@ export class MaterialLibrary {
   }
 
   /**
+   * Region colour for one Medieval Village material, derived from the texture's own luminance.
+   *
+   * A normal material colour is multiplied into its map channel by channel. That can darken the
+   * orange roof texture but cannot make it slate because the texture has very little blue to begin
+   * with. This treatment samples the finished base colour after `<map_fragment>`, keeps its linear
+   * luminance, and replaces only chroma before the ordinary lights, shadows, fog and tone mapping.
+   * Tile joints, plaster flecks, mortar and wood grain therefore survive the regional recolour.
+   *
+   * One derived material is cached per source, region and role. Its name and shader cache key both
+   * carry the style identity because `EntityViews` batches equal materials across separately loaded
+   * GLBs. Omitting either key could paint one region with another region's compiled shader.
+   */
+  architecture(
+    base: THREE.Material,
+    regionId: RegionId,
+    role: ArchitectureMaterialRole,
+  ): THREE.Material {
+    const source = base as THREE.MeshStandardMaterial;
+    if (!source.isMeshStandardMaterial) return base;
+
+    const key = this.key(["architecture", this.baseKey(base), regionId, role]);
+    return this.remember(key, () => {
+      const treatment = ARCHITECTURE_TREATMENT[role];
+      const tint = new THREE.Color(ARCHITECTURE_PALETTES[regionId][role]);
+      const tintLuminance = Math.max(1e-4, luminance(tint));
+      // Unit-luminance chroma. The shader restores the texture's own value by multiplying this by
+      // the sampled texel luminance, then applies the deliberately restrained role brightness.
+      tint.multiplyScalar(1 / tintLuminance);
+
+      const clone = source.clone();
+      const sourceCompile = source.onBeforeCompile;
+      const sourceProgramKey = source.customProgramCacheKey();
+      const shaderKey = `architecture-luma-v2:${regionId}:${role}`;
+      const strength = treatment.strength.toFixed(3);
+      const brightness = treatment.brightness.toFixed(3);
+      const contrast = treatment.contrast.toFixed(3);
+      const tintVector = `vec3(${tint.r.toFixed(6)}, ${tint.g.toFixed(6)}, ${tint.b.toFixed(6)})`;
+
+      clone.name = `${source.name || "MeshStandardMaterial"}@architecture:${regionId}:${role}`;
+      clone.onBeforeCompile = (shader, renderer) => {
+        sourceCompile.call(source, shader, renderer);
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <map_fragment>",
+          /* glsl */ `#include <map_fragment>
+float gArchitectureLuminance = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+float gArchitectureValue = clamp( ( gArchitectureLuminance - 0.18 ) * ${contrast} + 0.18, 0.0, 1.0 );
+vec3 gArchitectureTinted = clamp( gArchitectureValue * ${tintVector}, 0.0, 1.0 );
+diffuseColor.rgb = mix( diffuseColor.rgb, gArchitectureTinted, ${strength} ) * ${brightness};`,
+        );
+      };
+      clone.customProgramCacheKey = () => `${sourceProgramKey}|${shaderKey}`;
+      return clone;
+    });
+  }
+
+  /**
    * THE tier-variant entry point, and the reason instancing survives 36 tier x family combinations.
    *
    * Given a material that came off a loaded GLB, this returns a cached variant that keeps the
@@ -868,7 +1051,8 @@ export class MaterialLibrary {
     // A zero-strength, unlit, live surface IS the source material. Handing back the original
     // instance rather than an identical clone is not a micro-optimisation: a clone is a second
     // material, and a second material on the same geometry is a second draw call downstream.
-    // Buildings, props and NPC art all take this path — they have no tier ladder to express.
+    // Props, non-architectural landmarks and NPC art all take this path because they have no tier
+    // ladder to express. Architecture takes the separate region-aware path above.
     if (strength === 0 && glow === 0 && state === "normal") return base;
 
     const key = this.key(["variant", this.baseKey(base), palette.tier, state, strength, swatch, glow]);

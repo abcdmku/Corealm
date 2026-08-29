@@ -129,6 +129,16 @@ export class AssetRegistry {
     return this.byId.get(assetId)?.size ?? null;
   }
 
+  /** Local XZ centre of the measured mesh bounds relative to the GLB origin. */
+  assetCenterXZ(assetId: string): { x: number; z: number } | null {
+    const entry = this.byId.get(assetId);
+    if (!entry) return null;
+    return {
+      x: (entry.base?.x ?? -entry.size.x / 2) + entry.size.x / 2,
+      z: (entry.base?.z ?? -entry.size.z / 2) + entry.size.z / 2,
+    };
+  }
+
   /** All assets in a category, in manifest order. */
   byCategory(category: AssetCategory): AssetEntry[] {
     return (this.manifest?.assets ?? []).filter((asset) => asset.category === category);

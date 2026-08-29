@@ -87,6 +87,7 @@ import { Rng } from "../core/rng.js";
 import type { AssetRegistry } from "../render/assets.js";
 import {
   createValueNoise,
+  type GrassSpritePlacement,
   type Rect,
   type ScatterPlacement,
   type WorldScene,
@@ -94,10 +95,19 @@ import {
 
 // ------------------------------------------------------------- exclusions
 
-export type ExclusionKind = "settlement" | "road" | "cluster" | "spawn" | "water" | "custom";
+export type ExclusionKind = "building" | "settlement" | "road" | "cluster" | "spawn" | "water" | "custom";
 
 interface CircleZone { kind: ExclusionKind; id: string; x: number; z: number; radius: number }
-interface RectZone { kind: ExclusionKind; id: string; rect: Rect; margin: number }
+interface RectZone {
+  kind: ExclusionKind;
+  id: string;
+  x: number;
+  z: number;
+  halfX: number;
+  halfZ: number;
+  rotationY: number;
+  margin: number;
+}
 
 /**
  * How one layer answers one zone: dead clear out to `hard` metres past the zone edge, then ramping
@@ -118,6 +128,8 @@ export interface ExclusionProfile {
    * separate zone set from the root's one 46 m ring per settlement. Defaults to `base`.
    */
   authored?: ExclusionBand;
+  /** Building-footprint override within the authored set. Defaults to `authored`. */
+  authoredBuilding?: ExclusionBand;
 }
 
 const HARD_EDGE: ExclusionProfile = { base: { hard: 0, fade: 0 } };
@@ -139,6 +151,7 @@ export class ExclusionZones {
   private circles: CircleZone[] = [];
   private rects: RectZone[] = [];
   private index: Map<number, number[]> | null = null;
+  private rectIndex: Map<number, number[]> | null = null;
 
   addCircle(x: number, z: number, radius: number, kind: ExclusionKind = "custom", id = ""): this {
     this.circles.push({ kind, id, x, z, radius });
@@ -151,7 +164,40 @@ export class ExclusionZones {
   }
 
   addRect(rect: Rect, margin = 0, kind: ExclusionKind = "settlement", id = ""): this {
-    this.rects.push({ kind, id, rect, margin });
+    return this.addOrientedRect(
+      (rect.minX + rect.maxX) / 2,
+      (rect.minZ + rect.maxZ) / 2,
+      rect.maxX - rect.minX,
+      rect.maxZ - rect.minZ,
+      0,
+      margin,
+      kind,
+      id,
+    );
+  }
+
+  /** A precise footprint rectangle in its own rotated frame. Width/depth are full extents. */
+  addOrientedRect(
+    x: number,
+    z: number,
+    width: number,
+    depth: number,
+    rotationY: number,
+    margin = 0,
+    kind: ExclusionKind = "settlement",
+    id = "",
+  ): this {
+    this.rects.push({
+      kind,
+      id,
+      x,
+      z,
+      halfX: Math.max(0, width / 2),
+      halfZ: Math.max(0, depth / 2),
+      rotationY,
+      margin,
+    });
+    this.rectIndex = null;
     return this;
   }
 
@@ -189,11 +235,17 @@ export class ExclusionZones {
       density = Math.min(density, ramp(outside, band));
       if (density <= 0) return 0;
     }
-    for (const zone of this.rects) {
+    for (const zone of this.rectCandidates(x, z, profile)) {
       const band = profile.byKind?.[zone.kind] ?? profile.base;
-      const dx = Math.max(zone.rect.minX - x, 0, x - zone.rect.maxX);
-      const dz = Math.max(zone.rect.minZ - z, 0, z - zone.rect.maxZ);
-      density = Math.min(density, ramp(Math.hypot(dx, dz) - zone.margin, band));
+      const worldX = x - zone.x;
+      const worldZ = z - zone.z;
+      const cosine = Math.cos(zone.rotationY);
+      const sine = Math.sin(zone.rotationY);
+      const localX = worldX * cosine - worldZ * sine;
+      const localZ = worldX * sine + worldZ * cosine;
+      const outsideX = Math.max(Math.abs(localX) - zone.halfX, 0);
+      const outsideZ = Math.max(Math.abs(localZ) - zone.halfZ, 0);
+      density = Math.min(density, ramp(Math.hypot(outsideX, outsideZ) - zone.margin, band));
       if (density <= 0) return 0;
     }
     return density;
@@ -220,18 +272,25 @@ export class ExclusionZones {
     this.circles = [];
     this.rects = [];
     this.index = null;
+    this.rectIndex = null;
   }
 
   /** Circles that can possibly affect `(x, z)`, from the grid when the profile fits inside it. */
   private circleCandidates(x: number, z: number, profile: ExclusionProfile): CircleZone[] {
-    let reach = profile.base.hard + profile.base.fade;
-    for (const band of Object.values(profile.byKind ?? {})) {
-      if (band) reach = Math.max(reach, band.hard + band.fade);
-    }
+    const reach = profileReach(profile);
     if (reach > ZONE_INDEX_REACH) return this.circles;
     const bucket = this.zoneIndex().get(cellKey(Math.floor(x / ZONE_CELL), Math.floor(z / ZONE_CELL)));
     if (!bucket) return EMPTY_ZONES;
     return bucket.map((slot) => this.circles[slot]!);
+  }
+
+  /** Rectangles that can affect `(x, z)`, using the same bounded-reach grid as circles. */
+  private rectCandidates(x: number, z: number, profile: ExclusionProfile): RectZone[] {
+    const reach = profileReach(profile);
+    if (reach > ZONE_INDEX_REACH) return this.rects;
+    const bucket = this.rectZoneIndex().get(cellKey(Math.floor(x / ZONE_CELL), Math.floor(z / ZONE_CELL)));
+    if (!bucket) return EMPTY_RECT_ZONES;
+    return bucket.map((slot) => this.rects[slot]!);
   }
 
   private zoneIndex(): Map<number, number[]> {
@@ -255,9 +314,43 @@ export class ExclusionZones {
     this.index = index;
     return index;
   }
+
+  private rectZoneIndex(): Map<number, number[]> {
+    if (this.rectIndex) return this.rectIndex;
+    const index = new Map<number, number[]>();
+    for (const [slot, zone] of this.rects.entries()) {
+      const cosine = Math.abs(Math.cos(zone.rotationY));
+      const sine = Math.abs(Math.sin(zone.rotationY));
+      const extentX = zone.halfX * cosine + zone.halfZ * sine + zone.margin + ZONE_INDEX_REACH;
+      const extentZ = zone.halfX * sine + zone.halfZ * cosine + zone.margin + ZONE_INDEX_REACH;
+      const minCol = Math.floor((zone.x - extentX) / ZONE_CELL);
+      const maxCol = Math.floor((zone.x + extentX) / ZONE_CELL);
+      const minRow = Math.floor((zone.z - extentZ) / ZONE_CELL);
+      const maxRow = Math.floor((zone.z + extentZ) / ZONE_CELL);
+      for (let row = minRow; row <= maxRow; row += 1) {
+        for (let col = minCol; col <= maxCol; col += 1) {
+          const key = cellKey(col, row);
+          const bucket = index.get(key);
+          if (bucket) bucket.push(slot);
+          else index.set(key, [slot]);
+        }
+      }
+    }
+    this.rectIndex = index;
+    return index;
+  }
 }
 
 const EMPTY_ZONES: CircleZone[] = [];
+const EMPTY_RECT_ZONES: RectZone[] = [];
+
+function profileReach(profile: ExclusionProfile): number {
+  let reach = Math.max(0, profile.base.hard + profile.base.fade);
+  for (const band of Object.values(profile.byKind ?? {})) {
+    if (band) reach = Math.max(reach, band.hard + band.fade);
+  }
+  return reach;
+}
 
 function cellKey(col: number, row: number): number {
   return ((col & 0xffff) << 16) | (row & 0xffff);
@@ -318,10 +411,31 @@ const SHADOW_TILE_METRES = 96;
  */
 const TILE_MIN_INSTANCES = 4000;
 
-interface InstanceBucket {
+interface MeshInstanceBucket {
+  kind: "mesh";
   assetId: string;
   castShadow: boolean;
   placements: ScatterPlacement[];
+}
+
+interface GrassInstanceBucket {
+  kind: "grass";
+  assetId: "grass-sprite";
+  castShadow: false;
+  placements: GrassSpritePlacement[];
+}
+
+type InstanceBucket = MeshInstanceBucket | GrassInstanceBucket;
+
+const GRASS_SPRITE_IDS = new Set([
+  "grass_common_short",
+  "grass_common_tall",
+  "grass_wispy_short",
+  "grass_wispy_tall",
+]);
+
+function isGrassSprite(assetId: string): boolean {
+  return GRASS_SPRITE_IDS.has(assetId);
 }
 
 function tileIndex(x: number, z: number, metres: number): number {
@@ -329,12 +443,14 @@ function tileIndex(x: number, z: number, metres: number): number {
 }
 
 /** One mesh per tile for a caster or a big bucket, one mesh for everything else. */
-function shardByTile(bucket: InstanceBucket): { tile: number; placements: ScatterPlacement[] }[] {
+function shardByTile<T extends { position: Vec3 }>(
+  bucket: { castShadow: boolean; placements: T[] },
+): { tile: number; placements: T[] }[] {
   const metres = bucket.castShadow
     ? SHADOW_TILE_METRES
     : bucket.placements.length >= TILE_MIN_INSTANCES ? BUCKET_TILE_METRES : 0;
   if (metres <= 0) return [{ tile: 0, placements: bucket.placements }];
-  const shards = new Map<number, ScatterPlacement[]>();
+  const shards = new Map<number, T[]>();
   for (const placement of bucket.placements) {
     const tile = tileIndex(placement.position[0], placement.position[2], metres);
     const shard = shards.get(tile);
@@ -781,12 +897,14 @@ function authoredZones(regionId: RegionId): ExclusionZones {
   if (!settlement) return zones;
 
   for (const building of settlement.buildings) {
-    // Circumscribed circle of the footprint, so the zone is right whatever the rotation is, plus
-    // ROOF_EAVE_METRES (0.79, render/buildings.ts) rounded up for the overhang.
+    // Use the authored collision footprint in its own rotated frame. The old circumscribed circle
+    // was radius hypot(width, depth)/2 + 1 m, which kept cover hard-clear 3.4 m past the narrow
+    // side of a 6 x 4 m cottage and left the lanes between neighbouring houses bald. Cover wants
+    // the wall edge, not the roof's circumscribed/eave envelope.
     const [width, depth] = building.footprint;
-    zones.addCircle(
+    zones.addOrientedRect(
       building.position[0], building.position[1],
-      Math.hypot(width, depth) / 2 + 1, "settlement", building.id,
+      width, depth, building.rotationY, 0, "building", building.id,
     );
   }
   for (const wall of settlement.walls ?? []) {
@@ -967,7 +1085,13 @@ function siteFactor(
   let factor = ctx.exclusions.densityAt(x, z, profile);
   if (factor <= 0) return 0;
 
-  factor *= ctx.authored.densityAt(x, z, { base: profile.authored ?? profile.base });
+  const authoredBase = profile.authored ?? profile.base;
+  factor *= ctx.authored.densityAt(x, z, {
+    base: authoredBase,
+    byKind: profile.authoredBuilding
+      ? { building: profile.authoredBuilding }
+      : undefined,
+  });
   if (factor <= 0) return 0;
 
   // Water is a hard reject except for a shore layer that deliberately wades in. Round 1 excluded
@@ -1039,7 +1163,12 @@ function layerProfile(layer: ScatterLayerSpec, source: ScatterSource): Exclusion
   // profile dead code — `siteFactor` reads `profile.authored ?? profile.base` and always got the
   // base — so a wall or a paving kerb was answered with the open-country fade instead of the
   // tighter one written for it.
-  return { base: widen(base.base), byKind, authored: base.authored ? widen(base.authored) : undefined };
+  return {
+    base: widen(base.base),
+    byKind,
+    authored: base.authored ? widen(base.authored) : undefined,
+    authoredBuilding: base.authoredBuilding ? widen(base.authoredBuilding) : undefined,
+  };
 }
 
 /**
@@ -1100,7 +1229,9 @@ export async function scatterRegion(
     }
 
     try {
-      await assets.loadMany(species.map((entry) => entry.assetId));
+      // Grass uses a generated cutout and measured manifest dimensions. Its opaque source GLBs
+      // are no longer render inputs, so loading them would spend boot time and memory for nothing.
+      await assets.loadMany(species.filter((entry) => !isGrassSprite(entry.assetId)).map((entry) => entry.assetId));
     } catch {
       result.missingAssets.push(layer.id);
       continue;
@@ -1119,12 +1250,27 @@ export async function scatterRegion(
     for (const candidate of candidates) {
       const entry = byAsset.get(candidate.assetId);
       if (!entry) continue;
+      if (isGrassSprite(candidate.assetId)) {
+        const key = "grass-sprite|-";
+        const found = buckets.get(key);
+        const bucket: GrassInstanceBucket = found?.kind === "grass"
+          ? found
+          : { kind: "grass", assetId: "grass-sprite", castShadow: false, placements: [] };
+        bucket.placements.push(composeGrassPlacement(layer, ctx, entry, candidate, assets, rng));
+        buckets.set(key, bucket);
+        result.placed += 1;
+        result.byLayer[layer.id] = (result.byLayer[layer.id] ?? 0) + 1;
+        result.bySource[candidate.source] = (result.bySource[candidate.source] ?? 0) + 1;
+        continue;
+      }
       // Keyed on shadow as well as asset, because the shadow flag is a property of the
       // InstancedMesh: fern undergrowth and fern on a damp bank share one mesh, a shadow-casting
       // pine and a non-casting one could not.
       const key = `${candidate.assetId}|${castShadow ? "s" : "-"}`;
-      const bucket = buckets.get(key)
-        ?? { assetId: candidate.assetId, castShadow, placements: [] as ScatterPlacement[] };
+      const found = buckets.get(key);
+      const bucket: MeshInstanceBucket = found?.kind === "mesh"
+        ? found
+        : { kind: "mesh", assetId: candidate.assetId, castShadow, placements: [] };
       bucket.placements.push(composePlacement(layer, ctx, entry, candidate, rng));
       buckets.set(key, bucket);
       result.placed += 1;
@@ -1134,6 +1280,25 @@ export async function scatterRegion(
   }
 
   for (const bucket of buckets.values()) {
+    if (bucket.kind === "grass") {
+      for (const shard of shardByTile(bucket)) {
+        result.tiles += 1;
+        const meshes = scene.scatterGrassSprites(
+          shard.placements,
+          `scatter-${regionId}-grass-sprite-t${shard.tile >>> 0}`,
+          { regionId },
+        );
+        result.instancedMeshes += meshes.length;
+        result.estimatedDrawCalls += meshes.length;
+        for (const mesh of meshes) {
+          const indices = mesh.geometry.getIndex();
+          const positions = mesh.geometry.getAttribute("position");
+          const triangles = Math.round((indices?.count ?? positions?.count ?? 0) / 3);
+          result.estimatedTriangles += triangles * mesh.count;
+        }
+      }
+      continue;
+    }
     for (const shard of shardByTile(bucket)) {
       result.tiles += 1;
       const meshes = scene.scatterInstanced(
@@ -1185,7 +1350,14 @@ function collectField(
 
   const cluster = layer.cluster;
   if (!cluster) {
-    const points = shuffleByHash(poissonDisc(sampleRect, layer.spacing ?? 6, rng), 0x5eed01);
+    // Ordinary layers keep the historical 120k guard. Grass-only carpets may sample farther:
+    // exclusions reject roughly a quarter of their candidates around roads, water and authored
+    // structures, so a 120k candidate ceiling could never deliver Fallowmarch's 145k safe card
+    // budget. The grass ceiling remains explicit and bounded; no 3D layer can inherit it.
+    const grassOnly = species.every((entry) => isGrassSprite(entry.assetId));
+    const candidateCeiling = grassOnly ? 220000 : 120000;
+    const candidateCap = Math.min(candidateCeiling, Math.max(60000, Math.ceil(layer.maxCount * 1.4)));
+    const points = shuffleByHash(poissonDisc(sampleRect, layer.spacing ?? 6, rng, candidateCap), 0x5eed01);
     for (const [x, z] of points) {
       if (out.length >= layer.maxCount) break;
       const factor = siteFactor(layer, ctx, x, z, "field", true) * maskAt(x, z);
@@ -1324,6 +1496,65 @@ function composePlacement(
   };
 }
 
+/**
+ * Turns the same deterministic transform a GLB tuft would have received into a four-triangle card.
+ * Source dimensions come from the manifest, so changing render geometry does not change authored
+ * world height or the relative short/tall and common/wispy hierarchy.
+ */
+function composeGrassPlacement(
+  layer: ScatterLayerSpec,
+  ctx: LayerContext,
+  entry: ResolvedSpecies,
+  candidate: Candidate,
+  assets: AssetRegistry,
+  rng: Rng,
+): GrassSpritePlacement {
+  const placement = composePlacement(layer, ctx, entry, candidate, rng);
+  const scale = typeof placement.scale === "number"
+    ? [placement.scale, placement.scale, placement.scale] as const
+    : placement.scale;
+  const native = assets.assetSize(candidate.assetId) ?? { x: 0.8, y: 1.2, z: 0.8 };
+  // The generated cutout contains eleven blades, so its physical width needs to read as one tuft,
+  // not one stem. At the old 0.14 m floor almost every blade-carpet card collapsed to a pencil at
+  // gameplay distance. A 0.18 m floor and 90% of the source footprint increase occupied width by
+  // 1.22-1.29x without adding geometry, instances or draw calls.
+  const width = clampRange(Math.max(native.x * Math.abs(scale[0]), native.z * Math.abs(scale[2])) * 0.9, 0.18, 2.1);
+  const height = clampRange(native.y * Math.abs(scale[1]), 0.14, 2.3);
+  return {
+    position: placement.position,
+    rotationY: placement.rotationY,
+    width,
+    height,
+    colour: grassColour(candidate.assetId, candidate.x, candidate.z),
+    normal: placement.normal,
+    tilt: placement.tilt,
+  };
+}
+
+/** A positional colour shift. No extra RNG draw, so neighbouring non-grass transforms stay put. */
+function grassColour(assetId: string, x: number, z: number): number {
+  let seed = 0x811c9dc5;
+  for (let index = 0; index < assetId.length; index += 1) {
+    seed = Math.imul(seed ^ assetId.charCodeAt(index), 0x01000193) >>> 0;
+  }
+  const position = (Math.imul(Math.round(x * 32), 0x1f123bb5)
+    ^ Math.imul(Math.round(z * 32), 0x5f356495)) >>> 0;
+  const unit = hash32(seed, position) / 0xffffffff;
+  const gain = 0.86 + unit * 0.22;
+  return scaleHex(assetId.startsWith("grass_wispy") ? 0xb69f00 : 0x79ab20, gain);
+}
+
+function scaleHex(colour: number, gain: number): number {
+  const red = Math.min(255, Math.round(((colour >>> 16) & 0xff) * gain));
+  const green = Math.min(255, Math.round(((colour >>> 8) & 0xff) * gain));
+  const blue = Math.min(255, Math.round((colour & 0xff) * gain));
+  return (red << 16) | (green << 8) | blue;
+}
+
+function clampRange(value: number, low: number, high: number): number {
+  return Math.max(low, Math.min(high, value));
+}
+
 /** Dresses every region the scene knows about. */
 export async function scatterWorld(
   scene: WorldScene,
@@ -1401,6 +1632,10 @@ const COVER_EXCLUSION: ExclusionProfile = {
     spawn: { hard: 1, fade: 6 },
   },
   authored: { hard: 0.8, fade: 2.5 },
+  // Only structural footprints use this close band. Paving, walls, doors/roads, stations and
+  // props retain the authored 0.8 m hard / 2.5 m fade above, so foundations grow in without
+  // putting cards in interaction or circulation space.
+  authoredBuilding: { hard: 0.15, fade: 0.8 },
 };
 
 /** Pebbles and path rocks: allowed right up to anything, because they are ankle height. */
@@ -1599,6 +1834,28 @@ const UPLAND_CARPET: ScatterSpeciesSpec[] = [
 ];
 
 /**
+ * Low grass stems that buy density without multiplying the mixed cover pools.
+ *
+ * Keeping these pools grass-only matters. Halving the existing `carpet` spacing would multiply
+ * every pebble, fern and broad plant along with the grass, undoing most of the triangle saving and
+ * making paths look cluttered instead of grown in. All entries below merge with grass already
+ * emitted by `groundcover` and `carpet` into the same per-region, per-tile sprite mesh.
+ */
+const MEADOW_BLADES: ScatterSpeciesSpec[] = [
+  { assetId: "grass_common_short", weight: 10, scale: [0.14, 0.29] },
+  { assetId: "grass_wispy_short", weight: 1.4, scale: [0.18, 0.34], tilt: 0.2 },
+];
+
+const WOODLAND_BLADES: ScatterSpeciesSpec[] = [
+  { assetId: "grass_common_short", weight: 1, scale: [0.13, 0.26] },
+];
+
+const UPLAND_BLADES: ScatterSpeciesSpec[] = [
+  { assetId: "grass_common_short", weight: 7, scale: [0.12, 0.25] },
+  { assetId: "grass_wispy_short", weight: 3, scale: [0.17, 0.33], tilt: 0.2 },
+];
+
+/**
  * Pebbles, plus the six previously unused `path_rock_*` assets on roads only.
  *
  * All ten share the `PathRocks` material, so under a material-keyed batch the whole family would be
@@ -1754,6 +2011,16 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         road: { band: [2.4, 7.5], perMetre: 1.1 },
       },
       {
+        // A low, grass-only floor. At 0.67 m this settles at about 1.1 cards/m2 after road, water,
+        // settlement and slope rejection: dense enough for a continuous town-edge sward, while
+        // the authored road/building exclusions remain untouched. Four-triangle cards keep the
+        // 145k cap under 0.6M triangles and one already-tiled instanced material family.
+        id: "bladecarpet", species: MEADOW_BLADES,
+        spacing: 0.67, maxCount: 145000, scale: [0.14, 0.34], sizeBias: 1.4, tilt: 0.45,
+        exclusion: COVER_EXCLUSION,
+        terrain: { slopeBias: { low: 0.25, high: 0.8, flat: 1.2, steep: 0.35 } },
+      },
+      {
         // Colour accents only, as drifts rather than as a lawn. `flower_a_group` is 2.055 m native
         // and was scaled to 1.44-2.47 m in round 1; at [0.28, 0.5] it lands at 0.58-1.03 m.
         id: "bloom",
@@ -1882,6 +2149,15 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         terrain: { slopeBias: { low: 0.3, high: 0.9, flat: 1.15, steep: 0.5 } },
         road: { band: [2.4, 7.5], perMetre: 1.1 },
       },
+      {
+        // Patchy low grass under the canopy. Ferns and leaf plants stay in the mixed layers above;
+        // this count buys stems only and therefore does not turn Vellenwood's paths into clutter.
+        id: "bladecarpet", species: WOODLAND_BLADES,
+        spacing: 0.78, maxCount: 80000, scale: [0.13, 0.26], sizeBias: 1.45, tilt: 0.5,
+        exclusion: COVER_EXCLUSION,
+        terrain: { slopeBias: { low: 0.25, high: 0.85, flat: 1.1, steep: 0.35 } },
+        mask: { strength: 0.12, featureSize: 34 },
+      },
     ],
   },
 
@@ -1980,6 +2256,14 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         exclusion: COVER_EXCLUSION,
         terrain: { slopeBias: { low: 0.3, high: 0.8, flat: 1.2, steep: 0.3 } },
         road: { band: [2.4, 7.5], perMetre: 1.1 },
+      },
+      {
+        // Wind-short moor grass, still thinner than the meadow. Gold remains common enough to
+        // separate the upland turf from Fallowmarch without adding another material or draw call.
+        id: "bladecarpet", species: UPLAND_BLADES,
+        spacing: 0.8, maxCount: 80000, scale: [0.12, 0.33], sizeBias: 1.45, tilt: 0.55,
+        exclusion: COVER_EXCLUSION,
+        terrain: { slopeBias: { low: 0.25, high: 0.78, flat: 1.15, steep: 0.25 } },
       },
     ],
   },

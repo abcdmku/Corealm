@@ -201,8 +201,11 @@ export class EnemyAiSystem implements TickSystem {
         }
         if (distanceToPlayer > ENEMY_STANDOFF_METRES) {
           this.stepToward(entity, playerPos, ENEMY_SPEED_MPS, deltaMs, ENEMY_STANDOFF_METRES);
+        } else {
+          // At standoff there is no displacement for stepToward to face along. Keep looking at the
+          // player while the combat system swings.
+          this.faceless(entity, playerPos);
         }
-        this.faceless(entity, playerPos);
       }
     }
   }
@@ -492,23 +495,59 @@ export class EnemyAiSystem implements TickSystem {
     deltaMs: number,
     stopWithin: number,
   ): boolean {
-    const dx = target[0] - entity.position[0];
-    const dz = target[2] - entity.position[2];
+    const from = entity.position;
+    const dx = target[0] - from[0];
+    const dz = target[2] - from[2];
     const gap = Math.sqrt(dx * dx + dz * dz);
     if (gap <= stopWithin) return true;
 
     const step = Math.min(gap - stopWithin, (speed * deltaMs) / 1000);
     if (step <= 0) return false;
 
-    const nx = entity.position[0] + (dx / gap) * step;
-    const nz = entity.position[2] + (dz / gap) * step;
-    const wanted: Vec3 = [nx, entity.position[1], nz];
-    const snapped = this.deps.nav?.nearestWalkable(wanted, 2) ?? wanted;
+    const nx = from[0] + (dx / gap) * step;
+    const nz = from[2] + (dz / gap) * step;
+    const wanted: Vec3 = [nx, from[1], nz];
+    let snapped = this.snapStep(wanted);
 
+    // Detour returns the current boundary point when the direct candidate falls inside a carved
+    // solid. Retrying that point forever is the enemy version of walking into a wall. Sliding one
+    // axis at a time is cheap, deterministic, and gets around the ordinary building and rock
+    // corners without a full path query per enemy per tick.
+    if (!this.madeProgress(from, snapped, target, gap)) {
+      const candidates = [
+        this.snapStep([nx, from[1], from[2]]),
+        this.snapStep([from[0], from[1], nz]),
+      ].filter((candidate): candidate is Vec3 => this.madeProgress(from, candidate, target, gap));
+      candidates.sort((a, b) => distanceXZ(a, target) - distanceXZ(b, target));
+      snapped = candidates[0] ?? null;
+    }
+
+    if (!snapped) return false;
+    const movedX = snapped[0] - from[0];
+    const movedZ = snapped[2] - from[2];
     entity.position = snapped;
     this.deps.entities.setPosition?.(entity.id, snapped);
+    this.faceDirection(entity, movedX, movedZ);
     this.deps.store.markDirty();
     return distanceXZ(snapped, target) <= stopWithin;
+  }
+
+  /** Uses raw steering only when no nav port exists. A nav miss is a blocker, not permission. */
+  private snapStep(wanted: Vec3): Vec3 | null {
+    return this.deps.nav ? this.deps.nav.nearestWalkable(wanted, 2) : wanted;
+  }
+
+  /** A useful snap moves at least 1 mm and does not take the enemy further from its target. */
+  private madeProgress(from: Vec3, candidate: Vec3 | null, target: Vec3, oldGap: number): boolean {
+    if (!candidate || distanceXZ(from, candidate) <= 0.001) return false;
+    return distanceXZ(candidate, target) < oldGap - 0.001;
+  }
+
+  /** Faces the direction the navmesh actually allowed, including an axis fallback. */
+  private faceDirection(entity: SemanticEntity, dx: number, dz: number): void {
+    if (Math.hypot(dx, dz) <= 0.001) return;
+    const view = entity.view;
+    if (view) view.rotationY = Math.atan2(dx, dz);
   }
 
   /** Points an enemy at the player. Purely cosmetic, and cosmetics live in `meta`, not in a mesh. */

@@ -116,29 +116,26 @@ const CROSSFADE_SECONDS = 0.18;
 const ONE_SHOT_CROSSFADE_SECONDS = 0.06;
 
 /**
- * Ground speed each locomotion clip was authored at, m/s.
+ * Ground speed the walk clip was authored at, in m/s.
  *
  * Forward-kinematics measurement of animation_library_1.glb: 240 samples per clip, body-relative
- * velocity of `ball_l` through its planted (minimum-Y) phase. Walk_Loop 1.333 s / 0.809 m stride =
- * 0.98 m/s; Jog_Fwd_Loop 0.933 s / 1.453 m = 5.92 m/s; Sprint_Loop 0.667 s / 1.347 m = 9.15 m/s.
- * Root node world translation range is 0.000 in all three axes for all three clips — they are
- * in-place, so nothing corrects the stride rate except `timeScale`.
+ * velocity of `ball_l` through its planted phase. Walk_Loop implies 0.98 m/s. It is close enough to
+ * the configured walk band that playback scaling can plant the foot without making the pose look
+ * wrong.
  *
- * At the configured run speed of 4.2 m/s the jog is 41% too fast and the feet skate backwards at
- * 1.72 m/s. 4.2 / 5.92 = 0.71 is the scale that plants them.
+ * Jog_Fwd_Loop and Sprint_Loop imply 5.92 and 9.15 m/s. Matching either to 4.2 m/s by time scaling
+ * makes it visibly slow. Running therefore uses the presentation rates in MOVEMENT instead. The
+ * tradeoff is intentional: brisk cadence wins over scalar foot planting until the rig has stride
+ * warping, foot IK, or a clip authored for 4.2 m/s.
  */
-const IMPLIED_CLIP_SPEED: Readonly<Record<string, number>> = {
-  Walk_Loop: 0.98,
-  Jog_Fwd_Loop: 5.92,
-  Sprint_Loop: 9.15,
-};
+const WALK_CLIP_SPEED = 0.98;
 
 /**
- * Clamp on the stride time scale.
+ * Clamp on the walk time scale.
  *
  * A player pinned against a wall reports ~0 m/s, and 0 would freeze the clip mid-stride, which
- * reads as a crash rather than as a stall. The floor is 0.6 because `Jog_Fwd_Loop` at half tempo
- * is a 1.87 s stride cycle and reads as slow motion, not as a jog.
+ * reads as a crash rather than as a stall. The gait normally switches to idle before that occurs,
+ * but the floor also protects the frame where a pose transition and a speed update cross.
  *
  * The ceiling was 1.6, and that was measured to be wrong. Real ground speed under direct WASD
  * input, sampled with `performance.now()` and `getPlayerPosition()` inside ONE in-page evaluate so
@@ -147,28 +144,11 @@ const IMPLIED_CLIP_SPEED: Readonly<Record<string, number>> = {
  * ran 0.159 m/s slow. 2.2 covers the whole walk band up to 2.16 m/s; `Walk_Loop` is a 1.333 s
  * cycle, so 2.2x is 1.65 strides per second, which is a power walk and not a scurry.
  */
-const MIN_TIME_SCALE = 0.6;
-const MAX_TIME_SCALE = 2.2;
+const MIN_WALK_TIME_SCALE = 0.6;
+const MAX_WALK_TIME_SCALE = 2.2;
 
-/**
- * The locomotion clips, and the band each can cover once the clamp is applied.
- *
- * There is a hole in the library between them: `Walk_Loop` tops out at 0.98 * 2.2 = 2.16 m/s and
- * `Jog_Fwd_Loop` bottoms out at 5.92 * 0.6 = 3.55 m/s, so nothing plays honestly between those.
- * Measured, that hole is exactly where the game runs — the S-key sample above is 2.304 m/s, which
- * the old fixed mapping answered with `Jog_Fwd_Loop` clamped to 0.6, i.e. feet skating FORWARD at
- * 1.248 m/s. Choosing the clip with the smaller residual instead answers it with a fast walk and a
- * 0.14 m/s residual, and the worst case anywhere in the hole drops to (3.55 - 2.16) / 2 = 0.70 m/s.
- */
-const LOCOMOTION_CLIPS: readonly string[] = ["Walk_Loop", "Jog_Fwd_Loop", "Sprint_Loop"];
-
-/**
- * How much better a candidate clip has to be before the rig switches to it, in m/s of residual.
- *
- * Without it a speed sitting on a crossover flips clip every frame, and every flip is an
- * `action.reset()`, which is a visible stutter rather than a gait.
- */
-const CLIP_SWITCH_MARGIN = 0.25;
+/** Jog is the normal run. Sprint is used only when the asset library cannot supply the jog. */
+const RUN_CLIPS: ReadonlySet<string> = new Set(["Jog_Fwd_Loop", "Sprint_Loop"]);
 
 /**
  * Where a bone-attached slot hangs.
@@ -613,78 +593,25 @@ export class CharacterRig {
   }
 
   /**
-   * Matches the stride rate to the ground speed, so the feet stop skating.
+   * Sets locomotion playback without changing translation speed.
    *
-   * Only locomotion clips are scaled: a swing or a flinch is authored at its own tempo and speeding
-   * it up because the player happens to be running would be wrong. Call it every frame after
-   * `play`, which resets the scale to 1.
+   * Walk_Loop is speed-matched because it remains readable across its whole band. The run is not.
+   * Matching Jog_Fwd_Loop's measured 5.92 m/s foot speed to 4.2 m/s requires 0.71x playback, which
+   * looks like slow motion and stretches each visible footfall over 2.76 m of translation. The run
+   * instead ramps to MOVEMENT.runPlaybackRate, giving it a stable 1.2x cadence at full speed.
+   * Sprint_Loop receives the same treatment, but resolveAction reaches it only if Jog_Fwd_Loop is
+   * unavailable.
+   *
+   * Only locomotion clips are scaled. A swing or flinch keeps its authored tempo. Call this every
+   * frame after play, which resets a newly selected action's scale to 1.
    */
   setLocomotionSpeed(metresPerSecond: number): void {
     if (!this.currentAction || !this.currentClipName) return;
-    if (IMPLIED_CLIP_SPEED[this.currentClipName] === undefined) return;
-
-    const better = this.betterLocomotionClip(this.currentClipName, metresPerSecond);
-    if (better) this.switchLocomotionClip(better);
-
-    const action = this.currentAction;
-    const implied = this.currentClipName ? IMPLIED_CLIP_SPEED[this.currentClipName] : undefined;
-    if (!action || implied === undefined) return;
-    action.setEffectiveTimeScale(strideScale(metresPerSecond, implied));
-  }
-
-  /** How far the planted foot slides at this speed if `clipName` is the clip playing, in m/s. */
-  private static residual(clipName: string, metresPerSecond: number): number {
-    const implied = IMPLIED_CLIP_SPEED[clipName];
-    if (implied === undefined) return Infinity;
-    return Math.abs(metresPerSecond - implied * strideScale(metresPerSecond, implied));
-  }
-
-  /** A locomotion clip that plants the feet better than the current one, or null to stay put. */
-  private betterLocomotionClip(currentClipName: string, metresPerSecond: number): string | null {
-    const current = CharacterRig.residual(currentClipName, metresPerSecond);
-    let best: string | null = null;
-    let bestResidual = current - CLIP_SWITCH_MARGIN;
-    for (const clipName of LOCOMOTION_CLIPS) {
-      if (clipName === currentClipName) continue;
-      const residual = CharacterRig.residual(clipName, metresPerSecond);
-      if (residual < bestResidual) {
-        best = clipName;
-        bestResidual = residual;
-      }
+    if (this.currentClipName === "Walk_Loop") {
+      this.currentAction.setEffectiveTimeScale(walkStrideScale(metresPerSecond));
+    } else if (RUN_CLIPS.has(this.currentClipName)) {
+      this.currentAction.setEffectiveTimeScale(runPresentationScale(metresPerSecond));
     }
-    return best;
-  }
-
-  /**
-   * Crossfades to another locomotion clip without changing the pose.
-   *
-   * The pose stays whatever `poseFor` said — this is a gait choice inside "the character is
-   * moving", not a different thing to be doing — so `play()` still sees `pose === this.current` on
-   * the next frame and does not fight it.
-   */
-  private switchLocomotionClip(clipName: string): void {
-    if (!this.mixer) return;
-    let action = this.actions.get(clipName);
-    if (!action) {
-      const clip = this.assets.clip(clipName);
-      if (!clip) {
-        this.missingClips.add(clipName);
-        return;
-      }
-      action = this.mixer.clipAction(clip);
-      this.actions.set(clipName, action);
-    }
-    const previous = this.currentAction;
-    if (action === previous) return;
-    action.reset();
-    action.enabled = true;
-    action.setEffectiveWeight(1);
-    action.setLoop(THREE.LoopRepeat, Infinity);
-    action.clampWhenFinished = false;
-    if (previous) action.crossFadeFrom(previous, CROSSFADE_SECONDS, false);
-    action.play();
-    this.currentAction = action;
-    this.currentClipName = clipName;
   }
 
   private resolveAction(pose: CharacterPose): { action: THREE.AnimationAction; clipName: string } | null {
@@ -1047,6 +974,23 @@ export class CharacterRig {
     return this.currentClipName;
   }
 
+  /** Live playback state for browser acceptance; gameplay never reads this. */
+  motionSnapshot(): {
+    pose: CharacterPose;
+    clip: string | null;
+    time: number;
+    duration: number;
+    timeScale: number;
+  } {
+    return {
+      pose: this.current,
+      clip: this.currentClipName,
+      time: this.currentAction?.time ?? 0,
+      duration: this.currentAction?.getClip().duration ?? 0,
+      timeScale: this.currentAction?.getEffectiveTimeScale() ?? 0,
+    };
+  }
+
   /**
    * What the rig costs and what it is wearing. Read by screenshots and by the debug API; this is
    * the number that has to move when a kit is equipped.
@@ -1098,9 +1042,15 @@ export const VISIBLE_SLOTS: readonly EquipSlot[] = [
   "head", "body", "legs", "feet", "hands", "mainHand", "offHand",
 ] as const;
 
-/** The clamped time scale that plays `implied` m/s of stride at `metresPerSecond` of ground speed. */
-function strideScale(metresPerSecond: number, implied: number): number {
-  return Math.min(MAX_TIME_SCALE, Math.max(MIN_TIME_SCALE, metresPerSecond / implied));
+/** The clamped time scale that plants Walk_Loop at the supplied ground speed. */
+function walkStrideScale(metresPerSecond: number): number {
+  return Math.min(MAX_WALK_TIME_SCALE, Math.max(MIN_WALK_TIME_SCALE, metresPerSecond / WALK_CLIP_SPEED));
+}
+
+/** Brisk visual cadence for either run clip, independent of the unchanged 4.2 m/s translation. */
+function runPresentationScale(metresPerSecond: number): number {
+  const scaled = metresPerSecond / MOVEMENT.runSpeed * MOVEMENT.runPlaybackRate;
+  return Math.min(MOVEMENT.runPlaybackRate, Math.max(MOVEMENT.runMinPlaybackRate, scaled));
 }
 
 /** A part drawn by rebinding it onto the body's skeleton rather than parenting it to a bone. */

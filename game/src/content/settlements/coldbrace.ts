@@ -115,12 +115,12 @@ export const COLDBRACE: SettlementDef = {
     // gatehouse stands in the matching 8 m opening in its wall run.
     { id: "coldbrace_gate_south", name: "South Gatehouse", prefab: "gatehouse", position: [-160, -108], rotationY: 0, footprint: [8, 3] },
     { id: "coldbrace_gate_east", name: "East Gatehouse", prefab: "gatehouse", position: [-134, -80], rotationY: Math.PI / 2, footprint: [8, 3] },
-    // NEW. The `town_center` -> `west_track` road crosses the west wall at (-186,-72.6) - solve the
-    // straight line (-160,-80) to (-230,-60) at x = -186 - so the west opening is centred at
-    // z = -74 and spans z -78..-70, which contains that crossing with 1.4 m to spare. Before this
-    // the road left town through 46 m of nothing. There is no `coldbrace_west_gate` route node
-    // because `content/regions.ts` is not this file's to edit; see the worker's bootWiringNeeded.
-    { id: "coldbrace_gate_west", name: "West Gatehouse", prefab: "gatehouse", position: [-186, -74], rotationY: -Math.PI / 2, footprint: [8, 3] },
+    // The `town_center` -> `west_track` road crosses the west wall at (-186,-72.6). The gate used
+    // to be centred at z = -74, which left that crossing only 0.15 m inside the passage after the
+    // navmesh's 0.45 m erosion. At z = -72 the 4 m clear arch spans z -74..-70 and the road keeps
+    // 0.95 m of usable clearance. There is no `coldbrace_west_gate` route node because
+    // `content/regions.ts` is not this file's to edit; the authored road is the alignment contract.
+    { id: "coldbrace_gate_west", name: "West Gatehouse", prefab: "gatehouse", position: [-186, -72], rotationY: -Math.PI / 2, footprint: [8, 3] },
 
     // ------------------------------------------------------------ civic core
     // Unmoved. The `march_vault_tower` landmark stands 0.28 m off this tower's south door and
@@ -163,7 +163,7 @@ export const COLDBRACE: SettlementDef = {
     // --------------------------------------------------------------- houses
     // Every door below opens onto a paved street, the square, or a lane between two houses.
     // South quarter, two facing pairs on the gate street:
-    { id: "coldbrace_house_1", name: "Carter's House", prefab: "cottage", position: [-170, -102], rotationY: -Math.PI / 2, footprint: [6, 4] },
+    { id: "coldbrace_house_1", name: "Carter's House", prefab: "townhouse", position: [-170, -102], rotationY: -Math.PI / 2, footprint: [6, 4] },
     { id: "coldbrace_house_2", name: "Pitmaster's House", prefab: "cottage", position: [-180, -102], rotationY: -Math.PI / 2, footprint: [6, 4] },
     { id: "coldbrace_house_3", name: "Weaver's House", prefab: "cottage", position: [-150, -102], rotationY: Math.PI / 2, footprint: [6, 4] },
     { id: "coldbrace_house_4", name: "Drover's House", prefab: "cottage", position: [-140, -102], rotationY: Math.PI / 2, footprint: [6, 4] },
@@ -174,7 +174,7 @@ export const COLDBRACE: SettlementDef = {
     // The back lane behind the market row.
     { id: "coldbrace_house_7", name: "Old Surveyor's House", prefab: "cottage", position: [-180, -85], rotationY: Math.PI, footprint: [6, 4] },
     // On the east street, opposite the forge.
-    { id: "coldbrace_house_8", name: "Empty House", prefab: "cottage", position: [-142, -74], rotationY: 0, footprint: [6, 4] },
+    { id: "coldbrace_house_8", name: "Empty House", prefab: "townhouse", position: [-142, -74], rotationY: 0, footprint: [6, 4] },
   ],
 
   // A closed 208 m circuit with a shared corner post at each of the four corners. `at` is metres
@@ -188,10 +188,10 @@ export const COLDBRACE: SettlementDef = {
     { id: "coldbrace_wall_s", name: "South Wall", from: [-186, -108], to: [-134, -108], openings: [{ at: 26, width: 8 }] },
     { id: "coldbrace_wall_e", name: "East Wall", from: [-134, -108], to: [-134, -56], openings: [{ at: 28, width: 8 }] },
     { id: "coldbrace_wall_n", name: "North Wall", from: [-134, -56], to: [-186, -56] },
-    { id: "coldbrace_wall_w", name: "West Wall", from: [-186, -56], to: [-186, -108], openings: [{ at: 18, width: 8 }] },
+    { id: "coldbrace_wall_w", name: "West Wall", from: [-186, -56], to: [-186, -108], openings: [{ at: 16, width: 8 }] },
   ],
 
-  // 211 tiles of `floor_cobble`. Cobble because Coldbrace is the oldest and plainest of the three
+  // 216 tiles of `floor_cobble`. Cobble because Coldbrace is the oldest and plainest of the three
   // and lays what the river plain gives it; the quarry town pays for brick and the logging town
   // decks in plank. Every bound is an even metre, so the tiles - whose centres sit on the
   // half-module lattice anchored at the world origin - meet across rect boundaries with no half
@@ -208,8 +208,9 @@ export const COLDBRACE: SettlementDef = {
     { id: "coldbrace_pave_gate_street", rect: { minX: -166, minZ: -108, maxX: -154, maxZ: -96 }, assetId: "floor_cobble" },
     // The pit road out of the east gate. 14 tiles.
     { id: "coldbrace_pave_east_street", rect: { minX: -148, minZ: -82, maxX: -134, maxZ: -78 }, assetId: "floor_cobble" },
-    // The copse track out of the west gate, between houses 5 and 6. 16 tiles.
-    { id: "coldbrace_pave_west_street", rect: { minX: -186, minZ: -76, maxX: -170, maxZ: -72 }, assetId: "floor_cobble" },
+    // The copse track out of the west gate, between houses 5 and 6. Its north row follows the
+    // recentered passage while its south rows retain both houses' doorstep approach. 24 tiles.
+    { id: "coldbrace_pave_west_street", rect: { minX: -186, minZ: -76, maxX: -170, maxZ: -70 }, assetId: "floor_cobble" },
   ],
 
   stations: [

@@ -16,6 +16,27 @@ export interface RenderStats {
   overBudget: boolean;
 }
 
+export interface TopDownTileOptions {
+  centreX: number;
+  centreY: number;
+  centreZ: number;
+  spanMetres: number;
+  pixels: number;
+}
+
+/** JSON-safe description of the fixed outdoor daylight rig. */
+export const DAYLIGHT_LOOK = {
+  toneMappingExposure: 1.0,
+  environmentSaturation: 0.40,
+  environmentIntensity: 0.48,
+  sunColour: 0xffd3a3,
+  sunIntensity: 2.75,
+  sunOffset: { x: 68, y: 38, z: 44 },
+  hemisphereSky: 0xcac7c0,
+  hemisphereGround: 0x66513d,
+  hemisphereIntensity: 0.18,
+} as const;
+
 /**
  * The sky gradient, authored by elevation rather than by texture row.
  *
@@ -92,7 +113,7 @@ const SKY_STOPS: readonly { e: number; background: number; authored: number }[] 
   // Costed, because the lower hemisphere is a LIGHT as well as a picture: measured with
   // runs/corealm/audit/w3lit-irradiance.mjs, this leaves the irradiance on an up-facing surface
   // bit-identical, raises a down-facing one 15% and the full-sphere mean 8.1%. That is inside the
-  // 0.38-0.62 band light-sweep.mjs found usable for ENVIRONMENT_INTENSITY, so 0.50 stands.
+  // 0.38-0.62 band light-sweep.mjs found usable for ENVIRONMENT_INTENSITY, so 0.48 stays central.
   { e: -0.012, background: 0xcbe3f2, authored: 0xd0d9de },  // haze plateau, top
   { e: -0.180, background: 0xcbe3f2, authored: 0xd0d9de },  // haze plateau, bottom: 16 degrees down
   { e: -0.340, background: 0x8f9689, authored: 0x9fa699 },  // 31 degrees down, haze gives way to land
@@ -102,7 +123,7 @@ const SKY_STOPS: readonly { e: number; background: number; authored: number }[] 
 /**
  * How far the environment map is pulled toward its own luminance before it becomes a light.
  *
- * 0.35, and this is the correction that actually fixes the mint. A physically saturated sky IS
+ * 0.40, and this is the correction that actually fixes the mint. A physically saturated sky IS
  * blue, and its diffuse irradiance on an up-facing surface integrates to (0.163, 0.332, 0.558):
  * green is twice red and blue is three times it. Multiply that by a grass albedo, which is already
  * green over red, and the result is cyan by arithmetic — that is what shaded grass measuring
@@ -111,12 +132,12 @@ const SKY_STOPS: readonly { e: number; background: number; authored: number }[] 
  * letting each surface's own albedo decide its hue. The visible sky is untouched: only the light
  * is desaturated, so the frame still has a blue sky over neutrally-shadowed ground.
  */
-const ENVIRONMENT_SATURATION = 0.45;
+const ENVIRONMENT_SATURATION = DAYLIGHT_LOOK.environmentSaturation;
 
 /**
  * Global multiplier on `scene.environment` for every material that has no `envMap` of its own.
  *
- * 0.50. At the shipped 1.0 the environment was the brightest light in the scene by hue: measured
+ * 0.48. At the shipped 1.0 the environment was the brightest light in the scene by hue: measured
  * on flat lit ground the sun contributed (0.512, 0.417, 0.283) of diffuse and the environment
  * (0.123, 0.276, 0.543), so the illuminant summed BLUER THAN NEUTRAL and shaded ground got
  * (0.184, 0.373, 0.670), a 3.6:1 blue-over-red fill with only 2.19:1 of luminance separation from
@@ -125,9 +146,10 @@ const ENVIRONMENT_SATURATION = 0.45;
  * to (89,102,127), all measured against `baseline-bank.png`.
  *
  * Real daylight puts several times more energy on a horizontal surface from the sun than from the
- * sky. 0.50 with the desaturation above lands the fill at (0.123, 0.161, 0.212), which takes the
- * lit-to-shadow luminance ratio from 2.19:1 to 3.73:1 and a neutral wall in shadow from
- * (113,153,182) to (96,107,113). Swept in runs/corealm/audit/light-sweep.mjs across saturation
+ * sky. 0.48 with the desaturation above lands the fill at (0.121, 0.154, 0.197). In the complete
+ * afternoon rig, the direct-to-shadow luminance ratio is 2.80:1 and a neutral wall in shadow reads
+ * near (81,87,91), dark enough to model the wall without turning it blue. The earlier sweep in
+ * runs/corealm/audit/light-sweep.mjs covered saturation
  * 0.30-0.60 and intensity 0.38-0.62: below 0.38 the darkest shadows lose all detail, and above
  * 0.62 the lit-to-shadow ratio falls under 3:1 and the frame goes flat again.
  *
@@ -136,7 +158,7 @@ const ENVIRONMENT_SATURATION = 0.45;
  * `scene.environment` rather than by its own `envMap`, which is every material in this game. See
  * `iblScale` in materials.ts for how the two classes that need a different value get one.
  */
-const ENVIRONMENT_INTENSITY = 0.50;
+const ENVIRONMENT_INTENSITY = DAYLIGHT_LOOK.environmentIntensity;
 
 /**
  * Where on the sky gradient the fog colour is taken from, and how far the haze reaches.
@@ -173,13 +195,13 @@ const SKY_TEXTURE_WIDTH = 1024;
 /**
  * Where the sun sits relative to whatever `followShadow` is tracking.
  *
- * 32 degrees of elevation — `atan(42 / hypot(58, 34))` — not the 50.5 degrees this rig shipped
- * with. A 50-degree sun is near-noon light: shadows are short, faces of a hill differ by almost
- * nothing, and the measured result was an entire 1280x720 frame (`sunder_ledge`) of one grey value
- * across 36 m of authored verticality. At 32 degrees the same geometry throws a shadow 1.6x longer
- * and every building, boulder and terrace riser gets a readable long shadow.
+ * 25.1 degrees of elevation (`atan(38 / hypot(68, 44))`). The former 32-degree rig still read as
+ * noon under the high game camera: broad upward-facing roofs and yards took nearly all of a 3.0
+ * key, while their shadows compressed beneath them. At 25.1 degrees a vertical object throws a
+ * shadow 2.13 times its height, so buildings, boulders and terrace risers carry the afternoon
+ * direction even in a steep camera view.
  */
-const SUN_OFFSET = { x: 58, y: 42, z: 34 } as const;
+const SUN_OFFSET = DAYLIGHT_LOOK.sunOffset;
 
 export interface WarmupOptions {
   /**
@@ -236,9 +258,9 @@ export class Renderer {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // 1.00, not 1.05. Exposure above 1 on top of ACES and a key light of 3.0 clips the roof tiles
-    // in the Highcairn frame to flat orange while the ground under them stays undifferentiated.
-    this.renderer.toneMappingExposure = 1.0;
+    // Keep 1.00. SKY_STOPS.background is pre-compensated for this exposure, while fog is applied
+    // after tone mapping; changing only this number makes the sky and its own sampled fog disagree.
+    this.renderer.toneMappingExposure = DAYLIGHT_LOOK.toneMappingExposure;
 
     this.scene = new THREE.Scene();
 
@@ -315,9 +337,9 @@ export class Renderer {
     sampleSky(FOG_HORIZON_ELEVATION, "light", fog.color);
     this.scene.fog = fog;
 
-    // Key, sky fill, and the environment map doing the bounce. The old rig was a 2.4 key against
-    // ~1.5 of ambient — 1.6:1, which is a wash, not lighting. This is closer to 5:1.
-    this.sun = new THREE.DirectionalLight(0xffe9c4, 3.0);
+    // The lower, warmer key carries the direction. Keeping most of the old sky fill preserves
+    // daylight readability in Vellenwood while reducing horizontal-surface energy by about 30%.
+    this.sun = new THREE.DirectionalLight(DAYLIGHT_LOOK.sunColour, DAYLIGHT_LOOK.sunIntensity);
     this.sun.position.set(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
@@ -336,7 +358,7 @@ export class Renderer {
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
 
-    // 0.20, down from 0.55, and no longer blue.
+    // 0.18, down from 0.20, and warmer without turning the scene sepia.
     //
     // The environment map is the sky fill now, and it has direction, which is the whole reason it
     // exists. A hemisphere light at 0.55 in 0x9fc4dd added another (0.061, 0.097, 0.127) of pure
@@ -344,7 +366,11 @@ export class Renderer {
     // the problem. What is left here is a small neutral lift so the very darkest interiors do not
     // crush, with a warm ground half so that a face turned away from both sun and sky picks up
     // earth bounce rather than more sky.
-    this.scene.add(new THREE.HemisphereLight(0xcfd6d2, 0x6b5a44, 0.20));
+    this.scene.add(new THREE.HemisphereLight(
+      DAYLIGHT_LOOK.hemisphereSky,
+      DAYLIGHT_LOOK.hemisphereGround,
+      DAYLIGHT_LOOK.hemisphereIntensity,
+    ));
 
     // The 0.35 back-light that used to sit at (-30, 18, -24) is deliberately gone. It was a fixed
     // fill from one direction regardless of where the geometry faced; `scene.environment` does the
@@ -466,6 +492,65 @@ export class Renderer {
     };
   }
 
+  /**
+   * Renders one north-up orthographic tile of the actual game scene for the build-time world map.
+   *
+   * This is deliberately synchronous. The normal animation frame cannot overwrite the canvas
+   * between the render and `toDataURL`, and the caller can reveal streamed scatter immediately
+   * before calling it. The player and transient selection overlays are omitted because the map UI
+   * supplies its live player/destination markers separately.
+   */
+  captureTopDownTile(options: TopDownTileOptions): string {
+    const span = Math.max(1, options.spanMetres);
+    const pixels = Math.max(16, Math.round(options.pixels));
+    const camera = new THREE.OrthographicCamera(-span / 2, span / 2, span / 2, -span / 2, 0.1, 500);
+    // With a straight-down view, -Z as camera-up keeps +X on the image's right. The build tool
+    // flips the captured pixels vertically, which then puts +Z (north) at the top as well.
+    camera.up.set(0, 0, -1);
+    camera.position.set(options.centreX, options.centreY + 180, options.centreZ);
+    camera.lookAt(options.centreX, options.centreY, options.centreZ);
+    camera.updateMatrixWorld(true);
+
+    const previousSize = this.renderer.getSize(new THREE.Vector2());
+    const previousRatio = this.renderer.getPixelRatio();
+    const previousFog = this.scene.fog;
+    const previousSun = this.sun.position.clone();
+    const previousTarget = this.sun.target.position.clone();
+    const hidden = [this.scene.getObjectByName("player"), this.scene.getObjectByName("overlays")]
+      .filter((object): object is THREE.Object3D => object !== undefined)
+      .map((object) => ({ object, visible: object.visible }));
+
+    try {
+      for (const entry of hidden) entry.object.visible = false;
+      // Gameplay fog is measured from the player camera. From 180 m overhead it would flatten the
+      // whole tile to the horizon colour, so map capture uses the same geometry, materials and
+      // lights without that view-distance effect.
+      this.scene.fog = null;
+      // Anchor the shadow texel grid in the light camera's own right/up plane. World-X/Z snapping
+      // only happened to work while the sun was high: under a grazing key, both light-space axes
+      // contain world Y and Z, so neighbouring captures could land at a fractional texel there.
+      const shadowTarget = snapShadowTargetToTexels(
+        new THREE.Vector3(options.centreX, options.centreY, options.centreZ),
+        new THREE.Vector3().subVectors(this.sun.position, this.sun.target.position),
+        this.sun.shadow.camera,
+        this.sun.shadow.mapSize,
+      );
+      this.followShadow(shadowTarget);
+      this.renderer.setPixelRatio(1);
+      this.renderer.setSize(pixels, pixels, false);
+      this.renderer.render(this.scene, camera);
+      return this.renderer.domElement.toDataURL("image/png");
+    } finally {
+      for (const entry of hidden) entry.object.visible = entry.visible;
+      this.scene.fog = previousFog;
+      this.sun.position.copy(previousSun);
+      this.sun.target.position.copy(previousTarget);
+      this.sun.target.updateMatrixWorld(true);
+      this.renderer.setPixelRatio(previousRatio);
+      this.renderer.setSize(previousSize.x, previousSize.y, false);
+    }
+  }
+
   getStats(): RenderStats {
     return { ...this.stats };
   }
@@ -479,6 +564,39 @@ export class Renderer {
     this.skyGradients.length = 0;
     this.renderer.dispose();
   }
+}
+
+/**
+ * Moves a shadow target onto the directional light's global texel lattice.
+ *
+ * The component along the light direction is left untouched because it affects only shadow depth.
+ * Snapping the two camera-plane components makes overlapping map tiles differ by whole texels, so
+ * PCF samples the same shadow edge on both sides of a stitched join.
+ */
+function snapShadowTargetToTexels(
+  target: THREE.Vector3,
+  lightOffset: THREE.Vector3,
+  camera: THREE.OrthographicCamera,
+  mapSize: THREE.Vector2,
+): THREE.Vector3 {
+  if (lightOffset.lengthSq() < 1e-8) return target.clone();
+  const viewZ = lightOffset.clone().normalize();
+  const viewX = new THREE.Vector3(0, 1, 0).cross(viewZ);
+  if (viewX.lengthSq() < 1e-8) viewX.set(1, 0, 0);
+  else viewX.normalize();
+  const viewY = viewZ.clone().cross(viewX).normalize();
+
+  const texelX = Math.abs(camera.right - camera.left) / Math.max(1, mapSize.x);
+  const texelY = Math.abs(camera.top - camera.bottom) / Math.max(1, mapSize.y);
+  if (texelX <= 0 || texelY <= 0) return target.clone();
+
+  const right = Math.round(target.dot(viewX) / texelX) * texelX;
+  const up = Math.round(target.dot(viewY) / texelY) * texelY;
+  const depth = target.dot(viewZ);
+  return new THREE.Vector3()
+    .addScaledVector(viewX, right)
+    .addScaledVector(viewY, up)
+    .addScaledVector(viewZ, depth);
 }
 
 /** Which of the two authored columns a gradient is built from, and what happens to it after. */

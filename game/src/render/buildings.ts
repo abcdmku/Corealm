@@ -215,12 +215,12 @@ export interface PartPlacement {
  * config precisely because none of them has a doorway to pinch shut.
  */
 export type PrefabId =
-  | "cottage" | "hall" | "tower" | "stall" | "wall_segment"
+  | "cottage" | "townhouse" | "hall" | "tower" | "stall" | "wall_segment"
   | "gatehouse" | "shed" | "ruin" | "quarry_hut"
   | "forge" | "porch" | "arcade" | "market_row" | "well" | "farmstead";
 
 export const PREFAB_IDS: readonly PrefabId[] = [
-  "cottage", "hall", "tower", "stall", "wall_segment", "gatehouse", "shed", "ruin", "quarry_hut",
+  "cottage", "townhouse", "hall", "tower", "stall", "wall_segment", "gatehouse", "shed", "ruin", "quarry_hut",
   "forge", "porch", "arcade", "market_row", "well", "farmstead",
 ] as const;
 
@@ -395,6 +395,12 @@ function wallModule(
 ): void {
   out.push(part(`w${tag}`, assetId, onSide(side, count, index, y, 0), side.yaw));
   if (y === 0) trimUnder(out, `t${trimTag}`, side, count, index);
+  if (assetId === kit.wallWindow) {
+    // The wall modules contain the aperture but no frame or glass. `window_wide` is the matching
+    // complete insert (1.365 x 1.726 m), set a few centimetres proud so its frame does not z-fight
+    // the panel.
+    out.push(part(`g${tag}`, "window_wide", onSide(side, count, index, y, 0.03), side.yaw));
+  }
   if (kit.frame !== null && assetId !== kit.wallWindow && assetId !== kit.wallDoor) {
     out.push(part(`f${tag}`, kit.frame, onSide(side, count, index, y, 0.02), side.yaw));
   }
@@ -599,6 +605,7 @@ function gableEnds(
   width: number,
   depth: number,
   roof: PlacedRoof,
+  baseY = STOREY_METRES,
 ): void {
   // Where the roof crosses the wall head, which is what has to be closed - not the eave, which is
   // out over open air, and not the footprint, which the roof already over-sails.
@@ -609,7 +616,7 @@ function gableEnds(
     out.push(loose(
       `gable${index}`, "roof_gable_brick",
       roof.alongZ ? 0 : (ridgeLength / 2) * sign,
-      STOREY_METRES,
+      baseY,
       roof.alongZ ? (ridgeLength / 2) * sign : 0,
       roof.alongZ ? (sign < 0 ? 0 : Math.PI) : (sign < 0 ? Math.PI / 2 : -Math.PI / 2),
       scale,
@@ -620,7 +627,7 @@ function gableEnds(
   if (GABLE_HALF_AT_BASE * scale < headHalf - 0.35) {
     throw new Error(`gable half ${(GABLE_HALF_AT_BASE * scale).toFixed(3)} cannot reach the wall head at ${headHalf.toFixed(3)}`);
   }
-  eavesPlate(out, width, depth, roof);
+  eavesPlate(out, width, depth, roof, baseY);
 }
 
 /**
@@ -665,6 +672,7 @@ function eavesPlate(
   width: number,
   depth: number,
   roof: PlacedRoof,
+  baseY = STOREY_METRES,
 ): void {
   const sides = ringSides(width, depth);
   // The gable ends are the two faces the ridge runs INTO, which is the pair `gableEnds` closes.
@@ -672,7 +680,7 @@ function eavesPlate(
     const side = sides[s]!;
     out.push(part(
       `plate${index}`, "wall_bottom_trim",
-      onSide(side, 1, 0, EAVES_PLATE_Y, 0.01),
+      onSide(side, 1, 0, baseY - (STOREY_METRES - EAVES_PLATE_Y), 0.01),
       side.yaw,
       (side.length + 0.3) / MODULE_METRES,
     ));
@@ -704,9 +712,19 @@ function jointStuds(
       `${tagPrefix}${index}`, kit.corner,
       onSide(side, count, index, y, 0, spacing / 2),
       side.yaw,
-      STOREY_METRES / kit.cornerHeight,
+      storeyPostScale(kit),
     ));
   }
+}
+
+/** Scale the kit's structural post to meet the measured 3.123 m wall head. */
+function storeyPostScale(kit: BuildingKit): number {
+  return STOREY_METRES / kit.cornerHeight;
+}
+
+/** Gate jambs may use a different post family from the walls around them. */
+function gatePostScale(kit: BuildingKit): number {
+  return STOREY_METRES / kit.gateJambHeight;
 }
 
 // -------------------------------------------------------------- building kits
@@ -763,6 +781,10 @@ export interface BuildingKit {
    */
   gatePier: string;
   gateJamb: string;
+  /** Height of `gateJamb` at scale 1. */
+  gateJambHeight: number;
+  /** How far `gateJamb` reaches along its local +Z from the pivot. */
+  gateJambForward: number;
   corner: string;
   door: string;
   /** The 4x6-class roof, for cottages, sheds and huts. */
@@ -837,6 +859,8 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
     frame: null,
     gatePier: "wall_brick_straight",
     gateJamb: "corner_brick",
+    gateJambHeight: 3.016,
+    gateJambForward: 0.377,
     corner: "corner_wood",
     door: "door_round_1",
     roofSmall: "roof_tiles_4x6",
@@ -869,6 +893,8 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
     frame: "wall_plaster_timber",
     gatePier: "wall_brick_straight",
     gateJamb: "corner_brick",
+    gateJambHeight: 3.016,
+    gateJambForward: 0.377,
     corner: "corner_wood",
     door: "door_round_2",
     roofSmall: "roof_tiles_4x6",
@@ -902,6 +928,8 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
     frame: null,
     gatePier: "wall_brick_straight",
     gateJamb: "corner_brick",
+    gateJambHeight: 3.016,
+    gateJambForward: 0.377,
     corner: "corner_brick",
     door: "door_flat_1",
     roofSmall: "roof_tiles_6x8",
@@ -966,6 +994,7 @@ export function roofOverhang(
 
   switch (prefab) {
     case "cottage":
+    case "townhouse":
     case "forge":
       return beyond(kit.roofSmallBox, small());
     case "quarry_hut": {
@@ -998,7 +1027,7 @@ export function roofOverhang(
  */
 export const ROOF_EAVE_BY_KIT: Record<KitId, number> = (() => {
   const authored: readonly (readonly [PrefabId, readonly [number, number]])[] = [
-    ["cottage", [6, 4]], ["hall", [12, 6]], ["tower", [6, 6]], ["shed", [4, 4]],
+    ["cottage", [6, 4]], ["townhouse", [6, 4]], ["hall", [12, 6]], ["tower", [6, 6]], ["shed", [4, 4]],
     ["quarry_hut", [5, 4]], ["forge", [6, 5]], ["forge", [4, 4]],
   ];
   const worst = {} as Record<KitId, number>;
@@ -1030,6 +1059,7 @@ export function buildPrefab(
 
   switch (prefab) {
     case "cottage": return cottage(width, depth, rng, kit);
+    case "townhouse": return townhouse(width, depth, rng, kit);
     case "hall": return hall(width, depth, rng, kit);
     case "tower": return tower(width, depth, rng, kit);
     case "shed": return shed(width, depth, rng, kit);
@@ -1053,6 +1083,7 @@ export function prefabHeight(prefab: PrefabId): number {
     case "tower": return 2 * STOREY_METRES + 6.8;
     case "hall": return STOREY_METRES + 4.9;
     case "cottage": return STOREY_METRES + 3.7;
+    case "townhouse": return 2 * STOREY_METRES + 3.7;
     case "quarry_hut": return STOREY_METRES + 3.2;
     case "shed": return STOREY_METRES + 2.8;
     case "gatehouse": return 2 * STOREY_METRES;
@@ -1071,6 +1102,36 @@ export function prefabHeight(prefab: PrefabId): number {
     // between `roofLargeApex` and the hall's own roof: 3.123 + 5.4 against the hall's 3.123 + 4.9.
     case "farmstead": return STOREY_METRES + 5.4;
   }
+}
+
+/** Sparse, walk-through planting at the foundation; front slots stay clear of the centre door. */
+function foundationGreenery(
+  out: PartPlacement[], width: number, depth: number, rng: Rng, count: number,
+): void {
+  const slots: readonly (readonly [number, number])[] = [
+    [-width / 2 + 0.65, -depth / 2 - 0.4], [width / 2 - 0.65, -depth / 2 - 0.4],
+    [-width / 2 + 0.65, depth / 2 + 0.36], [width / 2 - 0.65, depth / 2 + 0.36],
+    [-width / 2 - 0.36, -depth * 0.2], [-width / 2 - 0.36, depth * 0.2],
+    [width / 2 + 0.36, -depth * 0.2], [width / 2 + 0.36, depth * 0.2],
+  ];
+  const start = rng.int(0, slots.length - 1);
+  for (let index = 0; index < Math.min(count, slots.length); index += 1) {
+    const [dx, dz] = slots[(start + index * 3) % slots.length]!;
+    const assetId = rng.chance(0.72) ? "plant_leafy_small" : "plant_broad_small";
+    const scale = rng.float(0.42, 0.62);
+    const dy = assetId === "plant_leafy_small" ? 0.035 * scale : -0.079 * scale;
+    out.push(loose(`foundation_plant_${index}`, assetId, dx, dy, dz, rng.float(0, Math.PI * 2), scale));
+  }
+
+  const sides = ringSides(width, depth);
+  const sideIndex = [0, 1, 3][rng.int(0, 2)]!;
+  const side = sides[sideIndex]!;
+  const modules = moduleCount(side.length);
+  out.push(part(
+    "foundation_vine", "vine_1",
+    onSide(side, modules, rng.int(0, modules - 1), 1.75, 0.1),
+    side.yaw, 0.75,
+  ));
 }
 
 /**
@@ -1095,7 +1156,7 @@ function cottage(width: number, depth: number, rng: Rng, kit: BuildingKit): Part
     jointStuds(out, `j${s}_`, side, count, kit);
   }
 
-  corners(out, width, depth, kit.corner, 0, 1, "c");
+  corners(out, width, depth, kit.corner, 0, storeyPostScale(kit), "c");
 
   const roof = smallRoof(kit, width, depth);
   out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
@@ -1116,7 +1177,80 @@ function cottage(width: number, depth: number, rng: Rng, kit: BuildingKit): Part
     onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET),
     entry.yaw,
   ));
+  foundationGreenery(out, width, depth, rng, 3);
 
+  return out;
+}
+
+/**
+ * A compact two-storey street house: brick ground floor, plaster-and-timber upper floor, a closed
+ * tiled roof with one dormer, and a 4 x 2 m balcony aligned with both entrance doors.
+ */
+function townhouse(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPlacement[] {
+  const out: PartPlacement[] = [];
+  const sides = ringSides(width, depth);
+  const entry = sides[2]!;
+  const entryCount = moduleCount(entry.length);
+  const doorIndex = Math.floor(entryCount / 2);
+  const isDoor = (s: number, index: number): boolean => s === 2 && index === doorIndex;
+  const lowerKit: BuildingKit = {
+    ...kit,
+    wall: "wall_brick_straight",
+    wallWindow: "wall_brick_window",
+    wallDoor: "wall_brick_door",
+    wallFeature: "wall_brick_straight",
+    frame: null,
+    corner: "corner_brick",
+    cornerHeight: 3.016,
+  };
+  const upperKit: BuildingKit = {
+    ...kit,
+    wall: "wall_plaster_base",
+    wallWindow: "wall_plaster_window",
+    wallDoor: "wall_plaster_door",
+    wallFeature: "wall_plaster_base",
+    frame: "wall_plaster_timber",
+    corner: "corner_wood",
+    cornerHeight: 3,
+  };
+  const storeys: readonly { kit: BuildingKit; y: number; windows: boolean[][] }[] = [
+    { kit: lowerKit, y: 0, windows: ringWindows(sides, rng, 0.38, isDoor) },
+    { kit: upperKit, y: STOREY_METRES, windows: ringWindows(sides, rng, 0.55, isDoor) },
+  ];
+
+  for (const [storey, layer] of storeys.entries()) {
+    for (const [s, side] of sides.entries()) {
+      const modules = moduleCount(side.length);
+      for (let index = 0; index < modules; index += 1) {
+        const assetId = isDoor(s, index)
+          ? layer.kit.wallDoor
+          : layer.windows[s]![index] === true ? layer.kit.wallWindow : layer.kit.wall;
+        wallModule(out, `${storey}_${s}_${index}`, assetId, side, modules, index, layer.kit, layer.y, `${s}_${index}`);
+      }
+      jointStuds(out, `j${storey}_${s}_`, side, modules, layer.kit, layer.y);
+    }
+    corners(out, width, depth, layer.kit.corner, layer.y, storeyPostScale(layer.kit), `c${storey}_`);
+  }
+
+  out.push(part("door_ground", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
+  out.push(part("door_balcony", kit.door, onSide(entry, entryCount, doorIndex, STOREY_METRES + 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
+
+  if (width >= 4) {
+    const deckY = STOREY_METRES + 0.01;
+    const railY = STOREY_METRES + 0.105;
+    for (const [index, along] of [-1, 1].entries()) {
+      out.push(part(`balcony_floor_${index}`, "floor_wood", onSide(entry, 1, 0, deckY, 1, along), entry.yaw));
+      out.push(part(`balcony_front_${index}`, "balcony_straight", onSide(entry, 1, 0, railY, 1, along), entry.yaw));
+    }
+    out.push(part("balcony_side_l", "balcony_straight", onSide(entry, 1, 0, railY, 1, 1), entry.yaw + Math.PI / 2));
+    out.push(part("balcony_side_r", "balcony_straight", onSide(entry, 1, 0, railY, 1, -1), entry.yaw - Math.PI / 2));
+  }
+
+  const roof = smallRoof(kit, width, depth);
+  out.push(loose("roof", kit.roofSmall, 0, 2 * STOREY_METRES, 0, roof.rotationY, roof.scale));
+  addRoofline(out, width, depth, roof, kit, 2 * STOREY_METRES, true);
+  out.push(loose("chimney", "chimney", width * 0.28, 2 * STOREY_METRES - 0.3, depth / 2 - 0.55, 0, 1));
+  foundationGreenery(out, width, depth, rng, 4);
   return out;
 }
 
@@ -1136,11 +1270,13 @@ function addRoofline(
   depth: number,
   roof: PlacedRoof,
   kit: BuildingKit,
+  baseY = STOREY_METRES,
+  forceDormer = false,
 ): void {
-  gableEnds(out, width, depth, roof);
+  gableEnds(out, width, depth, roof, baseY);
   const alongZ = roof.alongZ;
   const ridgeLength = alongZ ? depth : width;
-  const ridgeY = STOREY_METRES + roof.apex;
+  const ridgeY = baseY + roof.apex;
 
   if (kit.ridge === "roof_log") {
     // roof_log's pivot is 3.85 m below the beam, and the beam runs along local Z for +-5.35 m, so
@@ -1156,13 +1292,13 @@ function addRoofline(
     ));
   }
 
-  if (kit.roofFeature === "roof_dormer") {
+  if (forceDormer || kit.roofFeature === "roof_dormer") {
     // Halfway up the eave slope, opposite the chimney: a window looking out of the roof.
     const outward = (alongZ ? width : depth) / 2 - 0.5;
     out.push(loose(
       "dormer", "roof_dormer",
       alongZ ? -outward : 0,
-      STOREY_METRES + 0.55,
+      baseY + 0.55,
       alongZ ? 0 : -outward,
       alongZ ? -Math.PI / 2 : Math.PI,
       1,
@@ -1208,7 +1344,7 @@ function hall(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
     jointStuds(out, `j${s}_`, side, count, kit);
   }
 
-  corners(out, width, depth, kit.corner, 0, 1, "c");
+  corners(out, width, depth, kit.corner, 0, storeyPostScale(kit), "c");
 
   const roof = largeRoof(kit, width, depth);
   out.push(loose("roof", kit.roofLarge, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
@@ -1227,6 +1363,7 @@ function hall(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
   out.push(part("banner_r", "banner_1", onSide(entry, entryCount, doorIndex, 2.6, 0.12, 1.6), entry.yaw));
   out.push(part("lamp_l", "lamp_wall", onSide(entry, entryCount, doorIndex, 1.3, 0.08, -1.2), entry.yaw, 1.1));
   out.push(part("lamp_r", "lamp_wall", onSide(entry, entryCount, doorIndex, 1.3, 0.08, 1.2), entry.yaw, 1.1));
+  foundationGreenery(out, width, depth, rng, 4);
 
   return out;
 }
@@ -1274,7 +1411,7 @@ function tower(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPl
       }
       jointStuds(out, `j${storey}_${s}_`, side, count, kit, y);
     }
-    corners(out, width, depth, kit.corner, y, 1, `c${storey}_`);
+    corners(out, width, depth, kit.corner, y, storeyPostScale(kit), `c${storey}_`);
   }
 
   // roof_tower's bbox is 5.651 across; oversize it slightly so the eaves clear the walls.
@@ -1308,7 +1445,7 @@ function shed(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
     jointStuds(out, `j${s}_`, side, count, kit);
   }
 
-  corners(out, width, depth, kit.corner, 0, 1, "c");
+  corners(out, width, depth, kit.corner, 0, storeyPostScale(kit), "c");
   // The small roof at 0.8 of the footprint it covers leaves eaves all round a 4 x 4 shed with no
   // gaps. The ratio is against the kit's own coverage, so the stone kit's wider roof does not
   // swallow the shed it sits on.
@@ -1348,7 +1485,7 @@ function quarryHut(width: number, depth: number, rng: Rng, kit: BuildingKit): Pa
     jointStuds(out, `j${s}_`, side, count, kit);
   }
 
-  corners(out, width, depth, kit.corner, 0, 1, "c");
+  corners(out, width, depth, kit.corner, 0, storeyPostScale(kit), "c");
   // The 0.98 is the hut's own tightened roof, and `addRoofline` used to be handed the UNtightened
   // fit, so every gable and ridge on a quarry hut was sized to a roof 2% bigger than the one drawn.
   const hutRoof = smallRoof(kit, width, depth, 0.98);
@@ -1391,12 +1528,18 @@ function farmstead(width: number, depth: number, rng: Rng, kit: BuildingKit): Pa
   const entry = sides[2]!;
   const entryCount = moduleCount(entry.length);
   const doorIndex = Math.floor(entryCount / 2);
+  // An eight-metre barn gets a pair of adjacent door modules. The kit has no cart-door asset, but
+  // two leaves read as a working loading entrance and preserve the opaque wall-module contract.
+  const doorIndices = entryCount >= 4
+    ? new Set([Math.floor((entryCount - 1) / 2), Math.floor(entryCount / 2)])
+    : new Set([doorIndex]);
+  const isCartDoor = (s: number, index: number): boolean => s === 2 && doorIndices.has(index);
 
-  const windows = ringWindows(sides, rng, 0.3, (s, index) => s === 2 && index === doorIndex);
+  const windows = ringWindows(sides, rng, 0.3, isCartDoor);
   for (const [s, side] of sides.entries()) {
     const count = moduleCount(side.length);
     for (let index = 0; index < count; index += 1) {
-      const isDoor = s === 2 && index === doorIndex;
+      const isDoor = isCartDoor(s, index);
       const assetId = isDoor
         ? kit.wallDoor
         : windows[s]![index] === true ? kit.wallWindow : kit.wall;
@@ -1404,12 +1547,19 @@ function farmstead(width: number, depth: number, rng: Rng, kit: BuildingKit): Pa
     }
     jointStuds(out, `j${s}_`, side, count, kit);
   }
-  corners(out, width, depth, kit.corner, 0, 1, "c");
+  corners(out, width, depth, kit.corner, 0, storeyPostScale(kit), "c");
 
   const roof = largeRoof(kit, width, depth);
   out.push(loose("roof", kit.roofLarge, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
   addRoofline(out, width, depth, roof, kit);
-  out.push(part("door", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
+  for (const index of [...doorIndices].sort((a, b) => a - b)) {
+    out.push(part(
+      index === doorIndex ? "door" : `door_${index}`,
+      kit.door,
+      onSide(entry, entryCount, index, 0.02, 0.02, DOOR_LEAF_OFFSET),
+      entry.yaw,
+    ));
+  }
   out.push(part("lamp", "lamp_wall", onSide(entry, entryCount, doorIndex, 2.1, 0.08, 1.35), entry.yaw, 1.15));
 
   // The yard side. Everything here sits OUTSIDE the footprint, so it is outside the prefab's own
@@ -1496,9 +1646,25 @@ function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacemen
   const usable = gap + 2 * pierWidth;
   const pierModules = Math.round(pierWidth / MODULE_METRES);
   const faceZ = depth / 2;
+  const sideModules = moduleCount(depth);
+  const sideSpacing = depth / sideModules;
+  const jambScale = gatePostScale(kit);
+  // The passage jamb pivots sit their measured forward reach inside
+  // the pier so the visible masonry stops on the same +/-gap/2 line as the collision boxes.
+  const passageJambInset = kit.gateJambForward * jambScale;
   // A wall panel's outward face is WALL_FACE past its pivot, so trim placed 0.01 further out sits
   // on the face rather than inside it; `outward` carries the flip for the -Z elevation.
   const faces: readonly (readonly [string, number, number])[] = [["f", faceZ, 0], ["b", -faceZ, Math.PI]];
+  // The outer face and the passage face of each pier. A gate built from front and back elevations
+  // alone is two scenery cards with 2.37 m of daylight through each side at the authored 3 m
+  // depth. These four returns make each pier a closed masonry shell without narrowing the 4 m
+  // collision passage.
+  const returns: readonly (readonly [string, number, number, number])[] = [
+    ["ol", -usable / 2, -Math.PI / 2, -1],
+    ["il", -gap / 2 - WALL_FACE, Math.PI / 2, 1],
+    ["ir", gap / 2 + WALL_FACE, -Math.PI / 2, -1],
+    ["or", usable / 2, Math.PI / 2, 1],
+  ];
 
   for (let storey = 0; storey < 2; storey += 1) {
     const y = storey * STOREY_METRES;
@@ -1537,7 +1703,75 @@ function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacemen
         }
       }
     }
-    corners(out, usable, depth, kit.gateJamb, y, 1, `c${storey}_`);
+
+    for (const [name, x, yaw, outward] of returns) {
+      for (let m = 0; m < sideModules; m += 1) {
+        const z = (m + 0.5) * sideSpacing - depth / 2;
+        out.push(loose(`r${name}${storey}_${m}`, kit.gatePier, x, y, z, yaw));
+        if (storey === 0) {
+          out.push(loose(
+            `u${name}_${m}`, "wall_bottom_trim", x + outward * 0.01, 0, z, yaw,
+          ));
+        }
+      }
+      // A post at the joint between the two overlapping side modules keeps the 3 m return from
+      // reading as two panels pushed through one another.
+      for (let m = 1; m < sideModules; m += 1) {
+        const jointX = name === "il"
+          ? -gap / 2 - passageJambInset
+          : name === "ir" ? gap / 2 + passageJambInset : x;
+        out.push(loose(
+          `j${name}${storey}_${m - 1}`, kit.gateJamb,
+          jointX, y, -depth / 2 + m * sideSpacing, yaw, jambScale,
+        ));
+      }
+    }
+
+    corners(out, usable, depth, kit.gateJamb, y, jambScale, `c${storey}_`);
+    // The four passage corners are not footprint corners, so `corners` cannot place their jambs.
+    let innerCorner = 0;
+    for (const sx of [-1, 1]) {
+      const yaw = sx < 0 ? Math.PI / 2 : -Math.PI / 2;
+      for (const sz of [-1, 1]) {
+        out.push(loose(
+          `i${storey}_${innerCorner}`, kit.gateJamb,
+          sx * (gap / 2 + passageJambInset), y, sz * faceZ,
+          yaw, jambScale,
+        ));
+        innerCorner += 1;
+      }
+    }
+  }
+
+  // A masonry ceiling over the passage and a flat top deck. `floor_brick` is exactly 2 x 2 m;
+  // the 3 m gate depth takes two overlapping rows, which project 0.25 m beyond each elevation as
+  // a deliberate ledge. X remains on the exact module grid and the passage remains four metres.
+  const deck = (tag: string, span: number, y: number): void => {
+    const columns = Math.max(1, Math.round(span / MODULE_METRES));
+    for (let zIndex = 0; zIndex < sideModules; zIndex += 1) {
+      const z = (zIndex + 0.5) * sideSpacing - depth / 2;
+      for (let xIndex = 0; xIndex < columns; xIndex += 1) {
+        const x = (xIndex + 0.5) * MODULE_METRES - span / 2;
+        out.push(loose(`${tag}_${zIndex}_${xIndex}`, "floor_brick", x, y, z));
+      }
+    }
+  };
+  deck("ceiling", gap, STOREY_METRES);
+  // floor_brick extends 0.01 m below its pivot; lift the roof deck so its underside meets the wall.
+  deck("deck", usable, 2 * STOREY_METRES + 0.01);
+
+  // Front and back coping are emitted with the upper facade. Continue that parapet around both
+  // outer returns so the flat deck has no raw side edge.
+  for (const [index, sx] of [-1, 1].entries()) {
+    const yaw = sx < 0 ? -Math.PI / 2 : Math.PI / 2;
+    const x = sx * (usable / 2 - 0.46);
+    for (let m = 0; m < sideModules; m += 1) {
+      const z = (m + 0.5) * sideSpacing - depth / 2;
+      out.push(loose(
+        `ks${index}_${m}`, "kerb_straight",
+        x, 2 * STOREY_METRES - 0.134, z, yaw,
+      ));
+    }
   }
 
   for (const [index, sx] of [-1, 1].entries()) {
@@ -1571,8 +1805,8 @@ function wallSegment(width: number, kit: BuildingKit): PartPlacement[] {
     out.push(loose(`t${index}`, "wall_bottom_trim", x, 0, 0.01, 0));
     if (kit.frame !== null) out.push(loose(`f${index}`, kit.frame, x, 0, 0.02, 0));
   }
-  out.push(loose("end_l", kit.corner, -width / 2, 0, 0, -Math.PI / 4));
-  out.push(loose("end_r", kit.corner, width / 2, 0, 0, Math.PI / 4));
+  out.push(loose("end_l", kit.corner, -width / 2, 0, 0, -Math.PI / 4, storeyPostScale(kit)));
+  out.push(loose("end_r", kit.corner, width / 2, 0, 0, Math.PI / 4, storeyPostScale(kit)));
   return out;
 }
 
@@ -1605,7 +1839,9 @@ function ruin(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
   // ground and the other was stuck in it. Same yaw as the panel it sits under, pushed 0.01 out
   // along that panel's own outward normal (-X) so the two faces do not z-fight.
   out.push(loose("side_trim", "wall_bottom_trim", -width / 2 - 0.01, 0, 0, -Math.PI / 2));
-  out.push(loose("post", kit.corner, width / 2, 0, depth / 2, Math.PI / 4));
+  out.push(loose(
+    "post", kit.corner, width / 2, 0, depth / 2, Math.PI / 4, storeyPostScale(kit),
+  ));
   out.push(loose("rub1", "rubble_brick_1", rng.float(-1.5, 1.5), 0, rng.float(-2, 0), rng.float(0, Math.PI), 2.4));
   out.push(loose("rub2", "rubble_brick_2", rng.float(-1.5, 1.5), 0, rng.float(-2, 0), rng.float(0, Math.PI), 2.2));
   out.push(loose("vine", "vine_1", -width / 2 + 0.2, 3.0, 0.4, -Math.PI / 2, 1.3));
@@ -1682,7 +1918,7 @@ function forge(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPl
     jointStuds(out, `j${s}_`, side, count, kit);
   }
 
-  corners(out, width, depth, kit.corner, 0, 1, "c");
+  corners(out, width, depth, kit.corner, 0, storeyPostScale(kit), "c");
 
   const roof = smallRoof(kit, width, depth);
   out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
@@ -1725,10 +1961,14 @@ function porch(width: number, depth: number, kit: BuildingKit): PartPlacement[] 
   for (let index = 0; index < bays; index += 1) {
     coveredBay(out, `b${index}_`, kit, (index + 0.5) * MODULE_METRES - span / 2, backZ);
   }
-  // corner_wood is 3.000 tall and corner_brick 3.016, and both canopies soffit at 2.68 or higher,
-  // so an unscaled post reaches the front edge in every kit.
+  // Scale the kit post to the wall head. The raw wood and brick posts stop 0.123 m and 0.107 m
+  // short respectively, which leaves the stone canopy visibly unsupported from a low camera.
   for (const [index, sx] of [-1, 1].entries()) {
-    out.push(loose(`post${index}`, kit.corner, (span / 2 - 0.12) * sx, 0, frontZ - 0.12, Math.atan2(sx, 1)));
+    out.push(loose(
+      `post${index}`, kit.corner,
+      (span / 2 - 0.12) * sx, 0, frontZ - 0.12,
+      Math.atan2(sx, 1), storeyPostScale(kit),
+    ));
   }
   out.push(loose("lamp", "lamp_wall", -span / 2 + 0.7, 2.1, backZ + 0.35, 0, 1.15));
   out.push(loose("banner", "banner_1", span / 2 - 1.75, 2.4, backZ + 0.32, 0, 1.05));
@@ -1751,10 +1991,10 @@ function arcade(width: number, depth: number, kit: BuildingKit): PartPlacement[]
   // are the only thing that tells you at 40 m that the row is roofed rather than walled.
   for (let index = 0; index <= bays; index += 1) {
     const x = index * MODULE_METRES - span / 2;
-    out.push(loose(`post${index}`, kit.corner, x, 0, frontZ - 0.12, 0));
+    out.push(loose(`post${index}`, kit.corner, x, 0, frontZ - 0.12, 0, storeyPostScale(kit)));
   }
-  out.push(loose("end_l", kit.corner, -span / 2, 0, backZ, -Math.PI / 4));
-  out.push(loose("end_r", kit.corner, span / 2, 0, backZ, Math.PI / 4));
+  out.push(loose("end_l", kit.corner, -span / 2, 0, backZ, -Math.PI / 4, storeyPostScale(kit)));
+  out.push(loose("end_r", kit.corner, span / 2, 0, backZ, Math.PI / 4, storeyPostScale(kit)));
   out.push(loose("lamp_l", "lamp_wall", -span / 2 + 1, 2.1, backZ + 0.35, 0, 1.15));
   out.push(loose("lamp_r", "lamp_wall", span / 2 - 1, 2.1, backZ + 0.35, 0, 1.15));
 
@@ -1869,10 +2109,10 @@ function well(kit: BuildingKit): PartPlacement[] {
  *
  * WHAT BREAKS UP A 52 M RUN. It used to be one asset with one overlay on every module and a string
  * course on every fourth, which at 50 m is `wall_plaster_timber`'s brace repeated 21 times - the
- * "repeating timber Z that reads as wallpaper". Four seeded things now vary along a run: the panel
- * (plain, the kit's richer panel, or an arrow loop), the half-timbering, the string course, and a
- * buttress post at the module joints. All four come out of the run's own `variantSeed`, so adding a
- * run cannot shift anything else's randomness.
+ * "repeating timber Z that reads as wallpaper". Four seeded things now vary along a run: plain or
+ * richer solid panels, half-timbering, the string course, and a buttress post at the module joints.
+ * The kit's open household-window panels are deliberately excluded. All four choices come out of
+ * the run's own `variantSeed`, so adding a run cannot shift anything else's randomness.
  *
  * AND IT IS CAPPED. `kerb_straight` is 2.000 x 0.134 x 0.700 with its body entirely on the +Z side
  * of its pivot; laid along the wall head it overhangs the 0.406 m panel by 0.147 m on each face,
@@ -1893,17 +2133,18 @@ export function buildWallRun(
   for (const [index, module] of modules.entries()) {
     const centre = (module.from + module.to) / 2;
     const scale = (module.to - module.from) / MODULE_METRES;
-    // One roll, three outcomes, so the stream advances the same way whatever it picks.
+    // Fortification walls use only solid panels. The kit's window is an unglazed household-sized
+    // aperture, not an arrow loop, and a solid collision box behind it makes the opening lie.
+    // Keep one roll so seeds and every later decoration choice remain stable.
     const roll = rng.float(0, 1);
-    const assetId = roll < 0.16 ? kit.wallWindow : roll < 0.44 ? kit.wallFeature : kit.wall;
+    const assetId = roll < 0.28 ? kit.wallFeature : kit.wall;
     out.push(loose(`w${index}`, assetId, centre, 0, 0, 0, scale));
     out.push(loose(`t${index}`, "wall_bottom_trim", centre, 0, 0.01, 0, scale));
     // The coping. Its own y and z are unscaled by the module's length scale in everything but the
     // asset's uniform scale, so a short end module still gets a proportionate cap.
     out.push(loose(`k${index}`, "kerb_straight", centre, STOREY_METRES - 0.134 * scale, -0.11 - 0.35 * scale, 0, scale));
-    // Half-timbering on the solid modules only, same rule as a building's ring wall: the frame's
-    // braces cross the middle of the module and would draw an X over an arrow loop.
-    if (kit.frame !== null && assetId !== kit.wallWindow && rng.chance(0.8)) {
+    // Half-timbering on the solid modules only, same rule as a building's ring wall.
+    if (kit.frame !== null && rng.chance(0.8)) {
       out.push(loose(`f${index}`, kit.frame, centre, 0, 0.02, 0, scale));
     }
     // A string course two thirds up. Cheap (one more instance of an asset the run already draws)
@@ -1920,7 +2161,9 @@ export function buildWallRun(
     posts.add(r3(span.to));
   }
   for (const [postIndex, x] of [...posts].sort((a, b) => a - b).entries()) {
-    out.push(loose(`p${postIndex}`, kit.corner, x, 0, 0, Math.PI / 4));
+    out.push(loose(
+      `p${postIndex}`, kit.corner, x, 0, 0, Math.PI / 4, storeyPostScale(kit),
+    ));
   }
 
   // A buttress on every joint between two modules. It is the vertical rhythm the run had none of,
@@ -1932,7 +2175,7 @@ export function buildWallRun(
   for (const [index, module] of modules.entries()) {
     const next = modules[index + 1];
     if (next === undefined || Math.abs(next.from - module.to) > 1e-6) continue;
-    out.push(loose(`b${buttress}`, kit.corner, r3(module.to), 0, 0, 0, STOREY_METRES / kit.cornerHeight));
+    out.push(loose(`b${buttress}`, kit.corner, r3(module.to), 0, 0, 0, storeyPostScale(kit)));
     buttress += 1;
   }
 
@@ -2297,7 +2540,11 @@ function bankCounter(kit: BuildingKit): PartPlacement[] {
     coveredBay(out, `b${index}_`, kit, sx * (MODULE_METRES / 2), backZ);
   }
   for (const [index, sx] of [-1, 1].entries()) {
-    out.push(loose(`post${index}`, kit.corner, 1.9 * sx, 0, backZ + CANOPY_DEPTH_METRES - 0.12, Math.atan2(sx, 1)));
+    out.push(loose(
+      `post${index}`, kit.corner,
+      1.9 * sx, 0, backZ + CANOPY_DEPTH_METRES - 0.12,
+      Math.atan2(sx, 1), storeyPostScale(kit),
+    ));
   }
   // table_large is 2.848 x 0.813 x 1.097 with its pivot centred, so this sits it across the bay
   // mouth with 1.5 m of standing room behind it and the chest behind that.
@@ -2429,7 +2676,7 @@ function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
 
   // The barn, turned to face the yard. (-dx, -dz) with PI added to the yaw is a half turn about the
   // composition origin; the translation then puts its centre at local (0, -6.4).
-  for (const placement of buildPrefab("farmstead", [7, 4], rng.int(1, 1_000_000), kit.id)) {
+  for (const placement of buildPrefab("farmstead", [8, 4], rng.int(1, 1_000_000), kit.id)) {
     out.push({
       tag: `barn_${placement.tag}`,
       assetId: placement.assetId,
@@ -2477,6 +2724,11 @@ export function prefabCollision(prefab: PrefabId, footprint: readonly [number, n
   const depth = Math.max(MODULE_METRES, footprint[1]);
   const height = prefabHeight(prefab);
 
+  if (prefab === "townhouse") {
+    // The balcony and foundation planting are walk-through dressing. The two-storey body keeps the
+    // same horizontal footprint contract as a cottage, so it cannot silently close the street.
+    return [{ tag: "body", dx: 0, dz: 0, sizeX: width, sizeZ: depth, height }];
+  }
   if (prefab === "gatehouse") {
     // Two piers, GATE_GAP_METRES apart, from the same `gateGeometry` the arch is drawn to. This is
     // finding 1: the piers used to be `(width - 2) / 2` wide whatever the drawn geometry did, so

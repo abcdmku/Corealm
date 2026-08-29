@@ -18,6 +18,8 @@ export interface RuntimeSnapshot {
 export interface DriverOptions {
   headless?: boolean;
   viewport?: { width: number; height: number };
+  /** Optional browser launch flags. Deterministic gameplay checks keep the SwiftShader default. */
+  browserArgs?: string[];
 }
 
 export class GameDriver {
@@ -37,7 +39,7 @@ export class GameDriver {
   async launch(): Promise<void> {
     this.browser = await chromium.launch({
       headless: this.options.headless ?? true,
-      args: ["--enable-unsafe-swiftshader", "--mute-audio"],
+      args: this.options.browserArgs ?? ["--enable-unsafe-swiftshader", "--mute-audio"],
     });
     this.context = await this.browser.newContext({
       viewport: this.options.viewport ?? { width: 1280, height: 720 },

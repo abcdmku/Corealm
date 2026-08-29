@@ -17,10 +17,7 @@ import { RngStreams } from "../core/rng.js";
 import { Renderer } from "../render/renderer.js";
 import { OrbitCamera } from "../render/camera.js";
 import { AssetRegistry } from "../render/assets.js";
-import {
-  WorldScene, pavingStampFromRect,
-  type PavingStamp, type RoadStamp, type WaterStamp,
-} from "../render/scene.js";
+import { WorldScene } from "../render/scene.js";
 import { EntityViews } from "../render/entityViews.js";
 import { Physics } from "../systems/physics.js";
 import { Navigation, solidObstacleMeshes } from "../systems/navigation.js";
@@ -32,6 +29,7 @@ import { installBootPlaceholder, installGameDebug, type RecordedError } from "..
 import { GameLoop } from "./loop.js";
 import { InputController } from "../input/mouse.js";
 import { WATER_BASIN_DEPTH, buildWorldTerrainSpec, startingSpawn } from "./worldSpec.js";
+import { prepareWorldSurface } from "./worldSurface.js";
 import { CAMERA } from "./config.js";
 import { buildWorld, type BuildingBox } from "../world/regionBuilder.js";
 import { EntityStore, straightLineDistance } from "../world/entities.js";
@@ -82,6 +80,7 @@ export interface BootResult {
 
 export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   const errors: RecordedError[] = [];
+  const worldMapCapture = new URLSearchParams(window.location.search).get("world-map-capture") === "1";
   const startedAt = performance.now();
   const atMs = (): number => performance.now() - startedAt;
 
@@ -159,7 +158,8 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // Flat pads are registered before the terrain mesh is generated, or the ground under a
   // settlement stays as noisy as the moor around it — Coldbrace square measured a metre of tilt
   // across 33 m before this. worldSpec derives the pads from the authored settlement data.
-  scene.buildWorld(buildWorldTerrainSpec());
+  const terrainSpec = buildWorldTerrainSpec();
+  scene.buildWorld(terrainSpec);
   // One heightfield collider rather than 28 terrain trimeshes: same ground answers, 24 ms instead
   // of a per-chunk trimesh build, and a single collider for the ray queries to walk.
   physics.addHeightfield(scene.heightfieldSamples());
@@ -179,17 +179,11 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   //     already exists, and the water level has to be sampled off the finished terrain. Supplying
   //     roads here also retires the ribbon path — `scene.buildRoad` returns null once stamps are
   //     provided — so there is exactly one road in the world rather than two that disagree.
-  scene.setGroundStamps({
-    roads: collectRoadStamps(scene),
-    paving: collectPavingStamps(),
-    water: collectWaterStamps(scene),
-    seed: store.get().meta.seed,
-  });
+  prepareWorldSurface(scene, store.get().meta.seed);
 
   // 7c. Water. Fishing spots were authored as interaction markers with a note that the water itself
   //     is the render layer's job — and nothing was building it, so every fishing spot sat on dry
   //     grass. Each `kind: "water"` location gets a surface sunk just below the local ground.
-  buildWaterBodies(scene);
 
   // 8. Semantic world. Data in, entities out, deterministic from the seed.
   setStatus("populating the frontier…");
@@ -200,10 +194,28 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // Fallen Duskoak hovered 5.77 m and the Coldbrace fletching bench 1.41 m, and why 74 of 151
   // measured entities sat more than 5 cm off the ground. `assetSize` sizes the collision volumes
   // that make the world solid at all.
+  const roadPolylines = scene.getRoadPolylines();
+  const roadDistance = (x: number, z: number): number => {
+    let best = Infinity;
+    for (const line of roadPolylines) {
+      for (let index = 0; index < line.length - 1; index += 1) {
+        const a = line[index]!;
+        const b = line[index + 1]!;
+        const dx = b[0] - a[0];
+        const dz = b[2] - a[2];
+        const lengthSq = dx * dx + dz * dz;
+        const t = lengthSq <= 1e-9 ? 0 : Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[2]) * dz) / lengthSq));
+        best = Math.min(best, Math.hypot(x - (a[0] + dx * t), z - (a[2] + dz * t)));
+      }
+    }
+    return best;
+  };
   const worldPorts = {
     heightAt,
     baseY: (assetId: string): number => assets.baseY(assetId),
     assetSize: (assetId: string): { x: number; y: number; z: number } | null => assets.assetSize(assetId),
+    assetCenterXZ: (assetId: string): { x: number; z: number } | null => assets.assetCenterXZ(assetId),
+    roadDistance,
   };
   const built = buildWorld(store.get().meta.seed, heightAt, worldPorts);
 
@@ -725,6 +737,15 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // model-context container the browser provides. One implementation, three ways in.
   // The human UI. Everything it does goes through GameApi, the same object the agent tools call.
   const ui = createUi(api, {
+    mapTerrain: {
+      bounds: terrainSpec.bounds,
+      sample: (x, z) => ({
+        height: scene.meshHeightAt(x, z),
+        normal: scene.normalAt(x, z),
+        regionId: scene.regionAt(x, z),
+      }),
+      roadPolylines: () => scene.getRoadPolylines(),
+    },
     // OrbitCamera yaw is measured from +z clockwise; the compass wants a heading in the same frame.
     getHeadingRad: () => camera.yaw,
     hasSave: () => loaded.status === "loaded",
@@ -861,6 +882,23 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     // "scatter placed nothing" and "nobody asked scatter" are different bugs, and the debug surface
     // could not tell them apart while boot threw this array away.
     scatterStats: () => scatterResults,
+    playerMotion: () => playerRig.motionSnapshot(),
+    entityMotion: (entityId: EntityId) => entityViews.motionSnapshot(entityId),
+    waterBodies: () => scene.getWaterBodies(),
+    captureWorldMapTile: (options) => {
+      const position = store.get().player.position;
+      // All terrain, assets and entity batches are resident; only procedural scatter is hidden by
+      // region streaming. Reveal it for this synchronous render, then restore the gameplay view.
+      scene.updateStreaming(0, 0, Infinity);
+      try {
+        return renderer.captureTopDownTile({
+          ...options,
+          centreY: scene.meshHeightAt(options.centreX, options.centreZ),
+        });
+      } finally {
+        if (!worldMapCapture) scene.updateStreaming(position[0], position[2]);
+      }
+    },
     resetWorld,
     isIdle: () => store.get().player.movement.mode === "idle" && store.get().activity === null,
     teleport: (to: Vec3) => {
@@ -954,7 +992,13 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
 
   document.getElementById("boot-screen")?.remove();
-  loop.start();
+  if (worldMapCapture) {
+    // Build-time capture is deterministic: no animation/motion frame may land between two tiles.
+    scene.updateTime(0);
+    scene.updateStreaming(0, 0, Infinity);
+  } else {
+    loop.start();
+  }
   return { loop, api };
 }
 
@@ -1062,66 +1106,15 @@ function validateQuestObjectives(itemIds: ReadonlySet<string>): string[] {
  * The surface is set slightly BELOW the sampled ground height at the centre, so the shoreline is
  * where the terrain rises through the plane rather than a hard rectangle edge floating on a field.
  */
-function buildWaterBodies(scene: WorldScene): number {
-  let built = 0;
-  for (const region of REGIONS) {
-    // Water exists for a gameplay reason, so it is sized and centred on the fishing cluster rather
-    // than on the scenic location marker. Centring on the marker put every fishing spot on dry
-    // grass beside a pond, which reads as a bug even though both were where they were authored.
-    const clusters = region.clusters.filter((cluster) => cluster.archetype === "fishing_spot");
-    for (const cluster of clusters) {
-      const [x, z] = cluster.centre;
-      const half = cluster.radius + 14;
-
-      // worldSpec carved a basin here before the terrain mesh was built, so the floor is
-      // WATER_BASIN_DEPTH below the region floor. Filling most of that depth puts the waterline on
-      // the sloping bank, which is what makes the shoreline follow the terrain instead of ending
-      // in a rectangle.
-      const floor = scene.heightAt(region.id, x, z);
-      scene.buildWater(
-        { minX: x - half, maxX: x + half, minZ: z - half, maxZ: z + half },
-        floor + WATER_BASIN_DEPTH * 0.55,
-        region.id,
-      );
-      built += 1;
-    }
-  }
-  return built;
-}
-
 /**
  * The authored road network, as polylines for the ground stamp.
  *
- * Roads are authored as location-to-location links, so the line is derived from the endpoints.
- * Only x and z are read by the stamp — the ground supplies y — but the samples are taken along the
- * link anyway, because a straight two-point line over a rise stamps a corridor that cuts the hill
- * instead of following it. `setGroundStamps` then meanders each line from the world seed, so the
- * roads stop being dead straight; the route graph works on node ids rather than on this geometry,
- * so the Agility distance ledger in `content/regions.ts` is unaffected by the meander.
+ * Roads are authored as location links, then resolved through an actual settlement gate whenever
+ * one endpoint lies inside a wall circuit. The gate is an interior control point, not a decorative
+ * suggestion: stamping, scatter exclusion and the map all consume the same resulting polyline.
+ * Samples follow the terrain every six metres. The renderer may add a small deterministic meander
+ * between those fixed controls, while the route graph remains keyed by the original node ids.
  */
-function collectRoadStamps(scene: WorldScene): RoadStamp[] {
-  const stamps: RoadStamp[] = [];
-  for (const region of REGIONS) {
-    const locationById = new Map(region.locations.map((location) => [location.id, location]));
-    for (const road of region.roads) {
-      const from = locationById.get(road.from);
-      const to = locationById.get(road.to);
-      if (!from || !to) continue;
-
-      const steps = Math.max(2, Math.ceil(Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1]) / 6));
-      const points: Vec3[] = [];
-      for (let step = 0; step <= steps; step += 1) {
-        const t = step / steps;
-        const x = from.position[0] + (to.position[0] - from.position[0]) * t;
-        const z = from.position[1] + (to.position[1] - from.position[1]) * t;
-        points.push([x, scene.heightAt(region.id, x, z), z]);
-      }
-      stamps.push({ points, width: 3.2 });
-    }
-  }
-  return stamps;
-}
-
 /**
  * Paved ground, from whatever the settlements author.
  *
@@ -1129,16 +1122,6 @@ function collectRoadStamps(scene: WorldScene): RoadStamp[] {
  * emitted by `world/regionBuilder.ts`; this is the ground UNDER them, which has to read as cobble
  * rather than as grass showing through a 2 cm gap between 2 m tiles.
  */
-function collectPavingStamps(): PavingStamp[] {
-  const stamps: PavingStamp[] = [];
-  for (const region of REGIONS) {
-    for (const paving of region.settlement?.paving ?? []) {
-      stamps.push(pavingStampFromRect(paving.rect));
-    }
-  }
-  return stamps;
-}
-
 /**
  * Where water meets land, so the bank gets mud and wet stone instead of dry grass to the waterline.
  *
@@ -1147,22 +1130,6 @@ function collectPavingStamps(): PavingStamp[] {
  * pond, which reads as a bug even though both were where they were authored. The two must agree, so
  * they derive from the same numbers.
  */
-function collectWaterStamps(scene: WorldScene): WaterStamp[] {
-  const stamps: WaterStamp[] = [];
-  for (const region of REGIONS) {
-    for (const cluster of region.clusters) {
-      if (cluster.archetype !== "fishing_spot") continue;
-      const [x, z] = cluster.centre;
-      stamps.push({
-        centre: [x, z],
-        radius: cluster.radius + 14,
-        level: scene.heightAt(region.id, x, z) + WATER_BASIN_DEPTH * 0.55,
-      });
-    }
-  }
-  return stamps;
-}
-
 /**
  * Turns the authored dungeon data into a geometry spec.
  *
@@ -1223,18 +1190,11 @@ function registerExclusions(scene: WorldScene): void {
     for (const cluster of region.clusters) {
       worldExclusions.addCircle(cluster.centre[0], cluster.centre[1], cluster.radius + 3, "cluster", cluster.id);
     }
-    // Roads are authored as location-to-location links, so the corridor is derived from the two
-    // endpoints rather than a stored polyline.
-    const locationById = new Map(region.locations.map((location) => [location.id, location]));
-    for (const road of region.roads) {
-      const from = locationById.get(road.from);
-      const to = locationById.get(road.to);
-      if (!from || !to) continue;
-      const points: Vec3[] = [from.position, to.position].map(
-        (spot) => [spot[0], scene.heightAt(region.id, spot[0], spot[1]), spot[1]] as Vec3,
-      );
-      worldExclusions.addCorridor(points, 8, "road", `${road.from}->${road.to}`);
-    }
+  }
+  // Use the exact stamped centrelines, including gate controls and deterministic meander. A second
+  // straight-line reconstruction lets scatter and clusters grow directly through the visible road.
+  for (const [index, points] of scene.getRoadPolylines().entries()) {
+    worldExclusions.addCorridor(points, 8, "road", `resolved-road-${index}`);
   }
 }
 

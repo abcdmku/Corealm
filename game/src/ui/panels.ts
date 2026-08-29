@@ -19,7 +19,7 @@
  * resolved inside a function body instead.
  */
 import type {
-  EntityId, GameApi, ItemCategory, ItemDef, ItemId, ItemStack, Result, SkillId,
+  EntityId, GameApi, ItemCategory, ItemDef, ItemId, ItemStack, RegionId, Result, SkillId, Vec3,
 } from "../contracts.js";
 import { content } from "../content/index.js";
 import { SKILLS } from "../content/skills.js";
@@ -534,12 +534,21 @@ export function report<T>(result: Result<T>): boolean {
 
 // -------------------------------------------------------------- the context
 
+/** Read-only access to the same terrain and road geometry used by the playable world. */
+export interface MapTerrainSource {
+  readonly bounds: Readonly<{ minX: number; maxX: number; minZ: number; maxZ: number }>;
+  sample(x: number, z: number): Readonly<{ height: number; normal: Vec3; regionId: RegionId }>;
+  roadPolylines(): Vec3[][];
+}
+
 /** What each panel is handed. Everything shared, nothing global. */
 export interface UiContext {
   readonly api: GameApi;
   readonly tooltip: Tooltip;
   readonly menu: ContextMenu;
   readonly registry: KeyBindingRegistry;
+  /** Lightweight source for the real terrain-backed map; absent only in isolated UI tests. */
+  readonly mapTerrain?: MapTerrainSource;
   /** True while a bank window is open, so the inventory can offer Deposit. */
   isBankOpen(): boolean;
   /** True while a shop window is open, so the inventory can offer Sell. */
@@ -561,6 +570,7 @@ export interface ManagedPanel {
 
 export interface UiOptions {
   registry?: KeyBindingRegistry;
+  mapTerrain?: MapTerrainSource;
   /** True when boot found a save. The title screen offers "Continue" rather than "Begin". */
   hasSave?(): boolean;
   /**
@@ -619,6 +629,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     tooltip,
     menu,
     registry,
+    mapTerrain: options.mapTerrain,
     isBankOpen: () => bank?.frame.isOpen() ?? false,
     isShopOpen: () => shop?.frame.isOpen() ?? false,
     deposit: (itemId, quantity) => { bank?.deposit(itemId, quantity); },
@@ -666,7 +677,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       toggle: () => skills.frame.toggle(), isOpen: () => skills.frame.isOpen() },
     { id: "equipment", label: "Worn", key: "e", glyph: "⛨",
       toggle: () => equipment.frame.toggle(), isOpen: () => equipment.frame.isOpen() },
-    { id: "quests", label: "Journal", key: "j", glyph: "❋",
+    { id: "quests", label: "Quests", key: "j", glyph: "❋",
       toggle: () => quests.frame.toggle(), isOpen: () => quests.frame.isOpen(),
       badge: () => {
         const active = api.getQuests().filter((quest) => quest.status === "active").length;

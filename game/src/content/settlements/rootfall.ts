@@ -22,7 +22,7 @@
  * `attachedTo` / `padShape` vocabulary was added to fix.
  *
  * THE PLAN. A logging town inside a timber palisade on a 156 m circuit, x [44,80] z [102,144],
- * with three gatehouses standing IN the openings rather than beside them. 1 char = 2 m:
+ * with four gatehouses standing IN the openings rather than beside them. 1 char = 2 m:
  *
  *   144 |##################gggg####    <- north wall, Log Gate at x 74
  *   142 |#  SSS                   #
@@ -65,15 +65,15 @@
  *
  * Gate openings are authored at the gatehouse footprint's own width, 8 m, so `wallRunModules` cuts
  * exactly four 2 m modules and the two piers of the [8,3] gatehouse fill the outer two slots. That
- * leaves the full `GATE_GAP_METRES` 4 m clear span the navmesh needs. 126 m of the 156 m circuit
+ * leaves the full `GATE_GAP_METRES` 4 m clear span the navmesh needs. 124 m of the 156 m circuit
  * is built wall, all four corners are shared by two runs, and every opening carries either a
  * gatehouse or the postern the bank road leaves by. It was 0 m of wall on 140 m before.
  *
  * Gate positions are on the roads that actually leave, not on the compass. Vellenwood's roads run
  * Rootfall -> Marchgate and -> Mire Skirt (both due west), -> Blackwater Pools (crosses x = 80 at
  * z = 110.5), -> Gorge Head (crosses z = 144 at x = 74.7) and bank -> Hollowcut Seam (crosses
- * x = 80 at z = 138.0). Hence gates at (44,124), (80,110) and (74,144) plus a 6 m cart postern at
- * z = 138 on the east wall. `curveRoadPolyline` sways a road by up to length * 0.09, so those
+ * x = 80 at z = 138.0). Hence gates at (44,124), (80,110) and (74,144) plus an 8 m Hollowcut
+ * postern at z = 138 on the east wall. `curveRoadPolyline` sways a road by up to length * 0.09, so those
  * crossings are approximate to a few metres, which is why the openings are 8 m rather than 4.
  *
  * The south wall carries no gate on purpose: nothing in Vellenwood lies south of Rootfall, and a
@@ -161,6 +161,10 @@ export const ROOTFALL: SettlementDef = {
     { id: "rootfall_gate_west", name: "West Gate", prefab: "gatehouse", position: [44, 124], rotationY: -Math.PI / 2, footprint: [8, 3] },
     { id: "rootfall_gate_east", name: "Cart Gate", prefab: "gatehouse", position: [80, 110], rotationY: Math.PI / 2, footprint: [8, 3] },
     { id: "rootfall_gate_north", name: "Log Gate", prefab: "gatehouse", position: [74, 144], rotationY: 0, footprint: [8, 3] },
+    // The bank -> Hollowcut road already crossed the east wall here, but the old 6 m opening was
+    // only a raw gap between two jambs. This full gatehouse retains a 4 m clear passage. Its west
+    // edge starts at x = 78.5, 1.49 m clear of the Root Tunnel arch's measured east edge at 77.01.
+    { id: "rootfall_postern", name: "Hollowcut Postern", prefab: "gatehouse", position: [80, 138], rotationY: Math.PI / 2, footprint: [8, 3] },
   ],
 
   /**
@@ -176,10 +180,9 @@ export const ROOTFALL: SettlementDef = {
     { id: "rootfall_wall_north", name: "North Palisade", from: [44, 144], to: [80, 144], openings: [{ at: 30, width: 8 }] },
     {
       id: "rootfall_wall_east", name: "East Palisade", from: [80, 144], to: [80, 102],
-      // z 138 is the cart postern the bank -> Hollowcut Seam road leaves by; 6 m rather than the
-      // gates' 8 because it carries no gatehouse and the Root Tunnel arch stands 4 m inside it.
-      // z 110 is the Cart Gate.
-      openings: [{ at: 6, width: 6 }, { at: 34, width: 8 }],
+      // z 138 is the Hollowcut Postern and z 110 is the Cart Gate. Both use the gatehouse's full
+      // 8 m footprint, leaving the same 4 m clear passage after their two masonry piers.
+      openings: [{ at: 6, width: 8 }, { at: 34, width: 8 }],
     },
     // Solid. Nothing in Vellenwood is south of Rootfall.
     { id: "rootfall_wall_south", name: "South Palisade", from: [80, 102], to: [44, 102] },

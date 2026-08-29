@@ -228,7 +228,7 @@ function questsDoc(): string {
   return [
     "# Quests",
     "",
-    `${QUESTS.length} quests. Objectives and rewards are listed in the game's quest journal;`,
+    `${QUESTS.length} quests. Objectives and rewards are listed in the game's Quests panel;`,
     "later stages are deliberately not printed here, because a walkthrough is not documentation.",
     "",
     table(["Quest", "Region", "Stages", "Requires", "After"], rows),

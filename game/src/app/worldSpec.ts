@@ -14,6 +14,10 @@
 import type { RegionId } from "../contracts.js";
 import { REGIONS, type RegionDef, type SettlementDef } from "../content/regions.js";
 import type { FlatSpot, RegionTerrainSpec, WorldTerrainSpec, Rect } from "../render/scene.js";
+import { WATER_BASIN_DEPTH, waterBasinForCluster } from "../world/waterBodies.js";
+
+// Kept here as a re-export because boot and its existing callers already own this import path.
+export { WATER_BASIN_DEPTH };
 
 function rectOf(region: RegionDef): Rect {
   return {
@@ -34,16 +38,6 @@ function characterOf(regionId: RegionId): RegionTerrainSpec["character"] {
 }
 
 /**
- * How far below the surrounding ground a fishing basin is carved, in metres.
- *
- * Deliberately shallow. A 2.2 m basin filled to three quarters put the waterline above the
- * player's head — they stood on the basin floor and the surface was over them. These are shallows
- * and brooks, not lakes: a fisher stands shin-deep at the edge, which is both what the places are
- * named for and the only way the fishing-spot markers stay visible.
- */
-export const WATER_BASIN_DEPTH = 0.9;
-
-/**
  * Metres of flat ground beyond the outermost thing a settlement places.
  *
  * Roofs overhang their footprint by up to 1.5 m in this kit, and the player has to be able to
@@ -57,9 +51,9 @@ const SETTLEMENT_PAD_MARGIN = 8;
  * Settlements, banks, and stations need buildable ground. Noise does not provide it, so every
  * settlement centre and every named location gets a flattened pad.
  *
- * Fishing clusters get the opposite: a pad sunk BELOW the surrounding ground, which carves the
- * basin the water plane then fills. Without it there is nowhere for water to sit — the plains are
- * rolling, not channelled — so a water plane either floats on grass or buries itself.
+ * Fishing clusters do not use this list. `buildWorldTerrainSpec` gives them dedicated basins after
+ * it derives ordinary flats, because water needs both a depressed floor and a closed raised bank.
+ * A flat pad can provide the floor but has no way to guarantee the bank.
  */
 function flatSpotsFor(region: RegionDef): FlatSpot[] {
   const flats: FlatSpot[] = [];
@@ -100,22 +94,12 @@ function flatSpotsFor(region: RegionDef): FlatSpot[] {
   }
 
   // Named locations are where the player stands still: banks, seams, camps, gates. A 7 m pad keeps
-  // an interaction from happening on a slope steep enough to look broken.
+  // an interaction from happening on a slope steep enough to look broken. Water owns a separate
+  // basin applied after every ordinary pad, so a generic location pad must not pull its floor back
+  // toward the dry terrain.
   for (const location of region.locations) {
+    if (location.kind === "water") continue;
     flats.push({ x: location.position[0], z: location.position[1], radius: 7, blend: 9 });
-  }
-
-  for (const cluster of region.clusters) {
-    if (cluster.archetype !== "fishing_spot") continue;
-    flats.push({
-      x: cluster.centre[0],
-      z: cluster.centre[1],
-      radius: cluster.radius + 4,
-      // A wide falloff, so the bank slopes into the water instead of dropping as a cliff the
-      // navmesh would refuse to walk down.
-      blend: cluster.radius + 16,
-      height: -WATER_BASIN_DEPTH,
-    });
   }
 
   return flats;
@@ -171,13 +155,10 @@ export function buildWorldTerrainSpec(): WorldTerrainSpec {
     return spec;
   });
 
-  const flats = REGIONS.flatMap((region) => flatSpotsFor(region).map((flat) => (
-    // A negative authored height means "this far below the region floor", which is how basins are
-    // expressed. Everything else keeps its absolute height, or none at all.
-    flat.height !== undefined && flat.height < 0
-      ? { ...flat, height: region.baseHeight + flat.height }
-      : flat
-  )));
+  const flats = REGIONS.flatMap((region) => flatSpotsFor(region));
+  const basins = REGIONS.flatMap((region) => region.clusters
+    .filter((cluster) => cluster.archetype === "fishing_spot")
+    .map(waterBasinForCluster));
 
   const minX = Math.min(...regions.map((region) => region.rect.minX));
   const maxX = Math.max(...regions.map((region) => region.rect.maxX));
@@ -193,6 +174,7 @@ export function buildWorldTerrainSpec(): WorldTerrainSpec {
     blendMetres: 28,
     regions,
     flats,
+    basins,
   };
 }
 

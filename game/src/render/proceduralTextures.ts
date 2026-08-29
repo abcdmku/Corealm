@@ -761,6 +761,95 @@ export function createWaterNormalMap(variant: "fine" | "coarse"): THREE.DataText
   return texture;
 }
 
+// ---------------------------------------------------------- grass sprite
+
+let grassSprite: THREE.DataTexture | null = null;
+
+interface GrassBlade {
+  base: number;
+  height: number;
+  width: number;
+  lean: number;
+  curve: number;
+}
+
+/**
+ * One white, alpha-cut grass tuft shared by every instanced grass card in the world.
+ *
+ * The source grass GLBs cannot supply this texture: all four embed an opaque JPEG and use their
+ * geometry for the blade silhouette. The renderer needs an RGBA cutout to replace hundreds of
+ * triangles with two crossed quads. Keeping the texels white lets `InstancedMesh.instanceColor`
+ * supply common-green, dry-gold and their deterministic value variation without another texture
+ * or material bucket.
+ *
+ * The silhouette is generated rather than painted into the repository so it stays deterministic,
+ * has no asset download, and follows the same disposal lifetime as the other generated textures.
+ * RGB remains white even outside the cutout. That prevents the dark fringe a transparent-black
+ * border would bleed into its mipmaps.
+ */
+export function createGrassSpriteTexture(): THREE.DataTexture {
+  if (grassSprite) return grassSprite;
+
+  const size = 128;
+  const data = new Uint8Array(size * size * 4);
+  const blades: readonly GrassBlade[] = [
+    { base: -0.43, height: 0.62, width: 0.105, lean: -0.16, curve: 0.05 },
+    { base: -0.34, height: 0.86, width: 0.085, lean: 0.08, curve: -0.04 },
+    { base: -0.27, height: 0.72, width: 0.095, lean: -0.08, curve: 0.07 },
+    { base: -0.18, height: 0.96, width: 0.075, lean: 0.12, curve: 0.03 },
+    { base: -0.10, height: 0.78, width: 0.100, lean: -0.13, curve: -0.05 },
+    { base: -0.02, height: 1.00, width: 0.080, lean: 0.03, curve: 0.04 },
+    { base: 0.07, height: 0.83, width: 0.095, lean: 0.14, curve: -0.06 },
+    { base: 0.15, height: 0.93, width: 0.075, lean: -0.07, curve: 0.04 },
+    { base: 0.23, height: 0.69, width: 0.105, lean: 0.10, curve: 0.05 },
+    { base: 0.31, height: 0.82, width: 0.085, lean: -0.04, curve: -0.04 },
+    { base: 0.40, height: 0.60, width: 0.110, lean: 0.15, curve: -0.03 },
+  ];
+
+  for (let row = 0; row < size; row += 1) {
+    const y = row / (size - 1);
+    for (let column = 0; column < size; column += 1) {
+      const x = (column / (size - 1)) * 1.1 - 0.55;
+      let coverage = 0;
+      for (const blade of blades) {
+        if (y > blade.height) continue;
+        const t = y / blade.height;
+        const centre = blade.base + blade.lean * t + Math.sin(t * Math.PI) * blade.curve;
+        // Blades narrow toward a pointed tip. A one-texel smooth edge gives the generated mipmaps
+        // something to average without turning the entire tuft into a translucent rectangle.
+        const halfWidth = blade.width * Math.pow(1 - t, 0.72) + 0.002;
+        const edge = halfWidth - Math.abs(x - centre);
+        coverage = Math.max(coverage, clamp(edge * size * 1.7, 0, 1));
+      }
+
+      // Bind the blade bases with a small, ragged crown rather than a rectangular block.
+      if (y < 0.105) {
+        const crown = 1 - Math.abs(x) / (0.49 - y * 0.7);
+        coverage = Math.max(coverage, clamp(crown * 2.5, 0, 1) * clamp((0.11 - y) * 22, 0, 1));
+      }
+
+      const index = (row * size + column) * 4;
+      data[index] = 255;
+      data[index + 1] = 255;
+      data[index + 2] = 255;
+      data[index + 3] = Math.round(coverage * 255);
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
+  texture.name = "grass-sprite";
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = 4;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  grassSprite = texture;
+  return texture;
+}
+
 // ---------------------------------------------------------- contact decal
 
 let contactDecal: THREE.DataTexture | null = null;
@@ -822,6 +911,8 @@ export function disposeGeneratedTextures(): void {
   macroVariation = null;
   for (const texture of waterNormals.values()) texture.dispose();
   waterNormals.clear();
+  grassSprite?.dispose();
+  grassSprite = null;
   contactDecal?.dispose();
   contactDecal = null;
 }

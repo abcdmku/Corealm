@@ -1,6 +1,6 @@
 # Quests
 
-10 quests. Objectives and rewards are listed in the game's quest journal;
+10 quests. Objectives and rewards are listed in the game's Quests panel;
 later stages are deliberately not printed here, because a walkthrough is not documentation.
 
 | Quest | Region | Stages | Requires | After |

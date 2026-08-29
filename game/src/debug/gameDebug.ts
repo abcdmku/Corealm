@@ -86,6 +86,18 @@ export interface DebugDeps {
    * `getScatterStats()` answers `{ available: false }` rather than guessing.
    */
   scatterStats?(): unknown;
+  /** Live rig playback state; optional only for boot-fallback tests without a character rig. */
+  playerMotion?(): unknown;
+  entityMotion?(entityId: EntityId): unknown;
+  /** Solved shoreline contours and basin closure state for the rendered water bodies. */
+  waterBodies?(): unknown;
+  /** Build-time only: one north-up tile rendered from the complete Three scene. */
+  captureWorldMapTile?(options: {
+    centreX: number;
+    centreZ: number;
+    spanMetres: number;
+    pixels: number;
+  }): string;
 }
 
 /**
@@ -545,6 +557,28 @@ export function installGameDebug(deps: DebugDeps): void {
     getScatterStats(): unknown {
       if (!deps.scatterStats) return { available: false, reason: "boot did not supply a scatter port" };
       return { available: true, regions: deps.scatterStats() };
+    },
+
+    getPlayerMotion(): unknown {
+      return deps.playerMotion?.() ?? null;
+    },
+
+    getEntityMotion(entityId: EntityId): unknown {
+      return deps.entityMotion?.(entityId) ?? null;
+    },
+
+    getWaterBodies(): unknown {
+      return deps.waterBodies?.() ?? null;
+    },
+
+    captureWorldMapTile(options: {
+      centreX: number;
+      centreZ: number;
+      spanMetres: number;
+      pixels: number;
+    }): string {
+      if (!deps.captureWorldMapTile) throw new Error("World-map capture is not installed.");
+      return deps.captureWorldMapTile(options);
     },
 
     /** Instancing, rig and draw-call budget state for the entity layer. */

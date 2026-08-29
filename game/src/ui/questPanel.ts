@@ -1,5 +1,5 @@
 /**
- * The quest journal.
+ * The Quests panel.
  *
  * Phase 1 shipped ten quests, 82 dialogue nodes and no way for a player to read any of it: the
  * only place an objective appeared was a toast that scrolled away. This is that missing surface.
@@ -61,9 +61,9 @@ export class QuestPanel implements ManagedPanel {
   constructor(private readonly ctx: UiContext) {
     this.frame = new PanelFrame({
       id: "quests",
-      title: "Journal",
+      title: "Quests",
       key: "j",
-      keyLabel: "Journal",
+      keyLabel: "Quests",
       registry: ctx.registry,
       placement: { top: "96px", left: "24px", width: "360px" },
       onOpen: () => this.refresh(true),

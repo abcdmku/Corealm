@@ -6,10 +6,11 @@
  * appearance, and it never writes gameplay state. If a value is not on `view`, it is not this
  * file's business to invent it.
  *
- * The performance shape that matters: entities are grouped by (assetId, materialTier, archetype,
- * 128 m cell) and every group's parts are drawn out of a `BatchedMesh` shared by MATERIAL with
- * every other group in the same cell. Six hundred ore nodes across three regions are a handful of
- * draw calls, not six hundred, and so are the 29 different GLBs that all paint with `MI_WoodTrim`.
+ * The performance shape that matters: entities are grouped by (assetId, material tier or
+ * architecture region, archetype, 128 m cell) and every group's parts are drawn out of a
+ * `BatchedMesh` shared by MATERIAL with every other group in the same cell. Six hundred ore nodes
+ * across three regions are a handful of draw calls, not six hundred; architecture shares within a
+ * regional style so a Karrowmoor slate roof cannot inherit Fallowmarch's shader or colour.
  * Each entity owns a fixed slot in its group and one batch instance per part per pose variant;
  * changing state writes a matrix and flips two visibility bits. No rebuild, no allocation, no
  * reupload of anything but the matrices.
@@ -79,12 +80,12 @@
 import * as THREE from "three";
 import { clone as cloneRigged } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import type { Archetype, EntityId, SemanticEntity, Vec3 } from "../contracts.js";
+import type { Archetype, EntityId, RegionId, SemanticEntity, Vec3 } from "../contracts.js";
 import type { AssetRegistry } from "./assets.js";
 import type { WorldScene } from "./scene.js";
 import type { PaletteSwatch } from "./materials.js";
 import { Rng } from "../core/rng.js";
-import { MaterialLibrary, tierSilhouetteScale } from "./materials.js";
+import { architectureMaterialRole, MaterialLibrary, tierSilhouetteScale } from "./materials.js";
 import {
   assembleDressedCharacter,
   headCapHeightFor,
@@ -205,21 +206,6 @@ const TIER_BLIND_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc"]
 const LEAF_MATERIAL = /leaf|leaves|foliage|canopy/i;
 
 /**
- * The pantile material every roof in the kit shares.
- *
- * Building parts are `landmark` archetype, which carries no tint at all, so every roof in the
- * world drew at the texture's authored orange: Highcairn's slate quarry town had the same fired
- * pantiles as the farming village three regions away. Roofs take the tier BODY swatch at a low
- * strength — enough to weather Karrowmoor's roofs toward its blue-grey and Vellenwood's toward its
- * bark brown, and not enough to lose the tile.
- *
- * The standing rule still applies: a tint multiplies against the texture, so this DARKENS an
- * orange toward slate. It cannot turn one into a blue. That is why the walls carry the region's
- * identity — brick against plaster against exposed frame — and the roof only shades it.
- */
-const ROOF_MATERIAL = /roundtiles|rooftile/i;
-
-/**
  * Materials a tier tint must never touch. Eyes, teeth and the pure black/white trims on the
  * monster packs are art direction, not tier: pulling them toward a palette colour flattens a face
  * into a smear and buys no legibility.
@@ -284,11 +270,29 @@ const OWN_CLIP_PATTERNS: Record<CharacterMotion, readonly RegExp[]> = {
  */
 const HUMANOID_CLIPS: Record<CharacterMotion, readonly string[]> = {
   idle: HUMANOID_IDLES,
-  walk: ["Walk_Loop", "Jog_Fwd_Loop"],
-  attack: ["Sword_Attack", "Sword_Regular_A", "Punch_Jab"],
+  // EnemyAI moves at 3.1 m/s while pursuing and 3.6 m/s while returning. Walk_Loop implies only
+  // 0.98 m/s, so selecting it first makes a humanoid slide more than two metres on every second
+  // of ground it covers. Jog is the honest gait for both speeds.
+  walk: ["Jog_Fwd_Loop", "Walk_Loop"],
+  // Humanoid enemies do not carry a weapon attachment. A punch reads correctly; a sword clip
+  // makes them swing a blade that is not there.
+  attack: ["Punch_Jab", "Sword_Attack", "Sword_Regular_A"],
   hit: ["Hit_Chest", "Hit_Knockback"],
   death: ["Death01"],
 };
+
+/** Measured planted-foot speed of Jog_Fwd_Loop in the shared humanoid animation library. */
+const HUMANOID_JOG_IMPLIED_MPS = 5.92;
+
+/**
+ * One deterministic tempo for the AI's narrow 3.1..3.6 m/s band.
+ *
+ * The semantic view contract does not publish velocity, so the renderer cannot distinguish the
+ * pursuit and return speeds without reaching into systems/. Their midpoint leaves at most 8%
+ * slide at either end, against 216% when Walk_Loop ran at its authored tempo. Player locomotion
+ * has a real speed field and stays on CharacterRig's exact per-frame calculation.
+ */
+const HUMANOID_AI_JOG_TIME_SCALE = ((3.1 + 3.6) / 2) / HUMANOID_JOG_IMPLIED_MPS;
 
 /** Motions that play once and hand back to the entity's resting motion. */
 const ONE_SHOT_MOTIONS: ReadonlySet<CharacterMotion> = new Set<CharacterMotion>(["attack", "hit"]);
@@ -404,7 +408,15 @@ const BEARD_ASSET = "hair_beard";
  * into "a different person". Eyes, teeth, tongue and the pure black/white trims resolve to `none`
  * for the same reason `PROTECTED_MATERIAL` exists: a tinted eye is a smear.
  */
-type TintRole = "none" | "cloth" | "clothAlt" | "skin" | "hair" | "creature" | "creatureAccent";
+type TintRole =
+  | "none"
+  | "cloth"
+  | "clothAlt"
+  | "skin"
+  | "hair"
+  | "creature"
+  | "creatureAccent"
+  | "architecture";
 
 const CLOTH_MATERIAL = /^MI_Peasant/i;
 const CLOTH_ALT_MATERIAL = /^MI_Ranger/i;
@@ -413,8 +425,17 @@ const HAIR_MATERIAL = /^MI_Hair/i;
 const CREATURE_BODY_MATERIAL = /^Main(_Dark|_Light|_2)?$/i;
 const CREATURE_ACCENT_MATERIAL = /^(Wings|Horns)$/i;
 
-/** Archetypes whose parts carry a per-entity instance colour. Nothing else is ever tinted. */
+/** Character archetypes whose parts carry a per-entity dye colour. Architecture varies separately. */
 const TINTABLE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "enemy", "boss"]);
+
+/**
+ * Architecture is emitted as scenery landmarks, while a gate's inspectable arch is a portal.
+ * Material-name matching remains mandatory, so an ordinary rock landmark is left as authored.
+ */
+const ARCHITECTURE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["landmark", "portal"]);
+
+/** Quantised per-building value shifts. Stored as instance colour, so they add no material buckets. */
+const ARCHITECTURE_VALUE_STEPS: readonly number[] = [0.96, 0.98, 1, 1.02, 1.04];
 
 /**
  * The dye lots, hair colours, skin tones and creature hues, as MULTIPLIERS against the authored
@@ -747,8 +768,8 @@ interface PartDraw {
   /**
    * Which per-entity tint this part's material answers to, resolved once from its name.
    *
-   * "none" for every part in the world that is not a character, which is 3,400 of the 3,484
-   * entities, so the tint check costs one string compare on the rest.
+   * Characters use their dye role. Architecture uses one neutral value role shared by every
+   * material on its parent building. Everything else is "none".
    */
   role: TintRole;
   /**
@@ -773,6 +794,8 @@ interface InstanceGroup {
   depletedAssetId: string | null;
   archetype: Archetype;
   tier: number;
+  /** Region whose architecture palette this group uses, or null for ordinary entity art. */
+  regionId: RegionId | null;
   /** slot -> entity, or null for a freed slot. */
   slots: (EntityId | null)[];
   free: number[];
@@ -806,8 +829,8 @@ interface RigState {
   motion: CharacterMotion;
   /** Motion to fall back to when a one-shot finishes. */
   resting: CharacterMotion;
-  /** Per-entity timescale jitter, reapplied on every clip switch. */
-  timeScale: number;
+  /** Per-entity idle jitter. Locomotion and one-shots use deterministic tempos. */
+  idleTimeScale: number;
 }
 
 interface ViewRecord {
@@ -848,6 +871,8 @@ interface ViewRecord {
   previousRotationY: number;
   /** Syncs left before this entity stops counting as moving. See `MOVING_HOLD_SYNCS`. */
   movingTicks: number;
+  /** Raised only while playAction tries to move this record to the front of the rig pool. */
+  actionPriority: boolean;
   scale: number;
   /**
    * Per-entity dye lots, resolved once from the entity id. Null for anything not a character.
@@ -858,6 +883,8 @@ interface ViewRecord {
    * colour the moment it walks into rig range.
    */
   tints: EntityTints | null;
+  /** Neutral instance multiplier shared by every part under the same parent building id. */
+  architectureValue: number;
   /** Per-entity build multiplier on `scale`, as (x, y, z). `NO_BUILD` for everything else. */
   build: readonly [number, number, number];
   spent: boolean;
@@ -957,6 +984,26 @@ export interface EntityViewStats {
   missingAssets: string[];
 }
 
+export type EntityMotionPath = "live-rig" | "unique-static" | "baked" | "instanced-static";
+
+/** JSON-safe renderer state for browser motion acceptance. Gameplay never reads this. */
+export interface EntityMotionSnapshot {
+  readonly entityId: EntityId;
+  readonly liveRig: boolean;
+  readonly path: EntityMotionPath | null;
+  readonly semanticPosition: Vec3;
+  readonly drawnPosition: Vec3;
+  readonly semanticRotationY: number;
+  readonly drawnRotationY: number;
+  readonly facing: Vec3;
+  readonly motion: CharacterMotion | null;
+  readonly restingMotion: CharacterMotion | null;
+  readonly clip: string | null;
+  readonly time: number | null;
+  readonly duration: number | null;
+  readonly timeScale: number | null;
+}
+
 export interface EntityViewOptions {
   /**
    * THE cap that matters, expressed in the unit the budget is written in.
@@ -1010,6 +1057,8 @@ export class EntityViews {
   private readonly riggedAssets = new Map<string, boolean>();
   /** `(assetKey, archetype)` -> does tier belong in the group key. See `groupTier`. */
   private readonly tierKeyed = new Map<string, boolean>();
+  /** Asset id -> whether one of its source materials belongs to the architecture palette. */
+  private readonly architectureAssets = new Map<string, boolean>();
   private readonly seamGeometries = new Map<string, THREE.BufferGeometry>();
   /** Per-entity dye clones for the non-instanced path, keyed (source material, tint hex). */
   private readonly tintedMaterials = new Map<string, THREE.Material>();
@@ -1254,6 +1303,9 @@ export class EntityViews {
         // change before `sync` ever sees one, `updateMoving` decays the counter to zero, and the
         // walking pose could never latch for anything.
         record.movingTicks = MOVING_HOLD_SYNCS;
+        // Structural sync runs at 4 Hz. Waiting for it to select the walking clip leaves up to a
+        // quarter-second of a chasing enemy gliding in its idle pose.
+        if (!record.spent) this.setMotion(record, "walk", true);
       }
       if (rotationY !== record.targetRotationY) {
         record.previousRotationY = record.targetRotationY;
@@ -1280,7 +1332,8 @@ export class EntityViews {
     const tier = view.materialTier ?? entity.tier;
     const clip = view.clipFraction ?? 0;
     const character = this.characterFor(entity.id, entity.archetype, view.assetId, view.partAssetIds);
-    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${entity.archetype}|${clip}|${batchCell(entity.archetype, entity.position)}`;
+    const regionId = this.architectureRegion(entity.archetype, entity.regionId, view.assetId);
+    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${regionId ?? "-"}|${entity.archetype}|${clip}|${batchCell(entity.archetype, entity.position)}`;
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
@@ -1315,7 +1368,8 @@ export class EntityViews {
       this.records.delete(entity.id);
     }
 
-    const record = this.records.get(entity.id) ?? this.acquire(entity, groupKey, tier, clip, character);
+    const record = this.records.get(entity.id)
+      ?? this.acquire(entity, groupKey, tier, clip, character, regionId);
     if (!record) return;
 
     record.signature = signature;
@@ -1335,7 +1389,7 @@ export class EntityViews {
     const group = this.groups.get(groupKey);
     if (!group) return;
 
-    this.setMotion(record, spent ? "death" : moving ? "walk" : "idle");
+    this.setMotion(record, spent ? "death" : moving ? "walk" : "idle", moving);
 
     if (record.unique) {
       this.placeUnique(record);
@@ -1375,11 +1429,12 @@ export class EntityViews {
     tier: number,
     clip: number,
     character: CharacterSpec | null,
+    regionId: RegionId | null,
   ): ViewRecord | null {
     const view = entity.view!;
     const group = this.ensureGroup(
       groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier,
-      batchCell(entity.archetype, entity.position), clip, character,
+      batchCell(entity.archetype, entity.position), clip, character, regionId,
     );
     if (!group) return null;
 
@@ -1414,8 +1469,10 @@ export class EntityViews {
       targetRotationY: view.rotationY ?? 0,
       previousRotationY: view.rotationY ?? 0,
       movingTicks: 0,
+      actionPriority: false,
       scale: 1,
       tints: tintsFor(entity.id, entity.archetype, character),
+      architectureValue: regionId ? architectureValueFor(entity.id) : 1,
       build: buildFor(entity.id, entity.archetype),
       spent: false,
       normal: null,
@@ -1508,24 +1565,26 @@ export class EntityViews {
       // region, and an instanced boss is a rig frozen on one baked frame through a two-phase fight.
       if (!record.unique || record.archetype === "boss") continue;
       if (record.position.distanceToSquared(viewer) <= this.uniqueReleaseRadiusSq) continue;
-      const group = this.groups.get(record.groupKey);
-      if (!group) continue;
-      const slot = this.takeSlot(group, record.entityId);
-      if (slot < 0) continue;
-      this.releaseUnique(record);
-      record.slot = slot;
-      this.writeSlot(group, record);
+      this.demoteUnique(record);
     }
 
     let promoted = 0;
-    for (const record of this.rigCandidates) {
+    const ranked = [...this.rigCandidates].sort((a, b) => this.compareRigPriority(a, b, viewer));
+    for (const record of ranked) {
       if (promoted >= UNIQUE_PROMOTIONS_PER_FRAME) break;
       if (record.unique || record.slot < 0) continue;
       if (record.position.distanceToSquared(viewer) > this.animationRadiusSq) continue;
       const group = this.groups.get(record.groupKey);
       if (!group || !this.characterReady(group.assetId, group.character)) continue;
       const slot = record.slot;
-      if (!this.buildUnique(record, group)) continue;
+      if (!this.buildUnique(record, group)) {
+        // The 40 m acquisition radius and 70 m release radius stop boundary thrash, but they used
+        // to let a rig at 69 m block the enemy attacking at 2 m. Evict a lower-priority holder and
+        // retry before accepting a frozen combat target.
+        if (!this.makeRoomFor(record, group, ranked, viewer) || !this.buildUnique(record, group)) {
+          continue;
+        }
+      }
       promoted += 1;
       this.freeSlot(group, record.entityId, slot);
       record.slot = -1;
@@ -1533,6 +1592,68 @@ export class EntityViews {
       this.applyUniqueState(record, group.tier);
       this.setMotion(record, record.spent ? "death" : record.movingTicks > 0 ? "walk" : "idle");
     }
+  }
+
+  /** Boss, requested action, moving, then distance. Separate draw pools still enforce NPC reserve. */
+  private compareRigPriority(a: ViewRecord, b: ViewRecord, viewer: THREE.Vector3): number {
+    const boss = Number(b.archetype === "boss") - Number(a.archetype === "boss");
+    if (boss !== 0) return boss;
+    const aAction = a.actionPriority || (a.rig !== null && ONE_SHOT_MOTIONS.has(a.rig.motion));
+    const bAction = b.actionPriority || (b.rig !== null && ONE_SHOT_MOTIONS.has(b.rig.motion));
+    const action = Number(bAction) - Number(aAction);
+    if (action !== 0) return action;
+    const moving = Number(b.movingTicks > 0) - Number(a.movingTicks > 0);
+    if (moving !== 0) return moving;
+    return a.position.distanceToSquared(viewer) - b.position.distanceToSquared(viewer);
+  }
+
+  /**
+   * Frees enough lower-priority unique cost for `wanted`. Draw-budget pressure stays inside the
+   * named/other split; only the shared unique-view ceiling may evict across it. Returns true when
+   * the ordinary budget check can succeed after the evictions.
+   */
+  private makeRoomFor(
+    wanted: ViewRecord,
+    group: InstanceGroup,
+    ranked: readonly ViewRecord[],
+    viewer: THREE.Vector3,
+  ): boolean {
+    const source = this.sourceOf(group.assetId);
+    if (!source) return false;
+    const cost = this.uniqueCostOf(group.assetId, source, group.character);
+    const namedBudget = Math.round(this.maxUniqueDrawCalls * NAMED_CHARACTER_SHARE);
+    const budget = wanted.named ? namedBudget : this.maxUniqueDrawCalls - namedBudget;
+    const spend = (): number => wanted.named ? this.namedDrawCalls : this.otherDrawCalls;
+    const budgetBlocked = spend() + cost > budget;
+
+    const victims = ranked
+      .filter((candidate) => candidate !== wanted
+        && candidate.unique !== null
+        && candidate.archetype !== "boss"
+        // Crossing the named/other split cannot fix a pool shortage. It can fix only the global
+        // unique-view ceiling, when the wanted pool already has draw-call room.
+        && (candidate.named === wanted.named || !budgetBlocked)
+        && this.compareRigPriority(wanted, candidate, viewer) < 0)
+      .sort((a, b) => this.compareRigPriority(b, a, viewer));
+
+    for (const victim of victims) {
+      if (spend() + cost <= budget && this.countUnique() < this.maxUniqueViews) break;
+      this.demoteUnique(victim);
+    }
+    return spend() + cost <= budget && this.countUnique() < this.maxUniqueViews;
+  }
+
+  /** Converts a live rig back to the group's baked pose in the same frame. */
+  private demoteUnique(record: ViewRecord): boolean {
+    if (!record.unique || record.archetype === "boss") return false;
+    const group = this.groups.get(record.groupKey);
+    if (!group) return false;
+    const slot = this.takeSlot(group, record.entityId);
+    if (slot < 0) return false;
+    this.releaseUnique(record);
+    record.slot = slot;
+    this.writeSlot(group, record);
+    return true;
   }
 
   private release(record: ViewRecord): void {
@@ -1642,6 +1763,7 @@ export class EntityViews {
     cell: string,
     clipFraction = 0,
     character: CharacterSpec | null = null,
+    regionId: RegionId | null = null,
   ): InstanceGroup | null {
     const existing = this.groups.get(key);
     if (existing) return existing;
@@ -1649,8 +1771,8 @@ export class EntityViews {
     const rigged = this.isRigged(assetId);
     const ready = rigged && this.characterReady(assetId, character);
     let liveParts = ready
-      ? this.bakedParts(assetId, character, archetype, tier, false, "idle")
-      : this.collectParts(assetId, archetype, tier, false);
+      ? this.bakedParts(assetId, character, archetype, tier, regionId, false, "idle")
+      : this.collectParts(assetId, archetype, tier, regionId, false);
 
     // `view.clipFraction` keeps only the bottom of the mesh. One geometry per group, built once.
     if (clipFraction > 0 && clipFraction < 1) {
@@ -1673,6 +1795,7 @@ export class EntityViews {
       depletedAssetId,
       archetype,
       tier,
+      regionId,
       slots: [],
       free: [],
       liveParts,
@@ -1721,7 +1844,7 @@ export class EntityViews {
     if (group.moving.length > 0 || !group.posed) return;
     if (!group.movingParts) {
       group.movingParts = this.bakedParts(
-        group.assetId, group.character, group.archetype, group.tier, false, "walk",
+        group.assetId, group.character, group.archetype, group.tier, group.regionId, false, "walk",
       );
     }
     // The live and walk bakes no longer have to line up part-for-part: a `PartDraw` carries its own
@@ -1768,8 +1891,12 @@ export class EntityViews {
       const rigged = this.isRigged(group.depletedAssetId);
       const source = rigged ? this.sourceOf(group.depletedAssetId) : null;
       const parts = rigged && source
-        ? this.bakedParts(group.depletedAssetId, null, group.archetype, group.tier, true, "death")
-        : this.collectParts(group.depletedAssetId, group.archetype, group.tier, true);
+        ? this.bakedParts(
+          group.depletedAssetId, null, group.archetype, group.tier, group.regionId, true, "death",
+        )
+        : this.collectParts(
+          group.depletedAssetId, group.archetype, group.tier, group.regionId, true,
+        );
       if (parts.length > 0) return parts;
     }
 
@@ -1787,8 +1914,10 @@ export class EntityViews {
   private spentMaterialParts(group: InstanceGroup): SourcePart[] {
     const rigged = this.isRigged(group.assetId);
     const parts = rigged && this.characterReady(group.assetId, group.character)
-      ? this.bakedParts(group.assetId, group.character, group.archetype, group.tier, true, "death")
-      : this.collectParts(group.assetId, group.archetype, group.tier, true);
+      ? this.bakedParts(
+        group.assetId, group.character, group.archetype, group.tier, group.regionId, true, "death",
+      )
+      : this.collectParts(group.assetId, group.archetype, group.tier, group.regionId, true);
     if (group.archetype !== "ore" || parts.length === 0) return parts;
 
     // The ore seam is generated, not authored, so `collectParts` never returns it. Re-append it in
@@ -1799,15 +1928,15 @@ export class EntityViews {
   }
 
   /**
-   * Pulls (geometry, material, local transform) out of a loaded GLB and builds the tier variant of
-   * each material. `MaterialLibrary.variant` keeps the source's base-colour texture and swaps only
-   * colour/roughness/emissive, which is what stops tier ladders from fragmenting instancing
-   * (architecture correction R6).
+   * Pulls (geometry, material, local transform) out of a loaded GLB and builds its material variant.
+   * Gameplay nodes keep the existing tier treatment. Architecture and scenery use a region-aware
+   * luminance recolour over the identical source texture, so neither path adds texture buckets.
    */
   private collectParts(
     assetId: string,
     archetype: Archetype,
     tier: number,
+    regionId: RegionId | null,
     spent: boolean,
   ): SourcePart[] {
     if (!this.assets.isLoaded(assetId)) return [];
@@ -1822,7 +1951,7 @@ export class EntityViews {
       if (!base) return;
       parts.push({
         geometry: mesh.geometry,
-        material: this.variantFor(base, archetype, tier, spent),
+        material: this.variantFor(base, archetype, tier, regionId, spent),
         matrix: mesh.matrixWorld.clone(),
         triangles: triangleCount(mesh.geometry),
       });
@@ -1852,11 +1981,12 @@ export class EntityViews {
     character: CharacterSpec | null,
     archetype: Archetype,
     tier: number,
+    regionId: RegionId | null,
     spent: boolean,
     motion: CharacterMotion,
   ): SourcePart[] {
     const source = this.sourceOf(assetId);
-    if (!source) return this.collectParts(assetId, archetype, tier, spent);
+    if (!source) return this.collectParts(assetId, archetype, tier, regionId, spent);
     let dressed: DressedCharacter | null = null;
     // Set when a mesh could not be CPU-skinned and its SOURCE geometry was handed out instead. That
     // geometry may be one the assembly owns, so freeing the assembly would tear it out from under
@@ -1881,7 +2011,7 @@ export class EntityViews {
         if (!mesh.isMesh || !mesh.geometry) return;
         const base = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
         if (!base) return;
-        const material = this.variantFor(base, archetype, tier, spent);
+        const material = this.variantFor(base, archetype, tier, regionId, spent);
 
         if (skinned.isSkinnedMesh && skinned.skeleton) {
           const frozen = freezeSkin(skinned);
@@ -1915,7 +2045,7 @@ export class EntityViews {
       if (!sharedGeometry) dressed?.dispose();
       else dressed?.group.removeFromParent();
     }
-    return this.collectParts(assetId, archetype, tier, spent);
+    return this.collectParts(assetId, archetype, tier, regionId, spent);
   }
 
   // -------------------------------------------------------- characters
@@ -2031,6 +2161,9 @@ export class EntityViews {
         body,
         parts,
         headCap: true,
+        // A partly rebound outfit is worse than a missing part: the unmatched joint keeps its own
+        // undriven bone and hangs in bind pose beside the moving body.
+        onMissingBone: "reject",
         merge: true,
         mergeOptions: { materialKey: characterMaterialKey },
         name: `character-${character.key}`,
@@ -2049,8 +2182,14 @@ export class EntityViews {
     base: THREE.Material,
     archetype: Archetype,
     tier: number,
+    regionId: RegionId | null,
     spent: boolean,
   ): THREE.Material {
+    if (regionId && ARCHITECTURE_ARCHETYPES.has(archetype)) {
+      const architectureRole = architectureMaterialRole(base.name);
+      if (architectureRole) return this.materials.architecture(base, regionId, architectureRole);
+    }
+
     const look = this.appearanceFor(archetype, base);
     return this.materials.variant(base, {
       tier,
@@ -2062,7 +2201,12 @@ export class EntityViews {
 
   private appearanceFor(archetype: Archetype, material: THREE.Material): Appearance {
     if (PROTECTED_MATERIAL.test(material.name)) return NEUTRAL;
-    if (ROOF_MATERIAL.test(material.name)) return { swatch: "body", strength: 0.42 };
+    // Preserve the old tier-body treatment if a tile mesh is ever used as gameplay art. Scenery
+    // takes the region-aware architecture path before this fallback and stays tier-independent.
+    if (!ARCHITECTURE_ARCHETYPES.has(archetype)
+      && architectureMaterialRole(material.name) === "roof") {
+      return { swatch: "body", strength: 0.42 };
+    }
     if (archetype === "tree" && LEAF_MATERIAL.test(material.name)) {
       // Canopy stays close to its authored colour: species and scale carry a tree's region look,
       // and a heavy tint here fights the world layer rather than helping it.
@@ -2112,7 +2256,7 @@ export class EntityViews {
     let materials = 0;
     for (const id of ids) {
       // Undecidable until the GLB is in. Keep the tier in the key for now rather than caching a
-      // guess: an asset that turns out to be roof tiles must not have been merged first.
+      // guess: an asset that turns out to use a tier-treated material must not be merged first.
       if (!this.assets.isLoaded(id)) return tier;
       const source = this.sources.get(id) ?? this.assets.instance(id);
       source.traverse((child) => {
@@ -2128,6 +2272,30 @@ export class EntityViews {
     if (materials === 0) return tier;
     this.tierKeyed.set(cacheKey, keyed);
     return keyed ? tier : "-";
+  }
+
+  /** Region key only for scenery assets that actually contain a recognised architecture paint. */
+  private architectureRegion(
+    archetype: Archetype,
+    regionId: RegionId,
+    assetId: string,
+  ): RegionId | null {
+    if (!ARCHITECTURE_ARCHETYPES.has(archetype)) return null;
+
+    let architecture = this.architectureAssets.get(assetId);
+    if (architecture === undefined) {
+      architecture = false;
+      const source = this.sources.get(assetId) ?? this.assets.instance(assetId);
+      source.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh || !mesh.geometry) return;
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          if (material && architectureMaterialRole(material.name)) architecture = true;
+        }
+      });
+      this.architectureAssets.set(assetId, architecture);
+    }
+    return architecture ? regionId : null;
   }
 
   // -------------------------------------------------------------- seams
@@ -2222,10 +2390,10 @@ export class EntityViews {
     // setTime applies the pose as well as setting it, so the very first rendered frame is already
     // mid-idle. Without it the object holds bind pose until the first update() lands.
     mixer.setTime(rng.float(0, Math.max(0.001, clip.duration)));
-    const timeScale = rng.float(0.88, 1.12);
-    action.timeScale = timeScale;
+    const idleTimeScale = rng.float(0.88, 1.12);
+    action.timeScale = idleTimeScale;
     return {
-      mixer, root, action, clipName: clip.name, motion: "idle", resting: "idle", timeScale,
+      mixer, root, action, clipName: clip.name, motion: "idle", resting: "idle", idleTimeScale,
     };
   }
 
@@ -2241,7 +2409,7 @@ export class EntityViews {
    * animated set so a corpse costs no mixer time. Nothing brings a rig back out of it except a
    * respawn, which rebuilds the record.
    */
-  private setMotion(record: ViewRecord, motion: CharacterMotion): void {
+  private setMotion(record: ViewRecord, motion: CharacterMotion, interruptOneShot = false): void {
     const rig = record.rig;
     if (!rig || !record.unique) return;
     if (rig.motion === motion) return;
@@ -2251,10 +2419,15 @@ export class EntityViews {
     // the rest of the session.
     if (rig.motion === "death" && (motion === "death" || record.spent)) return;
     if (!ONE_SHOT_MOTIONS.has(motion)) rig.resting = motion;
-    // A swing or a flinch owns the rig until it finishes. `sync` runs while it is playing and would
-    // otherwise ask for "idle" a quarter of a second in and cut it off; the `finished` listener is
-    // what hands the rig back, to whatever resting motion was recorded in the meantime.
-    if (ONE_SHOT_MOTIONS.has(rig.motion) && !ONE_SHOT_MOTIONS.has(motion) && motion !== "death") return;
+    // Idle sync must not cut off a real swing or flinch. Actual translation is different: keeping
+    // the one-shot while the root moves is visible sliding, so syncMotion interrupts it into Jog.
+    // A clamped action is no longer running and must also be allowed through. This is the route the
+    // mixer's `finished` callback uses to hand the rig back to its resting motion.
+    if (ONE_SHOT_MOTIONS.has(rig.motion)
+      && !ONE_SHOT_MOTIONS.has(motion)
+      && motion !== "death"
+      && rig.action.isRunning()
+      && !interruptOneShot) return;
 
     const assetId = this.groups.get(record.groupKey)?.assetId ?? "";
     const clip = this.firstFittingClip(
@@ -2264,6 +2437,7 @@ export class EntityViews {
     // `Flying` to both. Crossfading an action from itself zeroes its weight; record the state change
     // and leave the clip running.
     if (clip && clip.name === rig.clipName) {
+      rig.action.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale);
       rig.motion = motion;
       return;
     }
@@ -2282,7 +2456,7 @@ export class EntityViews {
     const oneShot = ONE_SHOT_MOTIONS.has(motion) || motion === "death";
     next.setLoop(oneShot ? THREE.LoopOnce : THREE.LoopRepeat, oneShot ? 1 : Infinity);
     next.clampWhenFinished = oneShot;
-    next.timeScale = rig.timeScale;
+    next.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale);
     next.reset();
     next.enabled = true;
     next.setEffectiveWeight(1);
@@ -2297,6 +2471,21 @@ export class EntityViews {
     // from the tick set the instant the crossfade starts freezes halfway into the fall. The
     // `finished` listener in `bindRigEvents` is what takes it out.
     this.animated.add(record);
+  }
+
+  /** Idle may vary per person. A gait or one-shot must match what the entity is doing. */
+  private motionTimeScale(
+    assetId: string,
+    motion: CharacterMotion,
+    clip: THREE.AnimationClip,
+    idleTimeScale: number,
+  ): number {
+    if (motion === "idle") return idleTimeScale;
+    const own = this.assets.entry(assetId)?.animations ?? [];
+    if (motion === "walk" && own.length === 0 && clip.name === "Jog_Fwd_Loop") {
+      return HUMANOID_AI_JOG_TIME_SCALE;
+    }
+    return 1;
   }
 
   /**
@@ -2338,7 +2527,21 @@ export class EntityViews {
    */
   playAction(entityId: EntityId, motion: "attack" | "hit"): boolean {
     const record = this.records.get(entityId);
-    if (!record?.rig || record.rig.motion === "death") return false;
+    if (!record) return false;
+    // Combat publishes enemy swings only inside ENEMY_ATTACK_RANGE. The render-side half of that
+    // rule is that a moving record cannot start Punch_Jab, even if a queued swing arrives late.
+    if (motion === "attack" && record.movingTicks > 0) return false;
+    if (!record.rig) {
+      // A combat target is necessarily near the player, but an old rig inside release hysteresis
+      // may still own the pool. Give this record one synchronous priority pass before giving up.
+      record.actionPriority = true;
+      try {
+        this.rebalanceUniques();
+      } finally {
+        record.actionPriority = false;
+      }
+    }
+    if (!record.rig || record.rig.motion === "death") return false;
     const before = record.rig.motion;
     this.setMotion(record, motion);
     return record.rig.motion !== before;
@@ -2606,6 +2809,7 @@ export class EntityViews {
 
   private buildDraws(parts: readonly SourcePart[], cell: string, archetype: Archetype): PartDraw[] {
     const tintable = TINTABLE_ARCHETYPES.has(archetype);
+    const architecture = ARCHITECTURE_ARCHETYPES.has(archetype);
     const draws: PartDraw[] = [];
     for (const part of parts) {
       const batch = this.batchFor(part, cell);
@@ -2615,7 +2819,9 @@ export class EntityViews {
         geometryId: this.addBatchGeometry(batch, part.geometry),
         part,
         instances: [],
-        role: tintable ? tintRoleFor(part.material.name) : "none",
+        role: tintable
+          ? tintRoleFor(part.material.name)
+          : architecture && architectureMaterialRole(part.material.name) ? "architecture" : "none",
         tints: [],
       });
     }
@@ -2677,7 +2883,7 @@ export class EntityViews {
       draw.batch.mesh.setMatrixAt(instance, transform);
       draw.batch.mesh.setVisibleAt(instance, true);
       draw.batch.mesh.boundingSphere = null;
-      this.paintInstance(draw, slot, instance, record.tints);
+      this.paintInstance(draw, slot, instance, record.tints, record.architectureValue);
     }
     // An instance that is not part of the current pose is switched off, not parked at a zero-scale
     // matrix. `BatchedMesh` leaves an invisible instance out of the multi-draw entirely, so the
@@ -2690,17 +2896,16 @@ export class EntityViews {
   }
 
   /**
-   * Writes one entity's dye into one batch instance, when it is not already there.
+   * Writes one entity's dye or architectural value shift into one batch instance when needed.
    *
    * This is the whole recolour mechanism on the instanced path, and the reason it is free.
    * `BatchedMesh.setColorAt` writes into a per-instance RGBA float texture the batch owns and the
    * shader multiplies into `vColor` (three 0.185: `USE_BATCHING_COLOR` in `color_vertex`, which the
    * fragment stage picks up as `USE_COLOR_ALPHA` and applies as `diffuseColor *= vColor`). It does
    * NOT clone a material, so the `(cell, material, attribute signature)` batch key is untouched and
-   * two hundred differently dyed NPCs still share whatever draws their neighbours share. A material
-   * clone per tint would have done the opposite: 63 materials x 10 dyes is 630 batches where there
-   * are 263 today, and the ~100 draw calls of headroom this project just bought would have gone on
-   * shirt colours.
+   * two hundred differently dyed NPCs still share whatever draws their neighbours share. The same
+   * is true of a building's quantised +/-4% neutral value shift: it changes no material key, and
+   * every modular part seeded from that building's parent id receives the same multiplier.
    *
    * The white case is skipped rather than written, and that matters: the FIRST `setColorAt` on a
    * batch allocates its colours texture, which switches the whole batch onto a different compiled
@@ -2712,16 +2917,24 @@ export class EntityViews {
     slot: number,
     instance: number,
     tints: EntityTints | null,
+    architectureValue: number,
   ): void {
     if (draw.role === "none") return;
-    const hex = tints ? tintFor(tints, draw.role) : NO_TINT;
-    if (draw.tints[slot] === hex) return;
-    if (draw.tints[slot] === undefined && hex === NO_TINT) {
-      draw.tints[slot] = hex;
+    const token = draw.role === "architecture"
+      ? architectureValue
+      : tints ? tintFor(tints, draw.role) : NO_TINT;
+    if (draw.tints[slot] === token) return;
+    const neutral = draw.role === "architecture" ? token === 1 : token === NO_TINT;
+    if (draw.tints[slot] === undefined && neutral) {
+      draw.tints[slot] = token;
       return;
     }
-    draw.batch.mesh.setColorAt(instance, SCRATCH_COLOUR.setHex(hex));
-    draw.tints[slot] = hex;
+    if (draw.role === "architecture") {
+      draw.batch.mesh.setColorAt(instance, SCRATCH_COLOUR.setRGB(token, token, token));
+    } else {
+      draw.batch.mesh.setColorAt(instance, SCRATCH_COLOUR.setHex(token));
+    }
+    draw.tints[slot] = token;
   }
 
   /**
@@ -2927,6 +3140,48 @@ export class EntityViews {
     return record ? record.position.clone() : null;
   }
 
+  /** Live mixer state, or the pose the instanced fallback actually draws. */
+  motionSnapshot(entityId: EntityId): EntityMotionSnapshot | null {
+    const record = this.records.get(entityId);
+    if (!record) return null;
+
+    const rig = record.rig;
+    const group = record.slot >= 0 ? this.groups.get(record.groupKey) : null;
+    const moving = record.movingTicks > 0 && !record.spent;
+    const spentReady = Boolean(group && record.spent && group.spent.length > 0);
+    const movingReady = Boolean(group && moving && group.moving.length > 0);
+    const bakedMotion: CharacterMotion | null = group?.posed
+      ? spentReady ? "death" : movingReady ? "walk" : "idle"
+      : null;
+    const path: EntityMotionPath | null = rig
+      ? "live-rig"
+      : record.unique
+        ? "unique-static"
+        : group?.posed
+          ? "baked"
+          : group
+            ? "instanced-static"
+            : null;
+    const rotationY = record.rotationY;
+
+    return {
+      entityId,
+      liveRig: rig !== null,
+      path,
+      semanticPosition: [record.target.x, record.target.y, record.target.z],
+      drawnPosition: [record.position.x, record.position.y, record.position.z],
+      semanticRotationY: record.targetRotationY,
+      drawnRotationY: rotationY,
+      facing: [Math.sin(rotationY), 0, Math.cos(rotationY)],
+      motion: rig?.motion ?? bakedMotion,
+      restingMotion: rig?.resting ?? null,
+      clip: rig?.clipName ?? null,
+      time: rig?.action.time ?? null,
+      duration: rig?.action.getClip().duration ?? null,
+      timeScale: rig?.action.getEffectiveTimeScale() ?? null,
+    };
+  }
+
   has(entityId: EntityId): boolean {
     return this.records.has(entityId);
   }
@@ -3047,7 +3302,7 @@ export class EntityViews {
     const looks = new Set<string>();
     for (const record of this.records.values()) {
       if (record.movingTicks > 0) movingViews += 1;
-      if (record.tints) looks.add(lookKey(record));
+      if (record.tints || record.architectureValue !== 1) looks.add(lookKey(record));
       if (!record.unique) continue;
       unique += 1;
       if (record.dressed) dressedCharacters += 1;
@@ -3118,6 +3373,7 @@ export class EntityViews {
     this.sourceRequests.clear();
     this.riggedAssets.clear();
     this.tierKeyed.clear();
+    this.architectureAssets.clear();
     this.ringGeometry?.dispose();
     this.pipGeometry?.dispose();
     this.ringGeometry = null;
@@ -3136,7 +3392,7 @@ function lookKey(record: ViewRecord): string {
     ? [tints.cloth, tints.clothAlt, tints.skin, tints.hair, tints.creature, tints.creatureAccent]
       .map((hex) => hex.toString(16)).join(",")
     : "-";
-  return `${record.groupKey}|${dye}|${record.build.map(round).join(",")}`;
+  return `${record.groupKey}|${dye}|${record.architectureValue.toFixed(2)}|${record.build.map(round).join(",")}`;
 }
 
 /**
@@ -3242,6 +3498,12 @@ function remixOutfit(entityId: EntityId, parts: readonly string[], headwear: boo
 function pickFrom<T>(values: readonly T[], seed: string): T {
   const picked = values[new Rng(hashString(seed)).int(0, values.length - 1)];
   return picked ?? values[0]!;
+}
+
+/** One coherent value shift for every modular entity emitted under the same building id. */
+function architectureValueFor(entityId: EntityId): number {
+  const parentId = entityId.split("#", 1)[0] ?? entityId;
+  return pickFrom(ARCHITECTURE_VALUE_STEPS, `architectureValue:${parentId}`);
 }
 
 /** Deterministic coin flip at probability `p`, from a seed string. */
