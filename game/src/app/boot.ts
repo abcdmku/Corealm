@@ -1006,6 +1006,14 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
         ? bankSystem.op("deposit", { itemId, quantity })
         : inventorySystem.addItem(itemId, quantity, { silent: true })
     ),
+    openBank: (bankId?: string) => {
+      ui.openBank(bankId);
+      return true;
+    },
+    openShop: (shopId?: string) => {
+      ui.openShop(shopId);
+      return true;
+    },
     focusCamera: (shotId: string) => {
       const shot = findShot(shotId);
       if (!shot) return false;

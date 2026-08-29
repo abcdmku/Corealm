@@ -19,6 +19,8 @@
     "build-assets": "tsx tools/build-assets.ts",
     "agent-proof": "tsx tools/agent-proof.ts",
     "gen-docs": "tsx tools/gen-docs.ts",
+    "icons": "tsx tools/generate-item-icons.ts",
+    "icons:verify": "tsx tools/verify-item-icons.ts",
     "gate-check": "tsx tools/gate-check.ts"
   },
   "dependencies": {

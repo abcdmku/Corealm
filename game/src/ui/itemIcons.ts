@@ -1,10 +1,10 @@
 /**
- * Item icons, drawn rather than shipped.
+ * Item icon fallback shapes and the runtime raster element.
  *
  * Phase 1 put two letters of the item's name in a coloured square, which is legible and tells you
  * nothing: at 40 px a bank of 28 slots was 28 tiles of text, and "GO" for Grithe Ore reads no
  * faster than "GB" for Grithe Bar. No icon art exists in any of the CC0 packs the game uses, and
- * commissioning 102 sprites is not a Phase 1 job — so the icons are vector shapes authored here,
+ * commissioning 106 sprites was not a Phase 1 job — so the icons were vector shapes authored here,
  * one per role, on a 24x24 grid.
  *
  * A shape is chosen by what the item DOES, in this order:
@@ -20,9 +20,8 @@
  *   3. What it heals, plants, buys or builds — food, seed, currency, tool, component.
  *   4. Its raw category, for anything left over.
  *
- * Colour still comes from `itemGlyphColour`, so tier and category hue are unchanged; the shape is
- * what is new. Every path is a filled outline with no strokes, which stays readable at 26 px in the
- * shop list and at 44 px in the bank.
+ * The 3D icon pipeline now supplies a 48 px transparent PNG for every item. These paths remain the
+ * synchronous fallback while that image loads and if an asset request fails.
  */
 import type { EquipSlot, ItemCategory, ItemDef } from "../contracts.js";
 
@@ -186,4 +185,44 @@ export function itemIconSvg(def: ItemDef | undefined): string {
     .map((d) => `<path d="${d}" />`)
     .join("");
   return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths}</svg>`;
+}
+
+export const ITEM_ICON_GAME_SIZE = 48;
+const ITEM_ICON_BASE_URL = "assets/icons/items/48/";
+
+export function itemIconUrl(def: ItemDef | undefined): string | undefined {
+  return def ? `${ITEM_ICON_BASE_URL}${encodeURIComponent(def.id)}.png` : undefined;
+}
+
+/**
+ * A 48 px raster icon with the old vector silhouette behind it.
+ *
+ * The image starts hidden, so a slow or failed request never flashes a broken-image marker over an
+ * inventory slot. On a successful load it replaces the SVG in one class change. The wrapper is
+ * capped at 48 CSS pixels even in the 50-56 px equipment slots.
+ */
+export function createItemIcon(def: ItemDef | undefined): HTMLElement {
+  const wrapper = document.createElement("span");
+  wrapper.className = "item-icon";
+  wrapper.innerHTML = itemIconSvg(def);
+
+  const url = itemIconUrl(def);
+  if (!url) return wrapper;
+
+  const image = document.createElement("img");
+  image.className = "item-icon__raster";
+  image.src = url;
+  image.width = ITEM_ICON_GAME_SIZE;
+  image.height = ITEM_ICON_GAME_SIZE;
+  image.alt = "";
+  image.draggable = false;
+  image.decoding = "async";
+  image.hidden = true;
+  image.addEventListener("load", () => {
+    image.hidden = false;
+    wrapper.classList.add("is-raster-ready");
+  }, { once: true });
+  image.addEventListener("error", () => image.remove(), { once: true });
+  wrapper.appendChild(image);
+  return wrapper;
 }

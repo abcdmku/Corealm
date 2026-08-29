@@ -19,7 +19,7 @@
  * resolved inside a function body instead.
  */
 import type {
-  EntityId, GameApi, ItemCategory, ItemDef, ItemId, ItemStack, RegionId, Result, SkillId, Vec3,
+  EntityId, GameApi, ItemDef, ItemId, ItemStack, RegionId, Result, SkillId, Vec3,
 } from "../contracts.js";
 import { content } from "../content/index.js";
 import { SKILLS } from "../content/skills.js";
@@ -28,7 +28,7 @@ import type { KeyBindingRegistry, Unregister } from "../input/keyboard.js";
 import { ContextMenu, notify, reportResult, setNoticeSink } from "./contextMenu.js";
 import type { NoticeTone } from "./contextMenu.js";
 import { Tooltip } from "./tooltips.js";
-import { itemIconSvg } from "./itemIcons.js";
+import { createItemIcon } from "./itemIcons.js";
 import { Hud } from "./hud.js";
 import { InventoryPanel } from "./inventoryPanel.js";
 import { SkillsPanel } from "./skillsPanel.js";
@@ -94,39 +94,6 @@ export function itemSellPrice(def: ItemDef | undefined): number {
 
 // ------------------------------------------------------------- item glyphs
 
-/**
- * A slot's tile: a tier-shaded plate in the category's hue with a drawn icon on it.
- *
- * The colour rules are unchanged from round 2 — category hue, tier-derived shade — but the two
- * letters that used to sit on the plate are gone. `ui/itemIcons.ts` picks a vector shape from what
- * the item does: the sword, shield, helm and boot for the slot a piece of gear goes in, and an ore
- * chunk, ingot, fish, seed, scroll or coin for everything else. At 40 px a bank of 28 tiles of
- * two-letter text told a player nothing; a bank of 28 silhouettes tells them where the food is.
- *
- * `itemGlyphText` is kept for the tooltip and for anywhere text is genuinely wanted.
- */
-const CATEGORY_HUE: Record<ItemCategory, number> = {
-  resource: 28, bar: 20, equipment: 210, food: 96, tool: 42,
-  seed: 120, quest: 280, currency: 48, component: 320,
-};
-
-function hashString(text: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash);
-}
-
-export function itemGlyphColour(itemId: ItemId): string {
-  const def = content.item(itemId);
-  const hue = (def ? CATEGORY_HUE[def.category] : 35) + (hashString(itemId) % 24) - 12;
-  const tier = def?.tier ?? 1;
-  const light = Math.max(28, Math.min(52, 30 + tier * 1.4));
-  return `hsl(${((hue % 360) + 360) % 360} 34% ${light}%)`;
-}
-
 export function itemGlyphText(itemId: ItemId): string {
   const name = itemName(itemId);
   const words = name.split(/\s+/).filter(Boolean);
@@ -169,8 +136,7 @@ export function paintSlot(cell: HTMLElement, stack: ItemStack | null, emptyLabel
 
   const glyph = document.createElement("span");
   glyph.className = "slot__glyph";
-  glyph.style.setProperty("--glyph-colour", itemGlyphColour(stack.itemId));
-  glyph.innerHTML = itemIconSvg(itemDef(stack.itemId));
+  glyph.appendChild(createItemIcon(itemDef(stack.itemId)));
   cell.appendChild(glyph);
 
   if (stack.quantity > 1) {

@@ -65,6 +65,10 @@ export interface DebugDeps {
   callTool(name: string, args: unknown): Promise<unknown>;
   /** Test-only item grant. Goes through the real inventory so slot limits still apply. */
   giveItem(itemId: ItemId, quantity: number, to: "inventory" | "bank"): unknown;
+  /** Opens the real bank panel after a browser check has moved the player into bank range. */
+  openBank?(bankId?: EntityId): boolean;
+  /** Opens the real shop panel for browser acceptance without depending on unfinished trade wiring. */
+  openShop?(shopId?: EntityId): boolean;
   /** Empties a resource node through the real depletion path, so events and respawn still fire. */
   depleteNode(entityId: EntityId): boolean;
   /** Brings a node or enemy back immediately, skipping its respawn timer. */
@@ -357,6 +361,14 @@ export function installGameDebug(deps: DebugDeps): void {
       const slots = store.get().inventory.slots;
       for (let index = 0; index < slots.length; index += 1) slots[index] = null;
       store.markDirty();
+    },
+
+    openBank(bankId?: EntityId): boolean {
+      return deps.openBank?.(bankId) ?? false;
+    },
+
+    openShop(shopId?: EntityId): boolean {
+      return deps.openShop?.(shopId) ?? false;
     },
 
     getEntity(entityId: EntityId): unknown {
