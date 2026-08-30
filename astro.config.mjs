@@ -35,7 +35,7 @@ const sitesStaticWorker = {
         compatibility_date: "2026-05-15",
         no_bundle: true,
         rules: [{ type: "ESModule", globs: ["**/*.js", "**/*.mjs"] }],
-        assets: { directory: "../client" },
+        assets: { binding: "ASSETS", directory: "../client", run_worker_first: true },
       }));
     },
   },
