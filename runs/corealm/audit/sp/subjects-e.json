@@ -1,0 +1,12 @@
+[
+ {"tag":"c-square","x":-160,"y":1,"z":-95,"distance":28,"pitch":0.5,"yaws":[1.5707963]},
+ {"tag":"c-gatestreet","x":-160,"y":1,"z":-104,"distance":26,"pitch":0.48,"yaws":[0,3.1415926]},
+ {"tag":"c-yard","x":-170,"y":1,"z":-92,"distance":22,"pitch":0.55,"yaws":[0,1.5707963]},
+ {"tag":"c-eaststreet","x":-140,"y":1,"z":-80,"distance":20,"pitch":0.5,"yaws":[3.1415926]},
+ {"tag":"c-well","x":-164,"y":1.2,"z":-77,"distance":8,"pitch":0.3,"yaws":[0,3.1415926]},
+ {"tag":"c-hcporch","x":150.8,"y":2.5,"z":-69.6,"distance":11,"pitch":0.34,"yaws":[0,1.5707963]},
+ {"tag":"c-hcmarket","x":136.6,"y":2.5,"z":-63.4,"distance":14,"pitch":0.34,"yaws":[0]},
+ {"tag":"c-stones","x":206,"y":3,"z":168,"distance":18,"pitch":0.2,"yaws":[0,1.5707963]},
+ {"tag":"c-hcshed","x":146,"y":3,"z":-52,"distance":12,"pitch":0.3,"yaws":[0,3.1415926]},
+ {"tag":"c-vault","x":-168,"y":3,"z":-92,"distance":14,"pitch":0.3,"yaws":[3.1415926]}
+]
