@@ -102,6 +102,7 @@ export default defineConfig({
         { tag: "meta", attrs: { property: "og:description", content: "Guides, people, creatures, quests, and places generated from the live game." } },
         { tag: "meta", attrs: { property: "og:image", content: socialAsset("/og.png") } },
         { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+        { tag: "script", attrs: { type: "module", src: asset("/corealm-map.js") } },
       ],
     }),
     sitesStaticWorker,

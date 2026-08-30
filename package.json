@@ -23,7 +23,7 @@
     "gen-docs": "tsx tools/gen-docs.ts",
     "capture-docs": "tsx tools/capture-docs.ts",
     "docs:prepare": "tsx tools/prepare-docs-site.ts",
-    "docs:refresh": "npm run capture-docs && npm run gen-docs && npm run docs:prepare",
+    "docs:refresh": "npm run world-map && npm run capture-docs && npm run gen-docs && npm run docs:prepare",
     "docs:smoke": "tsx tools/smoke-docs-capture.ts",
     "docs:dev": "npm run gen-docs && npm run docs:prepare && astro dev",
     "docs:build": "npm run gen-docs && npm run docs:prepare && astro build",

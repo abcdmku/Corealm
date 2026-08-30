@@ -9,6 +9,7 @@
 import path from "node:path";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import sharp from "sharp";
 import { argValue, repoRoot } from "./lib/paths.js";
 
 import { content, gatherXp, respawnSeconds, sellPrice, toolBonus, yieldRange } from "../game/src/content/index.js";
@@ -23,6 +24,10 @@ import { NPCS, npc, npcGivingQuest } from "../game/src/content/npcs.js";
 import { REGIONS, type LocationDef } from "../game/src/content/regions.js";
 import { SKILLS } from "../game/src/content/skills.js";
 import { MAX_LEVEL, TIERS, totalXpAt, xpTable } from "../game/src/content/xp.js";
+import {
+  WORLD_MAP_IMAGE_BOUNDS,
+  WORLD_MAP_RENDER_FINGERPRINT,
+} from "../game/src/generated/worldMapFingerprint.js";
 import type { QuestObjectiveRef, RegionId, SkillId } from "../game/src/contracts.js";
 
 function cleanCell(value: string | number): string {
@@ -69,6 +74,24 @@ function humanizeId(id: string): string {
   return id.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function headingSlug(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\u2018\u2019']/g, "")
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function regionName(id: RegionId): string {
   if (id === "gravelmaw") return "Gravelmaw";
   return REGIONS.find((region) => region.id === id)?.name ?? id;
@@ -97,6 +120,48 @@ function allPlaces(): PlaceRecord[] {
     }
   }
   return places;
+}
+
+function locationMap(): string {
+  const bounds = WORLD_MAP_IMAGE_BOUNDS;
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxZ - bounds.minZ;
+  const surfacePlaces = REGIONS.flatMap((region) => region.locations.map((location) => ({
+    location,
+    regionLabel: region.name,
+  })));
+  const markers = surfacePlaces.map(({ location, regionLabel }) => {
+    const x = ((location.position[0] - bounds.minX) / width) * 100;
+    // The 4:3 source is contained inside a square viewport, leaving 12.5% above and below it.
+    const y = 12.5 + ((bounds.maxZ - location.position[1]) / height) * 75;
+    const label = `${location.name}, ${regionLabel}`;
+    return [
+      `<a class="corealm-map-marker" href="#${headingSlug(location.name)}"`,
+      ` style="--map-x:${x.toFixed(4)}%;--map-y:${y.toFixed(4)}%"`,
+      ` data-map-side="${x > 62 ? "left" : "right"}" data-map-kind="${location.kind}" data-map-marker`,
+      ` aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">`,
+      `<span>${escapeHtml(location.name)}<small>${escapeHtml(regionLabel)}</small></span></a>`,
+    ].join("");
+  }).join("\n");
+
+  return [
+    `<figure class="corealm-location-map" data-location-map style="--map-image-ratio:${width / height}">`,
+    `<div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Interactive map of Corealm locations">`,
+    `<div class="corealm-map-stage" data-map-stage>`,
+    `<img src="./assets/world-map.webp?v=${WORLD_MAP_RENDER_FINGERPRINT}" alt="Overhead map rendered from the Corealm game world" draggable="false" />`,
+    markers,
+    `</div>`,
+    `<span class="corealm-map-north" aria-hidden="true">N</span>`,
+    `<div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">`,
+    `<button type="button" data-map-action="out" aria-label="Zoom out" title="Zoom out">&minus;</button>`,
+    `<button type="button" data-map-action="reset" aria-label="Reset map" title="Reset map">&#x25CE;</button>`,
+    `<button type="button" data-map-action="in" aria-label="Zoom in" title="Zoom in">+</button>`,
+    `</div>`,
+    `<button class="corealm-map-expand" type="button" data-map-action="expand" aria-label="Expand map" aria-pressed="false" title="Expand map">&#x26F6;</button>`,
+    `</div>`,
+    `<figcaption>Drag to pan. Scroll or use + and &minus; to zoom. The Gravelmaw rooms lie below its entrance marker.</figcaption>`,
+    `</figure>`,
+  ].join("\n");
 }
 
 function placeById(id: string): PlaceRecord | undefined {
@@ -249,9 +314,9 @@ function resourcesDoc(): string {
 function regionsDoc(): string {
   const sections = REGIONS.map((region) => {
     const settlement = region.locations.find((location) => location.kind === "settlement") ?? region.locations[0];
-    const places = region.locations.map((location) => `- [${location.name}](./locations/#${location.id.replace(/_/g, "-")})`).join("\n");
+    const places = region.locations.map((location) => `- [${location.name}](./locations/#${headingSlug(location.name)})`).join("\n");
     const dungeon = region.dungeon
-      ? `\n\n### ${region.dungeon.name}\n\n${region.dungeon.locations.map((location) => `- [${location.name}](./locations/#${location.id.replace(/_/g, "-")})`).join("\n")}`
+      ? `\n\n### ${region.dungeon.name}\n\n${region.dungeon.locations.map((location) => `- [${location.name}](./locations/#${headingSlug(location.name)})`).join("\n")}`
       : "";
     return [
       `## ${region.name}`,
@@ -281,7 +346,10 @@ function locationsDoc(): string {
     "",
     `**Region:** ${regionLabel} · **Tier:** ${tier} · **Type:** ${location.kind.replace(/_/g, " ")}`,
   ].join("\n"));
-  return page("Places", "Named settlements, routes, landmarks, gathering sites, and dungeon rooms.", sections.join("\n\n"));
+  return page("Places", "Named settlements, routes, landmarks, gathering sites, and dungeon rooms.", [
+    locationMap(),
+    sections.join("\n\n"),
+  ].join("\n\n"));
 }
 
 function npcsDoc(): string {
@@ -457,6 +525,10 @@ async function main(): Promise<void> {
   await rm(iconTarget, { recursive: true, force: true });
   await mkdir(path.dirname(iconTarget), { recursive: true });
   await cp(iconSource, iconTarget, { recursive: true });
+  await sharp(path.resolve(repoRoot, "game/public/generated/world-map.png"))
+    .resize({ width: 2400, withoutEnlargement: true })
+    .webp({ quality: 88, effort: 6, smartSubsample: true })
+    .toFile(path.join(out, "assets/world-map.webp"));
 
   await writeFile(path.join(out, "README.md"), index, "utf8");
   for (const [name, body] of files) await writeFile(path.join(out, name), body, "utf8");

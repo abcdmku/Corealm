@@ -13,20 +13,20 @@ Tier 1. Settlement: **Coldbrace**.
 
 ### Places
 
-- [March Road End](./locations/#spawn)
-- [Coldbrace South Gate](./locations/#town-entrance)
-- [Coldbrace Square](./locations/#town-center)
-- [Coldbrace Bank](./locations/#bank-interior)
+- [March Road End](./locations/#march-road-end)
+- [Coldbrace South Gate](./locations/#coldbrace-south-gate)
+- [Coldbrace Square](./locations/#coldbrace-square)
+- [Coldbrace Bank](./locations/#coldbrace-bank)
 - [Coldbrace East Gate](./locations/#coldbrace-east-gate)
-- [The Broken Milestone](./locations/#north-milestone)
+- [The Broken Milestone](./locations/#the-broken-milestone)
 - [Bracken Pit](./locations/#bracken-pit)
 - [Palewood Copse](./locations/#palewood-copse)
 - [Redsill Shallows](./locations/#redsill-shallows)
 - [Corven Ford](./locations/#corven-ford)
-- [Marchfield](./locations/#marchfield-farm)
+- [Marchfield](./locations/#marchfield)
 - [West Track](./locations/#west-track)
-- [The Open March](./locations/#open-march-camp)
-- [North Gate](./locations/#fallowmarch-north-gate)
+- [The Open March](./locations/#the-open-march)
+- [North Gate](./locations/#north-gate)
 
 
 ## Vellenwood
@@ -39,17 +39,17 @@ Tier 5. Settlement: **Rootfall**.
 
 ### Places
 
-- [Marchgate](./locations/#vellenwood-marchgate)
-- [Rootfall](./locations/#rootfall-hamlet)
-- [Rootfall Bank Chest](./locations/#rootfall-bank)
+- [Marchgate](./locations/#marchgate)
+- [Rootfall](./locations/#rootfall)
+- [Rootfall Bank Chest](./locations/#rootfall-bank-chest)
 - [Hollowcut Seam](./locations/#hollowcut-seam)
-- [Duskoak Stand](./locations/#vellenwood-canopy)
+- [Duskoak Stand](./locations/#duskoak-stand)
 - [Mire Skirt](./locations/#mire-skirt)
 - [Blackwater Pools](./locations/#blackwater-pools)
 - [Gorge Ford](./locations/#gorge-ford)
 - [Gorge Head](./locations/#gorge-head)
-- [The Thornline](./locations/#thornline-camp)
-- [Cairn Gate](./locations/#vellenwood-east-gate)
+- [The Thornline](./locations/#the-thornline)
+- [Cairn Gate](./locations/#cairn-gate)
 
 
 ## Karrowmoor
@@ -62,17 +62,17 @@ Tier 10. Settlement: **Highcairn**.
 
 ### Places
 
-- [Moorgate](./locations/#karrowmoor-north-gate)
+- [Moorgate](./locations/#moorgate)
 - [Moor Road Bend](./locations/#moor-road-bend)
-- [Lower Quarry](./locations/#karrowmoor-terraces)
-- [The Gravelmaw](./locations/#gravelmaw-entrance)
-- [Highcairn](./locations/#highcairn-outpost)
+- [Lower Quarry](./locations/#lower-quarry)
+- [The Gravelmaw](./locations/#the-gravelmaw)
+- [Highcairn](./locations/#highcairn)
 - [Highcairn Bank](./locations/#highcairn-bank)
 - [Highcairn Plots](./locations/#highcairn-plots)
-- [Second Ramp](./locations/#karrow-ramp-two)
-- [Third Ramp](./locations/#karrow-ramp-three)
+- [Second Ramp](./locations/#second-ramp)
+- [Third Ramp](./locations/#third-ramp)
 - [Upper Karrow Seam](./locations/#upper-karrow-seam)
-- [The Great Cairn](./locations/#great-cairn)
+- [The Great Cairn](./locations/#the-great-cairn)
 - [Cairn Tarns](./locations/#cairn-tarns)
 - [Ridge Pines](./locations/#ridge-pines)
 - [Far Tarn](./locations/#far-tarn)
@@ -81,7 +81,7 @@ Tier 10. Settlement: **Highcairn**.
 
 ### The Gravelmaw
 
-- [The Lit Gallery](./locations/#gravelmaw-chamber1)
-- [The Collapse](./locations/#gravelmaw-chamber2)
-- [The Cairn Hall](./locations/#gravelmaw-chamber3)
-- [The Quarrykeeper's Floor](./locations/#gravelmaw-arena)
+- [The Lit Gallery](./locations/#the-lit-gallery)
+- [The Collapse](./locations/#the-collapse)
+- [The Cairn Hall](./locations/#the-cairn-hall)
+- [The Quarrykeeper's Floor](./locations/#the-quarrykeepers-floor)
