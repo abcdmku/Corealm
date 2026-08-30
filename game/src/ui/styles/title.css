@@ -5,7 +5,7 @@
  * settings panel, and what `.is-compact` actually does.
  *
  * The title screen is continuous with the boot screen on purpose: the same dark wash, the same
- * Cinzel mark in brass. A slim glass card, three quiet buttons — a moment, not a menu system.
+ * Cinzel mark in brass. A slim glass card, four quiet actions — a moment, not a menu system.
  *
  * The one rule in here that can break the whole game: `.title` covers the screen and takes pointer
  * events, so `.title[hidden]` MUST put it back to display:none. `#ui-root > *` sets pointer-events
@@ -104,6 +104,7 @@
 .title__action {
   width: 100%;
   min-height: 32px;
+  text-decoration: none;
   font-size: var(--size-sm);
   letter-spacing: 0.1em;
   text-transform: uppercase;

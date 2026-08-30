@@ -184,7 +184,7 @@ export class TitleScreen {
   private wrapFocus(event: KeyboardEvent): void {
     event.stopPropagation();
     const stops = [...this.card.querySelectorAll<HTMLElement>(
-      "button:not([disabled]), input:not([disabled]), [tabindex='0']",
+      "button:not([disabled]), input:not([disabled]), a[href], [tabindex='0']",
     )];
     if (stops.length === 0) return;
     const first = stops[0];
@@ -253,8 +253,15 @@ export class TitleScreen {
 
     const fresh = this.button("New game", "btn title__action", () => this.setView("confirm"));
     const settings = this.button("Settings", "btn title__action", () => this.options.onSettings());
+    const guide = document.createElement("a");
+    guide.className = "btn title__action";
+    guide.href = new URL("docs/", document.baseURI).href;
+    guide.target = "_blank";
+    guide.rel = "noopener noreferrer";
+    guide.textContent = "Game guide";
+    guide.setAttribute("aria-label", "Open the game guide in a new tab");
 
-    actions.append(resume, fresh, settings);
+    actions.append(resume, fresh, settings, guide);
 
     const hint = document.createElement("p");
     hint.className = "title__hint";
