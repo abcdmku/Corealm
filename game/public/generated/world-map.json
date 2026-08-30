@@ -12,8 +12,8 @@
   },
   "north": "+z",
   "seed": 1337,
-  "sha256": "f6afc0cf0af08061d811bcf8b3bfb5c34a9bb0b8a68deb149f4f9a8f6a3e5d3b",
-  "renderFingerprint": "f6afc0cf0af08061d811bcf8b3bfb5c34a9bb0b8a68deb149f4f9a8f6a3e5d3b",
+  "sha256": "284cbc77a05023d746cbddd53e8460f841864de54221c3ed7d01020a80d4e76c",
+  "renderFingerprint": "284cbc77a05023d746cbddd53e8460f841864de54221c3ed7d01020a80d4e76c",
   "tiles": {
     "columns": 14,
     "rows": 8,
