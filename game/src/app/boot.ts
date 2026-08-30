@@ -64,7 +64,7 @@ import { ENEMIES } from "../content/enemies.js";
 import { SHOPS } from "../content/shops.js";
 import { QUESTS } from "../content/quests.js";
 import { scatterWorld, worldExclusions, type ScatterResult } from "../world/scatter.js";
-import { findShot, shotIds } from "../debug/shots.js";
+import { findShot, shotIds, SHOTS } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
 import { createUi } from "../ui/panels.js";
 import { SettingsStore, type UiSettings } from "../ui/settings.js";
@@ -1080,6 +1080,44 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     errors.length = 0;
   };
 
+  let capturePreviousPause = false;
+  let capturePreviousRunning = false;
+
+  /**
+   * Places the camera around a documentation subject without adding a second camera system.
+   * The normal orbit camera still owns projection, occlusion, region streaming, and rendering.
+   */
+  const frameDocumentationTarget = (
+    target: Vec3,
+    yaw: number,
+    pitch: number,
+    distance: number,
+    reason: string,
+  ): void => {
+    const landed = nav.closestPoint(target) ?? target;
+    const regionId = regionAtPoint(landed);
+    store.get().player.position = landed;
+    store.get().player.regionId = regionId;
+    store.get().player.facingRad = yaw + Math.PI;
+    entityViews.sync(entityStore.all().filter((entity) =>
+      (entity.regionId === "gravelmaw") === (regionId === "gravelmaw")));
+    audioDirector.setRegion(regionId);
+    movement.stop(store.get(), clock.elapsedMs, reason);
+    scene.syncPlayer(landed, yaw + Math.PI, true);
+    camera.setPose(yaw, pitch, distance);
+    camera.update(target[0], target[1], target[2], true);
+    renderer.followShadow(renderer.camera.position.clone().setY(landed[1]));
+  };
+
+  const stableCaptureYaw = (id: string): number => {
+    let hash = 2166136261;
+    for (let index = 0; index < id.length; index += 1) {
+      hash ^= id.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return ((hash >>> 0) % 6283) / 1000;
+  };
+
   installGameDebug({
     store, events, clock, nav, movement, api, renderer, camera, assets, errors,
     version,
@@ -1189,6 +1227,10 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     focusCamera: (shotId: string) => {
       const shot = findShot(shotId);
       if (!shot) return false;
+      entityViews.setCaptureSubject(null);
+      scene.scatterGroup.visible = true;
+      scene.terrainGroup.visible = true;
+      if (dungeon) dungeon.group.visible = shot.regionId === "gravelmaw";
       const node = nav.routeNode(shot.locationId);
       if (!node) return false;
       const target = shot.position === undefined
@@ -1198,16 +1240,95 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
           scene.heightAt(shot.regionId, shot.position[0], shot.position[1]) + 0.2,
           shot.position[1],
         ] as Vec3;
-      const landed = nav.closestPoint(target) ?? target;
-      store.get().player.position = landed;
-      store.get().player.regionId = scene.regionAt(landed[0], landed[2]);
-      audioDirector.setRegion(store.get().player.regionId);
-      movement.stop(store.get(), clock.elapsedMs, "focus-camera");
-      scene.syncPlayer(landed, shot.yaw + Math.PI, true);
-      camera.setPose(shot.yaw, shot.pitch, shot.distance);
-      camera.update(landed[0], landed[1], landed[2], true);
+      frameDocumentationTarget(target, shot.yaw, shot.pitch, shot.distance, "focus-camera");
       return true;
     },
+    focusEntity: (entityId: string) => {
+      const entity = entityStore.get(entityId);
+      if (!entity) return false;
+      const dungeonEntity = entity.regionId === "gravelmaw";
+      const switchingRealm = (store.get().player.regionId === "gravelmaw") !== dungeonEntity;
+      // The dungeon's boss and puzzle door are composed inside the dungeon renderer rather than
+      // exclusively by EntityViews, so keep the complete interior for those two photographs.
+      if (switchingRealm) entityViews.setCaptureSubject(null);
+      scene.scatterGroup.visible = false;
+      scene.terrainGroup.visible = !dungeonEntity;
+      if (dungeon) dungeon.group.visible = dungeonEntity;
+      const yaw = entity.view?.rotationY ?? stableCaptureYaw(entity.id);
+      const baseDistance = entity.archetype === "boss" ? 7 : entity.archetype === "npc" ? 3.9 : 4.8;
+      if (switchingRealm) {
+        frameDocumentationTarget(entity.position, yaw, 0.25, baseDistance, "focus-entity-region");
+      }
+      entityViews.setCaptureSubject(dungeonEntity ? null : entityId);
+      const bounds = entityViews.drawnBounds(entityId);
+      const width = bounds ? bounds.max[0] - bounds.min[0] : 0;
+      const height = bounds ? bounds.max[1] - bounds.min[1] : 0;
+      const depth = bounds ? bounds.max[2] - bounds.min[2] : 0;
+      const distance = Math.max(baseDistance, width * 1.7, height * 1.7, depth * 1.7);
+      const target: Vec3 = bounds
+        ? [
+          (bounds.min[0] + bounds.max[0]) / 2,
+          (bounds.min[1] + bounds.max[1]) / 2 - 1.1,
+          (bounds.min[2] + bounds.max[2]) / 2,
+        ]
+        : entity.position;
+      const pitch = 0.25;
+      frameDocumentationTarget(target, yaw, pitch, distance, "focus-entity");
+      return true;
+    },
+    focusLocation: (locationId: string) => {
+      entityViews.setCaptureSubject(null);
+      scene.scatterGroup.visible = true;
+      scene.terrainGroup.visible = true;
+      const dungeonLocation = REGIONS.some((region) =>
+        region.dungeon?.locations.some((location) => location.id === locationId));
+      if (dungeon) dungeon.group.visible = dungeonLocation;
+      const authored = SHOTS.find((shot) => shot.id === locationId || shot.locationId === locationId);
+      if (authored) {
+        const target = authored.position === undefined
+          ? nav.routeNode(authored.locationId)?.position
+          : [
+            authored.position[0],
+            scene.heightAt(authored.regionId, authored.position[0], authored.position[1]) + 0.2,
+            authored.position[1],
+          ] as Vec3;
+        if (!target) return false;
+        frameDocumentationTarget(target, authored.yaw, authored.pitch, authored.distance, "focus-location");
+        return true;
+      }
+      const node = nav.routeNode(locationId);
+      if (!node) return false;
+      frameDocumentationTarget(
+        node.position,
+        stableCaptureYaw(locationId),
+        dungeonLocation ? 0.22 : 0.44,
+        dungeonLocation ? 7 : 20,
+        "focus-location",
+      );
+      return true;
+    },
+    setCaptureMode: (enabled: boolean) => {
+      if (enabled) {
+        capturePreviousPause = clock.paused;
+        capturePreviousRunning = loop.isRunning();
+        clock.paused = true;
+        if (capturePreviousRunning) loop.stop();
+        renderer.setRenderScale(0.85);
+        renderer.setShadowQuality("low");
+        playerRig.root.visible = false;
+      } else {
+        clock.paused = capturePreviousPause;
+        renderer.setRenderScale(appliedPreferences?.renderScale ?? 1);
+        renderer.setShadowQuality(appliedPreferences?.shadowQuality ?? "high");
+        playerRig.root.visible = true;
+        scene.scatterGroup.visible = true;
+        scene.terrainGroup.visible = true;
+        if (dungeon) dungeon.group.visible = store.get().player.regionId === "gravelmaw";
+        entityViews.setCaptureSubject(null);
+        if (capturePreviousRunning) loop.start();
+      }
+    },
+    captureDocumentationFrame: () => renderer.captureFrame(),
     listShots: () => shotIds(),
     callTool: (name: string, args: unknown) => agent.call(name, (args ?? {}) as Record<string, unknown>),
   });

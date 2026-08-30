@@ -76,6 +76,14 @@ export interface DebugDeps {
   getSaveBlob(): string;
   loadSaveBlob(json: string): void;
   focusCamera(shotId: string): boolean;
+  /** Frames one live entity for generated guide photography. */
+  focusEntity(entityId: EntityId): boolean;
+  /** Frames a route-graph location, using its authored shot when one exists. */
+  focusLocation(locationId: string): boolean;
+  /** Freezes simulation and hides the player while documentation captures run. */
+  setCaptureMode(enabled: boolean): void;
+  /** Renders and returns the current gameplay canvas before another frame can clear it. */
+  captureDocumentationFrame(): string;
   listShots(): string[];
   callTool(name: string, args: unknown): Promise<unknown>;
   /** Test-only item grant. Goes through the real inventory so slot limits still apply. */
@@ -640,6 +648,22 @@ export function installGameDebug(deps: DebugDeps): void {
 
     focusCamera(shotId: string): boolean {
       return deps.focusCamera(shotId);
+    },
+
+    focusEntity(entityId: EntityId): boolean {
+      return deps.focusEntity(entityId);
+    },
+
+    focusLocation(locationId: string): boolean {
+      return deps.focusLocation(locationId);
+    },
+
+    setCaptureMode(enabled: boolean): void {
+      deps.setCaptureMode(Boolean(enabled));
+    },
+
+    captureDocumentationFrame(): string {
+      return deps.captureDocumentationFrame();
     },
 
     /** Alias. `tools/screenshot.ts --preset` calls this name. */

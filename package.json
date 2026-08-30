@@ -21,6 +21,13 @@
     "world-map": "tsx tools/generate-world-map.ts",
     "agent-proof": "tsx tools/agent-proof.ts",
     "gen-docs": "tsx tools/gen-docs.ts",
+    "capture-docs": "tsx tools/capture-docs.ts",
+    "docs:prepare": "tsx tools/prepare-docs-site.ts",
+    "docs:refresh": "npm run capture-docs && npm run gen-docs && npm run docs:prepare",
+    "docs:smoke": "tsx tools/smoke-docs-capture.ts",
+    "docs:dev": "npm run gen-docs && npm run docs:prepare && astro dev",
+    "docs:build": "npm run gen-docs && npm run docs:prepare && astro build",
+    "docs:preview": "astro preview",
     "icons": "tsx tools/generate-item-icons.ts",
     "icons:verify": "tsx tools/verify-item-icons.ts",
     "gate-check": "tsx tools/gate-check.ts"
@@ -33,11 +40,14 @@
     "three": "0.185.1"
   },
   "devDependencies": {
+    "@astrojs/starlight": "^0.41.10",
     "@gltf-transform/core": "^4.4.2",
     "@gltf-transform/extensions": "^4.4.2",
     "@gltf-transform/functions": "^4.4.2",
+    "@openai/sites-vite-plugin": "^0.2.0",
     "@types/node": "24.3.0",
     "@types/three": "0.185.0",
+    "astro": "^7.2.9",
     "playwright": "1.62.1",
     "sharp": "^0.35.4",
     "tsx": "4.23.12",

@@ -1,0 +1,674 @@
+{
+  "version": 1,
+  "fingerprint": "2b26d0a1e97734abd6538250381d779b38bb1384d822023943a8d7fc0ab76a8f",
+  "captures": [
+    {
+      "id": "npc_warden_ilse",
+      "kind": "npc",
+      "label": "Warden Ilse",
+      "file": "assets/captures/npcs/npc_warden_ilse.webp",
+      "runtimeEntityId": "npc_warden_ilse",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "npc_pitmaster_dorn",
+      "kind": "npc",
+      "label": "Pitmaster Dorn",
+      "file": "assets/captures/npcs/npc_pitmaster_dorn.webp",
+      "runtimeEntityId": "npc_pitmaster_dorn",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "npc_smith_harrow",
+      "kind": "npc",
+      "label": "Harrow the Smith",
+      "file": "assets/captures/npcs/npc_smith_harrow.webp",
+      "runtimeEntityId": "npc_smith_harrow",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "npc_ranger_syb",
+      "kind": "npc",
+      "label": "Ranger Syb",
+      "file": "assets/captures/npcs/npc_ranger_syb.webp",
+      "runtimeEntityId": "npc_ranger_syb",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "npc_carter_bel",
+      "kind": "npc",
+      "label": "Carter Bel",
+      "file": "assets/captures/npcs/npc_carter_bel.webp",
+      "runtimeEntityId": "npc_carter_bel",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "npc_woodward_ansel",
+      "kind": "npc",
+      "label": "Woodward Ansel",
+      "file": "assets/captures/npcs/npc_woodward_ansel.webp",
+      "runtimeEntityId": "npc_woodward_ansel",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "npc_seamer_juno",
+      "kind": "npc",
+      "label": "Seamer Juno",
+      "file": "assets/captures/npcs/npc_seamer_juno.webp",
+      "runtimeEntityId": "npc_seamer_juno",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "npc_trapper_mott",
+      "kind": "npc",
+      "label": "Trapper Mott",
+      "file": "assets/captures/npcs/npc_trapper_mott.webp",
+      "runtimeEntityId": "npc_trapper_mott",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "npc_foreman_arden",
+      "kind": "npc",
+      "label": "Foreman Arden",
+      "file": "assets/captures/npcs/npc_foreman_arden.webp",
+      "runtimeEntityId": "npc_foreman_arden",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "npc_quarrier_vess",
+      "kind": "npc",
+      "label": "Quarrier Vess",
+      "file": "assets/captures/npcs/npc_quarrier_vess.webp",
+      "runtimeEntityId": "npc_quarrier_vess",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "npc_cairnkeeper_ode",
+      "kind": "npc",
+      "label": "Cairnkeeper Ode",
+      "file": "assets/captures/npcs/npc_cairnkeeper_ode.webp",
+      "runtimeEntityId": "npc_cairnkeeper_ode",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "npc_watcher_hale",
+      "kind": "npc",
+      "label": "Watcher Hale",
+      "file": "assets/captures/npcs/npc_watcher_hale.webp",
+      "runtimeEntityId": "npc_watcher_hale",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "coldbrace_furnace",
+      "kind": "entity",
+      "label": "Coldbrace Furnace",
+      "file": "assets/captures/entities/coldbrace_furnace.webp",
+      "runtimeEntityId": "coldbrace_furnace",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "coldbrace_anvil",
+      "kind": "entity",
+      "label": "Coldbrace Anvil",
+      "file": "assets/captures/entities/coldbrace_anvil.webp",
+      "runtimeEntityId": "coldbrace_anvil",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "coldbrace_bank",
+      "kind": "entity",
+      "label": "Coldbrace Bank",
+      "file": "assets/captures/entities/coldbrace_bank.webp",
+      "runtimeEntityId": "coldbrace_bank",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "coldbrace_range",
+      "kind": "entity",
+      "label": "Coldbrace Cooking Range",
+      "file": "assets/captures/entities/coldbrace_range.webp",
+      "runtimeEntityId": "coldbrace_range",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "brookvault_planks",
+      "kind": "entity",
+      "label": "Brookvault Planks",
+      "file": "assets/captures/entities/brookvault_planks.webp",
+      "runtimeEntityId": "brookvault_planks",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "wall_vault",
+      "kind": "entity",
+      "label": "Wall Vault",
+      "file": "assets/captures/entities/wall_vault.webp",
+      "runtimeEntityId": "wall_vault",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "split_duskoak",
+      "kind": "entity",
+      "label": "The Split Duskoak",
+      "file": "assets/captures/entities/split_duskoak.webp",
+      "runtimeEntityId": "split_duskoak",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "coldbrace_fletching",
+      "kind": "entity",
+      "label": "Coldbrace Fletching Bench",
+      "file": "assets/captures/entities/coldbrace_fletching.webp",
+      "runtimeEntityId": "coldbrace_fletching",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "coldbrace_crafting",
+      "kind": "entity",
+      "label": "Coldbrace Crafting Table",
+      "file": "assets/captures/entities/coldbrace_crafting.webp",
+      "runtimeEntityId": "coldbrace_crafting",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "sunder_ledge",
+      "kind": "entity",
+      "label": "Sunder Ledge",
+      "file": "assets/captures/entities/sunder_ledge.webp",
+      "runtimeEntityId": "sunder_ledge",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "highcairn_bank_counter",
+      "kind": "entity",
+      "label": "Highcairn Bank",
+      "file": "assets/captures/entities/highcairn_bank_counter.webp",
+      "runtimeEntityId": "highcairn_bank_counter",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "great_cairn_stone",
+      "kind": "entity",
+      "label": "The Great Cairn",
+      "file": "assets/captures/entities/great_cairn_stone.webp",
+      "runtimeEntityId": "great_cairn_stone",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "gravelmaw_mouth_portal",
+      "kind": "entity",
+      "label": "The Gravelmaw",
+      "file": "assets/captures/entities/gravelmaw_mouth_portal.webp",
+      "runtimeEntityId": "gravelmaw_mouth_portal",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "gravelmaw_stone_door",
+      "kind": "entity",
+      "label": "The Three-Lever Door",
+      "file": "assets/captures/entities/gravelmaw_stone_door.webp",
+      "runtimeEntityId": "gravelmaw_stone_door",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "skitterling_t1",
+      "kind": "enemy",
+      "label": "Rill Skitterling",
+      "file": "assets/captures/enemies/skitterling_t1.webp",
+      "runtimeEntityId": "rill_skitterlings_1",
+      "regionId": "rill_skitterlings"
+    },
+    {
+      "id": "marchwolf_t1",
+      "kind": "enemy",
+      "label": "Marchwolf Pup",
+      "file": "assets/captures/enemies/marchwolf_t1.webp",
+      "runtimeEntityId": "marchwolf_pups_1",
+      "regionId": "marchwolf_pups"
+    },
+    {
+      "id": "fenmite_t1",
+      "kind": "enemy",
+      "label": "Bracken Fenmite",
+      "file": "assets/captures/enemies/fenmite_t1.webp",
+      "runtimeEntityId": "bracken_fenmites_1",
+      "regionId": "bracken_fenmites"
+    },
+    {
+      "id": "mudback_t1",
+      "kind": "enemy",
+      "label": "Redsill Mudback",
+      "file": "assets/captures/enemies/mudback_t1.webp",
+      "runtimeEntityId": "redsill_mudbacks_1",
+      "regionId": "redsill_mudbacks"
+    },
+    {
+      "id": "reaver_t1",
+      "kind": "enemy",
+      "label": "March Road Reaver",
+      "file": "assets/captures/enemies/reaver_t1.webp",
+      "runtimeEntityId": "march_road_reavers_1",
+      "regionId": "march_road_reavers"
+    },
+    {
+      "id": "hollow_t1",
+      "kind": "enemy",
+      "label": "Palewood Hollow",
+      "file": "assets/captures/enemies/hollow_t1.webp",
+      "runtimeEntityId": "palewood_hollows_1",
+      "regionId": "palewood_hollows"
+    },
+    {
+      "id": "thornbound_t5",
+      "kind": "enemy",
+      "label": "Thornbound Husk",
+      "file": "assets/captures/enemies/thornbound_t5.webp",
+      "runtimeEntityId": "thornbound_husks_1",
+      "regionId": "thornbound_husks"
+    },
+    {
+      "id": "skitterling_t5",
+      "kind": "enemy",
+      "label": "Bramble Skitterling",
+      "file": "assets/captures/enemies/skitterling_t5.webp",
+      "runtimeEntityId": "bramble_skitterlings_1",
+      "regionId": "bramble_skitterlings"
+    },
+    {
+      "id": "marchwolf_t5",
+      "kind": "enemy",
+      "label": "Marchwolf",
+      "file": "assets/captures/enemies/marchwolf_t5.webp",
+      "runtimeEntityId": "marchwolves_deepwood_1",
+      "regionId": "marchwolves_deepwood"
+    },
+    {
+      "id": "fenmite_t5",
+      "kind": "enemy",
+      "label": "Mire Fenmite",
+      "file": "assets/captures/enemies/fenmite_t5.webp",
+      "runtimeEntityId": "mire_fenmites_1",
+      "regionId": "mire_fenmites"
+    },
+    {
+      "id": "reaver_t5",
+      "kind": "enemy",
+      "label": "Gorge Reaver",
+      "file": "assets/captures/enemies/reaver_t5.webp",
+      "runtimeEntityId": "gorge_reavers_1",
+      "regionId": "gorge_reavers"
+    },
+    {
+      "id": "hollow_t5",
+      "kind": "enemy",
+      "label": "Canopy Hollow",
+      "file": "assets/captures/enemies/hollow_t5.webp",
+      "runtimeEntityId": "canopy_hollows_1",
+      "regionId": "canopy_hollows"
+    },
+    {
+      "id": "cairnwight_t10",
+      "kind": "enemy",
+      "label": "Cairnwight",
+      "file": "assets/captures/enemies/cairnwight_t10.webp",
+      "runtimeEntityId": "cairnwights_fields_1",
+      "regionId": "cairnwights_fields"
+    },
+    {
+      "id": "skitterling_t10",
+      "kind": "enemy",
+      "label": "Scree Skitterling",
+      "file": "assets/captures/enemies/skitterling_t10.webp",
+      "runtimeEntityId": "scree_skitterlings_1",
+      "regionId": "scree_skitterlings"
+    },
+    {
+      "id": "thornbound_t10",
+      "kind": "enemy",
+      "label": "Thornbound Elder",
+      "file": "assets/captures/enemies/thornbound_t10.webp",
+      "runtimeEntityId": "thornbound_elders_ridge_1",
+      "regionId": "thornbound_elders_ridge"
+    },
+    {
+      "id": "mudback_t10",
+      "kind": "enemy",
+      "label": "Terrace Mudback",
+      "file": "assets/captures/enemies/mudback_t10.webp",
+      "runtimeEntityId": "terrace_mudbacks_1",
+      "regionId": "terrace_mudbacks"
+    },
+    {
+      "id": "reaver_t10",
+      "kind": "enemy",
+      "label": "Karrow Reaver",
+      "file": "assets/captures/enemies/reaver_t10.webp",
+      "runtimeEntityId": "karrow_reavers_1",
+      "regionId": "karrow_reavers"
+    },
+    {
+      "id": "marchwolf_t10",
+      "kind": "enemy",
+      "label": "Tarn Marchwolf",
+      "file": "assets/captures/enemies/marchwolf_t10.webp",
+      "runtimeEntityId": "tarn_marchwolves_1",
+      "regionId": "tarn_marchwolves"
+    },
+    {
+      "id": "quarrykeeper_t10",
+      "kind": "enemy",
+      "label": "Ordrun the Quarrykeeper",
+      "file": "assets/captures/enemies/quarrykeeper_t10.webp",
+      "runtimeEntityId": "ordrun",
+      "regionId": "ordrun"
+    },
+    {
+      "id": "spawn",
+      "kind": "location",
+      "label": "March Road End",
+      "file": "assets/captures/locations/spawn.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "town_entrance",
+      "kind": "location",
+      "label": "Coldbrace South Gate",
+      "file": "assets/captures/locations/town_entrance.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "town_center",
+      "kind": "location",
+      "label": "Coldbrace Square",
+      "file": "assets/captures/locations/town_center.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "bank_interior",
+      "kind": "location",
+      "label": "Coldbrace Bank",
+      "file": "assets/captures/locations/bank_interior.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "coldbrace_east_gate",
+      "kind": "location",
+      "label": "Coldbrace East Gate",
+      "file": "assets/captures/locations/coldbrace_east_gate.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "north_milestone",
+      "kind": "location",
+      "label": "The Broken Milestone",
+      "file": "assets/captures/locations/north_milestone.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "bracken_pit",
+      "kind": "location",
+      "label": "Bracken Pit",
+      "file": "assets/captures/locations/bracken_pit.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "palewood_copse",
+      "kind": "location",
+      "label": "Palewood Copse",
+      "file": "assets/captures/locations/palewood_copse.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "redsill_shallows",
+      "kind": "location",
+      "label": "Redsill Shallows",
+      "file": "assets/captures/locations/redsill_shallows.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "corven_ford",
+      "kind": "location",
+      "label": "Corven Ford",
+      "file": "assets/captures/locations/corven_ford.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "marchfield_farm",
+      "kind": "location",
+      "label": "Marchfield",
+      "file": "assets/captures/locations/marchfield_farm.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "west_track",
+      "kind": "location",
+      "label": "West Track",
+      "file": "assets/captures/locations/west_track.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "open_march_camp",
+      "kind": "location",
+      "label": "The Open March",
+      "file": "assets/captures/locations/open_march_camp.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "fallowmarch_north_gate",
+      "kind": "location",
+      "label": "North Gate",
+      "file": "assets/captures/locations/fallowmarch_north_gate.webp",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "vellenwood_marchgate",
+      "kind": "location",
+      "label": "Marchgate",
+      "file": "assets/captures/locations/vellenwood_marchgate.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "rootfall_hamlet",
+      "kind": "location",
+      "label": "Rootfall",
+      "file": "assets/captures/locations/rootfall_hamlet.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "rootfall_bank",
+      "kind": "location",
+      "label": "Rootfall Bank Chest",
+      "file": "assets/captures/locations/rootfall_bank.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "hollowcut_seam",
+      "kind": "location",
+      "label": "Hollowcut Seam",
+      "file": "assets/captures/locations/hollowcut_seam.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "vellenwood_canopy",
+      "kind": "location",
+      "label": "Duskoak Stand",
+      "file": "assets/captures/locations/vellenwood_canopy.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "mire_skirt",
+      "kind": "location",
+      "label": "Mire Skirt",
+      "file": "assets/captures/locations/mire_skirt.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "blackwater_pools",
+      "kind": "location",
+      "label": "Blackwater Pools",
+      "file": "assets/captures/locations/blackwater_pools.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "gorge_ford",
+      "kind": "location",
+      "label": "Gorge Ford",
+      "file": "assets/captures/locations/gorge_ford.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "gorge_head",
+      "kind": "location",
+      "label": "Gorge Head",
+      "file": "assets/captures/locations/gorge_head.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "thornline_camp",
+      "kind": "location",
+      "label": "The Thornline",
+      "file": "assets/captures/locations/thornline_camp.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "vellenwood_east_gate",
+      "kind": "location",
+      "label": "Cairn Gate",
+      "file": "assets/captures/locations/vellenwood_east_gate.webp",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "karrowmoor_north_gate",
+      "kind": "location",
+      "label": "Moorgate",
+      "file": "assets/captures/locations/karrowmoor_north_gate.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "moor_road_bend",
+      "kind": "location",
+      "label": "Moor Road Bend",
+      "file": "assets/captures/locations/moor_road_bend.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "karrowmoor_terraces",
+      "kind": "location",
+      "label": "Lower Quarry",
+      "file": "assets/captures/locations/karrowmoor_terraces.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "gravelmaw_entrance",
+      "kind": "location",
+      "label": "The Gravelmaw",
+      "file": "assets/captures/locations/gravelmaw_entrance.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "highcairn_outpost",
+      "kind": "location",
+      "label": "Highcairn",
+      "file": "assets/captures/locations/highcairn_outpost.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "highcairn_bank",
+      "kind": "location",
+      "label": "Highcairn Bank",
+      "file": "assets/captures/locations/highcairn_bank.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "highcairn_plots",
+      "kind": "location",
+      "label": "Highcairn Plots",
+      "file": "assets/captures/locations/highcairn_plots.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "karrow_ramp_two",
+      "kind": "location",
+      "label": "Second Ramp",
+      "file": "assets/captures/locations/karrow_ramp_two.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "karrow_ramp_three",
+      "kind": "location",
+      "label": "Third Ramp",
+      "file": "assets/captures/locations/karrow_ramp_three.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "upper_karrow_seam",
+      "kind": "location",
+      "label": "Upper Karrow Seam",
+      "file": "assets/captures/locations/upper_karrow_seam.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "great_cairn",
+      "kind": "location",
+      "label": "The Great Cairn",
+      "file": "assets/captures/locations/great_cairn.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "cairn_tarns",
+      "kind": "location",
+      "label": "Cairn Tarns",
+      "file": "assets/captures/locations/cairn_tarns.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "ridge_pines",
+      "kind": "location",
+      "label": "Ridge Pines",
+      "file": "assets/captures/locations/ridge_pines.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "far_tarn",
+      "kind": "location",
+      "label": "Far Tarn",
+      "file": "assets/captures/locations/far_tarn.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "tarn_track",
+      "kind": "location",
+      "label": "Tarn Track",
+      "file": "assets/captures/locations/tarn_track.webp",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "gravelmaw_chamber1",
+      "kind": "location",
+      "label": "The Lit Gallery",
+      "file": "assets/captures/locations/gravelmaw_chamber1.webp",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "gravelmaw_chamber2",
+      "kind": "location",
+      "label": "The Collapse",
+      "file": "assets/captures/locations/gravelmaw_chamber2.webp",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "gravelmaw_chamber3",
+      "kind": "location",
+      "label": "The Cairn Hall",
+      "file": "assets/captures/locations/gravelmaw_chamber3.webp",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "gravelmaw_arena",
+      "kind": "location",
+      "label": "The Quarrykeeper's Floor",
+      "file": "assets/captures/locations/gravelmaw_arena.webp",
+      "regionId": "gravelmaw"
+    }
+  ]
+}

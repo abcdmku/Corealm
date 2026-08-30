@@ -538,6 +538,12 @@ export class Renderer {
     };
   }
 
+  /** Renders and reads one gameplay frame synchronously for generated documentation. */
+  captureFrame(): string {
+    this.renderer.render(this.scene, this.camera);
+    return this.renderer.domElement.toDataURL("image/png");
+  }
+
   /**
    * Renders one north-up orthographic tile of the actual game scene for the build-time world map.
    *

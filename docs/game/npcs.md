@@ -1,0 +1,148 @@
+---
+title: "People"
+description: "Every named NPC, where to find them, and the quests they give."
+---
+
+## Warden Ilse
+
+![Warden Ilse](./assets/captures/npcs/npc_warden_ilse.webp)
+
+Warden of Coldbrace. Runs a town on behalf of a company that stopped writing back.
+
+**Found at:** Coldbrace Square, Fallowmarch
+
+### Quests
+
+_No quest._
+
+## Pitmaster Dorn
+
+![Pitmaster Dorn](./assets/captures/npcs/npc_pitmaster_dorn.webp)
+
+Runs the Bracken Pit, and the ledger that says what the Bracken Pit contains.
+
+**Found at:** Coldbrace Square, Fallowmarch
+
+### Quests
+
+- [Dorn's Tally](./quests/#dorns-tally)
+
+## Harrow the Smith
+
+![Harrow the Smith](./assets/captures/npcs/npc_smith_harrow.webp)
+
+Coldbrace's smith. Sells metal, teaches the material loop, says very little.
+
+**Found at:** Coldbrace Square, Fallowmarch
+
+### Quests
+
+- [Cold Iron](./quests/#cold-iron)
+
+## Ranger Syb
+
+![Ranger Syb](./assets/captures/npcs/npc_ranger_syb.webp)
+
+Walks the march. Knows where the water is and has not had a hot meal in some time.
+
+**Found at:** Coldbrace Square, Fallowmarch
+
+### Quests
+
+- [Bright Water](./quests/#bright-water)
+
+## Carter Bel
+
+![Carter Bel](./assets/captures/npcs/npc_carter_bel.webp)
+
+Hauls ore from the pit to the vault. Currently losing an argument to Warden Ilse.
+
+**Found at:** Coldbrace South Gate, Fallowmarch
+
+### Quests
+
+- [The Carter's Wager](./quests/#the-carters-wager)
+
+## Woodward Ansel
+
+![Woodward Ansel](./assets/captures/npcs/npc_woodward_ansel.webp)
+
+Keeps the Duskoak stand. Decides which trees may be felled and which may not.
+
+**Found at:** Rootfall, Vellenwood
+
+### Quests
+
+- [Crooked Grain](./quests/#crooked-grain)
+
+## Seamer Juno
+
+![Seamer Juno](./assets/captures/npcs/npc_seamer_juno.webp)
+
+Rootfall's crafter. Shafts, hide, cord, and anything that has to hold under load.
+
+**Found at:** Rootfall, Vellenwood
+
+### Quests
+
+- [Knots and Names](./quests/#knots-and-names)
+
+## Trapper Mott
+
+![Trapper Mott](./assets/captures/npcs/npc_trapper_mott.webp)
+
+Sets eleven traps in the deep wood. Has caught nothing in eleven days.
+
+**Found at:** Rootfall, Vellenwood
+
+### Quests
+
+- [Eleven Empty Days](./quests/#eleven-empty-days)
+
+## Foreman Arden
+
+![Foreman Arden](./assets/captures/npcs/npc_foreman_arden.webp)
+
+Foreman of the Highcairn quarry crew. Stopped the dig six months ago and kept the camp.
+
+**Found at:** Highcairn, Karrowmoor
+
+### Quests
+
+- [Bad Ground](./quests/#bad-ground)
+
+## Quarrier Vess
+
+![Quarrier Vess](./assets/captures/npcs/npc_quarrier_vess.webp)
+
+Works the Kaldite faces. Does not like what the blue-black stone does in the dark.
+
+**Found at:** Highcairn, Karrowmoor
+
+### Quests
+
+- [The Sparking Stone](./quests/#sparking-stone)
+
+## Cairnkeeper Ode
+
+![Cairnkeeper Ode](./assets/captures/npcs/npc_cairnkeeper_ode.webp)
+
+Keeps the cairns on the moor. Nobody appointed her; nobody has argued.
+
+**Found at:** Highcairn, Karrowmoor
+
+### Quests
+
+- [The Long Cairn](./quests/#long-cairn)
+
+## Watcher Hale
+
+![Watcher Hale](./assets/captures/npcs/npc_watcher_hale.webp)
+
+On the rota that watches the Gravelmaw mouth. It is his shift more often than it should be.
+
+**Found at:** Highcairn, Karrowmoor
+
+### Quests
+
+_No quest._

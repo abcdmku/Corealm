@@ -1,6 +1,7 @@
-# Recipes
-
-78 recipes across four production skills.
+---
+title: "Recipes"
+description: "Production recipes generated from the live game tables."
+---
 
 ## Smithing
 

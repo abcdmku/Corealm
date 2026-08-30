@@ -1,5 +1,8 @@
 node_modules/
 game/dist/
+dist/
+.astro/
+docs-site/src/content/docs/game/
 playwright-report/
 test-results/
 *.log

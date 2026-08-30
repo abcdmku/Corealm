@@ -1,0 +1,93 @@
+name: Game guide
+
+on:
+  pull_request:
+    paths:
+      - "game/src/**"
+      - "game/public/assets/**"
+      - "art/item-icons/**"
+      - "docs/game/**"
+      - "docs-site/**"
+      - "tools/capture-docs.ts"
+      - "tools/gen-docs.ts"
+      - "tools/prepare-docs-site.ts"
+      - "astro.config.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "game/src/**"
+      - "game/public/assets/**"
+      - "art/item-icons/**"
+      - "docs/game/**"
+      - "docs-site/**"
+      - "tools/capture-docs.ts"
+      - "tools/gen-docs.ts"
+      - "tools/prepare-docs-site.ts"
+      - "astro.config.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: game-guide-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run docs:build
+
+  publish:
+    if: github.event_name != 'pull_request' && !contains(github.event.head_commit.message || '', '[docs-sync]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      DOCS_BASE: /Corealm
+      DOCS_SITE_URL: https://abcdmku.github.io
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run docs:refresh
+
+      - name: Commit refreshed Markdown and captures
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/game; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/game
+          git commit -m "[docs-sync] refresh generated game guide"
+          git push
+
+      - run: npm run docs:build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

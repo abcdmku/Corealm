@@ -1,14 +1,15 @@
-# Experience table
+---
+title: "Experience table"
+description: "The complete Corealm experience curve."
+---
 
-Every skill runs from level 1 to level 99. Reaching 99 costs
-**9,999,879 experience**.
+Skills run from level 1 to 99. Level 99 requires **9,999,879 XP**.
 
-Content tiers sit at 1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99. Level 92 is roughly the halfway point of the total,
-so the last seven levels cost about as much as the first ninety-two.
+Content tiers unlock at levels 1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99.
 
-| Level | Total XP | XP for this level |
+| Level | Total XP | XP from previous level |
 | --- | --- | --- |
-| 1 | 0 | — |
+| 1 | 0 | - |
 | 2 | 99 | 99 |
 | 3 | 219 | 120 |
 | 4 | 360 | 141 |

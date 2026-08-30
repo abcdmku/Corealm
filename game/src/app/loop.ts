@@ -341,6 +341,10 @@ export class GameLoop {
     this.frameHandle = requestAnimationFrame(this.frame);
   }
 
+  isRunning(): boolean {
+    return this.running;
+  }
+
   stop(): void {
     this.running = false;
     if (this.frameHandle) cancelAnimationFrame(this.frameHandle);

@@ -1,104 +1,147 @@
 /**
- * Generates Corealm's human-readable documentation from canonical content.
+ * Generates the public game guide from the canonical content tables.
  *
- * The point is that these files cannot drift from the game: they are produced from the same tables
- * the runtime reads, so a rebalanced recipe rewrites its own documentation. Anything hand-written
- * here would be a second source of truth and would eventually be wrong.
+ * The Markdown and the website consume the same output. Screenshots are produced separately by
+ * tools/capture-docs.ts from the running Chromium game, then referenced here by stable content id.
  *
  * Usage: npx tsx tools/gen-docs.ts [--out docs/game]
  */
 import path from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { argValue, repoRoot } from "./lib/paths.js";
 
-import { content } from "../game/src/content/index.js";
+import { content, gatherXp, respawnSeconds, sellPrice, toolBonus, yieldRange } from "../game/src/content/index.js";
 import { ALL_ITEMS } from "../game/src/content/items.js";
 import { RESOURCES, RESOURCE_ARCHETYPES } from "../game/src/content/resources.js";
 import { RECIPES } from "../game/src/content/recipes.js";
 import { SPELLS } from "../game/src/content/spells.js";
 import { ENEMIES, ENEMY_BLOCKS } from "../game/src/content/enemies.js";
 import { SHOPS } from "../game/src/content/shops.js";
-import { QUESTS } from "../game/src/content/quests.js";
-import { REGIONS } from "../game/src/content/regions.js";
+import { QUESTS, type QuestGrant } from "../game/src/content/quests.js";
+import { NPCS, npc, npcGivingQuest } from "../game/src/content/npcs.js";
+import { REGIONS, type LocationDef } from "../game/src/content/regions.js";
 import { SKILLS } from "../game/src/content/skills.js";
 import { MAX_LEVEL, TIERS, totalXpAt, xpTable } from "../game/src/content/xp.js";
-import { gatherXp, healAmount, respawnSeconds, sellPrice, toolBonus, yieldRange } from "../game/src/content/index.js";
-import type { SkillId } from "../game/src/contracts.js";
+import type { QuestObjectiveRef, RegionId, SkillId } from "../game/src/contracts.js";
+
+function cleanCell(value: string | number): string {
+  return String(value).replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
 
 function table(headers: string[], rows: (string | number)[][]): string {
-  const head = `| ${headers.join(" | ")} |`;
+  const head = `| ${headers.map(cleanCell).join(" | ")} |`;
   const rule = `| ${headers.map(() => "---").join(" | ")} |`;
-  const body = rows.map((row) => `| ${row.join(" | ")} |`).join("\n");
+  const body = rows.map((row) => `| ${row.map(cleanCell).join(" | ")} |`).join("\n");
   return [head, rule, body].join("\n");
+}
+
+function page(title: string, description: string, body: string): string {
+  return [
+    "---",
+    `title: ${JSON.stringify(title)}`,
+    `description: ${JSON.stringify(description)}`,
+    "---",
+    "",
+    body.trim(),
+    "",
+  ].join("\n");
 }
 
 function skillName(id: SkillId): string {
   return SKILLS[id]?.name ?? id;
 }
 
+function itemName(id: string): string {
+  return content.item(id)?.name ?? id;
+}
+
+function itemIcon(id: string, label = itemName(id)): string {
+  return `![${label}](./assets/items/${id}.png)`;
+}
+
+function capture(kind: "npc" | "enemy" | "entity" | "location", id: string, label: string): string {
+  const folder = { npc: "npcs", enemy: "enemies", entity: "entities", location: "locations" }[kind];
+  return `![${label}](./assets/captures/${folder}/${id}.webp)`;
+}
+
+function humanizeId(id: string): string {
+  return id.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function regionName(id: RegionId): string {
+  if (id === "gravelmaw") return "Gravelmaw";
+  return REGIONS.find((region) => region.id === id)?.name ?? id;
+}
+
+interface PlaceRecord {
+  location: LocationDef;
+  regionId: RegionId;
+  regionLabel: string;
+  tier: number;
+}
+
+function allPlaces(): PlaceRecord[] {
+  const places: PlaceRecord[] = [];
+  for (const region of REGIONS) {
+    for (const location of region.locations) {
+      places.push({ location, regionId: region.id, regionLabel: region.name, tier: region.tier });
+    }
+    for (const location of region.dungeon?.locations ?? []) {
+      places.push({
+        location,
+        regionId: region.dungeon!.id,
+        regionLabel: region.dungeon!.name,
+        tier: region.dungeon!.tier,
+      });
+    }
+  }
+  return places;
+}
+
+function placeById(id: string): PlaceRecord | undefined {
+  return allPlaces().find(({ location }) => location.id === id);
+}
+
 function xpDoc(): string {
-  const rows = xpTable()
-    .map((xp, level) => [level, xp.toLocaleString(), level > 1 ? (xp - xpTable()[level - 1]!).toLocaleString() : "—"])
+  const levels = xpTable();
+  const rows = levels
+    .map((xp, level) => [level, xp.toLocaleString(), level > 1 ? (xp - levels[level - 1]!).toLocaleString() : "-"])
     .filter((row) => Number(row[0]) >= 1);
-  return [
-    "# Experience table",
+  return page("Experience table", "The complete Corealm experience curve.", [
+    `Skills run from level 1 to ${MAX_LEVEL}. Level ${MAX_LEVEL} requires **${totalXpAt(MAX_LEVEL).toLocaleString()} XP**.`,
     "",
-    `Every skill runs from level 1 to level ${MAX_LEVEL}. Reaching ${MAX_LEVEL} costs`,
-    `**${totalXpAt(MAX_LEVEL).toLocaleString()} experience**.`,
+    `Content tiers unlock at levels ${TIERS.join(", ")}.`,
     "",
-    `Content tiers sit at ${TIERS.join(", ")}. Level 92 is roughly the halfway point of the total,`,
-    "so the last seven levels cost about as much as the first ninety-two.",
-    "",
-    table(["Level", "Total XP", "XP for this level"], rows),
-    "",
-  ].join("\n");
+    table(["Level", "Total XP", "XP from previous level"], rows),
+  ].join("\n"));
 }
 
 function skillsDoc(): string {
   const groups: Record<string, string[]> = {};
   for (const skill of Object.values(SKILLS)) {
-    (groups[skill.group] ??= []).push(`**${skill.name}** — ${skill.blurb}`);
+    (groups[skill.group] ??= []).push(`- **${skill.name}:** ${skill.blurb}`);
   }
   const sections = Object.entries(groups)
-    .map(([group, lines]) => `## ${group[0]!.toUpperCase()}${group.slice(1)}\n\n${lines.join("\n\n")}`)
+    .map(([group, lines]) => `## ${group[0]!.toUpperCase()}${group.slice(1)}\n\n${lines.join("\n")}`)
     .join("\n\n");
-
   const gatherRows = TIERS.map((tier) => {
     const [low, high] = yieldRange(tier);
-    return [tier, gatherXp(tier), `${low}–${high}`, `${respawnSeconds(tier)} s`, `+${toolBonus(tier)}`];
+    return [tier, gatherXp(tier), `${low}-${high}`, `${respawnSeconds(tier)} s`, `+${toolBonus(tier)}`];
   });
-
-  return [
-    "# Skills",
-    "",
+  return page("Skills", "Corealm skills, gathering rules, and combat rules.", [
     sections,
     "",
-    "## How gathering works",
+    "## Gathering",
     "",
-    "Mining, Woodcutting and Fishing share one model. An attempt happens every **1.8 seconds**.",
-    "At a node's own required level your success chance is exactly **30%** — one yield every six",
-    "seconds — rising 1.6 percentage points per level above the requirement, capped at 95%.",
-    "",
-    "A better tool raises your *effective* level but never lets you gather something you do not",
-    "meet the base requirement for.",
+    "Mining, Woodcutting, and Fishing attempt an action every **1.8 seconds**. Success starts at 30% at the required level, rises by 1.6 percentage points per extra level, and caps at 95%.",
     "",
     table(["Tier", "XP per yield", "Yields per node", "Respawn", "Tool bonus"], gatherRows),
     "",
-    "## How combat works",
+    "## Combat",
     "",
-    "Attacks resolve on a 600 ms tick. Your chance to hit is `attackRoll / (attackRoll + defenceRoll)`,",
-    "clamped between 5% and 95%. Melee damage rolls 1 to `floor(2 + (Melee + gear power) / 4.2)`.",
-    "",
-    "There is no separate Defence skill: **Melee is your physical defence and Magic is your magical",
-    "defence**. Health is derived as `20 + 3 × floor((Melee + Magic) / 2)` plus equipment vitality.",
-    "",
-    "Magic is 15% more accurate and each cast costs an essence shard. It beats high-armour,",
-    "low-magic-armour targets; melee beats the reverse.",
-    "",
-    "You gain 4 experience per point of damage, plus twice the target's maximum health on the kill.",
-    "",
-  ].join("\n");
+    "Attacks resolve on a 600 ms tick. Melee supplies physical defence; Magic supplies magical defence. Health is `20 + 3 × floor((Melee + Magic) / 2)` plus equipment vitality. Magic is 15% more accurate but consumes an essence shard per cast.",
+  ].join("\n"));
 }
 
 function itemsDoc(): string {
@@ -109,21 +152,20 @@ function itemsDoc(): string {
         ? Object.entries(item.equip.requires).map(([skill, level]) => `${skillName(skill as SkillId)} ${level}`).join(", ")
         : "";
       const notes = [
-        item.equip ? `${item.equip.slot}` : "",
-        item.food ? `heals ${item.food.healAmount}` : "",
-        item.tool ? `${item.tool.skill} +${item.tool.gatherBonus}` : "",
+        item.equip?.slot,
+        item.food ? `Heals ${item.food.healAmount}` : "",
+        item.tool ? `${skillName(item.tool.skill)} +${item.tool.gatherBonus}` : "",
         requires,
       ].filter(Boolean).join("; ");
-      return [item.name, item.tier, item.category, item.stackable ? "yes" : "no", item.value, sellPrice(item.value), notes || "—"];
+      return [
+        `${itemIcon(item.id, item.name)} **${item.name}**`, item.tier, item.category,
+        item.stackable ? "Yes" : "No", item.value, sellPrice(item.value), notes || "-",
+      ];
     });
-  return [
-    "# Item encyclopedia",
-    "",
-    `${ALL_ITEMS.length} items. Shop price is what a shop charges; sell price is what one pays you.`,
-    "",
-    table(["Item", "Tier", "Category", "Stacks", "Buy", "Sell", "Notes"], rows),
-    "",
-  ].join("\n");
+  return page("Items", "Every item, price, requirement, and effect in Corealm.", table(
+    ["Item", "Tier", "Category", "Stacks", "Buy", "Sell", "Use"],
+    rows,
+  ));
 }
 
 function recipesDoc(): string {
@@ -137,133 +179,238 @@ function recipesDoc(): string {
     const rows = [...recipes].sort((a, b) => a.reqLevel - b.reqLevel).map((recipe) => [
       recipe.name,
       recipe.reqLevel,
-      recipe.station ?? "anywhere",
-      recipe.inputs.map((input) => `${input.quantity}× ${content.item(input.itemId)?.name ?? input.itemId}`).join(" + "),
-      `${recipe.output.quantity}× ${content.item(recipe.output.itemId)?.name ?? recipe.output.itemId}`,
+      recipe.station ?? "Anywhere",
+      recipe.inputs.map((input) => `${input.quantity}× ${itemName(input.itemId)}`).join(" + "),
+      `${recipe.output.quantity}× ${itemName(recipe.output.itemId)}`,
       `${(recipe.durationMs / 1000).toFixed(1)} s`,
       recipe.xp,
     ]);
     return `## ${skillName(skill)}\n\n${table(["Recipe", "Level", "Station", "Ingredients", "Makes", "Time", "XP"], rows)}`;
   });
-  return ["# Recipes", "", `${RECIPES.length} recipes across four production skills.`, "", sections.join("\n\n"), ""].join("\n");
+  return page("Recipes", "Production recipes generated from the live game tables.", sections.join("\n\n"));
 }
 
 function enemiesDoc(): string {
-  // `ENEMY_BLOCKS` is the canonical set: one stat block per creature. `ENEMIES` adds an alias row
-  // per world group so a lookup by group id resolves, and those aliases are lookup keys, not
-  // creatures. The index counts the same thing this table shows — see `main`.
-  const rows = [...ENEMY_BLOCKS]
+  const sections = [...ENEMY_BLOCKS]
     .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name))
-    .map((enemy) => [
-      enemy.name, enemy.tier, enemy.maxHealth, enemy.maxHit,
-      `${(enemy.attackSpeedMs / 1000).toFixed(1)} s`,
-      enemy.armour, enemy.magicArmour, enemy.behaviour,
-    ]);
-  return [
-    "# Enemies",
+    .map((enemy) => {
+      const dropRows = enemy.drops.map((drop) => [
+        `${itemIcon(drop.itemId)} ${itemName(drop.itemId)}`,
+        drop.quantity[0] === drop.quantity[1] ? drop.quantity[0] : `${drop.quantity[0]}-${drop.quantity[1]}`,
+        `${Math.round(drop.chance * 1000) / 10}%`,
+      ]);
+      if (enemy.marks) {
+        dropRows.unshift(["Marks", enemy.marks[0] === enemy.marks[1] ? enemy.marks[0] : `${enemy.marks[0]}-${enemy.marks[1]}`, "Always"]);
+      }
+      return [
+        `## ${enemy.name}`,
+        "",
+        capture("enemy", enemy.id, enemy.name),
+        "",
+        table(["Tier", "Health", "Max hit", "Attack speed", "Armour", "Magic armour", "Behaviour", "Aggro"], [[
+          enemy.tier, enemy.maxHealth, enemy.maxHit, `${(enemy.attackSpeedMs / 1000).toFixed(1)} s`,
+          enemy.armour, enemy.magicArmour, enemy.behaviour, `${enemy.aggroRadius} m`,
+        ]]),
+        "",
+        "### Drops",
+        "",
+        table(["Drop", "Quantity", "Chance"], dropRows),
+      ].join("\n");
+    });
+  return page("Bestiary", "Creature portraits, combat stats, and drop tables from Corealm.", [
+    "Armour resists melee. Magic armour resists spells.",
     "",
-    "Armour resists melee; magic armour resists spells. A target with high armour and low magic",
-    "armour is where Magic earns its cost, and the reverse is where Melee does.",
-    "",
-    table(["Enemy", "Tier", "Health", "Max hit", "Speed", "Armour", "Magic armour", "Behaviour"], rows),
-    "",
-  ].join("\n");
+    sections.join("\n\n"),
+  ].join("\n"));
 }
 
 function resourcesDoc(): string {
-  // Same alias situation as enemies: `RESOURCE_ARCHETYPES` is the canonical set and `RESOURCES`
-  // adds one alias per world cluster. The index counts archetypes, matching this table.
   const rows = [...RESOURCE_ARCHETYPES]
     .sort((a, b) => a.tier - b.tier || a.skill.localeCompare(b.skill))
     .map((resource) => {
       const [low, high] = yieldRange(resource.tier);
       return [
-        resource.name, skillName(resource.skill), resource.tier, resource.reqLevel,
-        content.item(resource.itemId)?.name ?? resource.itemId,
-        gatherXp(resource.tier), `${low}–${high}`, `${respawnSeconds(resource.tier)} s`,
+        resource.name,
+        skillName(resource.skill),
+        resource.tier,
+        resource.reqLevel,
+        `${itemIcon(resource.itemId)} ${itemName(resource.itemId)}`,
+        gatherXp(resource.tier),
+        `${low}-${high}`,
+        `${respawnSeconds(resource.tier)} s`,
       ];
     });
-  return [
-    "# Resources",
-    "",
-    "What each node gives, what it needs, and how long it lasts before it has to come back.",
-    "",
-    table(["Node", "Skill", "Tier", "Level", "Yields", "XP each", "Per node", "Respawn"], rows),
-    "",
-  ].join("\n");
+  return page("Resources", "Gathering nodes, requirements, yields, and respawn times.", table(
+    ["Node", "Skill", "Tier", "Level", "Yields", "XP each", "Per node", "Respawn"],
+    rows,
+  ));
 }
 
 function regionsDoc(): string {
   const sections = REGIONS.map((region) => {
-    const resources = region.clusters.map((cluster) =>
-      `- **${cluster.name}** — tier ${cluster.tier} ${cluster.skill}, needs level ${cluster.reqLevel}`);
-    const places = region.locations.map((location) => `- **${location.name}** (\`${location.id}\`)`);
+    const settlement = region.locations.find((location) => location.kind === "settlement") ?? region.locations[0];
+    const places = region.locations.map((location) => `- [${location.name}](./locations/#${location.id.replace(/_/g, "-")})`).join("\n");
+    const dungeon = region.dungeon
+      ? `\n\n### ${region.dungeon.name}\n\n${region.dungeon.locations.map((location) => `- [${location.name}](./locations/#${location.id.replace(/_/g, "-")})`).join("\n")}`
+      : "";
     return [
       `## ${region.name}`,
       "",
+      settlement ? capture("location", settlement.id, region.name) : "",
+      "",
       region.lore,
       "",
-      `Tier ${region.tier}. ${region.settlement ? `Settlement: **${region.settlement.name}**.` : ""}`,
-      "",
-      "### Resources",
-      "",
-      resources.join("\n") || "_None._",
+      `Tier ${region.tier}. Settlement: **${region.settlement.name}**.`,
       "",
       "### Places",
       "",
-      places.join("\n"),
+      places,
+      dungeon,
     ].join("\n");
   });
-  return ["# Regions", "", sections.join("\n\n"), ""].join("\n");
+  return page("Regions", "Corealm's regions and the places within them.", sections.join("\n\n"));
+}
+
+function locationsDoc(): string {
+  const sections = allPlaces().map(({ location, regionLabel, tier }) => [
+    `## ${location.name}`,
+    "",
+    capture("location", location.id, location.name),
+    "",
+    location.blurb ?? `${location.name} is a ${location.kind.replace(/_/g, " ")} in ${regionLabel}.`,
+    "",
+    `**Region:** ${regionLabel} · **Tier:** ${tier} · **Type:** ${location.kind.replace(/_/g, " ")}`,
+  ].join("\n"));
+  return page("Places", "Named settlements, routes, landmarks, gathering sites, and dungeon rooms.", sections.join("\n\n"));
+}
+
+function npcsDoc(): string {
+  const sections = NPCS.map((person) => {
+    const place = placeById(person.locationId);
+    const quests = person.questIds.length
+      ? person.questIds.map((id) => `- [${QUESTS.find((quest) => quest.id === id)?.name ?? id}](./quests/#${id.replace(/_/g, "-")})`).join("\n")
+      : "_No quest._";
+    return [
+      `## ${person.name}`,
+      "",
+      capture("npc", person.id, person.name),
+      "",
+      person.role,
+      "",
+      `**Found at:** ${place?.location.name ?? person.locationId}, ${regionName(person.regionId)}`,
+      "",
+      "### Quests",
+      "",
+      quests,
+    ].join("\n");
+  });
+  return page("People", "Every named NPC, where to find them, and the quests they give.", sections.join("\n\n"));
+}
+
+function grantRows(grant: QuestGrant | undefined): (string | number)[][] {
+  if (!grant) return [];
+  const rows: (string | number)[][] = [];
+  for (const [skill, xp] of Object.entries(grant.xp ?? {})) rows.push([`${skillName(skill as SkillId)} XP`, xp ?? 0]);
+  for (const stack of grant.items ?? []) rows.push([itemName(stack.itemId), stack.quantity]);
+  if (grant.currency) rows.push(["Marks", grant.currency]);
+  for (const unlock of grant.unlocks ?? []) rows.push(["Unlock", unlock]);
+  return rows;
+}
+
+function questReference(ref: QuestObjectiveRef, regionId: RegionId): string {
+  switch (ref.kind) {
+    case "item":
+      return `${itemIcon(ref.id)}\n\n**${itemName(ref.id)}**`;
+    case "location": {
+      const place = placeById(ref.id);
+      return `${capture("location", ref.id, place?.location.name ?? ref.id)}\n\n**${place?.location.name ?? ref.id}**`;
+    }
+    case "entity": {
+      const person = npc(ref.id);
+      return person
+        ? `${capture("npc", ref.id, person.name)}\n\n**${person.name}**`
+        : `${capture("entity", ref.id, humanizeId(ref.id))}\n\n**${humanizeId(ref.id)}**`;
+    }
+    case "enemyFamily": {
+      const tier = REGIONS.find((region) => region.id === regionId)?.tier ?? 1;
+      const choices = ENEMY_BLOCKS.filter((enemy) => enemy.family === ref.id);
+      const enemy = choices.sort((a, b) => Math.abs(a.tier - tier) - Math.abs(b.tier - tier))[0];
+      return enemy ? `${capture("enemy", enemy.id, enemy.name)}\n\n**${enemy.name}**` : `**${ref.id}**`;
+    }
+    case "recipe":
+      return `**Recipe:** ${RECIPES.find((recipe) => recipe.id === ref.id)?.name ?? ref.id}`;
+    case "spell":
+      return `**Spell:** ${SPELLS.find((spell) => spell.id === ref.id)?.name ?? ref.id}`;
+  }
 }
 
 function questsDoc(): string {
-  const rows = QUESTS.map((quest) => [
-    quest.name,
-    quest.regionId,
-    quest.stages.length,
-    Object.entries(quest.requirements).map(([skill, level]) => `${skillName(skill as SkillId)} ${level}`).join(", ") || "—",
-    quest.prerequisiteQuestIds.join(", ") || "—",
-  ]);
-  return [
-    "# Quests",
-    "",
-    `${QUESTS.length} quests. Objectives and rewards are listed in the game's Quests panel;`,
-    "later stages are deliberately not printed here, because a walkthrough is not documentation.",
-    "",
-    table(["Quest", "Region", "Stages", "Requires", "After"], rows),
-    "",
-  ].join("\n");
+  const sections = QUESTS.map((quest) => {
+    const giver = npcGivingQuest(quest.id) ?? npc(quest.giverNpcId);
+    const requirements = Object.entries(quest.requirements)
+      .map(([skill, level]) => `${skillName(skill as SkillId)} ${level}`)
+      .join(", ") || "None";
+    const prerequisites = quest.prerequisiteQuestIds
+      .map((id) => QUESTS.find((candidate) => candidate.id === id)?.name ?? id)
+      .join(", ") || "None";
+    const stages = quest.stages.map((stage) => {
+      const refs = (stage.refs ?? []).map((ref) => questReference(ref, quest.regionId)).join("\n\n");
+      const grants = grantRows(stage.grants);
+      return [
+        `#### ${stage.index + 1}. ${stage.objective}`,
+        "",
+        stage.hint,
+        refs ? `\n${refs}` : "",
+        grants.length ? `\n**Stage reward**\n\n${table(["Reward", "Amount"], grants)}` : "",
+      ].join("\n");
+    }).join("\n\n");
+    const rewards = grantRows(quest.rewards);
+    return [
+      `## ${quest.name}`,
+      "",
+      giver ? capture("npc", giver.id, giver.name) : "",
+      "",
+      quest.summary,
+      "",
+      table(["Giver", "Region", "Requirements", "Prerequisite"], [[
+        giver?.name ?? quest.giverNpcId, regionName(quest.regionId), requirements, prerequisites,
+      ]]),
+      "",
+      quest.onStart && grantRows(quest.onStart).length ? `### Supplied when accepted\n\n${table(["Item", "Amount"], grantRows(quest.onStart))}` : "",
+      "",
+      "### Walkthrough",
+      "",
+      stages,
+      "",
+      "### Completion rewards",
+      "",
+      rewards.length ? table(["Reward", "Amount"], rewards) : "_No additional reward._",
+    ].join("\n");
+  });
+  return page("Quest guides", "Complete Corealm quest walkthroughs generated from the live objectives.", sections.join("\n\n"));
 }
 
 function spellsAndShopsDoc(): string {
   const spellRows = SPELLS.map((spell) => [
     spell.name, spell.reqLevel, spell.baseMax, spell.divisor, spell.baseXp,
-    `${(spell.castMs / 1000).toFixed(1)} s`,
-    `${spell.cost.quantity}× ${content.item(spell.cost.itemId)?.name ?? spell.cost.itemId}`,
+    `${(spell.castMs / 1000).toFixed(1)} s`, `${spell.cost.quantity}× ${itemName(spell.cost.itemId)}`,
   ]);
   const shopSections = SHOPS.map((shop) => {
     const rows = shop.stock.map((entry) => {
       const item = content.item(entry.itemId);
-      return [item?.name ?? entry.itemId, entry.quantity, Math.round((item?.value ?? 0) * shop.buyMultiplier)];
+      return [`${itemIcon(entry.itemId)} ${item?.name ?? entry.itemId}`, entry.quantity, Math.round((item?.value ?? 0) * shop.buyMultiplier)];
     });
     return `### ${shop.name}\n\n${table(["Item", "Stock", "Price"], rows)}`;
   });
-  return [
-    "# Spells and shops",
-    "",
+  return page("Spells and shops", "Spell costs and shop inventories from the live economy tables.", [
     "## Spells",
-    "",
-    "Maximum damage is `baseMax + (Magic level + magic power) / divisor`. Experience is awarded",
-    "whether the cast hits or misses.",
     "",
     table(["Spell", "Magic level", "Base max", "Divisor", "XP", "Cast time", "Cost"], spellRows),
     "",
     "## Shops",
     "",
     shopSections.join("\n\n"),
-    "",
-  ].join("\n");
+  ].join("\n"));
 }
 
 async function main(): Promise<void> {
@@ -276,50 +423,44 @@ async function main(): Promise<void> {
   });
 
   const files: [string, string][] = [
-    ["experience.md", xpDoc()],
-    ["skills.md", skillsDoc()],
+    ["quests.md", questsDoc()],
+    ["npcs.md", npcsDoc()],
+    ["enemies.md", enemiesDoc()],
+    ["locations.md", locationsDoc()],
+    ["regions.md", regionsDoc()],
     ["items.md", itemsDoc()],
     ["recipes.md", recipesDoc()],
-    ["enemies.md", enemiesDoc()],
     ["resources.md", resourcesDoc()],
-    ["regions.md", regionsDoc()],
-    ["quests.md", questsDoc()],
+    ["skills.md", skillsDoc()],
+    ["experience.md", xpDoc()],
     ["spells-and-shops.md", spellsAndShopsDoc()],
   ];
 
-  const index = [
-    "# Corealm game documentation",
+  const index = page("Game guide", "Generated guides for Corealm's quests, people, creatures, places, and systems.", [
+    "These pages are regenerated from the same content tables the game runs.",
     "",
-    "Generated from canonical content by `npm run gen-docs`. Do not edit these files by hand —",
-    "they are regenerated from the same tables the game itself reads, which is what keeps them",
-    "from drifting away from what the game actually does.",
-    "",
-    ...files.map(([name]) => `- [${name.replace(/\.md$/, "").replace(/-/g, " ")}](./${name})`),
-    "",
-    "## Counts",
-    "",
-    "One row per thing that exists, matching the page it links to. Enemies and resources also",
-    "publish alias ids so a lookup by world group resolves to the same block; those aliases are",
-    `lookup keys rather than content, and are counted separately below.`,
-    "",
-    table(["Table", "Rows"], [
-      ["Items", ALL_ITEMS.length], ["Resources", RESOURCE_ARCHETYPES.length], ["Recipes", RECIPES.length],
-      ["Spells", SPELLS.length], ["Enemies", ENEMY_BLOCKS.length], ["Shops", SHOPS.length],
-      ["Quests", QUESTS.length], ["Regions", REGIONS.length], ["Skills", Object.keys(SKILLS).length],
-    ]),
-    "",
-    table(["Lookup table", "Ids that resolve"], [
-      ["Enemy ids (blocks + group aliases)", ENEMIES.length],
-      ["Resource ids (archetypes + cluster aliases)", RESOURCES.length],
-    ]),
-    "",
-  ].join("\n");
+    "- [Quest guides](./quests)",
+    "- [People](./npcs)",
+    "- [Bestiary](./enemies)",
+    "- [Places](./locations)",
+    "- [Regions](./regions)",
+    "- [Items](./items)",
+    "- [Recipes](./recipes)",
+    "- [Resources](./resources)",
+    "- [Skills](./skills)",
+    "- [Experience table](./experience)",
+    "- [Spells and shops](./spells-and-shops)",
+  ].join("\n"));
+
+  const iconSource = path.resolve(repoRoot, "art/item-icons/256");
+  const iconTarget = path.join(out, "assets/items");
+  await rm(iconTarget, { recursive: true, force: true });
+  await mkdir(path.dirname(iconTarget), { recursive: true });
+  await cp(iconSource, iconTarget, { recursive: true });
 
   await writeFile(path.join(out, "README.md"), index, "utf8");
   for (const [name, body] of files) await writeFile(path.join(out, name), body, "utf8");
-
-  console.log(`Wrote ${files.length + 1} files to ${path.relative(repoRoot, out)}`);
-  for (const [name, body] of files) console.log(`  ${name.padEnd(22)} ${body.split("\n").length} lines`);
+  console.log(`Wrote ${files.length + 1} guide files to ${path.relative(repoRoot, out)}`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

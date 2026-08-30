@@ -1057,6 +1057,8 @@ export interface EntityViewOptions {
 export class EntityViews {
   private readonly groups = new Map<string, InstanceGroup>();
   private readonly records = new Map<EntityId, ViewRecord>();
+  /** Non-null only while the documentation pipeline renders one semantic entity in isolation. */
+  private captureSubjectId: EntityId | null = null;
   private readonly highlights = new Map<EntityId, THREE.Object3D>();
   /** Every `BatchedMesh` this layer draws through, keyed by material identity. See `Batch`. */
   private readonly batches = new Map<string, Batch>();
@@ -1267,7 +1269,9 @@ export class EntityViews {
       this.viewer = (this.viewer ?? new THREE.Vector3()).copy(viewer);
       // Before the tick, not after: a character promoted this frame should be ticked this frame,
       // or it renders one frame of its baked pose at the exact moment the player walks up to it.
-      this.rebalanceUniques();
+      // Capture isolation freezes the pool after focusEntity promoted the subject. Rebalancing
+      // while the shot is held could create a newly visible unique character behind it.
+      if (this.captureSubjectId === null) this.rebalanceUniques();
     }
     if (this.animated.size === 0) return;
 
@@ -1316,6 +1320,7 @@ export class EntityViews {
 
     for (const entity of entities) {
       if (!MOVING_ARCHETYPES.has(entity.archetype)) continue;
+      if (this.captureSubjectId !== null && entity.id !== this.captureSubjectId) continue;
       const record = this.records.get(entity.id);
       if (!record) continue;
 
@@ -1350,6 +1355,49 @@ export class EntityViews {
       if (!group) continue;
       this.writeSlot(group, record);
     }
+  }
+
+  /**
+   * Shows one real entity view against the world surface while hiding every other semantic view.
+   * Locations pass null and get the complete world back. This works for unique rigs and batched
+   * props alike, so guide captures never need a second model-loading or rendering path.
+   */
+  setCaptureSubject(entityId: EntityId | null): void {
+    if (this.captureSubjectId === entityId) return;
+    const previous = this.captureSubjectId;
+    this.captureSubjectId = entityId;
+    this.highlightGroup.visible = entityId === null;
+
+    // Once isolation is active, the whole world is already hidden. Swapping portraits should
+    // touch two records, not restore and hide thousands of batched parts between every frame.
+    if (previous !== null && entityId !== null) {
+      const previousRecord = this.records.get(previous);
+      if (previousRecord) this.setCaptureRecordVisible(previousRecord, false);
+      const nextRecord = this.records.get(entityId);
+      if (nextRecord) this.setCaptureRecordVisible(nextRecord, true);
+      return;
+    }
+
+    for (const record of this.records.values()) {
+      const visible = entityId === null || record.entityId === entityId;
+      this.setCaptureRecordVisible(record, visible);
+    }
+  }
+
+  private setCaptureRecordVisible(record: ViewRecord, visible: boolean): void {
+    if (record.unique) {
+      record.unique.visible = visible;
+      return;
+    }
+    const group = this.groups.get(record.groupKey);
+    if (!group || record.slot < 0) return;
+    if (visible) {
+      this.writeSlot(group, record);
+      return;
+    }
+    for (const draw of group.live) hideInstance(draw, record.slot);
+    for (const draw of group.spent) hideInstance(draw, record.slot);
+    for (const draw of group.moving) hideInstance(draw, record.slot);
   }
 
   private syncOne(entity: SemanticEntity): void {

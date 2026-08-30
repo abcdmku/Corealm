@@ -1,0 +1,228 @@
+@font-face {
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("./cinzel-latin.woff2") format("woff2");
+}
+
+:root,
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #34270d;
+  --sl-color-accent: #d4af4e;
+  --sl-color-accent-high: #ffe9a8;
+  --sl-color-white: #f4efe3;
+  --sl-color-gray-1: #ece4d2;
+  --sl-color-gray-2: #d0c6ad;
+  --sl-color-gray-3: #a89f88;
+  --sl-color-gray-4: #6f6857;
+  --sl-color-gray-5: #3c372d;
+  --sl-color-gray-6: #242019;
+  --sl-color-black: #0e0c09;
+  --sl-color-bg: #0e0c09;
+  --sl-color-bg-nav: rgba(14, 12, 9, 0.94);
+  --sl-color-bg-sidebar: rgba(18, 15, 11, 0.94);
+  --sl-color-hairline-light: rgba(212, 175, 78, 0.22);
+  --sl-font: "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+  --sl-font-mono: "Consolas", "SF Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #34270d;
+  --sl-color-accent: #d4af4e;
+  --sl-color-accent-high: #ffe9a8;
+  --sl-color-white: #f4efe3;
+  --sl-color-gray-1: #ece4d2;
+  --sl-color-gray-2: #d0c6ad;
+  --sl-color-gray-3: #a89f88;
+  --sl-color-gray-4: #6f6857;
+  --sl-color-gray-5: #3c372d;
+  --sl-color-gray-6: #242019;
+  --sl-color-black: #0e0c09;
+  --sl-color-bg: #0e0c09;
+  --sl-color-bg-nav: rgba(14, 12, 9, 0.94);
+  --sl-color-bg-sidebar: rgba(18, 15, 11, 0.94);
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(circle at 70% 10%, rgba(108, 83, 31, 0.13), transparent 35rem),
+    linear-gradient(180deg, #14110c 0, #0e0c09 38rem);
+}
+
+h1,
+h2,
+h3,
+.site-title,
+.hero .tagline {
+  font-family: "Cinzel", "Trebuchet MS", serif;
+}
+
+h1,
+h2,
+.site-title {
+  letter-spacing: 0.045em;
+}
+
+header.header {
+  border-bottom-color: rgba(212, 175, 78, 0.28);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+starlight-theme-select {
+  display: none;
+}
+
+.sidebar-pane {
+  border-inline-end-color: rgba(212, 175, 78, 0.18);
+}
+
+.hero {
+  padding-block: clamp(2.5rem, 7vw, 6rem) 2rem;
+}
+
+.hero h1 {
+  color: #ffe9a8;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.75);
+}
+
+.hero .tagline {
+  color: #d0c6ad;
+  font-family: var(--sl-font);
+  letter-spacing: 0;
+  max-width: 48rem;
+}
+
+.sl-link-button.primary {
+  color: #1c1608;
+  background: linear-gradient(180deg, #e1c264, #a98230);
+  border-color: rgba(255, 233, 168, 0.45);
+  border-radius: 3px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.22), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.world-window {
+  position: relative;
+  margin: 0 auto 2rem;
+  max-width: 72rem;
+  overflow: hidden;
+  border: 1px solid rgba(212, 175, 78, 0.4);
+  border-radius: 4px;
+  background: #16130e;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.5);
+}
+
+.world-window::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 70px rgba(7, 5, 3, 0.72);
+}
+
+.world-window img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  object-fit: cover;
+  object-position: 50% 45%;
+}
+
+.world-window figcaption {
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 0;
+  padding: 1.3rem 1rem 0.75rem;
+  color: #d0c6ad;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-align: right;
+  text-transform: uppercase;
+  background: linear-gradient(transparent, rgba(10, 8, 6, 0.9));
+}
+
+.codex-index {
+  border-block: 1px solid rgba(212, 175, 78, 0.22);
+}
+
+.codex-index a {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.36fr) 1fr;
+  gap: 1rem;
+  padding: 0.95rem 0.25rem;
+  color: #ece4d2;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+  transition: color 100ms ease-out, background 100ms ease-out;
+}
+
+.codex-index a:last-child { border-bottom: 0; }
+.codex-index a:hover { color: #ffe9a8; background: rgba(212, 175, 78, 0.055); }
+.codex-index span { font-family: "Cinzel", "Trebuchet MS", serif; font-weight: 700; }
+.codex-index small { color: #a89f88; }
+
+.content-panel,
+.sl-markdown-content table {
+  border-color: rgba(212, 175, 78, 0.2);
+}
+
+.sl-markdown-content table {
+  display: table;
+  width: 100%;
+  background: rgba(20, 17, 12, 0.72);
+}
+
+.sl-markdown-content th {
+  color: #ffe9a8;
+  font-family: "Cinzel", "Trebuchet MS", serif;
+  font-size: 0.76rem;
+  letter-spacing: 0.045em;
+  background: rgba(212, 175, 78, 0.09);
+}
+
+.sl-markdown-content tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.sl-markdown-content h2 {
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgba(212, 175, 78, 0.22);
+}
+
+.sl-markdown-content > p > img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid rgba(212, 175, 78, 0.32);
+  border-radius: 2px;
+  background: #16130e;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+}
+
+.sl-markdown-content table img {
+  display: inline-block;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-inline-end: 0.45rem;
+  object-fit: contain;
+  vertical-align: middle;
+  border: 1px solid rgba(212, 175, 78, 0.18);
+  background: rgba(8, 7, 5, 0.5);
+}
+
+.sl-markdown-content p > img[src*="items"] {
+  width: 6rem;
+  height: 6rem;
+  aspect-ratio: 1;
+  object-fit: contain;
+  padding: 0.35rem;
+}
+
+@media (max-width: 50rem) {
+  .world-window img { aspect-ratio: 4 / 3; }
+  .codex-index a { grid-template-columns: 1fr; gap: 0.2rem; }
+  .sl-markdown-content table { display: block; overflow-x: auto; }
+}
