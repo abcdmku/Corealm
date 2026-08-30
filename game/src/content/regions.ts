@@ -763,14 +763,14 @@ const FALLOWMARCH: RegionDef = {
       // cutting a crop back to stubble. Swapping in a smaller rock read as the seam vanishing, and
       // swapping a tree for `anvil_log` — which is an anvil sitting on a log — put a blacksmith's
       // anvil where every felled tree had been.
-      assetId: "rock_medium_1",
+      assetId: "rock_medium_1", scale: 0.25,
       locationId: "bracken_pit",
     },
     {
       id: "bracken_pit_stone", name: "Marchstone Face", archetype: "ore",
       skill: "mining", tier: 1, reqLevel: 1, itemId: "march_stone",
       count: 2, centre: [-146, 88], radius: 5,
-      assetId: "rock_medium_3",
+      assetId: "rock_medium_3", scale: 0.25,
       locationId: "bracken_pit",
     },
     {
@@ -1025,7 +1025,7 @@ const VELLENWOOD: RegionDef = {
       id: "hollowcut_corven", name: "Corven Seam", archetype: "ore",
       skill: "mining", tier: 5, reqLevel: 5, itemId: "corven_ore",
       count: 5, centre: [94, 145], radius: 9,
-      assetId: "rock_medium_2",
+      assetId: "rock_medium_2", scale: 0.25,
       locationId: "hollowcut_seam",
     },
     {
@@ -1290,7 +1290,7 @@ const KARROWMOOR: RegionDef = {
       id: "lower_quarry_kaldite", name: "Kaldite Face", archetype: "ore",
       skill: "mining", tier: 10, reqLevel: 10, itemId: "kaldite_ore",
       count: 5, centre: [60, -16], radius: 10,
-      assetId: "rock_medium_3",
+      assetId: "rock_medium_3", scale: 0.25,
       locationId: "karrowmoor_terraces",
     },
     {
@@ -1299,7 +1299,7 @@ const KARROWMOOR: RegionDef = {
       id: "upper_karrow_kaldite", name: "Upper Kaldite Face", archetype: "ore",
       skill: "mining", tier: 10, reqLevel: 10, itemId: "kaldite_ore",
       count: 3, centre: [194, -132], radius: 7,
-      assetId: "rock_medium_1",
+      assetId: "rock_medium_1", scale: 0.25,
       locationId: "upper_karrow_seam",
     },
     {

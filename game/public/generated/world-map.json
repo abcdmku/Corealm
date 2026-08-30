@@ -19,8 +19,8 @@
   "imagePaddingMetres": 250,
   "north": "+z",
   "seed": 1337,
-  "sha256": "3a4a5f52e04db19261bf795ff5ab100e3b0dbc83c9529367bf581f708ab2ed5f",
-  "renderFingerprint": "3a4a5f52e04db19261bf795ff5ab100e3b0dbc83c9529367bf581f708ab2ed5f",
+  "sha256": "6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8",
+  "renderFingerprint": "6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8",
   "tiles": {
     "columns": 24,
     "rows": 18,

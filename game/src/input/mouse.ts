@@ -20,7 +20,7 @@ import {
   ContextMenu, INTERACTION_LABELS, notify, primaryInteraction, reportResult,
 } from "../ui/contextMenu.js";
 
-/** Below this the pointer was shaky, not dragging. Above it, the click is cancelled. */
+/** Pointer travel beyond this distance switches hover handling into drag mode. */
 const DRAG_THRESHOLD_PX = 4;
 
 /** Radians per pixel of orbit drag. Slow enough that the camera reads as a camera, not a cursor. */
@@ -86,11 +86,6 @@ export class InputController {
   private cursorX = 0;
   private cursorY = 0;
   private cursorOverCanvas = false;
-  /** A press that began on a panel must not fall through to the world on release. */
-  private pressStartedOnCanvas = false;
-  /** The click that dismisses an open context menu does nothing else. */
-  private suppressNextClick = false;
-
   private hoverLabel: HTMLElement | null = null;
   private labelAtX = Number.NaN;
   private labelAtY = Number.NaN;
@@ -167,12 +162,7 @@ export class InputController {
   };
 
   private onPointerDown = (event: PointerEvent): void => {
-    this.pressStartedOnCanvas = event.target === this.canvas;
-    if (!this.pressStartedOnCanvas) return;
-
-    // A click anywhere outside an open menu just dismisses it. The menu closes itself; we only
-    // have to make sure the same click does not also walk the player somewhere.
-    this.suppressNextClick = this.contextMenu.isOpen();
+    if (event.target !== this.canvas) return;
 
     this.pointerDown = true;
     this.dragging = false;
@@ -191,6 +181,10 @@ export class InputController {
     }
     // Middle click otherwise scrolls the page.
     if (event.button === 1) event.preventDefault();
+
+    // Left-button world actions happen at press time. Pointer travel can still switch the gesture
+    // into a camera drag, but it must not delay or cancel the action that began on this press.
+    if (event.button === 0) this.handleLeftClick(event.clientX, event.clientY);
   };
 
   private onPointerMove = (event: PointerEvent): void => {
@@ -222,22 +216,14 @@ export class InputController {
     if (!this.pointerDown) return;
     this.releaseCapture(event.pointerId);
     this.pointerDown = false;
-
     const wasDragging = this.dragging;
     this.dragging = false;
     this.activePointerId = null;
 
-    const suppressed = this.suppressNextClick;
-    this.suppressNextClick = false;
-
-    if (wasDragging || suppressed) return;
-    // A press that started on a panel, or a release that landed off the viewport, is not a world
-    // click. Both would otherwise teleport the destination marker somewhere the player never aimed.
-    if (!this.pressStartedOnCanvas) return;
+    // Right click opens its menu on release. A right drag only orbits the camera.
+    if (event.button !== 2 || wasDragging) return;
     if (!this.picker.containsPoint(event.clientX, event.clientY)) return;
-
-    if (event.button === 0) this.handleLeftClick(event.clientX, event.clientY);
-    else if (event.button === 2) this.handleRightClick(event.clientX, event.clientY);
+    this.handleRightClick(event.clientX, event.clientY);
   };
 
   private onPointerCancel = (event: PointerEvent): void => {
@@ -245,7 +231,6 @@ export class InputController {
     this.pointerDown = false;
     this.dragging = false;
     this.activePointerId = null;
-    this.suppressNextClick = false;
   };
 
   private onPointerLeave = (): void => {
@@ -467,7 +452,6 @@ export class InputController {
     this.keyboard.clear();
     this.pointerDown = false;
     this.dragging = false;
-    this.suppressNextClick = false;
     this.contextMenu.close();
     this.setHovered(null);
     this.setSelected(null);
