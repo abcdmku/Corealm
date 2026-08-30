@@ -1,7 +1,7 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import { sites } from "@openai/sites-vite-plugin";
-import { cp, mkdir, readdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +9,18 @@ const base = process.env.DOCS_BASE ?? "/";
 const site = process.env.DOCS_SITE_URL;
 const asset = (pathname) => `${base.replace(/\/$/, "")}${pathname}` || pathname;
 const socialAsset = (pathname) => site ? new URL(asset(pathname), site).href : asset(pathname);
+
+async function rewriteHostedImagePaths(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await rewriteHostedImagePaths(entryPath);
+    } else if (entry.name.endsWith(".html")) {
+      const html = await readFile(entryPath, "utf8");
+      await writeFile(entryPath, html.replace(/\/_astro\/([^"'\s>]+\.webp)/g, "/__corealm_media/$1"));
+    }
+  }
+}
 
 const sitesStaticWorker = {
   name: "corealm-sites-static-worker",
@@ -24,10 +36,11 @@ const sitesStaticWorker = {
         if ([".openai", "client", "server"].includes(entry.name)) continue;
         await cp(path.join(outDir, entry.name), path.join(clientDir, entry.name), { recursive: true });
       }
+      await rewriteHostedImagePaths(clientDir);
 
       await writeFile(
         path.join(serverDir, "index.js"),
-        `const contentTypes = {\n  ".avif": "image/avif",\n  ".css": "text/css; charset=utf-8",\n  ".gif": "image/gif",\n  ".html": "text/html; charset=utf-8",\n  ".ico": "image/x-icon",\n  ".jpeg": "image/jpeg",\n  ".jpg": "image/jpeg",\n  ".js": "text/javascript; charset=utf-8",\n  ".json": "application/json; charset=utf-8",\n  ".mjs": "text/javascript; charset=utf-8",\n  ".png": "image/png",\n  ".svg": "image/svg+xml",\n  ".wasm": "application/wasm",\n  ".webp": "image/webp",\n  ".woff": "font/woff",\n  ".woff2": "font/woff2",\n};\n\nfunction withContentType(response, pathname) {\n  const extension = pathname.slice(pathname.lastIndexOf(".")).toLowerCase();\n  const contentType = contentTypes[extension];\n  if (!contentType) return response;\n  const headers = new Headers(response.headers);\n  headers.set("Content-Type", contentType);\n  return new Response(response.body, {\n    status: response.status,\n    statusText: response.statusText,\n    headers,\n  });\n}\n\nasync function serveAsset(request, env) {\n  const response = await env.ASSETS.fetch(request);\n  return withContentType(response, new URL(request.url).pathname);\n}\n\nexport default {\n  async fetch(request, env) {\n    const direct = await serveAsset(request, env);\n    if (direct.status !== 404 || !["GET", "HEAD"].includes(request.method)) return direct;\n\n    const url = new URL(request.url);\n    const cleanPath = url.pathname.endsWith("/")\n      ? \`\${url.pathname}index.html\`\n      : \`\${url.pathname}/index.html\`;\n    const cleanUrl = new URL(cleanPath, url);\n    return serveAsset(new Request(cleanUrl, request), env);\n  },\n};\n`,
+        `const contentTypes = {\n  ".avif": "image/avif",\n  ".css": "text/css; charset=utf-8",\n  ".gif": "image/gif",\n  ".html": "text/html; charset=utf-8",\n  ".ico": "image/x-icon",\n  ".jpeg": "image/jpeg",\n  ".jpg": "image/jpeg",\n  ".js": "text/javascript; charset=utf-8",\n  ".json": "application/json; charset=utf-8",\n  ".mjs": "text/javascript; charset=utf-8",\n  ".png": "image/png",\n  ".svg": "image/svg+xml",\n  ".wasm": "application/wasm",\n  ".webp": "image/webp",\n  ".woff": "font/woff",\n  ".woff2": "font/woff2",\n};\n\nfunction withContentType(response, pathname) {\n  const extension = pathname.slice(pathname.lastIndexOf(".")).toLowerCase();\n  const contentType = contentTypes[extension];\n  if (!contentType) return response;\n  const headers = new Headers(response.headers);\n  headers.set("Content-Type", contentType);\n  return new Response(response.body, {\n    status: response.status,\n    statusText: response.statusText,\n    headers,\n  });\n}\n\nasync function serveAsset(request, env) {\n  const response = await env.ASSETS.fetch(request);\n  return withContentType(response, new URL(request.url).pathname);\n}\n\nexport default {\n  async fetch(request, env) {\n    const url = new URL(request.url);\n    if (url.pathname.startsWith("/__corealm_media/")) {\n      const assetUrl = new URL(url);\n      assetUrl.pathname = url.pathname.replace("/__corealm_media/", "/_astro/");\n      return serveAsset(new Request(assetUrl, request), env);\n    }\n\n    const direct = await serveAsset(request, env);\n    if (direct.status !== 404 || !["GET", "HEAD"].includes(request.method)) return direct;\n    const cleanPath = url.pathname.endsWith("/")\n      ? \`\${url.pathname}index.html\`\n      : \`\${url.pathname}/index.html\`;\n    const cleanUrl = new URL(cleanPath, url);\n    return serveAsset(new Request(cleanUrl, request), env);\n  },\n};\n`,
       );
       await writeFile(path.join(serverDir, "wrangler.json"), JSON.stringify({
         name: "corealm-codex",
