@@ -10,6 +10,19 @@ description: "Spell costs and shop inventories from the live economy tables."
 | Emberlash | 1 | 3 | 8 | 5 | 3.0 s | 1× Essence Shard |
 | Stonebrand | 5 | 5 | 7 | 12 | 3.0 s | 1× Essence Shard |
 | Voltrend | 10 | 8 | 6 | 22 | 3.0 s | 1× Essence Shard |
+| Rimewash | 13 | 9 | 6 | 28 | 3.0 s | 1× Essence Shard |
+| Skirlbolt | 17 | 11 | 5.5 | 36 | 3.0 s | 1× Essence Shard |
+| Sleetbolt | 23 | 13 | 5.2 | 47 | 3.0 s | 1× Essence Shard |
+| Shalebolt | 29 | 15 | 5 | 59 | 3.0 s | 1× Essence Shard |
+| Cinderbolt | 35 | 17 | 4.8 | 71 | 3.0 s | 1× Essence Shard |
+| Galeburst | 41 | 19 | 4.6 | 84 | 3.0 s | 1× Essence Shard |
+| Spateburst | 47 | 21 | 4.4 | 97 | 3.0 s | 1× Essence Shard |
+| Cragburst | 53 | 23 | 4.2 | 111 | 3.0 s | 1× Essence Shard |
+| Pyreburst | 59 | 25 | 4 | 125 | 3.0 s | 1× Essence Shard |
+| Squallsurge | 62 | 27 | 3.8 | 133 | 3.0 s | 1× Essence Shard |
+| Tidesurge | 65 | 29 | 3.6 | 141 | 3.0 s | 1× Essence Shard |
+| Scarpsurge | 68 | 31 | 3.5 | 149 | 3.0 s | 1× Essence Shard |
+| Kilnsurge | 70 | 33 | 3.4 | 155 | 3.0 s | 1× Essence Shard |
 
 ## Shops
 

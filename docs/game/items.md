@@ -6,6 +6,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | Item | Tier | Category | Stacks | Buy | Sell | Use |
 | --- | --- | --- | --- | --- | --- | --- |
 | <span id="worn-shortsword"></span>![Worn Shortsword](./assets/items/worn_sword.png) **Worn Shortsword** | 0 | equipment | No | 15 | 9 | mainHand |
+| <span id="worn-staff"></span>![Worn Staff](./assets/items/worn_staff.png) **Worn Staff** | 0 | equipment | No | 15 | 9 | mainHand |
 | <span id="worn-hatchet"></span>![Worn Hatchet](./assets/items/worn_hatchet.png) **Worn Hatchet** | 0 | tool | No | 8 | 5 | Woodcutting +1 |
 | <span id="worn-pickaxe"></span>![Worn Pickaxe](./assets/items/worn_pickaxe.png) **Worn Pickaxe** | 0 | tool | No | 8 | 5 | Mining +1 |
 | <span id="worn-rod"></span>![Worn Rod](./assets/items/worn_rod.png) **Worn Rod** | 0 | tool | No | 6 | 4 | Fishing +1 |
