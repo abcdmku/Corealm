@@ -17,7 +17,7 @@ const sitesStaticWorker = {
       await mkdir(fileURLToPath(serverDir), { recursive: true });
       await writeFile(
         new URL("index.js", serverDir),
-        `export default {\n  fetch(request, env) {\n    return env.ASSETS.fetch(request);\n  },\n};\n`,
+        `export default {\n  async fetch(request, env) {\n    const direct = await env.ASSETS.fetch(request);\n    if (direct.status !== 404 || !["GET", "HEAD"].includes(request.method)) return direct;\n\n    const url = new URL(request.url);\n    const cleanPath = url.pathname.endsWith("/")\n      ? \`\${url.pathname}index.html\`\n      : \`\${url.pathname}/index.html\`;\n    const cleanUrl = new URL(cleanPath, url);\n    return env.ASSETS.fetch(new Request(cleanUrl, request));\n  },\n};\n`,
       );
     },
   },
