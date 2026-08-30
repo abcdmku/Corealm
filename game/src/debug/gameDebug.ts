@@ -51,6 +51,10 @@ export interface DebugDeps {
   camera: OrbitCamera;
   assets: AssetRegistry;
   errors: RecordedError[];
+  /** JSON-safe audio playback state and evidence; absent only in boot-fallback tests. */
+  audioState?(): unknown;
+  audioHistory?(limit?: number): unknown;
+  clearAudioHistory?(): void;
   version: { build: string; contracts: string; content: string };
   /** Rebuilds the world and restores spawn state. Must complete synchronously. */
   resetWorld(seed?: number, keepSave?: boolean): void;
@@ -297,6 +301,18 @@ export function installGameDebug(deps: DebugDeps): void {
 
     getErrors(): RecordedError[] {
       return deps.errors.map((entry) => ({ ...entry }));
+    },
+
+    getAudioState(): unknown {
+      return deps.audioState?.() ?? null;
+    },
+
+    getAudioHistory(limit?: number): unknown {
+      return deps.audioHistory?.(limit) ?? [];
+    },
+
+    clearAudioHistory(): void {
+      deps.clearAudioHistory?.();
     },
 
     isIdle(): boolean {

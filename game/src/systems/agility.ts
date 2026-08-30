@@ -134,6 +134,7 @@ export class AgilitySystem implements TickSystem {
       { kind: "traversing", obstacleId: entity.id, endsAtMs: atMs + durationMs },
       atMs,
       {
+        op: context.interaction,
         durationMs,
         reqLevel: obstacle.reqLevel,
         savesMeters: obstacle.savesMeters,

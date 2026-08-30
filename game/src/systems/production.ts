@@ -181,6 +181,7 @@ export class ProductionSystem implements TickSystem {
       nextCompleteAtMs: atMs + recipe.durationMs,
     };
     this.deps.activity.start(activity, atMs, {
+      op: recipe.kind,
       recipeId: recipe.id,
       recipeName: recipe.name,
       quantity: wanted,

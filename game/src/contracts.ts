@@ -28,6 +28,55 @@ export const SKILL_IDS: readonly SkillId[] = [
 
 export type RegionId = "fallowmarch" | "vellenwood" | "karrowmoor" | "gravelmaw";
 
+// ------------------------------------------------------------------- audio
+
+/** Independent client-side mix buses. These are preferences, never simulation state. */
+export type AudioBus = "music" | "ambient" | "sfx";
+
+/** Linear gain values in the inclusive 0..1 range. */
+export interface AudioVolumes {
+  music: number;
+  ambient: number;
+  sfx: number;
+}
+
+/** Material weights shared by the terrain renderer and terrain-aware presentation systems. */
+export interface GroundSurfaceSample {
+  grass: number;
+  dry: number;
+  rock: number;
+  gravel: number;
+  dirt: number;
+  mud: number;
+  cobble: number;
+  wet: number;
+}
+
+/**
+ * Semantic cue vocabulary and its runtime list, so catalog coverage is testable. Gameplay
+ * publishes meaning; the audio layer chooses one of the cue's curated file variants.
+ */
+export const AUDIO_CUE_IDS = [
+  "ui.click", "ui.confirm", "ui.cancel", "ui.error", "ui.level_up",
+  "movement.footstep_grass", "movement.footstep_dirt", "movement.footstep_forest",
+  "movement.footstep_stone", "movement.footstep_wood", "movement.footstep_cave",
+  "gather.mining_swing", "gather.mining_impact", "gather.rock_break",
+  "gather.wood_swing", "gather.wood_impact", "gather.tree_fall",
+  "gather.fishing_cast", "gather.fishing_reel", "gather.fishing_catch",
+  "farm.rake", "farm.plant", "farm.harvest",
+  "production.smith", "production.smelt", "production.craft",
+  "production.cook", "production.fletch",
+  "combat.melee_swing", "combat.melee_hit", "combat.melee_miss",
+  "combat.magic_cast", "combat.magic_hit", "combat.special",
+  "combat.player_hit", "combat.enemy_death", "combat.player_death",
+  "interaction.door_open", "interaction.portal", "interaction.climb",
+  "interaction.vault", "interaction.loot", "interaction.equip", "interaction.consume",
+  "interaction.bank", "interaction.trade", "interaction.dialogue_open",
+  "interaction.dialogue_close", "interaction.activity_stop",
+] as const;
+
+export type AudioCueId = (typeof AUDIO_CUE_IDS)[number];
+
 export type EquipSlot =
   | "head" | "body" | "legs" | "feet" | "hands"
   | "mainHand" | "offHand" | "accessory1" | "accessory2";

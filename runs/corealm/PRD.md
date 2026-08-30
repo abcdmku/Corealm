@@ -37,6 +37,18 @@ These appear in the brief but do not serve the Phase 1 gate. Each is listed with
 2. **Death drops inventory only, not equipment.** The brief asks for consequence while keeping experimentation practical. Dropping worn gear makes the agent recovery loop much harder to test and much harsher for new players. Equipment stays worn through death.
 3. **Magic needs a consumable.** Attack spells consume one Essence Shard per cast. Without a cost, magic beats melee at every tier because it has no upkeep. Shards come from Crafting (gem plus log) and from shops, which wires Magic into Mining and Crafting.
 
+### Approved scope amendment: audio
+
+The August 29, 2026 audio brief reverses the Phase 1 cut for ambient audio and music. The shipped game now includes:
+
+- A rights-traced SFX library plus owner-supplied local music, curated to Corealm's grounded medieval-fantasy tone. Files that read as modern, sci-fi, cartoon, firearm, vehicle, electronic, or otherwise outside that tone are excluded.
+- SFX for player footsteps and every shipped interaction family: mining, woodcutting, fishing, farming, smithing, smelting, crafting, cooking, fletching, melee, magic, damage, death, looting, doors, portals, agility, equipment, banking, shops, dialogue, and UI feedback.
+- Repeated cue variants play in a fixed round-robin order at a fixed playback rate. Footsteps read the rendered ground material, with distinct families for grass, dirt and mud, stone and gravel, wood, forest floor, and cave floor.
+- Region ambience for the three surface regions and the Gravelmaw interior. Ambience changes with semantic player region and never changes game state.
+- Region music only where the supplied `C:\Users\Borg\Music\corealm` library names a shipped region theme. Fallowmarch uses plains music, Vellenwood uses `Deep Woodland`, Karrowmoor uses `Stone city`, and Gravelmaw has no music until a matching track is supplied. Desert, jungle, goblin-village, mire, and swamp tracks are reserved for future regions.
+- Three independently persisted client volumes, `music`, `ambient`, and `sfx`, exposed in an Audio section reachable from the main menu. Each control applies immediately and supports a true zero-volume state.
+- Browser acceptance that proves audio unlocks after a user gesture, region changes select the right ambience and eligible music, representative semantic actions select the right cue family, zero volume silences its own bus, settings survive reload, and no audio error reaches the console.
+
 ---
 
 ## 1. Player experience and core loop

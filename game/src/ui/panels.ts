@@ -536,6 +536,8 @@ export interface ManagedPanel {
 
 export interface UiOptions {
   registry?: KeyBindingRegistry;
+  /** Existing client-preference store, when boot must apply audio before the UI is constructed. */
+  settings?: SettingsStore;
   mapTerrain?: MapTerrainSource;
   /** True when boot found a save. The title screen offers "Continue" rather than "Begin". */
   hasSave?(): boolean;
@@ -583,7 +585,7 @@ const PANEL_INTERVAL_MS = 220;
  */
 export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   const registry = options.registry ?? keybindings;
-  const settings = new SettingsStore();
+  const settings = options.settings ?? new SettingsStore();
   const tooltip = new Tooltip(api);
   const menu = new ContextMenu({ api, skillLabel: skillName });
 
@@ -611,7 +613,12 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   const dialogue = new DialoguePanel(context);
   const controls = new ControlsPanel(context);
   const map = new MapPanel(context);
-  const settingsPanel = new SettingsPanel(context, settings);
+  let titleCoveredBySettings = false;
+  const settingsPanel = new SettingsPanel(context, settings, () => {
+    if (!titleCoveredBySettings) return;
+    titleCoveredBySettings = false;
+    title.setCovered(false);
+  });
   bank = new BankPanel(context);
   shop = new ShopPanel(context);
   const panels: ManagedPanel[] = [
@@ -625,7 +632,11 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       options.onNewGame?.();
       title.close();
     },
-    onSettings: () => settingsPanel.frame.open(),
+    onSettings: () => {
+      titleCoveredBySettings = true;
+      title.setCovered(true);
+      settingsPanel.frame.open();
+    },
     onClose: () => title.close(),
   });
 

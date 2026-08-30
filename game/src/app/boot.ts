@@ -66,12 +66,17 @@ import { scatterWorld, worldExclusions, type ScatterResult } from "../world/scat
 import { findShot, shotIds } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
 import { createUi } from "../ui/panels.js";
+import { SettingsStore, type UiSettings } from "../ui/settings.js";
 import { keybindings } from "../input/keyboard.js";
 import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
 import { addChamberLights, buildDungeon, type DungeonSpec } from "../render/dungeon.js";
 import { Ambience, Vfx, type AmbienceEmitter, type AmbienceKind } from "../render/vfx.js";
 import { DocSearch, buildDocs } from "../api/docs.js";
+import {
+  AudioDirector, AudioEngine, COREALM_AUDIO_CATALOG, CorealmAudioBridge,
+  footstepSurfaceAt, type AudioDiagnostic,
+} from "../audio/index.js";
 
 export interface BootResult {
   loop: GameLoop;
@@ -98,6 +103,24 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   const events = new EventBus();
   const clock = new SimClock();
   const rng = new RngStreams(store.get().meta.seed);
+  const clientSettings = new SettingsStore();
+  const initialSettings = clientSettings.get();
+  const audioDiagnostics: AudioDiagnostic[] = [];
+  const audioEngine = new AudioEngine(COREALM_AUDIO_CATALOG, {
+    initialVolumes: {
+      music: initialSettings.music,
+      ambient: initialSettings.ambient,
+      sfx: initialSettings.sfx,
+    },
+    onDiagnostic: (diagnostic) => {
+      audioDiagnostics.push(diagnostic);
+      if (audioDiagnostics.length > 64) audioDiagnostics.shift();
+    },
+  });
+  audioEngine.installGestureUnlock(window);
+  const audioDirector = new AudioDirector(audioEngine, COREALM_AUDIO_CATALOG, {
+    regionFadeMs: 1400,
+  });
 
   // Canonical content is registered before anything can ask for it. Systems and the docs index all
   // read through `content`, so this has to happen before the first tick and before buildDocs().
@@ -261,6 +284,17 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
   entityStore.load(built.entities);
   entityStore.registerLocations(built.knownLocations);
+  const gameAudio = new CorealmAudioBridge({
+    store,
+    engine: audioEngine,
+    director: audioDirector,
+    entity: (entityId) => entityStore.get(entityId),
+    surfaceAt: (position, regionId) => footstepSurfaceAt(
+      regionId,
+      position,
+      scene.groundSurfaceAt(position[0], position[2]),
+    ),
+  });
 
   // The other half of the quest-ref check in `validateQuestObjectives`: entity and location refs
   // can only be resolved once the world exists. An objective that points an agent at an id nothing
@@ -404,6 +438,10 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   } else if (loaded.status === "failed") {
     errors.push({ atMs: atMs(), source: "persistence", message: `Save could not be loaded: ${loaded.reason ?? "unknown"}` });
   }
+  // Region loops are selected only after the save decides the player's real starting region.
+  // Until this point gesture unlock has no desired loop to start, so the loading screen cannot
+  // briefly play Fallowmarch over a character saved elsewhere.
+  audioDirector.setRegion(store.get().player.regionId);
 
   // 14. API and hooks. Everything a human or an agent does goes through here.
   const movement = new Movement(nav, events);
@@ -629,6 +667,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     const snapped = nav.closestPoint(position) ?? position;
     store.get().player.position = snapped;
     store.get().player.regionId = regionId;
+    audioDirector.setRegion(regionId);
     movement.stop(store.get(), clock.elapsedMs, "portal");
     scene.syncPlayer(snapped, store.get().player.facingRad, true);
     camera.update(snapped[0], snapped[1], snapped[2], true);
@@ -646,10 +685,30 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   api.register("dialogue", dialogueSystem);
   api.register("combat", combatSystem.hook());
   api.register("production", productionSystem.hook());
-  api.register("inventory", inventorySystem);
+  api.register("inventory", {
+    slots: () => inventorySystem.slots(),
+    freeSlots: () => inventorySystem.freeSlots(),
+    use: (itemId, target) => {
+      const result = inventorySystem.use(itemId, target);
+      gameAudio.handleInventoryUse(result);
+      return result;
+    },
+  });
   api.register("equipment", equipmentSystem);
-  api.register("bank", bankSystem);
-  api.register("shop", economySystem);
+  api.register("bank", {
+    op: (op, args) => {
+      const result = bankSystem.op(op, args);
+      gameAudio.handleBank(op, result.ok);
+      return result;
+    },
+  });
+  api.register("shop", {
+    op: (op, args) => {
+      const result = economySystem.op(op, args);
+      gameAudio.handleTrade(op, result.ok);
+      return result;
+    },
+  });
   api.register("activity", activitySystem.hook());
 
   api.register("entities", {
@@ -657,7 +716,13 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     all: () => entityStore.all(),
     observe: (filter, from) => entityStore.observe(filter, from),
   });
-  api.register("interactions", { run: (id, interaction) => interactions.run(id, interaction) });
+  api.register("interactions", {
+    run: (id, interaction) => {
+      const result = interactions.run(id, interaction);
+      gameAudio.handleInteraction(interaction, result);
+      return result;
+    },
+  });
 
   // Assistance overlays. Presentation only: drawing one never changes canonical state, which is
   // what makes it safe to let an agent write here.
@@ -684,6 +749,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     playerPosition: () => store.get().player.position,
   });
   events.subscribe((event) => vfx.handle(event, clock.elapsedMs));
+  events.subscribe((event) => gameAudio.handleEvent(event));
 
   // Standing atmosphere, as opposed to the event-driven feedback above. Both are polled from Vfx's
   // own update, so the loop needs no change. One InstancedMesh for the whole world.
@@ -779,6 +845,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // model-context container the browser provides. One implementation, three ways in.
   // The human UI. Everything it does goes through GameApi, the same object the agent tools call.
   const ui = createUi(api, {
+    settings: clientSettings,
     mapTerrain: {
       bounds: terrainSpec.bounds,
       sample: (x, z) => ({
@@ -797,15 +864,53 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
   ui.mount(labelRoot);
 
+  // UI sound follows semantic activation, so pointer clicks and keyboard-generated clicks share
+  // one path. Canvas clicks are excluded: world actions have their own material-specific cues.
+  labelRoot.addEventListener("click", (event) => {
+    const target = event.target instanceof Element
+      ? event.target.closest("button, [role='button'], input[type='range'], select")
+      : null;
+    if (!target || target.matches(":disabled, [aria-disabled='true']")) return;
+    gameAudio.playUi("ui.click");
+  }, { capture: true });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !event.repeat) gameAudio.playUi("ui.cancel");
+  }, { capture: true });
+
   // Client preferences. Each one is applied here, and each one changes something on the next frame
   // — see the note in ui/settings.ts about why a setting that does nothing is worse than none.
+  let appliedPreferences: UiSettings | null = null;
   ui.settings.subscribe((preferences) => {
-    renderer.setRenderScale(preferences.renderScale);
-    renderer.setShadowQuality(preferences.shadowQuality);
-    renderer.setDrawDistance(preferences.drawDistance);
-    camera.invertPitch = preferences.invertCameraY;
-    vfx.damageNumbers = preferences.damageNumbers;
-    labelRoot.classList.toggle("is-compact", preferences.uiScale === "compact");
+    const previous = appliedPreferences;
+    if (!previous
+      || previous.music !== preferences.music
+      || previous.ambient !== preferences.ambient
+      || previous.sfx !== preferences.sfx) {
+      audioEngine.setVolumes({
+        music: preferences.music,
+        ambient: preferences.ambient,
+        sfx: preferences.sfx,
+      });
+    }
+    if (!previous || previous.renderScale !== preferences.renderScale) {
+      renderer.setRenderScale(preferences.renderScale);
+    }
+    if (!previous || previous.shadowQuality !== preferences.shadowQuality) {
+      renderer.setShadowQuality(preferences.shadowQuality);
+    }
+    if (!previous || previous.drawDistance !== preferences.drawDistance) {
+      renderer.setDrawDistance(preferences.drawDistance);
+    }
+    if (!previous || previous.invertCameraY !== preferences.invertCameraY) {
+      camera.invertPitch = preferences.invertCameraY;
+    }
+    if (!previous || previous.damageNumbers !== preferences.damageNumbers) {
+      vfx.damageNumbers = preferences.damageNumbers;
+    }
+    if (!previous || previous.uiScale !== preferences.uiScale) {
+      labelRoot.classList.toggle("is-compact", preferences.uiScale === "compact");
+    }
+    appliedPreferences = preferences;
   });
 
   // A bank or shop interaction has no event of its own, so the panel opens off the successful
@@ -880,6 +985,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.addSystem(productionSystem);
   loop.addSystem(questSystem);
   loop.addSystem(discoverySystem);
+  loop.addSystem(gameAudio);
 
   if (dungeon) loop.addInterior(dungeon.group, () => store.get().player.regionId === "gravelmaw");
   // What the player is interacting with, so the rig can pick a pose for it: opening a chest is not
@@ -888,6 +994,14 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.setOverlays(overlays);
   loop.setVfx(vfx);
   loop.setCombatHits(() => combatSystem.consumeHits());
+  loop.setCombatPresentationHandler((hit, phase) => gameAudio.handlePlayerCombatMotion(hit, phase));
+  loop.setPlayerMotionHandler((event) => {
+    if (event.kind === "footstep") {
+      gameAudio.handleFootstep();
+    } else if (event.pose === "mine" || event.pose === "chop") {
+      gameAudio.handleGatherMotion(event.pose, event.kind);
+    }
+  });
   loop.setUi(ui);
   if (rigged) loop.setPlayerRig(playerRig);
   loop.setEntityViews(entityViews, () => {
@@ -911,6 +1025,8 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     camera.setPose(spawnFacing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
     camera.update(spawn[0], spawn[1], spawn[2], true);
     scene.syncPlayer(spawn, spawnFacing, true);
+    loop.resetPresentation();
+    gameAudio.reset();
 
     // Node yields and enemy health are seeded world state, so a reset rebuilds them rather than
     // leaving a half-mined world behind a nominally fresh character.
@@ -925,6 +1041,13 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   installGameDebug({
     store, events, clock, nav, movement, api, renderer, camera, assets, errors,
     version,
+    audioState: () => ({
+      ...audioEngine.snapshot(),
+      regionId: store.get().player.regionId,
+      diagnostics: audioDiagnostics.map(({ kind, message, name, url }) => ({ kind, message, name, url })),
+    }),
+    audioHistory: (limit) => audioEngine.history(limit),
+    clearAudioHistory: () => audioEngine.clearHistory(),
     // "scatter placed nothing" and "nobody asked scatter" are different bugs, and the debug surface
     // could not tell them apart while boot threw this array away.
     scatterStats: () => scatterResults,
@@ -949,8 +1072,10 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     isIdle: () => store.get().player.movement.mode === "idle" && store.get().activity === null,
     teleport: (to: Vec3) => {
       const snapped = nav.closestPoint(to) ?? to;
+      const regionId = regionAtPoint(snapped);
       store.get().player.position = snapped;
-      store.get().player.regionId = regionAtPoint(snapped);
+      store.get().player.regionId = regionId;
+      audioDirector.setRegion(regionId);
       movement.stop(store.get(), clock.elapsedMs, "teleport");
       scene.syncPlayer(snapped, store.get().player.facingRad, true);
       camera.update(snapped[0], snapped[1], snapped[2], true);
@@ -1023,6 +1148,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       const landed = nav.closestPoint(node.position) ?? node.position;
       store.get().player.position = landed;
       store.get().player.regionId = scene.regionAt(landed[0], landed[2]);
+      audioDirector.setRegion(store.get().player.regionId);
       movement.stop(store.get(), clock.elapsedMs, "focus-camera");
       scene.syncPlayer(landed, shot.yaw + Math.PI, true);
       camera.setPose(shot.yaw, shot.pitch, shot.distance);

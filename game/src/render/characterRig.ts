@@ -52,6 +52,61 @@ export type CharacterPose =
   | "attack_melee" | "cast" | "hit" | "death"
   | "eat" | "climb" | "produce" | "bank";
 
+/** Contact events measured from the authored clips and consumed by sound and combat feedback. */
+export type CharacterMotionEvent =
+  | { kind: "footstep"; foot: "left" | "right"; pose: CharacterPose }
+  | { kind: "swing" | "impact"; pose: CharacterPose };
+
+interface ClipMotionMarker {
+  phase: number;
+  kind: CharacterMotionEvent["kind"];
+  foot?: "left" | "right";
+}
+
+/**
+ * Normalised contact frames measured from the shipped GLBs with forward kinematics.
+ *
+ * The jog's feet touch down near 0.10 and 0.60. TreeChopping's hands accelerate through 0.08
+ * and settle onto the target near 0.22. Sword_Attack reaches its target near 0.30. These are
+ * presentation data, not guesses based on gameplay timers.
+ */
+const CLIP_MOTION_MARKERS: Readonly<Record<string, readonly ClipMotionMarker[]>> = {
+  Walk_Loop: [
+    { phase: 0.10, kind: "footstep", foot: "left" },
+    { phase: 0.60, kind: "footstep", foot: "right" },
+  ],
+  Jog_Fwd_Loop: [
+    { phase: 0.10, kind: "footstep", foot: "left" },
+    { phase: 0.60, kind: "footstep", foot: "right" },
+  ],
+  Sprint_Loop: [
+    { phase: 0.10, kind: "footstep", foot: "left" },
+    { phase: 0.60, kind: "footstep", foot: "right" },
+  ],
+  TreeChopping_Loop: [
+    { phase: 0.08, kind: "swing" },
+    { phase: 0.22, kind: "impact" },
+  ],
+  Sword_Attack: [
+    { phase: 0.18, kind: "swing" },
+    { phase: 0.30, kind: "impact" },
+  ],
+  Sword_Regular_A: [
+    { phase: 0.35, kind: "swing" },
+    { phase: 0.56, kind: "impact" },
+  ],
+  Punch_Jab: [
+    { phase: 0.20, kind: "swing" },
+    { phase: 0.42, kind: "impact" },
+  ],
+  Spell_Simple_Shoot: [
+    { phase: 0.32, kind: "swing" },
+    { phase: 0.42, kind: "impact" },
+  ],
+};
+
+const GATHER_IMPACT_PHASE = 0.22;
+
 /**
  * Pose to clip name, from the shared library.
  *
@@ -334,6 +389,10 @@ export class CharacterRig {
   private current: CharacterPose = "idle";
   private currentAction: THREE.AnimationAction | null = null;
   private currentClipName: string | null = null;
+  private markerAction: THREE.AnimationAction | null = null;
+  private markerPhase = 0;
+  private controlledTimeScale: number | null = null;
+  private readonly motionEvents: CharacterMotionEvent[] = [];
   private ready = false;
   private missingClips = new Set<string>();
 
@@ -559,6 +618,14 @@ export class CharacterRig {
     if (pose === this.current && !force) return;
     if (!force && pose !== "death" && ONE_SHOT.has(this.current) && this.currentAction?.isRunning()) return;
 
+    const previousPose = this.current;
+    const previousClipDuration = this.currentAction?.getClip().duration ?? 0;
+    const previousLocomotionPhase = isLocomotionPose(previousPose)
+      && isLocomotionPose(pose)
+      && this.currentAction
+      && previousClipDuration > 0
+      ? this.currentAction.time / previousClipDuration
+      : null;
     const resolved = this.resolveAction(pose);
     const previous = this.currentAction;
     this.current = pose;
@@ -571,6 +638,10 @@ export class CharacterRig {
     }
 
     action.reset();
+    if (previousLocomotionPhase !== null) {
+      action.time = previousLocomotionPhase * action.getClip().duration;
+    }
+    action.paused = false;
     action.enabled = true;
     action.setEffectiveTimeScale(POSE_TIME_SCALE[pose] ?? 1);
     action.setEffectiveWeight(1);
@@ -590,6 +661,9 @@ export class CharacterRig {
 
     this.currentAction = action;
     this.currentClipName = clipName;
+    this.controlledTimeScale = null;
+    this.markerAction = action;
+    this.markerPhase = previousLocomotionPhase ?? 0;
   }
 
   /**
@@ -611,6 +685,48 @@ export class CharacterRig {
       this.currentAction.setEffectiveTimeScale(walkStrideScale(metresPerSecond));
     } else if (RUN_CLIPS.has(this.currentClipName)) {
       this.currentAction.setEffectiveTimeScale(runPresentationScale(metresPerSecond));
+    }
+  }
+
+  /**
+   * Locks the gathering loop to the gameplay roll that it represents.
+   *
+   * The clip is 0.967 s and a gathering roll is 1.8 s. Letting both clocks free-run made every
+   * later hit land at a different pose. This maps the clip's measured impact frame onto the next
+   * roll deadline every rendered frame. Pausing only the action time still lets the mixer advance
+   * crossfades normally.
+   */
+  syncGatheringCycle(msUntilImpact: number, cycleMs: number, reset = false): void {
+    const action = this.currentAction;
+    const clipName = this.currentClipName;
+    if (!action || !clipName || (this.current !== "mine" && this.current !== "chop")) return;
+
+    const phase = gatheringActionPhase(msUntilImpact, cycleMs, GATHER_IMPACT_PHASE);
+    const previous = this.markerAction === action ? this.markerPhase : phase;
+    action.paused = true;
+    action.time = phase * action.getClip().duration;
+    this.controlledTimeScale = action.getClip().duration / (Math.max(1, cycleMs) / 1000);
+    this.mixer?.update(0);
+
+    if (!reset) this.recordMotionMarkers(clipName, previous, phase);
+    this.markerAction = action;
+    this.markerPhase = phase;
+  }
+
+  /** Drains contact events once. Rendering, sound, and hit feedback consume the same edges. */
+  drainMotionEvents(): CharacterMotionEvent[] {
+    return this.motionEvents.splice(0, this.motionEvents.length);
+  }
+
+  private recordMotionMarkers(clipName: string, previous: number, current: number): void {
+    const markers = CLIP_MOTION_MARKERS[clipName] ?? [];
+    for (const marker of markers) {
+      if (!crossedAnimationMarker(previous, current, marker.phase)) continue;
+      if (marker.kind === "footstep" && marker.foot) {
+        this.motionEvents.push({ kind: "footstep", foot: marker.foot, pose: this.current });
+      } else if (marker.kind === "swing" || marker.kind === "impact") {
+        this.motionEvents.push({ kind: marker.kind, pose: this.current });
+      }
     }
   }
 
@@ -952,7 +1068,20 @@ export class CharacterRig {
   }
 
   update(deltaSeconds: number): void {
+    const action = this.currentAction;
+    const clipName = this.currentClipName;
+    const duration = action?.getClip().duration ?? 0;
+    const previous = action && duration > 0
+      ? (this.markerAction === action ? this.markerPhase : action.time / duration)
+      : 0;
     this.mixer?.update(deltaSeconds);
+
+    if (action && clipName && action === this.currentAction && clipName === this.currentClipName && duration > 0) {
+      const current = Math.min(1, Math.max(0, action.time / duration));
+      if (!action.paused) this.recordMotionMarkers(clipName, previous, current);
+      this.markerAction = action;
+      this.markerPhase = current;
+    }
     // A finished one-shot returns to idle on its own, so a swing does not freeze on its last frame.
     if (this.currentAction && ONE_SHOT.has(this.current) && !this.currentAction.isRunning()) {
       this.play("idle", true);
@@ -987,7 +1116,7 @@ export class CharacterRig {
       clip: this.currentClipName,
       time: this.currentAction?.time ?? 0,
       duration: this.currentAction?.getClip().duration ?? 0,
-      timeScale: this.currentAction?.getEffectiveTimeScale() ?? 0,
+      timeScale: this.controlledTimeScale ?? this.currentAction?.getEffectiveTimeScale() ?? 0,
     };
   }
 
@@ -1031,6 +1160,34 @@ export class CharacterRig {
   }
 }
 
+/** Phase that places the measured contact marker on the next semantic gathering deadline. */
+export function gatheringActionPhase(msUntilImpact: number, cycleMs: number, impactPhase = GATHER_IMPACT_PHASE): number {
+  const safeCycle = Number.isFinite(cycleMs) && cycleMs > 0 ? cycleMs : 1;
+  const remaining = Number.isFinite(msUntilImpact)
+    ? Math.min(safeCycle, Math.max(0, msUntilImpact))
+    : safeCycle;
+  const phase = impactPhase - remaining / safeCycle;
+  return ((phase % 1) + 1) % 1;
+}
+
+/** True when forward playback crossed a normalised marker, including one loop wrap. */
+export function crossedAnimationMarker(previous: number, current: number, marker: number): boolean {
+  if (![previous, current, marker].every(Number.isFinite) || previous === current) return false;
+  // Phase arithmetic such as (0.22 - 1) % 1 can produce 0.21999999999999997. Without this
+  // tolerance the very next frame treats the same marker as a new crossing and plays a false hit
+  // at activity start.
+  const epsilon = 1e-6;
+  if (current > previous) return marker > previous + epsilon && marker <= current + epsilon;
+  return marker > previous + epsilon || marker <= current + epsilon;
+}
+
+/** Read-only marker phases for timing tests and the browser diagnostic surface. */
+export function motionMarkerPhases(clipName: string, kind: CharacterMotionEvent["kind"]): readonly number[] {
+  return (CLIP_MOTION_MARKERS[clipName] ?? [])
+    .filter((marker) => marker.kind === kind)
+    .map((marker) => marker.phase);
+}
+
 /**
  * Equipment slots the rig draws when no `equipmentVisuals` port is wired.
  *
@@ -1051,6 +1208,10 @@ function walkStrideScale(metresPerSecond: number): number {
 function runPresentationScale(metresPerSecond: number): number {
   const scaled = metresPerSecond / MOVEMENT.runSpeed * MOVEMENT.runPlaybackRate;
   return Math.min(MOVEMENT.runPlaybackRate, Math.max(MOVEMENT.runMinPlaybackRate, scaled));
+}
+
+function isLocomotionPose(pose: CharacterPose): boolean {
+  return pose === "walk" || pose === "run";
 }
 
 /** A part drawn by rebinding it onto the body's skeleton rather than parenting it to a bone. */

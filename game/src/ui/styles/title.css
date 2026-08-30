@@ -194,7 +194,7 @@
  */
 #panel-settings { z-index: calc(var(--z-boot) + 60) !important; }
 
-/* The graphics window replaces the pause card while it is open. The dark pause backdrop stays. */
+/* The settings window replaces the pause card while it is open. The dark pause backdrop stays. */
 #panel-settings:not([hidden]) ~ .title .title__card { visibility: hidden; }
 
 /*
@@ -228,8 +228,7 @@
 }
 
 /*
- * Label, then what it does to the picture, then the control. The sentence is the point: a settings
- * screen that only names its flags teaches nothing about what turning one off will look like.
+ * Label, then what the value changes, then the control. The sentence keeps each choice concrete.
  */
 .settings__row {
   display: grid;
@@ -250,6 +249,34 @@
 
 .settings__label { font-size: var(--size-sm); font-weight: 600; color: var(--ink); }
 .settings__hint { font-size: var(--size-xs); line-height: 1.45; color: var(--ink-dim); }
+
+/* Native ranges keep every browser and keyboard interaction, with a fixed-width numeric readout. */
+.volume {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 42px;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 196px;
+}
+
+.volume__range {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.volume__range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.volume__value {
+  color: var(--accent);
+  font-size: var(--size-sm);
+  font-weight: 700;
+  text-align: right;
+}
 
 .settings__footer {
   display: flex;
@@ -391,6 +418,7 @@
 #ui-root.is-compact .switch__knob { width: 12px; height: 12px; }
 #ui-root.is-compact .switch.is-on .switch__knob { transform: translateX(16px); }
 #ui-root.is-compact .seg__btn { min-width: 56px; min-height: 22px; }
+#ui-root.is-compact .volume { grid-template-columns: minmax(100px, 150px) 38px; min-width: 164px; }
 
 /* ---- the edge-anchored panels give the world its width back */
 #ui-root.is-compact #panel-inventory { max-width: 206px; }
@@ -422,4 +450,5 @@
   .settings__row { grid-template-columns: 1fr; }
   .seg { justify-content: stretch; }
   .seg__btn { flex: 1 1 0; }
+  .volume { width: 100%; grid-template-columns: minmax(0, 1fr) 42px; }
 }

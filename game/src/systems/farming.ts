@@ -209,7 +209,7 @@ export class FarmingSystem implements TickSystem {
     this.deps.activity.start(
       { kind: "farming", op: "rake", plotId: plot.plotId, endsAtMs: atMs + FARM_ACTION_MS },
       atMs,
-      { durationMs: FARM_ACTION_MS, xp: RAKE_XP },
+      { op: "rake", durationMs: FARM_ACTION_MS, xp: RAKE_XP },
     );
     return ok({ started: `raking ${entity.name}` });
   }
@@ -239,7 +239,7 @@ export class FarmingSystem implements TickSystem {
     this.deps.activity.start(
       { kind: "farming", op: "plant", plotId: plot.plotId, endsAtMs: atMs + FARM_ACTION_MS },
       atMs,
-      { durationMs: FARM_ACTION_MS, seedId },
+      { op: "plant", durationMs: FARM_ACTION_MS, seedId },
     );
     return ok({ started: `planting ${seedId} in ${entity.name}` });
   }
@@ -275,6 +275,7 @@ export class FarmingSystem implements TickSystem {
       { kind: "farming", op: "harvest", plotId: plot.plotId, endsAtMs: atMs + GATHER_TICK_MS },
       atMs,
       {
+        op: "harvest",
         cropId: plot.cropId,
         remaining: node.remaining,
         tickMs: GATHER_TICK_MS,

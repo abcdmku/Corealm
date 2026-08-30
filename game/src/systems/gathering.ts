@@ -221,6 +221,7 @@ export class GatheringSystem implements TickSystem {
       yieldsThisSession: 0,
     };
     this.deps.activity.start(activity, atMs, {
+      op: interaction,
       itemId: resource.itemId,
       remaining: node.remaining,
       tier: entity.tier,

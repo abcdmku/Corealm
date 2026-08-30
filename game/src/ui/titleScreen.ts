@@ -34,8 +34,8 @@ export interface TitleScreenOptions {
   hasSave(): boolean;
   /** Clears the save and rebuilds the world. Wired by the root to `resetWorld`. */
   onNewGame(): void;
-  /** Opens the graphics settings panel. */
-  onGraphics(): void;
+  /** Opens the client settings panel. */
+  onSettings(): void;
   /** Dismisses. Called on Continue and on Escape. */
   onClose(): void;
 }
@@ -48,6 +48,8 @@ export class TitleScreen {
   private view: View = "menu";
   private popEscape: Unregister | null = null;
   private restoreFocus: HTMLElement | null = null;
+  private covered = false;
+  private disposed = false;
 
   constructor(private readonly options: TitleScreenOptions) {
     const root = document.createElement("section");
@@ -88,21 +90,16 @@ export class TitleScreen {
 
   open(): void {
     if (this.isOpen()) return;
+    this.covered = false;
+    this.root.inert = false;
+    this.root.removeAttribute("aria-hidden");
     this.restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.view = "menu";
     this.render();
     this.root.hidden = false;
 
     // Escape backs out one step: out of the confirmation first, out of the menu second.
-    this.popEscape = keybindings.pushEscapeHandler(() => {
-      if (!this.isOpen()) return false;
-      if (this.view === "confirm") {
-        this.setView("menu");
-        return true;
-      }
-      this.options.onClose();
-      return true;
-    });
+    this.installEscapeHandler();
 
     this.focusFirst();
   }
@@ -110,6 +107,9 @@ export class TitleScreen {
   close(): void {
     if (!this.isOpen()) return;
     this.root.hidden = true;
+    this.covered = false;
+    this.root.inert = false;
+    this.root.removeAttribute("aria-hidden");
     this.popEscape?.();
     this.popEscape = null;
     // Next time it opens it opens on the menu, never mid-confirmation.
@@ -125,9 +125,30 @@ export class TitleScreen {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.popEscape?.();
     this.popEscape = null;
     this.root.remove();
+  }
+
+  /**
+   * Keeps the pause backdrop in place while a child modal owns focus. The title dialog is removed
+   * from both keyboard navigation and the accessibility tree until that modal closes.
+   */
+  setCovered(covered: boolean): void {
+    if (this.disposed || !this.isOpen() || this.covered === covered) return;
+    this.covered = covered;
+    this.root.inert = covered;
+    if (covered) {
+      this.root.setAttribute("aria-hidden", "true");
+      this.popEscape?.();
+      this.popEscape = null;
+      return;
+    }
+
+    this.root.removeAttribute("aria-hidden");
+    this.installEscapeHandler();
+    this.focusFirst();
   }
 
   // ------------------------------------------------------------------ keys
@@ -145,6 +166,19 @@ export class TitleScreen {
     // stopPropagation, not preventDefault: Enter and Space must still press the focused button.
     event.stopPropagation();
   };
+
+  private installEscapeHandler(): void {
+    this.popEscape?.();
+    this.popEscape = keybindings.pushEscapeHandler(() => {
+      if (!this.isOpen() || this.covered) return false;
+      if (this.view === "confirm") {
+        this.setView("menu");
+        return true;
+      }
+      this.options.onClose();
+      return true;
+    });
+  }
 
   /** Tab stays inside the card. A menu you can tab out of is a menu you can lose. */
   private wrapFocus(event: KeyboardEvent): void {
@@ -218,7 +252,7 @@ export class TitleScreen {
     resume.dataset["autofocus"] = "true";
 
     const fresh = this.button("New game", "btn title__action", () => this.setView("confirm"));
-    const settings = this.button("Graphics settings", "btn title__action", () => this.options.onGraphics());
+    const settings = this.button("Settings", "btn title__action", () => this.options.onSettings());
 
     actions.append(resume, fresh, settings);
 

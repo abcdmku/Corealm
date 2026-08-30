@@ -27,7 +27,7 @@
  * This file owns no gameplay state. It reads geometry parameters and draws.
  */
 import * as THREE from "three";
-import type { RegionId, Vec3 } from "../contracts.js";
+import type { GroundSurfaceSample, RegionId, Vec3 } from "../contracts.js";
 import { MaterialLibrary, REGION_PALETTES, surfaceColour } from "./materials.js";
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from "../app/config.js";
 import { Rng } from "../core/rng.js";
@@ -1529,6 +1529,22 @@ export class WorldScene {
     return [-dx / length, 1 / length, -dz / length];
   }
 
+  /** Returns the same ground-material blend the visible terrain uses at this point. */
+  groundSurfaceAt(x: number, z: number): GroundSurfaceSample {
+    const surface = emptySurface();
+    this.sampleSurface(x, z, this.sampleLattice(x, z), surface, false);
+    return {
+      grass: surface.grass,
+      dry: surface.dry,
+      rock: surface.rock,
+      gravel: surface.gravel,
+      dirt: surface.dirt,
+      mud: surface.mud,
+      cobble: surface.cobble,
+      wet: surface.wet,
+    };
+  }
+
   // -------------------------------------------------------- ground stamps
 
   /**
@@ -1645,7 +1661,13 @@ export class WorldScene {
    * undrawable. Every weight below comes from data the chunk builder already had (slope, altitude,
    * the second derivative of the same central differences) or from a stamp.
    */
-  private sampleSurface(x: number, z: number, height: number, out: SurfaceSample): void {
+  private sampleSurface(
+    x: number,
+    z: number,
+    height: number,
+    out: SurfaceSample,
+    shadeColour = true,
+  ): void {
     const blend = this.world?.blendMetres ?? 45;
     let weightSum = 0;
     let local = 0;
@@ -1796,8 +1818,10 @@ export class WorldScene {
         + dirtB * out.dirt + mudB * out.mud + cobbleB * out.cobble + wetB * out.wet) * inverse,
     );
 
-    const ao = this.horizonAo(x, z, height);
-    out.colour.multiplyScalar(ao);
+    if (shadeColour) {
+      const ao = this.horizonAo(x, z, height);
+      out.colour.multiplyScalar(ao);
+    }
   }
 
   /**

@@ -1,28 +1,27 @@
 /**
  * Player-facing settings, and the only place they are stored.
  *
- * Deliberately small and deliberately real: every setting here changes something the player can see
- * on the next frame, and the root subscribes to apply it. A setting that does nothing is worse than
- * no settings screen, because it teaches the player that the screen is decoration.
- *
- * Audio is not here. There is no audio system yet, and a volume slider over silence is exactly the
- * kind of setting this rule exists to keep out.
+ * Deliberately small and deliberately real: every setting here changes the client immediately,
+ * and the root subscribes to apply it. A setting that does nothing is worse than no settings
+ * screen, because it teaches the player that the screen is decoration.
  *
  * Persisted separately from the save. These are preferences about the client, not about the
  * character, so "New Game" must not reset them and a save transferred between browsers must not
  * carry them.
  *
- * `boot.ts` subscribes once and wires each value. Render scale changes the WebGL drawing buffer,
+ * The root subscribes once and wires each value. Render scale changes the WebGL drawing buffer,
  * shadow quality changes both the shadow-map size and whether the sun casts one, inversion lands
  * on the camera, damage numbers are never created rather than created-and-hidden, and compact
- * density puts `.is-compact` on `#ui-root`.
+ * density puts `.is-compact` on `#ui-root`. The same update carries the three audio bus gains.
  */
+
+import type { AudioVolumes } from "../contracts.js";
 
 export type RenderScale = 0.7 | 0.85 | 1;
 export type ShadowQuality = "off" | "low" | "high";
 export type DrawDistance = "near" | "medium" | "far";
 
-export interface UiSettings {
+export interface UiSettings extends AudioVolumes {
   /** Fraction of the native drawing-buffer resolution. */
   renderScale: RenderScale;
   /** Off, a 1024 px map, or a 2048 px map. */
@@ -38,6 +37,9 @@ export interface UiSettings {
 }
 
 export const DEFAULT_SETTINGS: UiSettings = {
+  music: 0.6,
+  ambient: 0.7,
+  sfx: 0.8,
   renderScale: 1,
   shadowQuality: "high",
   drawDistance: "far",
@@ -70,7 +72,12 @@ export class SettingsStore {
 
   /** Applies a partial change, persists it, and notifies. */
   set(patch: Partial<UiSettings>): UiSettings {
-    this.settings = { ...this.settings, ...patch };
+    const normalised = normaliseAudioPatch(patch);
+    const changed = (Object.keys(normalised) as (keyof UiSettings)[])
+      .some((key) => !Object.is(this.settings[key], normalised[key]));
+    if (!changed) return this.get();
+
+    this.settings = { ...this.settings, ...normalised };
     writeStored(this.settings);
     for (const listener of this.listeners) listener(this.get());
     return this.get();
@@ -110,6 +117,9 @@ function readStored(): Partial<UiSettings> {
 
   const source = parsed as Record<string, unknown>;
   const out: Partial<UiSettings> = {};
+  if (isVolume(source["music"])) out.music = source["music"];
+  if (isVolume(source["ambient"])) out.ambient = source["ambient"];
+  if (isVolume(source["sfx"])) out.sfx = source["sfx"];
   if (source["renderScale"] === 0.7 || source["renderScale"] === 0.85 || source["renderScale"] === 1) {
     out.renderScale = source["renderScale"];
   }
@@ -126,6 +136,24 @@ function readStored(): Partial<UiSettings> {
   if (typeof source["invertCameraY"] === "boolean") out.invertCameraY = source["invertCameraY"];
   if (source["uiScale"] === "compact" || source["uiScale"] === "normal") out.uiScale = source["uiScale"];
   return out;
+}
+
+/** Keeps programmatic callers on the same inclusive range as the sliders and audio contract. */
+function normaliseAudioPatch(patch: Partial<UiSettings>): Partial<UiSettings> {
+  const normalised = { ...patch };
+  if (typeof normalised.music === "number") normalised.music = clampVolume(normalised.music);
+  if (typeof normalised.ambient === "number") normalised.ambient = clampVolume(normalised.ambient);
+  if (typeof normalised.sfx === "number") normalised.sfx = clampVolume(normalised.sfx);
+  return normalised;
+}
+
+function isVolume(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+function clampVolume(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }
 
 function writeStored(settings: UiSettings): void {

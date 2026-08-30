@@ -30,11 +30,11 @@ import type { SaveService } from "../persistence/storage.js";
 import type { InputController } from "../input/mouse.js";
 import type { EntityViews } from "../render/entityViews.js";
 import type { Overlays } from "../render/overlays.js";
-import type { CharacterRig, CharacterPose } from "../render/characterRig.js";
+import type { CharacterMotionEvent, CharacterRig, CharacterPose } from "../render/characterRig.js";
 import type { Vfx } from "../render/vfx.js";
 import type { Ui } from "../ui/panels.js";
 import type { EntityId, SemanticEntity, Vec3 } from "../contracts.js";
-import { SIM_TICK_MS } from "../core/time.js";
+import { GATHER_TICK_MS, SIM_TICK_MS } from "../core/time.js";
 import { AUTOSAVE_INTERVAL_MS, MOVEMENT } from "./config.js";
 
 /** A system that wants a slice of each sim tick. Registered by later build rounds. */
@@ -114,6 +114,10 @@ export class GameLoop {
   private playerRig: CharacterRig | null = null;
   private vfx: Vfx | null = null;
   private drainHits: (() => readonly CombatHit[]) | null = null;
+  private playerMotionHandler: ((event: CharacterMotionEvent) => void) | null = null;
+  private combatPresentationHandler: ((hit: CombatHit, phase: "swing" | "impact" | "combined") => void) | null = null;
+  private readonly pendingPlayerHits: { hit: CombatHit; swingPresented: boolean }[] = [];
+  private gatheringRigKey: string | null = null;
   private ui: Ui | null = null;
   private interiors: { group: { visible: boolean }; visible: () => boolean }[] = [];
 
@@ -226,6 +230,18 @@ export class GameLoop {
     this.drainHits = drain;
   }
 
+  /** Sound and other presentation systems consume the rig's measured contact frames here. */
+  setPlayerMotionHandler(handler: (event: CharacterMotionEvent) => void): void {
+    this.playerMotionHandler = handler;
+  }
+
+  /** Splits a resolved player attack into its visible swing and contact frames. */
+  setCombatPresentationHandler(
+    handler: (hit: CombatHit, phase: "swing" | "impact" | "combined") => void,
+  ): void {
+    this.combatPresentationHandler = handler;
+  }
+
   /** The human UI. `update()` is internally throttled, so calling it every frame is correct. */
   setUi(ui: Ui): void {
     this.ui = ui;
@@ -259,6 +275,15 @@ export class GameLoop {
     this.running = false;
     if (this.frameHandle) cancelAnimationFrame(this.frameHandle);
     this.frameHandle = 0;
+  }
+
+  /** Clears render-only work when debug or save loading replaces the canonical world. */
+  resetPresentation(): void {
+    this.pendingRigPose = null;
+    this.pendingPlayerHits.length = 0;
+    this.gatheringRigKey = null;
+    this.playerRig?.drainMotionEvents();
+    this.playerRig?.play("idle", true);
   }
 
   private frame = (nowMs: number): void => {
@@ -388,7 +413,7 @@ export class GameLoop {
     this.vfx?.update(nowMs);
     this.ui?.update();
     this.syncPlayerEquipment();
-    this.syncPlayerRig(position, facingRad, realDeltaMs);
+    this.syncPlayerRig(position, facingRad, realDeltaMs, nowMs);
     scene.syncPlayer(position, facingRad);
     camera.update(position[0], position[1], position[2]);
     renderer.followShadow(renderer.camera.position.clone().setY(position[1]));
@@ -404,7 +429,7 @@ export class GameLoop {
    * render frame — speed, differenced between drawn positions — is exactly what froze the run
    * animation; see `PlayerMovementView`.
    */
-  private syncPlayerRig(position: Vec3, facingRad: number, realDeltaMs: number): void {
+  private syncPlayerRig(position: Vec3, facingRad: number, realDeltaMs: number, nowMs: number): void {
     const rig = this.playerRig;
     if (!rig) return;
 
@@ -433,7 +458,31 @@ export class GameLoop {
       }));
     }
     rig.setLocomotionSpeed(speed);
+
+    if (activity?.kind === "gathering" && (activity.skill === "mining" || activity.skill === "woodcutting")) {
+      const key = `${activity.entityId}:${activity.startedAtMs}:${activity.skill}`;
+      // Systems evaluate at the start of a sim tick, then the clock commits 100 ms. Rewinding one
+      // tick and adding the render interpolation fraction gives the same instant the current state
+      // represents, so the contact pose does not lead its semantic roll by a whole fixed step.
+      const presentationAtMs = Math.max(
+        0,
+        this.deps.clock.elapsedMs - SIM_TICK_MS + this.renderAlpha * SIM_TICK_MS,
+      );
+      rig.syncGatheringCycle(
+        activity.nextRollAtMs - presentationAtMs,
+        GATHER_TICK_MS,
+        key !== this.gatheringRigKey,
+      );
+      this.gatheringRigKey = key;
+    } else {
+      this.gatheringRigKey = null;
+    }
+
     rig.update(realDeltaMs / 1000);
+    for (const event of rig.drainMotionEvents()) {
+      this.playerMotionHandler?.(event);
+      this.presentPlayerCombatEvent(event, nowMs);
+    }
   }
 
   /**
@@ -483,22 +532,57 @@ export class GameLoop {
     for (const swing of this.drainHits()) {
       const incoming = swing.attacker === "enemy";
       const kind = incoming ? "incoming" : swing.kind === "magic" ? "magic" : "melee";
-      const over = incoming ? playerId : swing.targetId;
-      this.vfx?.damage(over === playerId ? null : over, swing.damage, kind, nowMs);
-
       if (incoming) {
+        this.vfx?.damage(null, swing.damage, kind, nowMs);
+        this.combatPresentationHandler?.(swing, "combined");
         if (swing.hit && swing.targetId === playerId) swingPose = "hit";
         // The enemy that threw it swings; the player takes it. Without this the boss fight is a
         // frozen statue exchanging damage numbers with a moving player.
         this.entityViews?.playAction(swing.sourceId, "attack");
       } else {
+        // Damage is already canonical. Its sound and number wait for the attack clip's measured
+        // contact frame, so the player's sword or spell is what appears to cause it.
+        if (this.pendingPlayerHits.length > 0) this.flushPendingPlayerHits(nowMs);
+        this.pendingPlayerHits.push({ hit: swing, swingPresented: false });
         if (swingPose !== "hit") swingPose = swing.kind === "magic" ? "cast" : "attack_melee";
-        if (swing.hit && swing.targetId !== playerId) {
-          this.entityViews?.playAction(swing.targetId, "hit");
-        }
       }
     }
+    // A flinch outranks the attack pose. If both land in one render frame there will be no player
+    // contact marker to consume the queued hit, so present it now instead of losing the feedback.
+    if (swingPose === "hit" && this.pendingPlayerHits.length > 0) this.flushPendingPlayerHits(nowMs);
+    if (!this.playerRig && this.pendingPlayerHits.length > 0) this.flushPendingPlayerHits(nowMs);
     if (swingPose) this.pendingRigPose = swingPose;
+  }
+
+  private presentPlayerCombatEvent(event: CharacterMotionEvent, nowMs: number): void {
+    if (event.kind === "footstep" || (event.pose !== "attack_melee" && event.pose !== "cast")) return;
+    const expectedKind = event.pose === "cast" ? "magic" : "melee";
+    const pending = this.pendingPlayerHits.find((entry) => entry.hit.kind === expectedKind);
+    if (!pending) return;
+
+    if (event.kind === "swing") {
+      if (pending.swingPresented) return;
+      pending.swingPresented = true;
+      this.combatPresentationHandler?.(pending.hit, "swing");
+      return;
+    }
+
+    if (!pending.swingPresented) this.combatPresentationHandler?.(pending.hit, "swing");
+    this.combatPresentationHandler?.(pending.hit, "impact");
+    const kind = pending.hit.kind === "magic" ? "magic" : "melee";
+    this.vfx?.damage(pending.hit.targetId, pending.hit.damage, kind, nowMs);
+    if (pending.hit.hit) this.entityViews?.playAction(pending.hit.targetId, "hit");
+    const index = this.pendingPlayerHits.indexOf(pending);
+    if (index >= 0) this.pendingPlayerHits.splice(index, 1);
+  }
+
+  private flushPendingPlayerHits(nowMs: number): void {
+    for (const pending of this.pendingPlayerHits.splice(0, this.pendingPlayerHits.length)) {
+      this.combatPresentationHandler?.(pending.hit, "combined");
+      const kind = pending.hit.kind === "magic" ? "magic" : "melee";
+      this.vfx?.damage(pending.hit.targetId, pending.hit.damage, kind, nowMs);
+      if (pending.hit.hit) this.entityViews?.playAction(pending.hit.targetId, "hit");
+    }
   }
 
   /** Diffs semantic entities into the render layer a few times a second, not every frame. */

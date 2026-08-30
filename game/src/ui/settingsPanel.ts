@@ -1,9 +1,8 @@
 /**
  * The settings screen, over `SettingsStore`.
  *
- * Every control here has to change something visible. See the note in `ui/settings.ts`. Each row
- * therefore says what it does to the picture rather than naming the flag again: "the sun stops
- * casting" is checkable by looking out of the window, "Shadows: off" is not.
+ * Every control here changes the client as it moves. Graphics rows describe what changes in the
+ * picture, and audio rows name what each bus contains.
  *
  * The DOM is built once and only its states are synced afterwards. `refresh()` is called on the
  * panel cadence — every 220 ms while the panel is open — and rebuilding the rows on that beat
@@ -12,6 +11,7 @@
  * The panel also subscribes to the store, so a setting changed anywhere else (the debug surface,
  * a second panel, "reset") shows up here without the panel being reopened.
  */
+import type { AudioBus } from "../contracts.js";
 import type { DrawDistance, RenderScale, SettingsStore, ShadowQuality, UiSettings } from "./settings.js";
 import type { ManagedPanel, UiContext } from "./panels.js";
 import { PanelFrame } from "./panels.js";
@@ -68,6 +68,28 @@ const DENSITY: readonly { value: UiSettings["uiScale"]; label: string }[] = [
   { value: "compact", label: "Compact" },
 ];
 
+const AUDIO_CONTROLS: readonly {
+  key: AudioBus;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    key: "music",
+    label: "Music",
+    hint: "Region themes, where the current region has one.",
+  },
+  {
+    key: "ambient",
+    label: "Ambient",
+    hint: "Wind, wildlife, town life, and the Gravelmaw interior.",
+  },
+  {
+    key: "sfx",
+    label: "SFX",
+    hint: "Movement, combat, gathering, crafting, and interface feedback.",
+  },
+];
+
 export class SettingsPanel implements ManagedPanel {
   readonly frame: PanelFrame;
   private readonly body: HTMLElement;
@@ -77,16 +99,21 @@ export class SettingsPanel implements ManagedPanel {
   private readonly shadowQualityButtons = new Map<ShadowQuality, HTMLButtonElement>();
   private readonly drawDistanceButtons = new Map<DrawDistance, HTMLButtonElement>();
   private readonly densityButtons = new Map<UiSettings["uiScale"], HTMLButtonElement>();
+  private readonly audioInputs = new Map<AudioBus, HTMLInputElement>();
+  private readonly audioOutputs = new Map<AudioBus, HTMLOutputElement>();
   private readonly unsubscribe: () => void;
 
-  constructor(ctx: UiContext, private readonly settings: SettingsStore) {
+  constructor(ctx: UiContext, private readonly settings: SettingsStore, onClose?: () => void) {
     this.frame = new PanelFrame({
       id: "settings",
-      title: "Graphics settings",
+      title: "Settings",
       registry: ctx.registry,
       placement: { top: "64px", left: "50%", width: "480px" },
       onOpen: () => this.refresh(true),
+      onClose,
     });
+    this.frame.root.setAttribute("aria-modal", "true");
+    this.frame.root.addEventListener("keydown", this.onKeyDown);
     this.frame.setSubtitle("Changes apply instantly");
 
     this.body = document.createElement("div");
@@ -105,13 +132,43 @@ export class SettingsPanel implements ManagedPanel {
 
   dispose(): void {
     this.unsubscribe();
+    this.frame.root.removeEventListener("keydown", this.onKeyDown);
     this.frame.dispose();
   }
+
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    // Escape reaches the shared escape stack. Every other key remains inside this modal so slider
+    // arrows cannot also move the character behind it.
+    if (event.key === "Escape") return;
+    if (event.key !== "Tab") {
+      event.stopPropagation();
+      return;
+    }
+
+    event.stopPropagation();
+    const stops = [...this.frame.root.querySelectorAll<HTMLElement>(
+      "button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex='0']",
+    )];
+    const first = stops[0];
+    const last = stops[stops.length - 1];
+    if (!first || !last) return;
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === this.frame.root)) {
+      event.preventDefault();
+      last.focus({ preventScroll: true });
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
+  };
 
   // --------------------------------------------------------------- building
 
   private build(): void {
     this.body.replaceChildren();
+
+    const audio = this.group("Audio");
+    for (const spec of AUDIO_CONTROLS) audio.appendChild(this.volumeRow(spec));
 
     const graphics = this.group("Graphics");
     graphics.append(
@@ -243,6 +300,54 @@ export class SettingsPanel implements ManagedPanel {
     );
   }
 
+  private volumeRow(spec: (typeof AUDIO_CONTROLS)[number]): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "settings__row";
+
+    const text = document.createElement("div");
+    text.className = "settings__text";
+
+    const inputId = `setting-volume-${spec.key}`;
+    const hintId = `${inputId}-hint`;
+
+    const label = document.createElement("label");
+    label.className = "settings__label";
+    label.htmlFor = inputId;
+    label.textContent = spec.label;
+
+    const hint = document.createElement("span");
+    hint.id = hintId;
+    hint.className = "settings__hint";
+    hint.textContent = spec.hint;
+    text.append(label, hint);
+
+    const control = document.createElement("div");
+    control.className = "volume";
+
+    const input = document.createElement("input");
+    input.id = inputId;
+    input.className = "volume__range";
+    input.type = "range";
+    input.min = "0";
+    input.max = "100";
+    input.step = "1";
+    input.setAttribute("aria-describedby", hintId);
+    input.addEventListener("input", () => {
+      const percent = Number(input.value);
+      this.settings.set({ [spec.key]: percent / 100 });
+    });
+
+    const output = document.createElement("output");
+    output.className = "volume__value u-numeric";
+    output.setAttribute("for", inputId);
+
+    control.append(input, output);
+    row.append(text, control);
+    this.audioInputs.set(spec.key, input);
+    this.audioOutputs.set(spec.key, output);
+    return row;
+  }
+
   private choiceRow<T extends string | number>(
     labelText: string,
     hintText: string,
@@ -272,6 +377,7 @@ export class SettingsPanel implements ManagedPanel {
     group.setAttribute("role", "radiogroup");
     group.setAttribute("aria-label", ariaLabel);
 
+    const choiceButtons: HTMLButtonElement[] = [];
     for (const option of options) {
       const button = document.createElement("button");
       button.type = "button";
@@ -281,8 +387,28 @@ export class SettingsPanel implements ManagedPanel {
       button.setAttribute("aria-label", `${ariaLabel}: ${option.accessibleLabel ?? option.label}`);
       button.addEventListener("click", () => { onChoose(option.value); });
       buttons.set(option.value, button);
+      choiceButtons.push(button);
       group.appendChild(button);
     }
+
+    group.addEventListener("keydown", (event) => {
+      const current = choiceButtons.indexOf(event.target as HTMLButtonElement);
+      if (current < 0) return;
+      let next = current;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (current + 1) % options.length;
+      else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (current - 1 + options.length) % options.length;
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = options.length - 1;
+      else return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const option = options[next];
+      const button = choiceButtons[next];
+      if (!option || !button) return;
+      onChoose(option.value);
+      button.focus({ preventScroll: true });
+    });
 
     row.append(text, group);
     return row;
@@ -292,6 +418,16 @@ export class SettingsPanel implements ManagedPanel {
 
   private sync(): void {
     const current = this.settings.get();
+
+    for (const spec of AUDIO_CONTROLS) {
+      const percent = Math.round(current[spec.key] * 100);
+      const input = this.audioInputs.get(spec.key);
+      if (input && input.value !== String(percent)) input.value = String(percent);
+      if (input) input.setAttribute("aria-valuetext", `${percent} percent`);
+      const output = this.audioOutputs.get(spec.key);
+      const value = `${percent}%`;
+      if (output && output.textContent !== value) output.textContent = value;
+    }
 
     for (const spec of TOGGLES) {
       const on = current[spec.key];
@@ -309,24 +445,28 @@ export class SettingsPanel implements ManagedPanel {
       const on = current.renderScale === value;
       button.classList.toggle("is-active", on);
       button.setAttribute("aria-checked", on ? "true" : "false");
+      button.tabIndex = on ? 0 : -1;
     }
 
     for (const [value, button] of this.shadowQualityButtons) {
       const on = current.shadowQuality === value;
       button.classList.toggle("is-active", on);
       button.setAttribute("aria-checked", on ? "true" : "false");
+      button.tabIndex = on ? 0 : -1;
     }
 
     for (const [value, button] of this.drawDistanceButtons) {
       const on = current.drawDistance === value;
       button.classList.toggle("is-active", on);
       button.setAttribute("aria-checked", on ? "true" : "false");
+      button.tabIndex = on ? 0 : -1;
     }
 
     for (const [value, button] of this.densityButtons) {
       const on = current.uiScale === value;
       button.classList.toggle("is-active", on);
       button.setAttribute("aria-checked", on ? "true" : "false");
+      button.tabIndex = on ? 0 : -1;
     }
   }
 }
