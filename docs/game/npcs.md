@@ -25,7 +25,7 @@ Runs the Bracken Pit, and the ledger that says what the Bracken Pit contains.
 
 ### Quests
 
-- [Dorn's Tally](./quests/#dorns-tally)
+- [Dorn's Tally](../quests/dorns_tally/)
 
 ## Harrow the Smith
 
@@ -37,7 +37,7 @@ Coldbrace's smith. Sells metal, teaches the material loop, says very little.
 
 ### Quests
 
-- [Cold Iron](./quests/#cold-iron)
+- [Cold Iron](../quests/cold_iron/)
 
 ## Ranger Syb
 
@@ -49,7 +49,7 @@ Walks the march. Knows where the water is and has not had a hot meal in some tim
 
 ### Quests
 
-- [Bright Water](./quests/#bright-water)
+- [Bright Water](../quests/bright_water/)
 
 ## Carter Bel
 
@@ -61,7 +61,7 @@ Hauls ore from the pit to the vault. Currently losing an argument to Warden Ilse
 
 ### Quests
 
-- [The Carter's Wager](./quests/#the-carters-wager)
+- [The Carter's Wager](../quests/the_carters_wager/)
 
 ## Woodward Ansel
 
@@ -73,7 +73,7 @@ Keeps the Duskoak stand. Decides which trees may be felled and which may not.
 
 ### Quests
 
-- [Crooked Grain](./quests/#crooked-grain)
+- [Crooked Grain](../quests/crooked_grain/)
 
 ## Seamer Juno
 
@@ -85,7 +85,7 @@ Rootfall's crafter. Shafts, hide, cord, and anything that has to hold under load
 
 ### Quests
 
-- [Knots and Names](./quests/#knots-and-names)
+- [Knots and Names](../quests/knots_and_names/)
 
 ## Trapper Mott
 
@@ -97,7 +97,7 @@ Sets eleven traps in the deep wood. Has caught nothing in eleven days.
 
 ### Quests
 
-- [Eleven Empty Days](./quests/#eleven-empty-days)
+- [Eleven Empty Days](../quests/eleven_empty_days/)
 
 ## Foreman Arden
 
@@ -109,7 +109,7 @@ Foreman of the Highcairn quarry crew. Stopped the dig six months ago and kept th
 
 ### Quests
 
-- [Bad Ground](./quests/#bad-ground)
+- [Bad Ground](../quests/bad_ground/)
 
 ## Quarrier Vess
 
@@ -121,7 +121,7 @@ Works the Kaldite faces. Does not like what the blue-black stone does in the dar
 
 ### Quests
 
-- [The Sparking Stone](./quests/#sparking-stone)
+- [The Sparking Stone](../quests/sparking_stone/)
 
 ## Cairnkeeper Ode
 
@@ -133,7 +133,7 @@ Keeps the cairns on the moor. Nobody appointed her; nobody has argued.
 
 ### Quests
 
-- [The Long Cairn](./quests/#long-cairn)
+- [The Long Cairn](../quests/long_cairn/)
 
 ## Watcher Hale
 

@@ -12,7 +12,15 @@ import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 import { argValue, repoRoot } from "./lib/paths.js";
 
-import { content, gatherXp, respawnSeconds, sellPrice, toolBonus, yieldRange } from "../game/src/content/index.js";
+import {
+  content,
+  gatherXp,
+  respawnSeconds,
+  sellPrice,
+  toolBonus,
+  yieldRange,
+  type EnemyDef,
+} from "../game/src/content/index.js";
 import { ALL_ITEMS } from "../game/src/content/items.js";
 import { RESOURCES, RESOURCE_ARCHETYPES } from "../game/src/content/resources.js";
 import { RECIPES } from "../game/src/content/recipes.js";
@@ -76,7 +84,7 @@ function itemIcon(id: string, label = itemName(id)): string {
 
 type CaptureKind = "npc" | "enemy" | "enemyGroup" | "entity" | "location";
 
-function captureAsset(kind: CaptureKind, id: string): string {
+function captureAsset(kind: CaptureKind, id: string, base = "./"): string {
   const folder = {
     npc: "npcs",
     enemy: "enemies",
@@ -84,19 +92,19 @@ function captureAsset(kind: CaptureKind, id: string): string {
     entity: "entities",
     location: "locations",
   }[kind];
-  return `./assets/captures/${folder}/${id}.webp`;
+  return `${base}assets/captures/${folder}/${id}.webp`;
 }
 
 function publicCaptureAsset(kind: CaptureKind, id: string): string {
   return captureAsset(kind, id).replace("./assets/", "/game/assets/");
 }
 
-function capture(kind: CaptureKind, id: string, label: string): string {
-  return `![${label}](${captureAsset(kind, id)})`;
+function capture(kind: CaptureKind, id: string, label: string, base = "./"): string {
+  return `![${label}](${captureAsset(kind, id, base)})`;
 }
 
-function itemLink(id: string, label = itemName(id)): string {
-  return `[${label}](./items/#${headingSlug(label)})`;
+function itemLink(id: string, label = itemName(id), base = "./"): string {
+  return `[${label}](${base}items/#${headingSlug(label)})`;
 }
 
 function humanizeId(id: string): string {
@@ -152,6 +160,13 @@ interface AuthoredEntityPoint {
 interface ResolvedEnemyGroup {
   group: EnemyGroupDef;
   regionId: RegionId;
+}
+
+interface CreatureSpawn {
+  group: EnemyGroupDef;
+  regionId: RegionId;
+  regionLabel: string;
+  place: PlaceRecord;
 }
 
 function allPlaces(): PlaceRecord[] {
@@ -331,6 +346,47 @@ function distanceBetween(a: readonly [number, number], b: readonly [number, numb
   return Math.hypot(a[0] - b[0], a[1] - b[1]);
 }
 
+function nearestPlace(regionId: RegionId, position: readonly [number, number]): PlaceRecord {
+  const places = allPlaces().filter((place) => place.regionId === regionId);
+  const nearest = [...places].sort((a, b) =>
+    distanceBetween(a.location.position, position) - distanceBetween(b.location.position, position))[0];
+  if (!nearest) throw new Error(`No authored place exists in ${regionId}.`);
+  return nearest;
+}
+
+function creatureForGroup(group: EnemyGroupDef): EnemyDef {
+  const creature = ENEMY_BLOCKS.find((candidate) =>
+    candidate.family === group.family && candidate.tier === group.tier);
+  if (!creature) throw new Error(`No creature stat block resolves for enemy group ${group.id}.`);
+  return creature;
+}
+
+function creatureSpawns(creature: EnemyDef): CreatureSpawn[] {
+  const spawns: CreatureSpawn[] = [];
+  for (const region of REGIONS) {
+    for (const group of region.enemyGroups) {
+      if (group.family !== creature.family || group.tier !== creature.tier) continue;
+      spawns.push({
+        group,
+        regionId: region.id,
+        regionLabel: region.name,
+        place: nearestPlace(region.id, group.centre),
+      });
+    }
+    for (const group of region.dungeon?.enemyGroups ?? []) {
+      if (group.family !== creature.family || group.tier !== creature.tier || !region.dungeon) continue;
+      spawns.push({
+        group,
+        regionId: region.dungeon.id,
+        regionLabel: region.dungeon.name,
+        place: nearestPlace(region.dungeon.id, group.centre),
+      });
+    }
+  }
+  if (spawns.length === 0) throw new Error(`No authored spawn group resolves for creature ${creature.id}.`);
+  return spawns;
+}
+
 function questStepMap(quest: QuestDef, stage: QuestStageDef): string {
   const places = stagePlaces(stage);
   const subjectPoints: MapPoint[] = [];
@@ -346,20 +402,21 @@ function questStepMap(quest: QuestDef, stage: QuestStageDef): string {
         kind: person ? "npc" : "entity",
         position: point.position,
         href: person
-          ? `./npcs/#${headingSlug(person.name)}`
-          : `./locations/#${headingSlug(places[0]!.location.name)}`,
+          ? `../../npcs/#${headingSlug(person.name)}`
+          : `../../regions/#${headingSlug(places[0]!.location.name)}`,
       });
     }
     if (ref.kind === "enemyFamily") {
       const resolved = enemyGroupForStage(quest, stage, ref.id);
       if (!resolved || resolved.regionId === "gravelmaw") continue;
+      const creature = creatureForGroup(resolved.group);
       subjectPoints.push({
         id: resolved.group.id,
         label: resolved.group.name,
         context: regionName(resolved.regionId),
         kind: "enemy",
         position: resolved.group.centre,
-        href: `./bestiary/#${headingSlug(resolved.group.name)}`,
+        href: `../../creatures/${creature.id}/`,
       });
     }
   }
@@ -372,7 +429,7 @@ function questStepMap(quest: QuestDef, stage: QuestStageDef): string {
       context: place.regionLabel,
       kind: place.location.kind,
       position: place.location.position,
-      href: `./locations/#${headingSlug(place.location.name)}`,
+      href: `../../regions/#${headingSlug(place.location.name)}`,
     }));
   const distantLocations = locationPoints.filter((location) =>
     !subjectPoints.some((subject) => distanceBetween(subject.position, location.position) < 24));
@@ -388,7 +445,7 @@ function questStepMap(quest: QuestDef, stage: QuestStageDef): string {
       context: `Entrance to ${dungeonPlaces.map((place) => place.location.name).join(", ")}`,
       kind: "dungeon",
       position: entrance.location.position,
-      href: `./locations/#${headingSlug(dungeonPlaces.at(-1)!.location.name)}`,
+      href: `../../regions/#${headingSlug(dungeonPlaces.at(-1)!.location.name)}`,
     });
   }
 
@@ -449,10 +506,10 @@ function questStepScenes(quest: QuestDef, stage: QuestStageDef): QuestScene[] {
 function questStepEvidence(quest: QuestDef, stage: QuestStageDef): string {
   const places = stagePlaces(stage);
   const whereLinks = places.map((place) =>
-    `<a href="./locations/#${headingSlug(place.location.name)}">${escapeHtml(place.location.name)}</a>`).join("");
+    `<a href="../../regions/#${headingSlug(place.location.name)}">${escapeHtml(place.location.name)}</a>`).join("");
   const itemLinks = (stage.refs ?? [])
     .filter((ref) => ref.kind === "item")
-    .map((ref) => `<a href="./items/#${headingSlug(itemName(ref.id))}">${escapeHtml(itemName(ref.id))}</a>`)
+    .map((ref) => `<a href="../../items/#${headingSlug(itemName(ref.id))}">${escapeHtml(itemName(ref.id))}</a>`)
     .join("");
   const where = `<nav class="corealm-quest-where" aria-label="Locations for step ${stage.index + 1}"><span>Where</span>${whereLinks}</nav>`;
   const items = itemLinks
@@ -564,37 +621,101 @@ function recipesDoc(): string {
   return page("Recipes", "Production recipes generated from the live game tables.", sections.join("\n\n"));
 }
 
-function enemiesDoc(): string {
-  const sections = [...ENEMY_BLOCKS]
+function creatureSpawnMap(creature: EnemyDef, spawns: readonly CreatureSpawn[]): string {
+  const entrance = placeById("gravelmaw_entrance");
+  const points = spawns.map((spawn): MapPoint => {
+    const insideDungeon = spawn.regionId === "gravelmaw";
+    if (insideDungeon && !entrance) throw new Error("The Gravelmaw entrance is missing from the authored locations.");
+    return {
+      id: spawn.group.id,
+      label: spawn.group.name,
+      context: insideDungeon
+        ? `${spawn.regionLabel}, ${spawn.place.location.name}`
+        : `${spawn.place.location.name}, ${spawn.regionLabel}`,
+      kind: insideDungeon ? "dungeon" : "enemy",
+      position: insideDungeon ? entrance!.location.position : spawn.group.centre,
+      href: `../../regions/#${headingSlug(spawn.place.location.name)}`,
+    };
+  });
+  const hasDungeonSpawn = spawns.some((spawn) => spawn.regionId === "gravelmaw");
+  return worldMapFigure(points, {
+    className: "corealm-creature-map",
+    ariaLabel: `Spawn map for ${creature.name}`,
+    caption: hasDungeonSpawn
+      ? "Outdoor markers use the exact spawn centre. Gravelmaw markers use the dungeon entrance; the room is listed beside each capture."
+      : "Markers use each authored spawn group's exact centre.",
+  });
+}
+
+function creatureIndexDoc(): string {
+  const rows = [...ENEMY_BLOCKS]
     .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name))
-    .map((enemy) => {
-      const dropRows = enemy.drops.map((drop) => [
-        itemLink(drop.itemId),
-        drop.quantity[0] === drop.quantity[1] ? drop.quantity[0] : `${drop.quantity[0]}-${drop.quantity[1]}`,
-        `${Math.round(drop.chance * 1000) / 10}%`,
-      ]);
-      if (enemy.marks) {
-        dropRows.unshift(["Marks", enemy.marks[0] === enemy.marks[1] ? enemy.marks[0] : `${enemy.marks[0]}-${enemy.marks[1]}`, "Always"]);
-      }
-      return [
-        `## ${enemy.name}`,
-        "",
-        capture("enemy", enemy.id, enemy.name),
-        "",
-        table(["Tier", "Health", "Max hit", "Attack speed", "Armour", "Magic armour", "Behaviour", "Aggro"], [[
-          enemy.tier, enemy.maxHealth, enemy.maxHit, `${(enemy.attackSpeedMs / 1000).toFixed(1)} s`,
-          enemy.armour, enemy.magicArmour, enemy.behaviour, `${enemy.aggroRadius} m`,
-        ]]),
-        "",
-        "### Drops",
-        "",
-        table(["Drop", "Quantity", "Chance"], dropRows),
-      ].join("\n");
+    .map((creature) => {
+      const spawns = creatureSpawns(creature);
+      const regions = [...new Map(spawns.map((spawn) => [spawn.regionId, spawn.regionLabel])).values()].join(", ");
+      return [`[${creature.name}](./${creature.id}/)`, creature.tier, regions];
     });
-  return page("Bestiary", "Creature portraits, combat stats, and drop tables from Corealm.", [
-    "Armour resists melee. Magic armour resists spells.",
+  return page("Creatures", "Every creature in Corealm, with a separate spawn, stats, and drops page.", table(
+    ["Creature", "Tier", "Regions"],
+    rows,
+  ));
+}
+
+function creatureDoc(creature: EnemyDef): string {
+  const spawns = creatureSpawns(creature);
+  const spawnRows = spawns.map((spawn) => [
+    `[${spawn.regionLabel}](../../regions/#${headingSlug(spawn.place.location.name)})`,
+    `[${spawn.place.location.name}](../../regions/#${headingSlug(spawn.place.location.name)})`,
+    spawn.group.name,
+    spawn.group.count,
+  ]);
+  const scenes = spawns.map((spawn) => [
+    `<figure class="corealm-quest-scene">`,
+    `<img src="${publicCaptureAsset("enemyGroup", spawn.group.id)}" alt="${escapeHtml(`${spawn.group.name} at its authored spawn in ${spawn.regionLabel}`)}" loading="lazy" />`,
+    `<figcaption><strong>${escapeHtml(spawn.group.name)}</strong><span>${escapeHtml(`${spawn.place.location.name}, ${spawn.regionLabel}`)}</span></figcaption>`,
+    `</figure>`,
+  ].join("")).join("\n");
+  const dropRows: (string | number)[][] = creature.drops.map((drop) => [
+    itemLink(drop.itemId, itemName(drop.itemId), "../../"),
+    drop.quantity[0] === drop.quantity[1] ? drop.quantity[0] : `${drop.quantity[0]}-${drop.quantity[1]}`,
+    `${Math.round(drop.chance * 1000) / 10}%`,
+  ]);
+  if (creature.marks) {
+    dropRows.unshift([
+      "Marks",
+      creature.marks[0] === creature.marks[1] ? creature.marks[0] : `${creature.marks[0]}-${creature.marks[1]}`,
+      "Always",
+    ]);
+  }
+  return page(creature.name, `${creature.name} spawn locations, combat stats, and drops.`, [
+    `<div class="corealm-creature-spawn-evidence">`,
+    `<div class="corealm-quest-scenes">${scenes}</div>`,
+    creatureSpawnMap(creature, spawns),
+    `</div>`,
     "",
-    sections.join("\n\n"),
+    "## Spawn locations",
+    "",
+    table(["Region", "Nearest place", "Spawn group", "Count"], spawnRows),
+    "",
+    "## Stats",
+    "",
+    table(["Tier", "Health", "Attack", "Defence", "Accuracy", "Max hit", "Attack speed", "Armour", "Magic armour", "Behaviour", "Aggro"], [[
+      creature.tier,
+      creature.maxHealth,
+      creature.attackLevel,
+      creature.defenceLevel,
+      creature.accuracy,
+      creature.maxHit,
+      `${(creature.attackSpeedMs / 1000).toFixed(1)} s`,
+      creature.armour,
+      creature.magicArmour,
+      creature.behaviour,
+      `${creature.aggroRadius} m`,
+    ]]),
+    "",
+    "## Drops",
+    "",
+    table(["Drop", "Quantity", "Chance"], dropRows),
   ].join("\n"));
 }
 
@@ -622,40 +743,44 @@ function resourcesDoc(): string {
 
 function regionsDoc(): string {
   const sections = REGIONS.map((region) => {
-    const settlement = region.locations.find((location) => location.kind === "settlement") ?? region.locations[0];
-    const places = region.locations.map((location) => `- [${location.name}](./locations/#${headingSlug(location.name)})`).join("\n");
+    const places = region.locations.map((location) => [
+      `### ${location.name}`,
+      "",
+      capture("location", location.id, location.name),
+      "",
+      location.blurb ?? `${location.name} is a ${location.kind.replace(/_/g, " ")} in ${region.name}.`,
+      "",
+      `**Tier:** ${region.tier} · **Type:** ${location.kind.replace(/_/g, " ")}`,
+    ].join("\n")).join("\n\n");
     const dungeon = region.dungeon
-      ? `\n\n### ${region.dungeon.name}\n\n${region.dungeon.locations.map((location) => `- [${location.name}](./locations/#${headingSlug(location.name)})`).join("\n")}`
+      ? [
+          `## ${region.dungeon.name}`,
+          "",
+          `Tier ${region.dungeon.tier}. Enter through [The Gravelmaw](#the-gravelmaw).`,
+          "",
+          region.dungeon.locations.map((location) => [
+            `### ${location.name}`,
+            "",
+            capture("location", location.id, location.name),
+            "",
+            location.blurb ?? `${location.name} is a ${location.kind.replace(/_/g, " ")} in ${region.dungeon!.name}.`,
+            "",
+            `**Tier:** ${region.dungeon!.tier} · **Type:** ${location.kind.replace(/_/g, " ")}`,
+          ].join("\n")).join("\n\n"),
+        ].join("\n")
       : "";
     return [
       `## ${region.name}`,
-      "",
-      settlement ? capture("location", settlement.id, region.name) : "",
       "",
       region.lore,
       "",
       `Tier ${region.tier}. Settlement: **${region.settlement.name}**.`,
       "",
-      "### Places",
-      "",
       places,
       dungeon,
     ].join("\n");
   });
-  return page("Regions", "Corealm's regions and the places within them.", sections.join("\n\n"));
-}
-
-function locationsDoc(): string {
-  const sections = allPlaces().map(({ location, regionLabel, tier }) => [
-    `## ${location.name}`,
-    "",
-    capture("location", location.id, location.name),
-    "",
-    location.blurb ?? `${location.name} is a ${location.kind.replace(/_/g, " ")} in ${regionLabel}.`,
-    "",
-    `**Region:** ${regionLabel} · **Tier:** ${tier} · **Type:** ${location.kind.replace(/_/g, " ")}`,
-  ].join("\n"));
-  return page("Places", "Named settlements, routes, landmarks, gathering sites, and dungeon rooms.", [
+  return page("Regions", "Corealm's regions, settlements, routes, landmarks, gathering sites, and dungeon rooms.", [
     locationMap(),
     sections.join("\n\n"),
   ].join("\n\n"));
@@ -665,7 +790,7 @@ function npcsDoc(): string {
   const sections = NPCS.map((person) => {
     const place = placeById(person.locationId);
     const quests = person.questIds.length
-      ? person.questIds.map((id) => `- [${QUESTS.find((quest) => quest.id === id)?.name ?? id}](./quests/#${id.replace(/_/g, "-")})`).join("\n")
+      ? person.questIds.map((id) => `- [${QUESTS.find((quest) => quest.id === id)?.name ?? id}](../quests/${id}/)`).join("\n")
       : "_No quest._";
     return [
       `## ${person.name}`,
@@ -684,60 +809,99 @@ function npcsDoc(): string {
   return page("People", "Every named NPC, where to find them, and the quests they give.", sections.join("\n\n"));
 }
 
-function grantRows(grant: QuestGrant | undefined): (string | number)[][] {
+function grantRows(grant: QuestGrant | undefined, itemBase = "./"): (string | number)[][] {
   if (!grant) return [];
   const rows: (string | number)[][] = [];
   for (const [skill, xp] of Object.entries(grant.xp ?? {})) rows.push([`${skillName(skill as SkillId)} XP`, xp ?? 0]);
-  for (const stack of grant.items ?? []) rows.push([itemName(stack.itemId), stack.quantity]);
+  for (const stack of grant.items ?? []) rows.push([itemLink(stack.itemId, itemName(stack.itemId), itemBase), stack.quantity]);
   if (grant.currency) rows.push(["Marks", grant.currency]);
   for (const unlock of grant.unlocks ?? []) rows.push(["Unlock", unlock]);
   return rows;
 }
 
-function questsDoc(): string {
-  const sections = QUESTS.map((quest) => {
-    const giver = npcGivingQuest(quest.id) ?? npc(quest.giverNpcId);
-    const requirements = Object.entries(quest.requirements)
-      .map(([skill, level]) => `${skillName(skill as SkillId)} ${level}`)
-      .join(", ") || "None";
-    const prerequisites = quest.prerequisiteQuestIds
-      .map((id) => QUESTS.find((candidate) => candidate.id === id)?.name ?? id)
-      .join(", ") || "None";
-    const stages = quest.stages.map((stage) => {
-      const grants = grantRows(stage.grants);
-      return [
-        `#### ${stage.index + 1}. ${stage.objective}`,
-        "",
-        stage.hint,
-        "",
-        questStepEvidence(quest, stage),
-        grants.length ? `\n**Stage reward**\n\n${table(["Reward", "Amount"], grants)}` : "",
-      ].join("\n");
-    }).join("\n\n");
-    const rewards = grantRows(quest.rewards);
+function rewardSummary(grant: QuestGrant, itemBase: string): string {
+  const parts: string[] = [];
+  for (const [skill, xp] of Object.entries(grant.xp ?? {})) {
+    if (xp) parts.push(`${xp.toLocaleString()} ${skillName(skill as SkillId)} XP`);
+  }
+  for (const stack of grant.items ?? []) {
+    parts.push(`${stack.quantity}× ${itemLink(stack.itemId, itemName(stack.itemId), itemBase)}`);
+  }
+  if (grant.currency) parts.push(`${grant.currency.toLocaleString()} Marks`);
+  for (const unlock of grant.unlocks ?? []) parts.push(unlock);
+  return parts.join("; ") || "None";
+}
+
+function questStartPlace(quest: QuestDef): PlaceRecord {
+  const giver = npcGivingQuest(quest.id) ?? npc(quest.giverNpcId);
+  const place = giver && placeById(giver.locationId);
+  if (!place) throw new Error(`Quest ${quest.id} has no authored start location.`);
+  return place;
+}
+
+function questIndexDoc(): string {
+  const rows = QUESTS.map((quest) => {
+    const start = questStartPlace(quest);
     return [
-      `## ${quest.name}`,
-      "",
-      giver ? capture("npc", giver.id, giver.name) : "",
-      "",
-      quest.summary,
-      "",
-      table(["Giver", "Region", "Requirements", "Prerequisite"], [[
-        giver?.name ?? quest.giverNpcId, regionName(quest.regionId), requirements, prerequisites,
-      ]]),
-      "",
-      quest.onStart && grantRows(quest.onStart).length ? `### Supplied when accepted\n\n${table(["Item", "Amount"], grantRows(quest.onStart))}` : "",
-      "",
-      "### Walkthrough",
-      "",
-      stages,
-      "",
-      "### Completion rewards",
-      "",
-      rewards.length ? table(["Reward", "Amount"], rewards) : "_No additional reward._",
-    ].join("\n");
+      `[${quest.name}](./${quest.id}/)`,
+      `[${start.location.name}](../regions/#${headingSlug(start.location.name)})`,
+      rewardSummary(quest.rewards, "../"),
+    ];
   });
-  return page("Quest guides", "Complete Corealm quest walkthroughs generated from the live objectives.", sections.join("\n\n"));
+  return page("Quests", "Every Corealm quest, its start location, and its completion reward.", table(
+    ["Quest", "Start location", "Reward"],
+    rows,
+  ));
+}
+
+function questDoc(quest: QuestDef): string {
+  const giver = npcGivingQuest(quest.id) ?? npc(quest.giverNpcId);
+  const start = questStartPlace(quest);
+  const requirements = Object.entries(quest.requirements)
+    .map(([skill, level]) => `${skillName(skill as SkillId)} ${level}`)
+    .join(", ") || "None";
+  const prerequisites = quest.prerequisiteQuestIds
+    .map((id) => {
+      const prerequisite = QUESTS.find((candidate) => candidate.id === id);
+      return `[${prerequisite?.name ?? id}](../${id}/)`;
+    })
+    .join(", ") || "None";
+  const stages = quest.stages.map((stage) => {
+    const grants = grantRows(stage.grants, "../../");
+    return [
+      `### ${stage.index + 1}. ${stage.objective}`,
+      "",
+      stage.hint,
+      "",
+      questStepEvidence(quest, stage),
+      grants.length ? `\n#### Stage reward\n\n${table(["Reward", "Amount"], grants)}` : "",
+    ].join("\n");
+  }).join("\n\n");
+  const rewards = grantRows(quest.rewards, "../../");
+  const supplied = grantRows(quest.onStart, "../../");
+  return page(quest.name, `${quest.name} start location, requirements, walkthrough, and rewards.`, [
+    quest.summary,
+    "",
+    giver ? capture("npc", giver.id, giver.name, "../") : "",
+    "",
+    table(["Giver", "Start location", "Region", "Requirements", "Prerequisite"], [[
+      giver ? `[${giver.name}](../../npcs/#${headingSlug(giver.name)})` : quest.giverNpcId,
+      `[${start.location.name}](../../regions/#${headingSlug(start.location.name)})`,
+      `[${regionName(quest.regionId)}](../../regions/#${headingSlug(regionName(quest.regionId))})`,
+      requirements,
+      prerequisites,
+    ]]),
+    "",
+    supplied.length ? `## Supplied when accepted\n\n${table(["Item", "Amount"], supplied)}` : "",
+    "",
+    "## Walkthrough",
+    "",
+    stages,
+    "",
+    "## Completion rewards",
+    "",
+    rewards.length ? table(["Reward", "Amount"], rewards) : "_No additional reward._",
+  ].join("\n"));
 }
 
 function spellsAndShopsDoc(): string {
@@ -772,11 +936,16 @@ async function main(): Promise<void> {
     spells: SPELLS, enemies: ENEMIES, shops: SHOPS,
   });
 
+  for (const stale of ["quests.md", "enemies.md", "locations.md", "quests", "creatures"]) {
+    await rm(path.join(out, stale), { recursive: true, force: true });
+  }
+
   const files: [string, string][] = [
-    ["quests.md", questsDoc()],
+    ["quests/index.md", questIndexDoc()],
+    ...QUESTS.map((quest): [string, string] => [`quests/${quest.id}.md`, questDoc(quest)]),
     ["npcs.md", npcsDoc()],
-    ["enemies.md", enemiesDoc()],
-    ["locations.md", locationsDoc()],
+    ["creatures/index.md", creatureIndexDoc()],
+    ...ENEMY_BLOCKS.map((creature): [string, string] => [`creatures/${creature.id}.md`, creatureDoc(creature)]),
     ["regions.md", regionsDoc()],
     ["items.md", itemsDoc()],
     ["recipes.md", recipesDoc()],
@@ -786,13 +955,12 @@ async function main(): Promise<void> {
     ["spells-and-shops.md", spellsAndShopsDoc()],
   ];
 
-  const index = page("Game guide", "Generated guides for Corealm's quests, people, creatures, places, and systems.", [
+  const index = page("Game guide", "Generated guides for Corealm's quests, people, creatures, regions, and systems.", [
     "These pages are regenerated from the same content tables the game runs.",
     "",
-    "- [Quest guides](./quests)",
+    "- [Quests](./quests)",
     "- [People](./npcs)",
-    "- [Bestiary](./enemies)",
-    "- [Places](./locations)",
+    "- [Creatures](./creatures)",
     "- [Regions](./regions)",
     "- [Items](./items)",
     "- [Recipes](./recipes)",
@@ -813,7 +981,11 @@ async function main(): Promise<void> {
     .toFile(path.join(out, "assets/world-map.webp"));
 
   await writeFile(path.join(out, "README.md"), index, "utf8");
-  for (const [name, body] of files) await writeFile(path.join(out, name), body, "utf8");
+  for (const [name, body] of files) {
+    const target = path.join(out, name);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, body, "utf8");
+  }
   console.log(`Wrote ${files.length + 1} guide files to ${path.relative(repoRoot, out)}`);
 }
 

@@ -1,14 +1,13 @@
 ---
 title: "Game guide"
-description: "Generated guides for Corealm's quests, people, creatures, places, and systems."
+description: "Generated guides for Corealm's quests, people, creatures, regions, and systems."
 ---
 
 These pages are regenerated from the same content tables the game runs.
 
-- [Quest guides](./quests)
+- [Quests](./quests)
 - [People](./npcs)
-- [Bestiary](./enemies)
-- [Places](./locations)
+- [Creatures](./creatures)
 - [Regions](./regions)
 - [Items](./items)
 - [Recipes](./recipes)

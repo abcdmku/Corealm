@@ -78,10 +78,9 @@ export default defineConfig({
           label: "World guide",
           items: [
             { label: "Guide index", link: "/game/" },
-            { label: "Quest guides", link: "/game/quests/" },
+            { label: "Quests", link: "/game/quests/" },
             { label: "People", link: "/game/npcs/" },
-            { label: "Bestiary", link: "/game/enemies/" },
-            { label: "Places", link: "/game/locations/" },
+            { label: "Creatures", link: "/game/creatures/" },
             { label: "Regions", link: "/game/regions/" },
           ],
         },
@@ -99,7 +98,7 @@ export default defineConfig({
       ],
       head: [
         { tag: "meta", attrs: { property: "og:title", content: "Corealm Codex" } },
-        { tag: "meta", attrs: { property: "og:description", content: "Guides, people, creatures, quests, and places generated from the live game." } },
+        { tag: "meta", attrs: { property: "og:description", content: "Guides, people, creatures, quests, and regions generated from the live game." } },
         { tag: "meta", attrs: { property: "og:image", content: socialAsset("/og.png") } },
         { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
         { tag: "script", attrs: { type: "module", src: asset("/corealm-map.js") } },

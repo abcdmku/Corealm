@@ -257,7 +257,8 @@ starlight-theme-select {
   text-underline-offset: 0.16em;
 }
 
-.corealm-quest-step-evidence {
+.corealm-quest-step-evidence,
+.corealm-creature-spawn-evidence {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 16rem;
   gap: 1rem;
@@ -304,7 +305,8 @@ starlight-theme-select {
   font-size: 0.72rem;
 }
 
-.corealm-quest-map { margin: 0; }
+.corealm-quest-map,
+.corealm-creature-map { margin: 0; }
 
 .corealm-location-map {
   --marker-inverse: 1;
@@ -540,5 +542,6 @@ html.corealm-map-open body { overflow: hidden; }
   .world-window img { aspect-ratio: 4 / 3; }
   .codex-index a { grid-template-columns: 1fr; gap: 0.2rem; }
   .sl-markdown-content table { display: block; overflow-x: auto; }
-  .corealm-quest-step-evidence { grid-template-columns: 1fr; }
+  .corealm-quest-step-evidence,
+  .corealm-creature-spawn-evidence { grid-template-columns: 1fr; }
 }
