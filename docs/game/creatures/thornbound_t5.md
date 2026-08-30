@@ -4,11 +4,11 @@ description: "Thornbound Husk spawn locations, combat stats, and drops."
 ---
 
 <div class="corealm-creature-spawn-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/enemy-groups/thornbound_husks.webp" alt="Thornbound Husk at its authored spawn in Vellenwood" loading="lazy" /><figcaption><strong>Thornbound Husk</strong><span>The Thornline, Vellenwood</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/thornbound_husks.webp" alt="Thornbound Husk at its authored spawn in Vellenwood" loading="lazy" /><figcaption><strong>Thornbound Husk</strong><span>The Thornline, Vellenwood</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Thornbound Husk">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#the-thornline" style="--map-x:66.3333%;--map-y:37.3333%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Thornbound Husk, The Thornline, Vellenwood" title="Thornbound Husk, The Thornline, Vellenwood"><span>Thornbound Husk<small>The Thornline, Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

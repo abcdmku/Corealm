@@ -2,13 +2,15 @@ import type { AudioCueId } from "../contracts.js";
 import type { AudioCueDefinition } from "./catalog.js";
 import { defineAudioCatalog } from "./catalog.js";
 
-const noxSfx = (name: string): string => `/audio/sfx/nox/${name}.ogg`;
-const noxAmbience = (name: string): string => `/audio/ambience/nox/${name}.ogg`;
-const tom = (name: string): string => `/audio/sfx/tommusic/${name}.ogg`;
-const cow1 = (name: string): string => `/audio/sfx/filmcow-v1/${name}.ogg`;
-const cow4 = (name: string): string => `/audio/sfx/filmcow-v4/${name}.ogg`;
-const oga = (name: string): string => `/audio/sfx/oga/${name}.ogg`;
-const music = (name: string): string => `/audio/music/${name}.mp3`;
+const publicBase = import.meta.env?.BASE_URL ?? "/";
+const publicAsset = (pathname: string): string => `${publicBase.replace(/\/?$/, "/")}${pathname.replace(/^\/+/, "")}`;
+const noxSfx = (name: string): string => publicAsset(`audio/sfx/nox/${name}.ogg`);
+const noxAmbience = (name: string): string => publicAsset(`audio/ambience/nox/${name}.ogg`);
+const tom = (name: string): string => publicAsset(`audio/sfx/tommusic/${name}.ogg`);
+const cow1 = (name: string): string => publicAsset(`audio/sfx/filmcow-v1/${name}.ogg`);
+const cow4 = (name: string): string => publicAsset(`audio/sfx/filmcow-v4/${name}.ogg`);
+const oga = (name: string): string => publicAsset(`audio/sfx/oga/${name}.ogg`);
+const music = (name: string): string => publicAsset(`audio/music/${name}.mp3`);
 
 /**
  * Every semantic cue has an explicit grounded-fantasy source. The curation ledgers under `docs/`

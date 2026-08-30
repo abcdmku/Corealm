@@ -27,11 +27,11 @@ Six plots sit inside the old wall line. `interact(<plot>, "rake")`, then `"plant
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#marchfield">Marchfield</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 1"><span>Items</span><a href="../../items/#bittergrain">Bittergrain</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/locations/marchfield_farm.webp" alt="Marchfield in the running Corealm world" loading="lazy" /><figcaption><strong>Marchfield</strong><span>Marchfield</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/marchfield_farm.webp" alt="Marchfield in the running Corealm world" loading="lazy" /><figcaption><strong>Marchfield</strong><span>Marchfield</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bright Water, step 1">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#marchfield" style="--map-x:42.0000%;--map-y:51.8333%" data-map-side="right" data-map-kind="farm" data-map-marker aria-label="Marchfield, Fallowmarch" title="Marchfield, Fallowmarch"><span>Marchfield<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -59,11 +59,11 @@ Four fishing spots on the red silt, 120 m east of town. `interact(<spot>, "fish"
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#redsill-shallows">Redsill Shallows</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 2"><span>Items</span><a href="../../items/#silt-minnow">Silt Minnow</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/locations/redsill_shallows.webp" alt="Redsill Shallows in the running Corealm world" loading="lazy" /><figcaption><strong>Redsill Shallows</strong><span>Redsill Shallows</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/redsill_shallows.webp" alt="Redsill Shallows in the running Corealm world" loading="lazy" /><figcaption><strong>Redsill Shallows</strong><span>Redsill Shallows</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bright Water, step 2">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#redsill-shallows" style="--map-x:46.6667%;--map-y:55.0000%" data-map-side="right" data-map-kind="water" data-map-marker aria-label="Redsill Shallows, Fallowmarch" title="Redsill Shallows, Fallowmarch"><span>Redsill Shallows<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -91,11 +91,11 @@ At Cooking 1 nearly half of them burn. That is the rule, not bad luck - cook spa
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#seared-minnow">Seared Minnow</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/entities/coldbrace_range.webp" alt="Coldbrace Cooking Range in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Cooking Range</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_range.webp" alt="Coldbrace Cooking Range in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Cooking Range</strong><span>Coldbrace Square</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bright Water, step 3">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:37.5833%;--map-y:56.0250%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Cooking Range, Fallowmarch" title="Coldbrace Cooking Range, Fallowmarch"><span>Coldbrace Cooking Range<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -123,11 +123,11 @@ She is in Coldbrace Square. The handover takes the food out of your bag.
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 4"><span>Items</span><a href="../../items/#seared-minnow">Seared Minnow</a><a href="../../items/#bittergrain">Bittergrain</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/npcs/npc_ranger_syb.webp" alt="Ranger Syb in the running Corealm world" loading="lazy" /><figcaption><strong>Ranger Syb</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_ranger_syb.webp" alt="Ranger Syb in the running Corealm world" loading="lazy" /><figcaption><strong>Ranger Syb</strong><span>Coldbrace Square</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bright Water, step 4">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../npcs/#ranger-syb" style="--map-x:35.2500%;--map-y:56.1833%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Ranger Syb, Fallowmarch" title="Ranger Syb, Fallowmarch"><span>Ranger Syb<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

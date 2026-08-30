@@ -4,12 +4,12 @@ description: "Thornbound Elder spawn locations, combat stats, and drops."
 ---
 
 <div class="corealm-creature-spawn-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/enemy-groups/thornbound_elders_ridge.webp" alt="Thornbound Elder at its authored spawn in Karrowmoor" loading="lazy" /><figcaption><strong>Thornbound Elder</strong><span>Far Tarn, Karrowmoor</span></figcaption></figure>
-<figure class="corealm-quest-scene"><img src="/game/assets/captures/enemy-groups/gravelmaw_ch3_elders.webp" alt="Thornbound Elder at its authored spawn in The Gravelmaw" loading="lazy" /><figcaption><strong>Thornbound Elder</strong><span>The Cairn Hall, The Gravelmaw</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/thornbound_elders_ridge.webp" alt="Thornbound Elder at its authored spawn in Karrowmoor" loading="lazy" /><figcaption><strong>Thornbound Elder</strong><span>Far Tarn, Karrowmoor</span></figcaption></figure>
+<figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch3_elders.webp" alt="Thornbound Elder at its authored spawn in The Gravelmaw" loading="lazy" /><figcaption><strong>Thornbound Elder</strong><span>The Cairn Hall, The Gravelmaw</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Thornbound Elder">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#far-tarn" style="--map-x:72.3333%;--map-y:61.6667%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Thornbound Elder, Far Tarn, Karrowmoor" title="Thornbound Elder, Far Tarn, Karrowmoor"><span>Thornbound Elder<small>Far Tarn, Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#the-cairn-hall" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="Thornbound Elder, The Gravelmaw, The Cairn Hall" title="Thornbound Elder, The Gravelmaw, The Cairn Hall"><span>Thornbound Elder<small>The Gravelmaw, The Cairn Hall</small></span></a>
 </div>

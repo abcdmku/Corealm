@@ -4,11 +4,11 @@ description: "Mire Fenmite spawn locations, combat stats, and drops."
 ---
 
 <div class="corealm-creature-spawn-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/enemy-groups/mire_fenmites.webp" alt="Mire Fenmite at its authored spawn in Vellenwood" loading="lazy" /><figcaption><strong>Mire Fenmite</strong><span>Mire Skirt, Vellenwood</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/mire_fenmites.webp" alt="Mire Fenmite at its authored spawn in Vellenwood" loading="lazy" /><figcaption><strong>Mire Fenmite</strong><span>Mire Skirt, Vellenwood</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Mire Fenmite">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#mire-skirt" style="--map-x:50.3333%;--map-y:38.8333%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Mire Fenmite, Mire Skirt, Vellenwood" title="Mire Fenmite, Mire Skirt, Vellenwood"><span>Mire Fenmite<small>Mire Skirt, Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

@@ -4,11 +4,11 @@ description: "Marchwolf Pup spawn locations, combat stats, and drops."
 ---
 
 <div class="corealm-creature-spawn-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/enemy-groups/marchwolf_pups.webp" alt="Marchwolf Pup at its authored spawn in Fallowmarch" loading="lazy" /><figcaption><strong>Marchwolf Pup</strong><span>The Open March, Fallowmarch</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/marchwolf_pups.webp" alt="Marchwolf Pup at its authored spawn in Fallowmarch" loading="lazy" /><figcaption><strong>Marchwolf Pup</strong><span>The Open March, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Marchwolf Pup">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#the-open-march" style="--map-x:29.1667%;--map-y:47.5000%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Marchwolf Pup, The Open March, Fallowmarch" title="Marchwolf Pup, The Open March, Fallowmarch"><span>Marchwolf Pup<small>The Open March, Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

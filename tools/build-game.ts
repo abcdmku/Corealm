@@ -7,4 +7,4 @@ import { generateItemIcons } from "./generate-item-icons.js";
 await assertGameInitialized();
 await generateItemIcons();
 await generateWorldMap();
-await build({ root: gameRoot });
+await build({ root: gameRoot, base: process.env.GAME_BASE ?? "/" });

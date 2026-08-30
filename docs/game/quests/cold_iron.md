@@ -22,11 +22,11 @@ Six seams stand at the pit, 160 m north of Coldbrace. `moveTo({ locationId: "bra
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#bracken-pit">Bracken Pit</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 1"><span>Items</span><a href="../../items/#grithe-ore">Grithe Ore</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/locations/bracken_pit.webp" alt="Bracken Pit in the running Corealm world" loading="lazy" /><figcaption><strong>Bracken Pit</strong><span>Bracken Pit</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/bracken_pit.webp" alt="Bracken Pit in the running Corealm world" loading="lazy" /><figcaption><strong>Bracken Pit</strong><span>Bracken Pit</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Cold Iron, step 1">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#bracken-pit" style="--map-x:36.6667%;--map-y:43.3333%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Bracken Pit, Fallowmarch" title="Bracken Pit, Fallowmarch"><span>Bracken Pit<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -49,11 +49,11 @@ Stand at the furnace and `produce("smelt_grithe_bar", 2)`. The furnace is in the
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 2"><span>Items</span><a href="../../items/#grithe-bar">Grithe Bar</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/entities/coldbrace_furnace.webp" alt="Coldbrace Furnace in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Furnace</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_furnace.webp" alt="Coldbrace Furnace in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Furnace</strong><span>Coldbrace Square</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Cold Iron, step 2">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:37.9500%;--map-y:57.2500%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Furnace, Fallowmarch" title="Coldbrace Furnace, Fallowmarch"><span>Coldbrace Furnace<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -76,11 +76,11 @@ The anvil stands four metres from the furnace. The dagger is the cheapest thing 
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#grithe-dagger">Grithe Dagger</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/entities/coldbrace_anvil.webp" alt="Coldbrace Anvil in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Anvil</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_anvil.webp" alt="Coldbrace Anvil in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Anvil</strong><span>Coldbrace Square</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Cold Iron, step 3">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:37.9333%;--map-y:57.0500%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Anvil, Fallowmarch" title="Coldbrace Anvil, Fallowmarch"><span>Coldbrace Anvil<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -103,11 +103,11 @@ The anvil stands four metres from the furnace. The dagger is the cheapest thing 
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#redsill-shallows">Redsill Shallows</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 4"><span>Items</span><a href="../../items/#grithe-dagger">Grithe Dagger</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/enemy-groups/rill_skitterlings.webp" alt="Rill Skitterling in the running Corealm world" loading="lazy" /><figcaption><strong>Rill Skitterling</strong><span>Redsill Shallows</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/rill_skitterlings.webp" alt="Rill Skitterling in the running Corealm world" loading="lazy" /><figcaption><strong>Rill Skitterling</strong><span>Redsill Shallows</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Cold Iron, step 4">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../creatures/skitterling_t1/" style="--map-x:42.6667%;--map-y:55.8333%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Rill Skitterling, Fallowmarch" title="Rill Skitterling, Fallowmarch"><span>Rill Skitterling<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#redsill-shallows" style="--map-x:46.6667%;--map-y:55.0000%" data-map-side="right" data-map-kind="water" data-map-marker aria-label="Redsill Shallows, Fallowmarch" title="Redsill Shallows, Fallowmarch"><span>Redsill Shallows<small>Fallowmarch</small></span></a>
 </div>
@@ -130,11 +130,11 @@ Walk back into Coldbrace Square and `interact("npc_smith_harrow", "talk")`.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 5"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/npcs/npc_smith_harrow.webp" alt="Harrow the Smith in the running Corealm world" loading="lazy" /><figcaption><strong>Harrow the Smith</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_smith_harrow.webp" alt="Harrow the Smith in the running Corealm world" loading="lazy" /><figcaption><strong>Harrow the Smith</strong><span>Coldbrace Square</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Cold Iron, step 5">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../npcs/#harrow-the-smith" style="--map-x:37.7167%;--map-y:57.2833%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Harrow the Smith, Fallowmarch" title="Harrow the Smith, Fallowmarch"><span>Harrow the Smith<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

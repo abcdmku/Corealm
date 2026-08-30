@@ -95,8 +95,8 @@ function captureAsset(kind: CaptureKind, id: string, base = "./"): string {
   return `${base}assets/captures/${folder}/${id}.webp`;
 }
 
-function publicCaptureAsset(kind: CaptureKind, id: string): string {
-  return captureAsset(kind, id).replace("./assets/", "/game/assets/");
+function publicCaptureAsset(kind: CaptureKind, id: string, base: string): string {
+  return captureAsset(kind, id, base);
 }
 
 function capture(kind: CaptureKind, id: string, label: string, base = "./"): string {
@@ -189,7 +189,7 @@ function allPlaces(): PlaceRecord[] {
 
 function worldMapFigure(
   points: readonly MapPoint[],
-  options: { className?: string; ariaLabel: string; caption: string },
+  options: { className?: string; ariaLabel: string; caption: string; assetBase: string },
 ): string {
   const bounds = WORLD_MAP_IMAGE_BOUNDS;
   const width = bounds.maxX - bounds.minX;
@@ -212,7 +212,7 @@ function worldMapFigure(
     `<figure class="corealm-location-map${options.className ? ` ${options.className}` : ""}" data-location-map style="--map-image-ratio:${width / height}">`,
     `<div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="${escapeHtml(options.ariaLabel)}">`,
     `<div class="corealm-map-stage" data-map-stage>`,
-    `<img src="/game/assets/world-map.webp?v=${WORLD_MAP_RENDER_FINGERPRINT}" alt="Overhead map rendered from the Corealm game world" draggable="false" />`,
+    `<img src="${options.assetBase}world-map.webp?v=${WORLD_MAP_RENDER_FINGERPRINT}" alt="Overhead map rendered from the Corealm game world" draggable="false" />`,
     markers,
     `</div>`,
     `<span class="corealm-map-north" aria-hidden="true">N</span>`,
@@ -240,6 +240,7 @@ function locationMap(): string {
   return worldMapFigure(points, {
     ariaLabel: "Interactive map of Corealm locations",
     caption: "Drag to pan. Scroll or use + and - to zoom. The Gravelmaw rooms lie below its entrance marker.",
+    assetBase: "../assets/",
   });
 }
 
@@ -456,6 +457,7 @@ function questStepMap(quest: QuestDef, stage: QuestStageDef): string {
     className: "corealm-quest-map",
     ariaLabel: `Map for ${quest.name}, step ${stage.index + 1}`,
     caption: `${names}.${dungeonNote}`,
+    assetBase: "../../assets/",
   });
 }
 
@@ -518,7 +520,7 @@ function questStepEvidence(quest: QuestDef, stage: QuestStageDef): string {
   const placeNames = places.map((place) => place.location.name).join(", ");
   const scenes = questStepScenes(quest, stage).map((scene) => [
     `<figure class="corealm-quest-scene">`,
-    `<img src="${publicCaptureAsset(scene.kind, scene.id)}" alt="${escapeHtml(`${scene.label} in the running Corealm world`)}" loading="lazy" />`,
+    `<img src="${publicCaptureAsset(scene.kind, scene.id, "../../")}" alt="${escapeHtml(`${scene.label} in the running Corealm world`)}" loading="lazy" />`,
     `<figcaption><strong>${escapeHtml(scene.label)}</strong><span>${escapeHtml(placeNames)}</span></figcaption>`,
     `</figure>`,
   ].join("")).join("\n");
@@ -644,6 +646,7 @@ function creatureSpawnMap(creature: EnemyDef, spawns: readonly CreatureSpawn[]):
     caption: hasDungeonSpawn
       ? "Outdoor markers use the exact spawn centre. Gravelmaw markers use the dungeon entrance; the room is listed beside each capture."
       : "Markers use each authored spawn group's exact centre.",
+    assetBase: "../../assets/",
   });
 }
 
@@ -671,7 +674,7 @@ function creatureDoc(creature: EnemyDef): string {
   ]);
   const scenes = spawns.map((spawn) => [
     `<figure class="corealm-quest-scene">`,
-    `<img src="${publicCaptureAsset("enemyGroup", spawn.group.id)}" alt="${escapeHtml(`${spawn.group.name} at its authored spawn in ${spawn.regionLabel}`)}" loading="lazy" />`,
+    `<img src="${publicCaptureAsset("enemyGroup", spawn.group.id, "../../")}" alt="${escapeHtml(`${spawn.group.name} at its authored spawn in ${spawn.regionLabel}`)}" loading="lazy" />`,
     `<figcaption><strong>${escapeHtml(spawn.group.name)}</strong><span>${escapeHtml(`${spawn.place.location.name}, ${spawn.regionLabel}`)}</span></figcaption>`,
     `</figure>`,
   ].join("")).join("\n");

@@ -4,12 +4,12 @@ description: "Terrace Mudback spawn locations, combat stats, and drops."
 ---
 
 <div class="corealm-creature-spawn-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="/game/assets/captures/enemy-groups/terrace_mudbacks.webp" alt="Terrace Mudback at its authored spawn in Karrowmoor" loading="lazy" /><figcaption><strong>Terrace Mudback</strong><span>Lower Quarry, Karrowmoor</span></figcaption></figure>
-<figure class="corealm-quest-scene"><img src="/game/assets/captures/enemy-groups/gravelmaw_ch2_mudbacks.webp" alt="Gravelmaw Mudback at its authored spawn in The Gravelmaw" loading="lazy" /><figcaption><strong>Gravelmaw Mudback</strong><span>The Collapse, The Gravelmaw</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/terrace_mudbacks.webp" alt="Terrace Mudback at its authored spawn in Karrowmoor" loading="lazy" /><figcaption><strong>Terrace Mudback</strong><span>Lower Quarry, Karrowmoor</span></figcaption></figure>
+<figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch2_mudbacks.webp" alt="Gravelmaw Mudback at its authored spawn in The Gravelmaw" loading="lazy" /><figcaption><strong>Gravelmaw Mudback</strong><span>The Collapse, The Gravelmaw</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Terrace Mudback">
 <div class="corealm-map-stage" data-map-stage>
-<img src="/game/assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#lower-quarry" style="--map-x:56.0000%;--map-y:53.6667%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Terrace Mudback, Lower Quarry, Karrowmoor" title="Terrace Mudback, Lower Quarry, Karrowmoor"><span>Terrace Mudback<small>Lower Quarry, Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#the-collapse" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="Gravelmaw Mudback, The Gravelmaw, The Collapse" title="Gravelmaw Mudback, The Gravelmaw, The Collapse"><span>Gravelmaw Mudback<small>The Gravelmaw, The Collapse</small></span></a>
 </div>
