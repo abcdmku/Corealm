@@ -168,6 +168,29 @@ describe("AudioEngine buses and unlock", () => {
     await Promise.resolve();
     expect(context.resumeCalls).toBe(2);
   });
+
+  it("decodes selected one-shots on the gesture that unlocks audio", async () => {
+    const { engine, context, fetcher } = createEngine();
+    const target = new EventTarget();
+    engine.installGestureUnlock(target, ["test:shared"]);
+
+    target.dispatchEvent(new Event("pointerdown"));
+    await vi.waitFor(() => expect(context.decodeCalls).toBe(1));
+
+    expect(fetcher).toHaveBeenCalledWith("test:shared");
+    expect(engine.snapshot().cachedBuffers).toBe(1);
+  });
+
+  it("decodes selected one-shots when another system unlocks audio first", async () => {
+    const { engine, context, fetcher } = createEngine();
+    engine.installGestureUnlock(null, ["test:shared"]);
+
+    await engine.unlock();
+    await vi.waitFor(() => expect(context.decodeCalls).toBe(1));
+
+    expect(fetcher).toHaveBeenCalledWith("test:shared");
+    expect(engine.snapshot().cachedBuffers).toBe(1);
+  });
 });
 
 describe("AudioEngine one-shots", () => {

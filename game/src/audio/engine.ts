@@ -117,6 +117,7 @@ export class AudioEngine {
 
   private context: AudioContext | null = null;
   private unlockPromise: Promise<boolean> | null = null;
+  private readonly unlockPreloadUrls = new Set<string>();
   private pendingOneShots = 0;
   private oneShotGeneration = 0;
   private loopToken = 0;
@@ -166,8 +167,15 @@ export class AudioEngine {
    */
   installGestureUnlock(
     target: EventTarget | null = typeof window === "undefined" ? null : window,
+    preloadUrls: readonly string[] = [],
   ): () => void {
-    if (!target || this.disposed || this.unlocked) return () => undefined;
+    for (const url of preloadUrls) if (url) this.unlockPreloadUrls.add(url);
+    if (this.disposed) return () => undefined;
+    if (this.unlocked) {
+      this.warmUnlockPreloads();
+      return () => undefined;
+    }
+    if (!target) return () => undefined;
 
     const handler = (): void => { void this.unlock(); };
     const eventNames = ["pointerdown", "keydown", "touchstart"] as const;
@@ -190,13 +198,18 @@ export class AudioEngine {
   /** Returns false instead of rejecting when Web Audio is absent or the browser still blocks it. */
   async unlock(): Promise<boolean> {
     if (this.disposed) return false;
-    if (this.unlocked && this.context?.state === "running") return true;
+    if (this.unlocked && this.context?.state === "running") {
+      this.warmUnlockPreloads();
+      return true;
+    }
     if (this.unlockPromise) return this.unlockPromise;
 
     const attempt = this.performUnlock();
     this.unlockPromise = attempt;
     try {
-      return await attempt;
+      const unlocked = await attempt;
+      if (unlocked) this.warmUnlockPreloads();
+      return unlocked;
     } finally {
       if (this.unlockPromise === attempt) this.unlockPromise = null;
     }
@@ -533,6 +546,10 @@ export class AudioEngine {
     const promise = this.fetchAndDecode(url);
     this.bufferCache.set(url, promise);
     return promise;
+  }
+
+  private warmUnlockPreloads(): void {
+    for (const url of this.unlockPreloadUrls) void this.loadBuffer(url);
   }
 
   private async fetchAndDecode(url: string): Promise<AudioBuffer | null> {

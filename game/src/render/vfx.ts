@@ -26,6 +26,7 @@ import * as THREE from "three";
 import type { GameEvent, SkillId, Vec3 } from "../contracts.js";
 import { SKILLS } from "../content/skills.js";
 import { MOVEMENT } from "../app/config.js";
+import { LevelUpVfx } from "./levelUpVfx.js";
 
 interface FloatingText {
   element: HTMLElement;
@@ -123,6 +124,7 @@ export class Vfx {
   private ambience: Ambience | null = null;
   private readonly projected = new THREE.Vector3();
   private readonly group = new THREE.Group();
+  private readonly levelUp: LevelUpVfx;
   private readonly viewer = new THREE.Vector3();
   private readonly facing = new THREE.Quaternion();
   private fanIndex = 0;
@@ -135,6 +137,11 @@ export class Vfx {
   constructor(private readonly deps: VfxDeps) {
     this.group.name = "vfx";
     this.deps.parent.add(this.group);
+    this.levelUp = new LevelUpVfx({
+      parent: this.group,
+      camera: this.deps.camera,
+      playerPosition: this.deps.playerPosition,
+    });
   }
 
   /**
@@ -165,7 +172,9 @@ export class Vfx {
         const skill = event.data.skill as SkillId | undefined;
         const level = event.data.level as number | undefined;
         if (skill && typeof level === "number") {
-          this.floatAt(this.deps.playerPosition(), `${SKILLS[skill]?.name ?? skill} ${level}`, "vfx-level", nowMs, 2200, 2.6);
+          const position = this.deps.playerPosition();
+          this.floatAt(position, `${SKILLS[skill]?.name ?? skill} ${level}`, "vfx-level", nowMs, 2200, 2.6);
+          this.levelUp.burst(nowMs, event.seq);
         }
         break;
       }
@@ -296,6 +305,7 @@ export class Vfx {
     this.pollTelegraphs();
     this.pollXp(nowMs);
     this.pollFootfalls(nowMs);
+    this.levelUp.update(nowMs);
 
     if (this.ambience) {
       this.deps.camera.getWorldPosition(this.viewer);
@@ -312,11 +322,16 @@ export class Vfx {
     return this.telegraphs.size;
   }
 
+  activeLevelParticles(): number {
+    return this.levelUp.liveParticles();
+  }
+
   dispose(): void {
     for (const floater of this.floaters) floater.element.remove();
     this.floaters = [];
     for (const id of [...this.telegraphs.keys()]) this.clearTelegraph(id);
     this.ambience?.dispose();
+    this.levelUp.dispose();
     this.group.removeFromParent();
   }
 

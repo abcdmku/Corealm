@@ -119,7 +119,10 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       if (audioDiagnostics.length > 64) audioDiagnostics.shift();
     },
   });
-  audioEngine.installGestureUnlock(window);
+  const levelUpVariant = COREALM_AUDIO_CATALOG.cues["ui.level_up"].variants[0]!;
+  // Decode the level-up sting on the first audio-unlocking gesture. Without this, its first use
+  // waits on fetch + Vorbis decode while the visual starts immediately.
+  audioEngine.installGestureUnlock(window, [levelUpVariant]);
   const audioDirector = new AudioDirector(audioEngine, COREALM_AUDIO_CATALOG, {
     regionFadeMs: 1400,
   });
@@ -766,7 +769,10 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     entityPosition: (entityId) => entityStore.get(entityId)?.position ?? null,
     playerPosition: () => store.get().player.position,
   });
-  events.subscribe((event) => vfx.handle(event, clock.elapsedMs));
+  // VFX ages on the render clock in `GameLoop.renderFrame`, so birth stamps must use that same
+  // clock. A sim-clock stamp makes every one-second event look several seconds old on arrival after
+  // a long boot, and it disappears before its first rendered frame.
+  events.subscribe((event) => vfx.handle(event, performance.now()));
   // The bolt starts when the cast is rolled, not when it lands. `systems/combat.ts` now holds the
   // damage back for the flight, so the hit log entry arrives at the far end and cannot be the cue.
   events.subscribe((event) => loop.handleSpellLaunch(event, performance.now()));

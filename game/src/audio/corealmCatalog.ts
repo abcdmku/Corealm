@@ -10,6 +10,7 @@ const tom = (name: string): string => publicAsset(`audio/sfx/tommusic/${name}.og
 const cow1 = (name: string): string => publicAsset(`audio/sfx/filmcow-v1/${name}.ogg`);
 const cow4 = (name: string): string => publicAsset(`audio/sfx/filmcow-v4/${name}.ogg`);
 const oga = (name: string): string => publicAsset(`audio/sfx/oga/${name}.ogg`);
+const custom = (name: string): string => publicAsset(`audio/sfx/custom/${name}.ogg`);
 const music = (name: string): string => publicAsset(`audio/music/${name}.mp3`);
 
 /**
@@ -22,7 +23,13 @@ const cues = {
   "ui.confirm": { variants: [tom("lock-unlock")], gain: 0.32, playbackRate: [1.02, 1.08] },
   "ui.cancel": { variants: [cow1("door-latch-01")], gain: 0.24, playbackRate: 0.9 },
   "ui.error": { variants: [cow4("shield-metal-strike-01")], gain: 0.24, playbackRate: 0.82 },
-  "ui.level_up": { variants: [tom("magic-impact-01"), tom("magic-impact-02")], gain: 0.42, playbackRate: [1.05, 1.12] },
+  "ui.level_up": {
+    variants: [custom("starter-plains-drums")],
+    gain: 0.42,
+    playbackRate: 1,
+    minIntervalMs: 180,
+    maxConcurrent: 1,
+  },
 
   "movement.footstep_grass": { variants: [noxSfx("footstep-grass-01"), noxSfx("footstep-grass-02")], gain: 0.5, playbackRate: [0.96, 1.04], maxConcurrent: 2 },
   "movement.footstep_dirt": { variants: [oga("footstep-ground-01"), { url: oga("footstep-ground-02"), gain: 0.57 }], gain: 0.23, playbackRate: 0.82, maxConcurrent: 2 },
