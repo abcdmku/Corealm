@@ -8,7 +8,10 @@ const source = path.resolve(repoRoot, "docs/game");
 const docsSiteRoot = path.resolve(repoRoot, "docs-site");
 const target = path.resolve(docsSiteRoot, "src/content/docs/game");
 const worldMapSource = path.resolve(source, "assets/world-map.webp");
-const worldMapTarget = path.resolve(docsSiteRoot, "public/game/locations/assets/world-map.webp");
+const worldMapTarget = path.resolve(docsSiteRoot, "public/game/assets/world-map.webp");
+const legacyWorldMapTarget = path.resolve(docsSiteRoot, "public/game/locations/assets/world-map.webp");
+const capturesSource = path.resolve(source, "assets/captures");
+const capturesTarget = path.resolve(docsSiteRoot, "public/game/assets/captures");
 
 function assertSafeTarget(): void {
   const relative = path.relative(docsSiteRoot, target);
@@ -23,8 +26,12 @@ async function main(): Promise<void> {
   await mkdir(path.dirname(target), { recursive: true });
   await cp(source, target, { recursive: true });
   await rename(path.join(target, "README.md"), path.join(target, "index.md"));
+  await rm(legacyWorldMapTarget, { force: true });
   await mkdir(path.dirname(worldMapTarget), { recursive: true });
   await cp(worldMapSource, worldMapTarget);
+  await rm(capturesTarget, { recursive: true, force: true });
+  await mkdir(path.dirname(capturesTarget), { recursive: true });
+  await cp(capturesSource, capturesTarget, { recursive: true });
   console.log(`Staged ${path.relative(repoRoot, source)} in ${path.relative(repoRoot, target)}`);
 }
 

@@ -223,6 +223,89 @@ starlight-theme-select {
   padding: 0.35rem;
 }
 
+.corealm-quest-where,
+.corealm-quest-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.85rem;
+  margin: 1rem 0 0;
+  padding: 0.55rem 0;
+  border-block: 1px solid rgba(212, 175, 78, 0.18);
+}
+
+.corealm-quest-items {
+  margin-top: -1px;
+  border-top: 0;
+}
+
+.corealm-quest-where > span,
+.corealm-quest-items > span {
+  min-width: 3.5rem;
+  color: #8e8776;
+  font-family: "Cinzel", "Trebuchet MS", serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.corealm-quest-where a,
+.corealm-quest-items a {
+  color: #ead89c;
+  text-decoration-color: rgba(234, 216, 156, 0.42);
+  text-underline-offset: 0.16em;
+}
+
+.corealm-quest-step-evidence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16rem;
+  gap: 1rem;
+  align-items: start;
+  margin: 1rem 0 2.4rem;
+}
+
+.corealm-quest-scenes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+}
+
+.corealm-quest-scene {
+  min-width: 0;
+  margin: 0;
+}
+
+.corealm-quest-scene img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid rgba(212, 175, 78, 0.34);
+  border-radius: 2px;
+  background: #16130e;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+}
+
+.corealm-quest-scene figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.2rem 0.8rem;
+  margin-top: 0.5rem;
+  color: #8e8776;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.corealm-quest-scene figcaption strong {
+  color: #e9d89e;
+  font-family: "Cinzel", "Trebuchet MS", serif;
+  font-size: 0.72rem;
+}
+
+.corealm-quest-map { margin: 0; }
+
 .corealm-location-map {
   --marker-inverse: 1;
   width: 16rem;
@@ -457,4 +540,5 @@ html.corealm-map-open body { overflow: hidden; }
   .world-window img { aspect-ratio: 4 / 3; }
   .codex-index a { grid-template-columns: 1fr; gap: 0.2rem; }
   .sl-markdown-content table { display: block; overflow-x: auto; }
+  .corealm-quest-step-evidence { grid-template-columns: 1fr; }
 }

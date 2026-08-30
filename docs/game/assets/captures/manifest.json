@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "fingerprint": "2b26d0a1e97734abd6538250381d779b38bb1384d822023943a8d7fc0ab76a8f",
+  "version": 2,
+  "fingerprint": "b25172982145fd7b5878f15b1fe1cfde9454716e5d7f1cde53b8ee88a774068d",
   "captures": [
     {
       "id": "npc_warden_ilse",
@@ -361,6 +361,198 @@
       "file": "assets/captures/enemies/quarrykeeper_t10.webp",
       "runtimeEntityId": "ordrun",
       "regionId": "ordrun"
+    },
+    {
+      "id": "rill_skitterlings",
+      "kind": "enemyGroup",
+      "label": "Rill Skitterling",
+      "file": "assets/captures/enemy-groups/rill_skitterlings.webp",
+      "runtimeEntityId": "rill_skitterlings_1",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "marchwolf_pups",
+      "kind": "enemyGroup",
+      "label": "Marchwolf Pup",
+      "file": "assets/captures/enemy-groups/marchwolf_pups.webp",
+      "runtimeEntityId": "marchwolf_pups_1",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "bracken_fenmites",
+      "kind": "enemyGroup",
+      "label": "Bracken Fenmite",
+      "file": "assets/captures/enemy-groups/bracken_fenmites.webp",
+      "runtimeEntityId": "bracken_fenmites_1",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "redsill_mudbacks",
+      "kind": "enemyGroup",
+      "label": "Redsill Mudback",
+      "file": "assets/captures/enemy-groups/redsill_mudbacks.webp",
+      "runtimeEntityId": "redsill_mudbacks_1",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "march_road_reavers",
+      "kind": "enemyGroup",
+      "label": "March Road Reaver",
+      "file": "assets/captures/enemy-groups/march_road_reavers.webp",
+      "runtimeEntityId": "march_road_reavers_1",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "palewood_hollows",
+      "kind": "enemyGroup",
+      "label": "Palewood Hollow",
+      "file": "assets/captures/enemy-groups/palewood_hollows.webp",
+      "runtimeEntityId": "palewood_hollows_1",
+      "regionId": "fallowmarch"
+    },
+    {
+      "id": "thornbound_husks",
+      "kind": "enemyGroup",
+      "label": "Thornbound Husk",
+      "file": "assets/captures/enemy-groups/thornbound_husks.webp",
+      "runtimeEntityId": "thornbound_husks_1",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "bramble_skitterlings",
+      "kind": "enemyGroup",
+      "label": "Bramble Skitterling",
+      "file": "assets/captures/enemy-groups/bramble_skitterlings.webp",
+      "runtimeEntityId": "bramble_skitterlings_1",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "marchwolves_deepwood",
+      "kind": "enemyGroup",
+      "label": "Marchwolf",
+      "file": "assets/captures/enemy-groups/marchwolves_deepwood.webp",
+      "runtimeEntityId": "marchwolves_deepwood_1",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "mire_fenmites",
+      "kind": "enemyGroup",
+      "label": "Mire Fenmite",
+      "file": "assets/captures/enemy-groups/mire_fenmites.webp",
+      "runtimeEntityId": "mire_fenmites_1",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "gorge_reavers",
+      "kind": "enemyGroup",
+      "label": "Gorge Reaver",
+      "file": "assets/captures/enemy-groups/gorge_reavers.webp",
+      "runtimeEntityId": "gorge_reavers_1",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "canopy_hollows",
+      "kind": "enemyGroup",
+      "label": "Canopy Hollow",
+      "file": "assets/captures/enemy-groups/canopy_hollows.webp",
+      "runtimeEntityId": "canopy_hollows_1",
+      "regionId": "vellenwood"
+    },
+    {
+      "id": "cairnwights_fields",
+      "kind": "enemyGroup",
+      "label": "Cairnwight",
+      "file": "assets/captures/enemy-groups/cairnwights_fields.webp",
+      "runtimeEntityId": "cairnwights_fields_1",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "scree_skitterlings",
+      "kind": "enemyGroup",
+      "label": "Scree Skitterling",
+      "file": "assets/captures/enemy-groups/scree_skitterlings.webp",
+      "runtimeEntityId": "scree_skitterlings_1",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "thornbound_elders_ridge",
+      "kind": "enemyGroup",
+      "label": "Thornbound Elder",
+      "file": "assets/captures/enemy-groups/thornbound_elders_ridge.webp",
+      "runtimeEntityId": "thornbound_elders_ridge_1",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "terrace_mudbacks",
+      "kind": "enemyGroup",
+      "label": "Terrace Mudback",
+      "file": "assets/captures/enemy-groups/terrace_mudbacks.webp",
+      "runtimeEntityId": "terrace_mudbacks_1",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "karrow_reavers",
+      "kind": "enemyGroup",
+      "label": "Karrow Reaver",
+      "file": "assets/captures/enemy-groups/karrow_reavers.webp",
+      "runtimeEntityId": "karrow_reavers_1",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "tarn_marchwolves",
+      "kind": "enemyGroup",
+      "label": "Tarn Marchwolf",
+      "file": "assets/captures/enemy-groups/tarn_marchwolves.webp",
+      "runtimeEntityId": "tarn_marchwolves_1",
+      "regionId": "karrowmoor"
+    },
+    {
+      "id": "gravelmaw_ch1_wights",
+      "kind": "enemyGroup",
+      "label": "Cairnwight",
+      "file": "assets/captures/enemy-groups/gravelmaw_ch1_wights.webp",
+      "runtimeEntityId": "gravelmaw_ch1_wights_1",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "gravelmaw_ch1_reavers",
+      "kind": "enemyGroup",
+      "label": "Gravelmaw Reaver",
+      "file": "assets/captures/enemy-groups/gravelmaw_ch1_reavers.webp",
+      "runtimeEntityId": "gravelmaw_ch1_reavers_1",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "gravelmaw_ch2_skitterlings",
+      "kind": "enemyGroup",
+      "label": "Scree Skitterling",
+      "file": "assets/captures/enemy-groups/gravelmaw_ch2_skitterlings.webp",
+      "runtimeEntityId": "gravelmaw_ch2_skitterlings_1",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "gravelmaw_ch2_mudbacks",
+      "kind": "enemyGroup",
+      "label": "Gravelmaw Mudback",
+      "file": "assets/captures/enemy-groups/gravelmaw_ch2_mudbacks.webp",
+      "runtimeEntityId": "gravelmaw_ch2_mudbacks_1",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "gravelmaw_ch3_elders",
+      "kind": "enemyGroup",
+      "label": "Thornbound Elder",
+      "file": "assets/captures/enemy-groups/gravelmaw_ch3_elders.webp",
+      "runtimeEntityId": "gravelmaw_ch3_elders_1",
+      "regionId": "gravelmaw"
+    },
+    {
+      "id": "ordrun",
+      "kind": "enemyGroup",
+      "label": "Ordrun the Quarrykeeper",
+      "file": "assets/captures/enemy-groups/ordrun.webp",
+      "runtimeEntityId": "ordrun",
+      "regionId": "gravelmaw"
     },
     {
       "id": "spawn",

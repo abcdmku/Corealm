@@ -4,6 +4,8 @@ dist/
 .astro/
 docs-site/src/content/docs/game/
 docs-site/public/game/locations/assets/world-map.webp
+docs-site/public/game/assets/world-map.webp
+docs-site/public/game/assets/captures/
 playwright-report/
 test-results/
 *.log

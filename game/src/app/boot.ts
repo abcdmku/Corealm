@@ -1247,18 +1247,21 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       const entity = entityStore.get(entityId);
       if (!entity) return false;
       const dungeonEntity = entity.regionId === "gravelmaw";
-      const contextualNpc = entity.archetype === "npc" && !dungeonEntity;
+      const settlementEntity = !dungeonEntity
+        && ["npc", "station", "bank", "shop"].includes(entity.archetype);
       const switchingRealm = (store.get().player.regionId === "gravelmaw") !== dungeonEntity;
-      // The dungeon's boss and puzzle door are composed inside the dungeon renderer rather than
-      // exclusively by EntityViews, so keep the complete interior for those two photographs.
-      if (switchingRealm) entityViews.setCaptureSubject(null);
-      scene.scatterGroup.visible = contextualNpc;
+      // Guide photographs must show the actual subject in its authored surroundings. Hiding the
+      // rest of EntityViews made a furnace or monster look like a detached catalogue render and
+      // also removed the nearby actors that tell a player where the subject really lives.
+      entityViews.setCaptureSubject(null);
+      scene.scatterGroup.visible = !dungeonEntity;
       scene.terrainGroup.visible = !dungeonEntity;
       if (dungeon) dungeon.group.visible = dungeonEntity;
-      // Photograph settlement NPCs from the square side of their stand: that is the authored open
-      // player approach, while the opposite side is commonly a forge, stall, or house wall.
+      // Photograph settlement subjects from the square side of their stand. The opposite side is
+      // commonly a forge, stall, or house wall. Wilderness and dungeon subjects keep a stable
+      // authored-or-id yaw so their local terrain remains the context.
       const authoredYaw = entity.view?.rotationY ?? stableCaptureYaw(entity.id);
-      const settlementRegion = contextualNpc
+      const settlementRegion = settlementEntity
         ? REGIONS.find((region) => region.id === entity.regionId)
         : undefined;
       const settlementCentre = settlementRegion?.settlement.centre;
@@ -1275,16 +1278,23 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       // Rootfall's square is itself a giant stump. A keeper standing beside that landmark needs a
       // tangent view; a camera on the literal centre line would photograph the inside of the stump.
       const contextualYaw = centreHasLandmark && centreDistance < 6 ? centreYaw + Math.PI / 2 : centreYaw;
-      const baseDistance = entity.archetype === "boss" ? 7 : contextualNpc ? 6.5 : 4.8;
+      const baseDistance = entity.archetype === "boss"
+        ? 11
+        : entity.archetype === "enemy"
+          ? 9
+          : entity.archetype === "npc"
+            ? 7
+            : settlementEntity
+              ? 9
+              : 10;
       if (switchingRealm) {
         frameDocumentationTarget(entity.position, contextualYaw, 0.25, baseDistance, "focus-entity-region");
       }
-      entityViews.setCaptureSubject(dungeonEntity || contextualNpc ? null : entityId);
       const bounds = entityViews.drawnBounds(entityId);
       const width = bounds ? bounds.max[0] - bounds.min[0] : 0;
       const height = bounds ? bounds.max[1] - bounds.min[1] : 0;
       const depth = bounds ? bounds.max[2] - bounds.min[2] : 0;
-      const distance = Math.max(baseDistance, width * 1.7, height * 1.7, depth * 1.7);
+      const distance = Math.max(baseDistance, width * 2.1, height * 2.1, depth * 2.1);
       const target: Vec3 = bounds
         ? [
           (bounds.min[0] + bounds.max[0]) / 2,
@@ -1292,7 +1302,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
           (bounds.min[2] + bounds.max[2]) / 2,
         ]
         : entity.position;
-      const pitch = contextualNpc ? 0.38 : 0.25;
+      const pitch = entity.archetype === "npc" ? 0.38 : dungeonEntity ? 0.28 : 0.34;
       frameDocumentationTarget(target, contextualYaw, pitch, distance, "focus-entity");
       return true;
     },

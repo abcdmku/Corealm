@@ -29,7 +29,7 @@ interface RuntimeEntity {
 
 interface CaptureRecord {
   id: string;
-  kind: "npc" | "enemy" | "entity" | "location";
+  kind: "npc" | "enemy" | "enemyGroup" | "entity" | "location";
   label: string;
   file: string;
   runtimeEntityId?: string;
@@ -57,6 +57,7 @@ function capturePath(kind: CaptureRecord["kind"], id: string): { absolute: strin
   const folder = {
     npc: "npcs",
     enemy: "enemies",
+    enemyGroup: "enemy-groups",
     entity: "entities",
     location: "locations",
   }[kind];
@@ -206,6 +207,41 @@ async function main(): Promise<void> {
       records.push(record);
     }
 
+    const enemyGroups = REGIONS.flatMap((region) => [
+      ...region.enemyGroups.map((group) => ({ group, regionId: region.id })),
+      ...(region.dungeon?.enemyGroups ?? []).map((group) => ({
+        group,
+        regionId: region.dungeon!.id,
+      })),
+    ]);
+    for (const { group, regionId } of enemyGroups) {
+      if (!wanted("enemyGroup", group.id)) continue;
+      const runtime = runtimeEntities.find((entity) =>
+        (entity.archetype === "enemy" || entity.archetype === "boss")
+        && entity.meta?.groupId === group.id,
+      );
+      if (!runtime) throw new Error(`Enemy group capture target ${group.id} is absent.`);
+      const target = capturePath("enemyGroup", group.id);
+      const record: CaptureRecord = {
+        id: group.id,
+        kind: "enemyGroup",
+        label: group.name,
+        file: target.relative,
+        runtimeEntityId: runtime.id,
+        regionId,
+      };
+      if (skipExisting && await fileExists(target.absolute)) {
+        records.push(record);
+        continue;
+      }
+      console.log(`Capturing enemy group: ${group.name} at ${group.id}`);
+      const focused = await driver.callDebug("focusEntity", [runtime.id]);
+      if (focused !== true) throw new Error(`Could not frame enemy group ${group.id}.`);
+      await driver.wait(180);
+      await captureFrame(driver, target.absolute);
+      records.push(record);
+    }
+
     const locations = new Map<string, { name: string; regionId: string }>();
     for (const region of REGIONS) {
       for (const location of region.locations) {
@@ -259,7 +295,7 @@ async function main(): Promise<void> {
   if (only === "") {
     await writeFile(
       path.join(outputRoot, "manifest.json"),
-      `${JSON.stringify({ version: 1, fingerprint, captures: records }, null, 2)}\n`,
+      `${JSON.stringify({ version: 2, fingerprint, captures: records }, null, 2)}\n`,
       "utf8",
     );
   }
