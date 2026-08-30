@@ -32,6 +32,7 @@ import { createItemIcon } from "./itemIcons.js";
 import { Hud } from "./hud.js";
 import { InventoryPanel } from "./inventoryPanel.js";
 import { SkillsPanel } from "./skillsPanel.js";
+import { SkillGuidePanel } from "./skillGuidePanel.js";
 import { EquipmentPanel } from "./equipmentPanel.js";
 import { BankPanel } from "./bankPanel.js";
 import { ShopPanel } from "./shopPanel.js";
@@ -286,6 +287,7 @@ export class PanelFrame {
         const onMove = (move: PointerEvent) => {
           const left = Math.min(Math.max(move.clientX - grabX, 0), Math.max(0, window.innerWidth - rect.width));
           const top = Math.min(Math.max(move.clientY - grabY, 0), Math.max(0, window.innerHeight - 32));
+          root.classList.add("is-moved");
           root.style.left = `${Math.round(left)}px`;
           root.style.top = `${Math.round(top)}px`;
           root.style.right = "auto";
@@ -684,7 +686,8 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
 
   const hud = new Hud(context, options);
   const inventory = new InventoryPanel(context);
-  const skills = new SkillsPanel(context);
+  const skillGuide = new SkillGuidePanel(context);
+  const skills = new SkillsPanel(context, (skill) => skillGuide.openFor(skill));
   const equipment = new EquipmentPanel(context);
   const quests = new QuestPanel(context);
   const dialogue = new DialoguePanel(context);
@@ -699,7 +702,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   bank = new BankPanel(context);
   shop = new ShopPanel(context);
   const panels: ManagedPanel[] = [
-    inventory, skills, equipment, quests, map, controls, dialogue, settingsPanel, bank, shop,
+    inventory, skills, skillGuide, equipment, quests, map, controls, dialogue, settingsPanel, bank, shop,
   ];
 
   const death = new DeathScreen(context);

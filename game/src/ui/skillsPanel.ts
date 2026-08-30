@@ -33,7 +33,10 @@ export class SkillsPanel implements ManagedPanel {
   private readonly rows = new Map<SkillId, SkillRow>();
   private signature = "";
 
-  constructor(private readonly ctx: UiContext) {
+  constructor(
+    private readonly ctx: UiContext,
+    private readonly onSkillClick?: (skill: SkillId) => void,
+  ) {
     this.frame = new PanelFrame({
       id: "skills",
       title: "Skills",
@@ -126,9 +129,10 @@ export class SkillsPanel implements ManagedPanel {
 
     row.append(dot, name, level, bar, detail);
 
-    // The generated skill guide is a later round. Until then a click says what the skill is for,
-    // which is the part a new player needs first.
-    row.addEventListener("click", () => notify(`${def.name}: ${def.blurb}`, "info"));
+    row.addEventListener("click", () => {
+      if (this.onSkillClick) this.onSkillClick(id);
+      else notify(`${def.name}: ${def.blurb}`, "info");
+    });
     this.ctx.tooltip.attach(row, () => ({ kind: "text", title: def.name, lines: [def.blurb] }));
 
     this.rows.set(id, { level, fill, detail, root: row });

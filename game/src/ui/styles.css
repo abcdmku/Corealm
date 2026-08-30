@@ -1206,7 +1206,7 @@ html, body {
 
 /* ------------------------------------------------------------ movable panels */
 
-.panel--movable .panel__header { cursor: grab; user-select: none; }
+.panel--movable .panel__header { cursor: grab; user-select: none; touch-action: none; }
 .panel--movable .panel__header:active { cursor: grabbing; }
 
 /* -------------------------------------------------------------- the minimap */
@@ -1388,3 +1388,168 @@ html, body {
 
 .quests__pin:hover { color: var(--highlight); }
 .quests__pin.is-pinned { color: var(--accent); }
+
+/* --------------------------------------------------------- the skill guide */
+
+/* A compact companion pane: the shared panel supplies the game chrome, this only lays out rows. */
+#panel-skill-guide {
+  width: 320px;
+  max-width: calc(100vw - (var(--space-4) * 2));
+}
+
+#panel-skill-guide .panel__body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.skill-guide {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.skill-guide__intro {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: var(--size-sm);
+  line-height: 1.35;
+}
+
+.skill-guide__summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: rgba(0, 0, 0, 0.28);
+  border-left: 2px solid var(--skill-colour, var(--accent));
+  color: var(--ink-dim);
+}
+
+.skill-guide__summary-label {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: var(--size-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.skill-guide__summary-value {
+  color: var(--ink);
+  font-family: var(--font-numeric);
+  font-size: var(--size-xs);
+  white-space: nowrap;
+}
+
+.skill-guide__section {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.skill-guide__section-title {
+  margin: 0 0 var(--space-1);
+  color: var(--ink-dim);
+}
+
+.skill-guide__unlocks {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(52vh, 400px);
+  margin: 0;
+  padding: 0 var(--space-1) 0 0;
+  overflow-y: auto;
+  scrollbar-color: #4a4133 transparent;
+  scrollbar-width: thin;
+}
+
+.skill-guide__unlocks::-webkit-scrollbar { width: 7px; }
+.skill-guide__unlocks::-webkit-scrollbar-track { background: transparent; }
+.skill-guide__unlocks::-webkit-scrollbar-thumb { background: #4a4133; border-radius: 4px; }
+
+.skill-guide__unlock {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-1) var(--space-1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.skill-guide__unlock:hover { background: rgba(255, 255, 255, 0.04); }
+
+.skill-guide__level {
+  color: var(--skill-colour, var(--ink-dim));
+  font-family: var(--font-numeric);
+  font-size: var(--size-xs);
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.skill-guide__text { min-width: 0; }
+
+.skill-guide__name {
+  display: inline-block;
+  margin-right: var(--space-1);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: var(--size-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.skill-guide__detail {
+  color: var(--ink);
+  font-size: var(--size-sm);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.skill-guide__state {
+  align-self: start;
+  color: var(--success);
+  font-size: var(--size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.skill-guide__unlock.is-locked { opacity: 0.56; }
+.skill-guide__unlock.is-locked .skill-guide__state { color: var(--ink-faint); }
+.skill-guide__unlock.is-locked .skill-guide__name { color: var(--ink-dim); }
+.skill-guide__empty { margin: 0; padding: var(--space-2) 0; color: var(--ink-dim); font-size: var(--size-sm); }
+
+@media (max-height: 800px) {
+  .skill-guide__unlocks { max-height: min(48vh, 340px); }
+}
+
+@media (max-width: 760px) {
+  #panel-skill-guide:not(.is-moved) {
+    top: var(--space-2) !important;
+    right: var(--space-2) !important;
+    bottom: var(--space-2) !important;
+    left: var(--space-2) !important;
+    width: auto !important;
+    max-width: none;
+    max-height: calc(100vh - (var(--space-2) * 2));
+    transform: none !important;
+  }
+
+  #panel-skill-guide.is-moved {
+    max-width: calc(100vw - (var(--space-2) * 2));
+  }
+
+  .skill-guide__unlocks { max-height: none; }
+  .skill-guide__unlock { grid-template-columns: 34px minmax(0, 1fr) auto; }
+}
