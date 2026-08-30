@@ -5,15 +5,14 @@
  *
  * Three rules the whole file follows:
  *
- *  - Tokens only. Every colour here is a `:root` variable from styles.css or a shade already used
- *    by `.btn` in that file. Nothing new is invented; brass is still the only actionable colour.
+ *  - Tokens only. Every colour here is a `:root` variable from styles.css or a wash already used
+ *    by the shared chrome. Brass is still the only actionable colour.
  *  - The window sits low and centred and never grows past half the screen, because the player has
  *    to be able to look at the person they are talking to. `bottom`/`left`/`width`/`max-height`
  *    come from the panel's placement in dialoguePanel.ts; the centring transform is here because
  *    `left: 50%` alone would hang the panel off to the right.
  *  - Only `#panel-dialogue` and `.dialogue*` are selected. The shared `.panel`, `.btn` and `.u-*`
- *    rules belong to styles.css and are not touched or overridden here; where this file needs
- *    different behaviour from `.btn` it builds its own class from the same tokens instead.
+ *    rules belong to styles.css and are not touched or overridden here.
  */
 
 /*
@@ -22,7 +21,7 @@
  * `max-height` stay inline because the frame always writes those two.
  */
 #panel-dialogue {
-  width: 620px;
+  width: 560px;
   /* `left: 50%` positions the left edge; this pulls the box back over the centre line. */
   transform: translateX(-50%);
   max-width: calc(100vw - 32px);
@@ -35,7 +34,7 @@
 #panel-dialogue .panel__body {
   overflow: hidden;
   min-height: 0;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 /* The speaker is the headline here, not the word "Conversation". */
@@ -48,7 +47,7 @@
 .dialogue {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-height: 0;
 }
 
@@ -71,7 +70,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding-right: var(--space-2);
   /* Growth adds lines at the bottom; without this the view would jump on every choice. */
   overflow-anchor: none;
@@ -79,15 +78,15 @@
    * out when idle, and a transcript whose only "there is more above" signal has faded is a
    * transcript the player does not know they have. `thin` pins a real one. */
   scrollbar-width: thin;
-  scrollbar-color: var(--panel-edge-bright) var(--panel-sunken);
+  scrollbar-color: #4a4133 rgba(0, 0, 0, 0.3);
 }
 
-.dialogue__scroll::-webkit-scrollbar { width: 9px; }
-.dialogue__scroll::-webkit-scrollbar-track { background: var(--panel-sunken); border-radius: 5px; }
+.dialogue__scroll::-webkit-scrollbar { width: 8px; }
+.dialogue__scroll::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); border-radius: 4px; }
 .dialogue__scroll::-webkit-scrollbar-thumb {
-  background: var(--panel-edge-bright);
-  border: 2px solid var(--panel-sunken);
-  border-radius: 5px;
+  background: #4a4133;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
 }
 
 /*
@@ -113,22 +112,22 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .dialogue__turn {
-  padding-left: var(--space-3);
+  padding-left: var(--space-2);
   border-left: 2px solid var(--panel-edge);
 }
 
 .dialogue__who {
-  margin-bottom: 3px;
+  margin-bottom: 2px;
   color: var(--ink-faint);
 }
 
 .dialogue__said p {
-  margin: 0 0 var(--space-2);
-  line-height: 1.5;
+  margin: 0 0 var(--space-1);
+  line-height: 1.45;
 }
 
 .dialogue__said p:last-child { margin-bottom: 0; }
@@ -156,12 +155,13 @@
 
 .dialogue__turn--npc.is-current .dialogue__who {
   color: var(--accent);
+  font-weight: 600;
 }
 
 .dialogue__turn--npc.is-current .dialogue__said {
   font-size: var(--size-md);
   color: var(--ink);
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 /* ---------------------------------------------------------------- the replies */
@@ -170,52 +170,45 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding-top: var(--space-3);
-  border-top: var(--border);
+  gap: 1px;
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(212, 175, 88, 0.18);
 }
 
 /*
- * Built on the `.btn` recipe — same gradient, same brass hover, same radius — rather than reusing
- * the class, because a reply is a left-aligned paragraph that may carry a second line of reason
- * text under it, and `.btn` is a centred single-line inline-flex with a fixed min-height.
+ * A reply is a line, not a button: quiet until hovered, then the brass wash the whole UI uses for
+ * "you are on this". Built from scratch rather than on `.btn`, because a reply is a left-aligned
+ * paragraph that may carry a second line of reason text under it. `border-color` is deliberately
+ * NOT transitioned: in Chromium a transitioned longhand whose base comes from a var()-carrying
+ * shorthand never leaves its start value, so `.is-refused` would stay on the base colour forever.
  */
 .dialogue__option {
   display: grid;
-  grid-template-columns: 20px 1fr;
+  grid-template-columns: 18px 1fr;
   column-gap: var(--space-2);
-  row-gap: 5px;
+  row-gap: 3px;
   width: 100%;
-  padding: 6px 10px;
+  padding: 3px 6px;
   text-align: left;
   font-family: inherit;
-  font-size: var(--size-sm);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: var(--size-md);
+  font-weight: 400;
+  letter-spacing: 0;
   color: var(--ink);
-  background: linear-gradient(180deg, #3a332b, #262119);
-  border: var(--border-bright);
+  background: none;
+  border: 1px solid transparent;
   border-radius: var(--radius);
   cursor: pointer;
-  /*
-   * `border-color` is deliberately NOT transitioned.
-   *
-   * The base border here is `border: var(--border-bright)`, a shorthand carrying a var(), and in
-   * Chromium a transitioned longhand whose base value comes from such a shorthand never leaves its
-   * start value: `.is-refused` set `border-color: var(--danger)` and the computed value stayed on
-   * `--panel-edge` forever, verified in the browser. Dropping it from the transition list makes the
-   * colour land instantly, which is what feedback on a keypress wants anyway. `.btn` in styles.css
-   * has the same pairing and is likely to have the same silent problem — reported to the root.
-   */
   transition: background var(--transition), color var(--transition);
 }
 
 .dialogue__option:hover {
-  background: linear-gradient(180deg, #473e33, #2f281f);
-  border-color: var(--accent-dim);
+  background: rgba(212, 175, 78, 0.12);
 }
 
-.dialogue__option:active { background: #221d17; }
+.dialogue__option:hover .dialogue__option-text { color: var(--highlight); }
+
+.dialogue__option:active { background: rgba(0, 0, 0, 0.3); }
 
 .dialogue__option-text { line-height: 1.4; }
 
@@ -226,10 +219,10 @@
  * wrong for the sentence underneath it: `disabledReason` is written to be read ("Harrow will not
  * sell Kaldite work below Smithing 10...") and it is how the player learns what to go and do. So
  * this is not a `.btn`, it never carries the `disabled` attribute, and the reason stays at full
- * contrast on a sunken plate. It is still focusable and still announced, via `aria-disabled`.
+ * contrast. It is still focusable and still announced, via `aria-disabled`.
  */
 .dialogue__option--locked {
-  background: var(--panel-sunken);
+  background: rgba(0, 0, 0, 0.25);
   border-width: 1px;
   border-style: dashed;
   border-color: var(--panel-edge);
@@ -237,9 +230,11 @@
 }
 
 .dialogue__option--locked:hover {
-  background: var(--panel-sunken);
+  background: rgba(0, 0, 0, 0.25);
   border-color: var(--panel-edge-bright);
 }
+
+.dialogue__option--locked:hover .dialogue__option-text { color: var(--ink-dim); }
 
 .dialogue__option--locked .dialogue__option-text {
   color: var(--ink-dim);
@@ -250,7 +245,7 @@
   font-size: var(--size-xs);
   font-weight: 400;
   letter-spacing: 0;
-  line-height: 1.45;
+  line-height: 1.4;
   color: var(--ink-dim);
 }
 
@@ -259,7 +254,7 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--danger);
-  background: linear-gradient(180deg, #3a201a, #2a1712);
+  background: rgba(224, 101, 80, 0.1);
 }
 
 .dialogue__option.is-refused .dialogue__option-text { color: #f3c3b8; }
@@ -272,14 +267,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  padding: 0 4px;
-  background: var(--panel-sunken);
+  min-width: 16px;
+  padding: 0 3px;
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--panel-edge);
   border-radius: 3px;
   font-family: var(--font-numeric);
-  font-size: 10px;
-  line-height: 15px;
+  font-size: 9px;
+  line-height: 14px;
   letter-spacing: 0;
   color: var(--ink-faint);
   vertical-align: middle;
@@ -309,14 +304,14 @@
  * buy back a little room inside it. */
 @media (max-height: 800px) {
   .dialogue__turn:not(.is-current) .dialogue__said { font-size: var(--size-xs); }
-  .dialogue__log, .dialogue__scroll { gap: var(--space-2); }
+  .dialogue__log, .dialogue__scroll { gap: var(--space-1); }
   /* Every row saved here is a line of the speech kept on screen. */
-  .dialogue__option { padding: 4px 8px; }
-  .dialogue__choices { padding-top: var(--space-2); }
-  #panel-dialogue .panel__body { padding: var(--space-2) var(--space-3); gap: var(--space-2); }
+  .dialogue__option { padding: 2px 6px; }
+  .dialogue__choices { padding-top: var(--space-1); }
+  #panel-dialogue .panel__body { padding: var(--space-1) var(--space-2); gap: var(--space-1); }
 }
 
 /* 1280 is the floor. Narrower than the panel is wide, and the vitals cluster starts to crowd it. */
 @media (max-width: 1320px) {
-  #panel-dialogue { width: 560px; }
+  #panel-dialogue { width: 520px; }
 }

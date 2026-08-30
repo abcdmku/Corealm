@@ -30,7 +30,8 @@ export class InventoryPanel implements ManagedPanel {
       key: "i",
       keyLabel: "Inventory",
       registry: ctx.registry,
-      placement: { top: "96px", right: "16px", width: "236px" },
+      placement: { right: "10px", bottom: "48px", width: "190px", maxHeight: "calc(100vh - 110px)" },
+      group: "side",
       onOpen: () => this.refresh(true),
     });
 
@@ -64,7 +65,7 @@ export class InventoryPanel implements ManagedPanel {
     }
 
     const free = inventory.freeSlots;
-    this.frame.setSubtitle(free === 0 ? "full" : `${free} of ${INVENTORY_SLOTS} free`);
+    this.frame.setSubtitle(free === 0 ? "full" : `${free}/${INVENTORY_SLOTS} free`);
   }
 
   dispose(): void {

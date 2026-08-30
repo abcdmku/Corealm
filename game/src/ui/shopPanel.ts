@@ -46,7 +46,8 @@ export class ShopPanel implements ManagedPanel {
       id: "shop",
       title: "Shop",
       registry: ctx.registry,
-      placement: { top: "80px", left: "calc(50% - 340px)", width: "680px" },
+      placement: { top: "64px", left: "calc(50% - 310px)", width: "620px" },
+      group: "center",
       onOpen: () => this.refresh(true),
     });
 

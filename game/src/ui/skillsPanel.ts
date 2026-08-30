@@ -40,7 +40,8 @@ export class SkillsPanel implements ManagedPanel {
       key: "k",
       keyLabel: "Skills",
       registry: ctx.registry,
-      placement: { top: "96px", right: "264px", width: "320px" },
+      placement: { right: "10px", bottom: "48px", width: "190px", maxHeight: "calc(100vh - 110px)" },
+      group: "side",
       onOpen: () => this.refresh(true),
     });
 
@@ -87,7 +88,7 @@ export class SkillsPanel implements ManagedPanel {
       );
     }
 
-    this.frame.setSubtitle(`Total level ${totalLevel} · ${formatQuantity(totalXp)} xp`);
+    this.frame.setSubtitle(`Total ${totalLevel} · ${formatQuantity(totalXp)} xp`);
   }
 
   dispose(): void {

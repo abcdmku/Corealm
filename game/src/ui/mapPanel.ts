@@ -12,7 +12,9 @@ import { REGION_PALETTES } from "../render/materials.js";
 import { notify } from "./contextMenu.js";
 import type { ManagedPanel, MapTerrainSource, UiContext } from "./panels.js";
 import { PanelFrame, report } from "./panels.js";
-import { WorldMapCanvas, type MapScreenPoint } from "./worldMapCanvas.js";
+import {
+  MAP_HOME_ZOOM, MAP_MAX_ZOOM, MAP_MIN_ZOOM, WorldMapCanvas, type MapScreenPoint,
+} from "./worldMapCanvas.js";
 
 /** Kept for isolated consumers. The live panel uses `MapTerrainSource.bounds`. */
 export const WORLD_BOUNDS = {
@@ -24,6 +26,8 @@ export const WORLD_BOUNDS = {
 
 const LABEL_SIZE = 12;
 const PIP_RADIUS = 4;
+/** How often the expensive observe()/rebuild half of refresh() may run. See refresh(). */
+const DATA_INTERVAL_MS = 1_000;
 const HIT_RADIUS = 12;
 const PAN_KEY_PIXELS = 48;
 
@@ -202,6 +206,7 @@ export class MapPanel implements ManagedPanel {
   private dragX = 0;
   private dragY = 0;
   private paintFrame = 0;
+  private lastDataMs = -Infinity;
 
   constructor(private readonly ctx: UiContext) {
     this.source = ctx.mapTerrain ?? fallbackTerrain();
@@ -211,11 +216,15 @@ export class MapPanel implements ManagedPanel {
       key: "m",
       keyLabel: "Map",
       registry: ctx.registry,
-      placement: { top: "72px", left: "50%", width: "min(900px, calc(100vw - 40px))" },
+      placement: { top: "56px", left: "50%", width: "min(1040px, calc(100vw - 80px))" },
+      group: "center",
+      movable: true,
       onOpen: () => {
         this.rovingIndex = 0;
         this.focusKey = null;
         this.resize();
+        // Open where the player is, at street level. The whole map is one wheel-out away.
+        this.map.centreOn(this.ctx.api.getPlayer().position, MAP_HOME_ZOOM);
         this.refresh(true);
       },
       onClose: () => this.endDrag(),
@@ -268,6 +277,8 @@ export class MapPanel implements ManagedPanel {
     this.figure.dataset["mapLabels"] = "shown";
     this.figure.dataset["mapWorldBounds"] = JSON.stringify(this.source.bounds);
 
+    // The hover readout floats inside the figure (bottom-left) rather than adding a footer row:
+    // the window is one header and one map, nothing else.
     const readout = document.createElement("div");
     readout.className = "map__readout";
     readout.setAttribute("role", "status");
@@ -279,11 +290,21 @@ export class MapPanel implements ManagedPanel {
     this.readoutRange = document.createElement("span");
     this.readoutRange.className = "map__readout-range u-numeric";
     readout.append(this.readoutName, this.readoutMeta, this.readoutRange);
+    this.figure.appendChild(readout);
 
+    // Still populated by refresh(), never attached: the region legend was a footer this window
+    // no longer spends a row on.
     this.legend = document.createElement("div");
     this.legend.className = "map__legend";
-    this.body.append(toolbar, this.figure, readout, this.legend);
+    this.body.append(this.figure);
     this.frame.body.appendChild(this.body);
+
+    // One header for the whole window: the view controls sit in the panel header, between the
+    // title and the close button, instead of a second toolbar row above the map.
+    const header = this.frame.root.querySelector(":scope > .panel__header");
+    const close = header?.querySelector(".panel__close") ?? null;
+    if (header && close) header.insertBefore(toolbar, close);
+    else this.body.prepend(toolbar);
 
     this.figure.addEventListener("pointerover", this.onPointerOver);
     this.figure.addEventListener("pointerleave", this.onPointerLeave);
@@ -316,24 +337,36 @@ export class MapPanel implements ManagedPanel {
 
   refresh(force = false): void {
     const player = this.ctx.api.getPlayer();
-    const rows = this.known().filter((row) => SURFACE_REGIONS.has(row.regionId));
-    const signature = rows.map((row) => row.id).sort().join(",");
-    if (force || signature !== this.signature) {
-      this.signature = signature;
-      this.rebuild(rows);
-    } else {
-      for (const row of rows) {
-        const place = this.byEntity.get(row.id);
-        if (!place) continue;
-        place.distance = row.distance;
-        place.group.setAttribute(
-          "aria-label",
-          `${place.name}, ${KIND_LABEL[place.kind]}, ${Math.round(place.distance)} metres. Walk there.`,
-        );
+
+    /*
+     * The observe() half is the expensive half: `scope: "known"` prices every known place by PATH
+     * distance, which is a navmesh query per row. At the shared 220 ms panel cadence that made the
+     * whole game hitch while the window was open — so the data half runs on its own ~1 s clock,
+     * and never during a drag, while the cheap parts (player mark, readout, repaint) keep the
+     * panel feeling live every tick.
+     */
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if ((force || now - this.lastDataMs >= DATA_INTERVAL_MS) && this.dragPointer === null) {
+      this.lastDataMs = now;
+      const rows = this.known().filter((row) => SURFACE_REGIONS.has(row.regionId));
+      const signature = rows.map((row) => row.id).sort().join(",");
+      if (force || signature !== this.signature) {
+        this.signature = signature;
+        this.rebuild(rows);
+      } else {
+        for (const row of rows) {
+          const place = this.byEntity.get(row.id);
+          if (!place) continue;
+          place.distance = row.distance;
+          place.group.setAttribute(
+            "aria-label",
+            `${place.name}, ${KIND_LABEL[place.kind]}, ${Math.round(place.distance)} metres. Walk there.`,
+          );
+        }
       }
+      this.frame.setSubtitle(this.subtitle(rows, player.regionId));
     }
 
-    this.frame.setSubtitle(this.subtitle(rows, player.regionId));
     this.trackPlayer(player.position);
     this.syncDestinationState();
     this.paintReadout();
@@ -586,10 +619,13 @@ export class MapPanel implements ManagedPanel {
   private updateControls(): void {
     const zoom = this.map.zoomLevel();
     const state = this.map.viewState();
-    this.zoomOutButton.disabled = zoom <= 1.001;
-    this.zoomInButton.disabled = zoom >= 5.999;
-    this.zoomReadout.value = `${Math.round(zoom * 100)}%`;
-    this.zoomReadout.textContent = `${Math.round(zoom * 100)}%`;
+    this.zoomOutButton.disabled = zoom <= MAP_MIN_ZOOM + 0.001;
+    this.zoomInButton.disabled = zoom >= MAP_MAX_ZOOM - 0.001;
+    // The label is relative to the home view: opening on the player reads 100%, the whole-map
+    // view reads ~17%, and the ceiling reads 200%.
+    const percent = `${Math.round((zoom / MAP_HOME_ZOOM) * 100)}%`;
+    this.zoomReadout.value = percent;
+    this.zoomReadout.textContent = percent;
     this.figure.dataset["mapZoom"] = state.zoom.toFixed(3);
     this.figure.dataset["mapCentreU"] = state.centreU.toFixed(3);
     this.figure.dataset["mapCentreV"] = state.centreV.toFixed(3);
@@ -696,7 +732,9 @@ export class MapPanel implements ManagedPanel {
     if (!mark || !position) return;
     const screen = this.map.screen(position);
     const heading = this.headingRad;
-    const rotation = heading === null ? 0 : (heading * 180) / Math.PI;
+    // Negated: the map frame draws +x leftward (see WorldMapCanvas.project), and a mirror flips
+    // angles. Without this the arrow pointed east while the player walked west.
+    const rotation = heading === null ? 0 : -(heading * 180) / Math.PI;
     mark.setAttribute("transform", `translate(${round(screen.x)} ${round(screen.y)}) rotate(${round(rotation)})`);
     mark.setAttribute("visibility", screen.visible ? "visible" : "hidden");
     this.playerArrow?.setAttribute("visibility", heading === null ? "hidden" : "visible");
@@ -724,10 +762,10 @@ export class MapPanel implements ManagedPanel {
     const place = this.focusKey ? this.byKey.get(this.focusKey) : undefined;
     const leader = this.leader;
     if (!place) {
-      const nearest = this.places[0];
-      this.readoutName.textContent = "You are here";
-      this.readoutMeta.textContent = nearest ? `Nearest: ${nearest.name}` : "No places found";
-      this.readoutRange.textContent = nearest ? `${Math.round(nearest.distance)} m` : "";
+      // Idle shows nothing: the readout chip only exists while a place is under the cursor.
+      this.readoutName.textContent = "";
+      this.readoutMeta.textContent = "";
+      this.readoutRange.textContent = "";
       leader?.setAttribute("visibility", "hidden");
       return;
     }

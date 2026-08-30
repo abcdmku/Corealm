@@ -19,7 +19,7 @@
  * resolved inside a function body instead.
  */
 import type {
-  EntityId, GameApi, ItemDef, ItemId, ItemStack, RegionId, Result, SkillId, Vec3,
+  EntityId, GameApi, ItemDef, ItemId, ItemStack, QuestId, RegionId, Result, SkillId, Vec3,
 } from "../contracts.js";
 import { content } from "../content/index.js";
 import { SKILLS } from "../content/skills.js";
@@ -44,6 +44,8 @@ import { TitleScreen } from "./titleScreen.js";
 import { SettingsPanel } from "./settingsPanel.js";
 import { SettingsStore } from "./settings.js";
 import { PanelDock } from "./dock.js";
+import { QuestTracker } from "./questTracker.js";
+import { Minimap } from "./minimap.js";
 
 /** The inventory is 28 slots, per PRD section 5. Panels that mirror it use this, never a literal. */
 export const INVENTORY_SLOTS = 28;
@@ -174,6 +176,14 @@ export interface PanelFrameOptions {
   key?: string;
   /** Shown in a controls list. Defaults to "Toggle <title>". */
   keyLabel?: string;
+  /**
+   * Panels in the same group share one screen slot: opening one closes the others. This is the
+   * no-overlap rule — "side" is the tab slot above the dock, "center" is the one large window.
+   * The group name is also added as a `panel--<group>` class so the stylesheet can shape the slot.
+   */
+  group?: string;
+  /** Draggable by its header. The first drag converts the placement to explicit left/top. */
+  movable?: boolean;
   onOpen?(): void;
   onClose?(): void;
 }
@@ -185,6 +195,10 @@ const PANEL_Z_BASE = 20;
 const PANEL_STACK_DEPTH = 9;
 
 let panelZCounter = 0;
+
+/** Frames by group, so open() can vacate a shared slot. Module-level: frames register on
+ * construction and leave on dispose, and the map never outlives the page. */
+const panelGroups = new Map<string, Set<PanelFrame>>();
 
 /**
  * One panel chrome: header, close button, body, key binding, Escape handling, focus restore.
@@ -208,6 +222,15 @@ export class PanelFrame {
 
     const root = document.createElement("section");
     root.className = "panel panel--float";
+    if (options.group) {
+      root.classList.add(`panel--${options.group}`);
+      let peers = panelGroups.get(options.group);
+      if (!peers) {
+        peers = new Set();
+        panelGroups.set(options.group, peers);
+      }
+      peers.add(this);
+    }
     root.id = `panel-${options.id}`;
     root.hidden = true;
     root.tabIndex = -1;
@@ -245,6 +268,39 @@ export class PanelFrame {
     close.addEventListener("click", () => this.close());
 
     header.append(titles, close);
+
+    /*
+     * Drag-to-move, on the header only. The placement may be anchored any way (right/bottom, or
+     * left:50% + a stylesheet transform); the first drag converts it to explicit left/top and
+     * kills the transform, because mixing a centring transform with a dragged position doubles
+     * every movement. Listeners on window exist only for the duration of a drag.
+     */
+    if (options.movable) {
+      root.classList.add("panel--movable");
+      header.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        if (event.target instanceof Element && event.target.closest("button")) return;
+        const rect = root.getBoundingClientRect();
+        const grabX = event.clientX - rect.left;
+        const grabY = event.clientY - rect.top;
+        const onMove = (move: PointerEvent) => {
+          const left = Math.min(Math.max(move.clientX - grabX, 0), Math.max(0, window.innerWidth - rect.width));
+          const top = Math.min(Math.max(move.clientY - grabY, 0), Math.max(0, window.innerHeight - 32));
+          root.style.left = `${Math.round(left)}px`;
+          root.style.top = `${Math.round(top)}px`;
+          root.style.right = "auto";
+          root.style.bottom = "auto";
+          root.style.transform = "none";
+        };
+        const onUp = () => {
+          window.removeEventListener("pointermove", onMove);
+          window.removeEventListener("pointerup", onUp);
+        };
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        event.preventDefault();
+      });
+    }
 
     const body = document.createElement("div");
     body.className = "panel__body";
@@ -285,6 +341,13 @@ export class PanelFrame {
     if (this.opened) {
       this.raise();
       return;
+    }
+    // One slot per group. The sibling closes BEFORE this opens so focus restore and the escape
+    // stack see a plain close-then-open, never two panels fighting over the same pixels.
+    if (this.options.group) {
+      for (const peer of panelGroups.get(this.options.group) ?? []) {
+        if (peer !== this) peer.close();
+      }
     }
     this.opened = true;
     this.root.hidden = false;
@@ -347,6 +410,7 @@ export class PanelFrame {
 
   dispose(): void {
     this.close();
+    if (this.options.group) panelGroups.get(this.options.group)?.delete(this);
     for (const dispose of this.disposers) dispose();
     this.disposers.length = 0;
     this.root.remove();
@@ -521,6 +585,10 @@ export interface UiContext {
   isShopOpen(): boolean;
   deposit(itemId: ItemId, quantity: number): void;
   sell(itemId: ItemId, quantity: number): void;
+  /** Pin a quest to the floating tracker card, or null to unpin. */
+  pinQuest(questId: QuestId | null): void;
+  /** The quest currently pinned to the tracker, or null. */
+  pinnedQuestId(): QuestId | null;
   /** Repaint every open panel now. Called after any mutation so the player sees the result. */
   refresh(): void;
 }
@@ -552,6 +620,11 @@ export interface UiOptions {
    * which is still correct, just not view-relative.
    */
   getHeadingRad?(): number;
+  /**
+   * Where the player is currently walking to, or null when idle. Read by the minimap for its
+   * destination marker. Comes from the store because `GameApi` does not expose the live path.
+   */
+  getDestination?(): Vec3 | null;
 }
 
 export interface Ui {
@@ -592,6 +665,8 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   let bank: BankPanel | null = null;
   let shop: ShopPanel | null = null;
 
+  const tracker = new QuestTracker(api);
+
   const context: UiContext = {
     api,
     tooltip,
@@ -602,6 +677,8 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     isShopOpen: () => shop?.frame.isOpen() ?? false,
     deposit: (itemId, quantity) => { bank?.deposit(itemId, quantity); },
     sell: (itemId, quantity) => { shop?.sell(itemId, quantity); },
+    pinQuest: (questId) => { tracker.pin(questId); },
+    pinnedQuestId: () => tracker.pinnedId(),
     refresh: () => refreshAll(true),
   };
 
@@ -639,6 +716,14 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     },
     onClose: () => title.close(),
   });
+
+  // Built after the map and the title screen exist: its corner buttons drive both.
+  const minimap = options.mapTerrain
+    ? new Minimap(api, options.mapTerrain, options.getDestination, options.getHeadingRad, {
+        onOpenMap: () => map.frame.toggle(),
+        onMenu: () => title.open(),
+      })
+    : null;
 
   // Every panel gets a permanent on-screen button that prints its own key. The bank and the shop
   // are deliberately not on it: both are opened by standing at one, and a button that answers
@@ -681,6 +766,12 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       if (mounted) return;
       mounted = true;
       hud.mount(root);
+      // The minimap owns the top-right corner; the HUD's purse cluster steps down below it.
+      if (minimap) {
+        minimap.mount(root);
+        root.querySelector(".hud")?.classList.add("has-minimap");
+      }
+      tracker.mount(root);
       dock.mount(root);
       for (const panel of panels) panel.frame.mount(root);
       // Both of these cover the screen, so they mount last and sit above the panels.
@@ -699,6 +790,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
         hud.update(now);
         dock.update();
         death.update();
+        minimap?.update(now);
         // The world may open a bank or a shop through an interaction rather than through us.
         const wants = hud.takeAutoOpen();
         if (wants === "bank") bank?.openFor(undefined);
@@ -707,11 +799,14 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       if (now - lastPanelMs >= PANEL_INTERVAL_MS) {
         lastPanelMs = now;
         refreshAll(false);
+        tracker.update();
       }
     },
 
     dispose(): void {
       setNoticeSink(null);
+      minimap?.dispose();
+      tracker.dispose();
       dock.dispose();
       death.dispose();
       title.dispose();

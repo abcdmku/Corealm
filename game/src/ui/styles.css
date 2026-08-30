@@ -1,9 +1,14 @@
 /*
  * Corealm UI. The visual language for every panel, not just the ones that exist today.
  *
- * Style target: stylized medieval RPG. Aged parchment ink on dark leather, brass for anything the
- * player can act on. Readable over twitchy — the brief's pillar is that a screenshot should be
- * legible at a glance, so this file favours weight and contrast over animation.
+ * Style target: modern medieval RPG. Smoked-glass panels over the living world, brass hairlines,
+ * Cinzel small-caps for anything ceremonial, clean compact sans for everything read at speed.
+ * This is a game, not a website: chrome is thin, translucent and edge-hugging, the HUD is mostly
+ * frameless text with a hard shadow, and the world stays visible through everything.
+ *
+ * Space is expensive. Panels live in two fixed slots — the side slot above the dock (one panel at
+ * a time, swapped like tabs) and the centre slot for the one large window — so nothing ever
+ * overlaps and nothing floats loose. Density beats whitespace everywhere.
  *
  * Rules that must survive every later edit:
  *   - #boot-screen, #ui-root and #viewport keep their ids and their behaviour. The boot sequence
@@ -28,57 +33,73 @@
 @import "./styles/death.css";
 @import "./styles/title.css";
 
-:root {
-  /* ---- ink and surfaces */
-  --ink: #f2ece0;
-  --ink-dim: #b8ae9c;
-  --ink-faint: #8b8271;
-  --ink-inverse: #1a1815;
-  --panel: rgba(24, 22, 20, 0.92);
-  --panel-solid: #1c1a17;
-  --panel-raised: #262220;
-  --panel-sunken: #141210;
-  --panel-edge: #4a4238;
-  --panel-edge-bright: #6b5f4d;
+/* Cinzel (SIL OFL 1.1), self-hosted variable font. The ceremonial face: titles, the mark, gold
+ * numbers. Body text stays on the system sans stack — small type in a HUD must stay crisp. */
+@font-face {
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/assets/fonts/cinzel-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
-  /* ---- accents */
-  --accent: #c9a227;          /* brass. anything actionable */
-  --accent-dim: #8a6f1c;
-  --accent-ink: #2a2107;
-  --danger: #c9553d;
+:root {
+  /* ---- ink. One scale: every surface is dark glass, so ink is always light. */
+  --ink: #ece4d2;
+  --ink-dim: #b0a68c;
+  --ink-faint: #80785f;
+  --ink-inverse: #17130c;
+
+  /* ---- surfaces. Translucent smoked glass; the world is the background. */
+  --panel: rgba(16, 13, 10, 0.85);
+  --panel-solid: #16130e;
+  --panel-raised: rgba(255, 255, 255, 0.05);
+  --panel-sunken: rgba(0, 0, 0, 0.32);
+  --panel-edge: rgba(255, 255, 255, 0.09);
+  --panel-edge-bright: rgba(212, 175, 88, 0.35);
+
+  /* ---- accents. Brass for anything actionable; the highlight is candle-light, not neon. */
+  --accent: #d4af4e;
+  --accent-dim: #96762a;
+  --accent-ink: #1c1608;
+  --highlight: #ffe9a8;
+  --danger: #e06550;
   --danger-dim: #7e3527;
-  --success: #6b9c52;
-  --info: #6f8fd6;
+  --success: #82b563;
+  --info: #7d9bd9;
 
   /* ---- tier badges. material colour, matching the render palette families */
   --tier-1: #a8a294;
   --tier-5: #93a06a;
   --tier-10: #6d86a8;
 
-  /* ---- geometry */
-  --radius: 4px;
-  --radius-lg: 6px;
+  /* ---- geometry. Tight. Every pixel of chrome is a pixel of world lost. */
+  --radius: 3px;
+  --radius-lg: 4px;
   --border: 1px solid var(--panel-edge);
   --border-bright: 1px solid var(--panel-edge-bright);
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
+  --space-1: 3px;
+  --space-2: 6px;
+  --space-3: 10px;
+  --space-4: 14px;
+  --space-5: 20px;
 
-  /* ---- depth. one shadow recipe so panels read as one system */
-  --shadow-panel: 0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4);
-  --shadow-pop: 0 6px 18px rgba(0, 0, 0, 0.6);
-  --inset-well: inset 0 1px 0 rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  /* ---- depth. One soft shadow; a gold hairline inside the panel edge does the framing. */
+  --shadow-panel: 0 6px 22px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 4px 14px rgba(0, 0, 0, 0.55);
+  --inset-well: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-text: 0 1px 2px rgba(0, 0, 0, 0.9);
 
   /* ---- type */
-  --font: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --font: "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+  --font-display: "Cinzel", "Trebuchet MS", serif;
   --font-numeric: "Consolas", "SF Mono", ui-monospace, monospace;
-  --size-xs: 11px;
-  --size-sm: 12px;
-  --size-md: 14px;
-  --size-lg: 17px;
-  --size-xl: 22px;
+  --size-xs: 10px;
+  --size-sm: 11px;
+  --size-md: 13px;
+  --size-lg: 15px;
+  --size-xl: 19px;
   --tracking-wide: 0.08em;
 
   /* ---- layers. every fixed UI element picks from this list, never a raw number */
@@ -88,7 +109,7 @@
   --z-tooltip: 40;
   --z-boot: 50;
 
-  --transition: 120ms ease-out;
+  --transition: 100ms ease-out;
 
   /* ---- skill colours, from content/skills.ts */
   --skill-melee: #c9553d;
@@ -110,7 +131,7 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #10100f;
+  background: #0e0c09;
   color: var(--ink);
   font-family: var(--font);
   font-size: var(--size-md);
@@ -155,7 +176,7 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  background: radial-gradient(circle at 50% 40%, #23201c 0%, #100f0d 70%);
+  background: radial-gradient(circle at 50% 40%, #221d15 0%, #0e0c09 70%);
   transition: opacity 400ms ease;
   z-index: var(--z-boot);
 }
@@ -163,11 +184,13 @@ html, body {
 #boot-screen.hidden { opacity: 0; pointer-events: none; }
 
 .boot-mark {
-  font-size: 42px;
-  letter-spacing: 0.42em;
-  text-indent: 0.42em;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
   color: var(--accent);
-  font-weight: 700;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
 }
 
 .boot-status { color: var(--ink-dim); font-size: var(--size-md); letter-spacing: var(--tracking-wide); }
@@ -189,7 +212,7 @@ html, body {
 
 /* One focus ring for the whole UI. Keyboard reachability is a requirement, not a nicety. */
 :where(button, [role="menuitem"], [tabindex], a):focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -201,17 +224,19 @@ html, body {
 
 /* --------------------------------------------------------------- panels */
 
+/*
+ * A pane of smoked glass with one brass hairline inside its edge. The header is a single slim
+ * line — a small-caps title, a close glyph — not a bar. The world stays readable through it.
+ */
 .panel {
   position: absolute;
   display: flex;
   flex-direction: column;
-  min-width: 180px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0)) ,
-    var(--panel);
-  border: var(--border);
+  min-width: 170px;
+  background: linear-gradient(180deg, rgba(28, 23, 17, 0.92), rgba(13, 11, 8, 0.9));
+  border: 1px solid rgba(0, 0, 0, 0.85);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-panel);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 88, 0.16), var(--shadow-panel);
   color: var(--ink);
   z-index: var(--z-panel);
   overflow: hidden;
@@ -221,25 +246,37 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: linear-gradient(180deg, #2e2823, #211d19);
-  border-bottom: var(--border);
+  gap: var(--space-2);
+  min-height: 24px;
+  padding: 2px var(--space-2) 2px var(--space-3);
+  background: rgba(0, 0, 0, 0.28);
+  border-bottom: 1px solid rgba(212, 175, 88, 0.2);
 }
 
 .panel__title {
-  font-size: var(--size-lg);
+  font-family: var(--font-display);
+  font-size: var(--size-sm);
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  text-shadow: var(--shadow-text);
 }
 
-.panel__subtitle { font-size: var(--size-xs); color: var(--ink-dim); letter-spacing: var(--tracking-wide); }
+.panel__subtitle {
+  font-size: var(--size-xs);
+  color: var(--ink-dim);
+  letter-spacing: 0.04em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-.panel__body { padding: var(--space-3); overflow: auto; }
+.panel__body { padding: var(--space-2); overflow: auto; }
 
 .panel__footer {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-2);
   border-top: var(--border);
   background: rgba(0, 0, 0, 0.25);
 }
@@ -249,57 +286,58 @@ html, body {
 .panel__close {
   border: none;
   background: none;
-  color: var(--ink-dim);
-  font-size: var(--size-lg);
+  color: var(--ink-faint);
+  font-size: var(--size-md);
   line-height: 1;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: var(--radius);
 }
 
-.panel__close:hover { color: var(--ink); background: rgba(255, 255, 255, 0.07); }
+.panel__close:hover { color: var(--highlight); background: rgba(255, 255, 255, 0.07); }
 
 /* --------------------------------------------------------------- buttons */
 
+/* Quiet until hovered: a whisper of glass with a hairline, brass on approach. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: 6px 12px;
-  min-height: 28px;
+  padding: 2px 10px;
+  min-height: 22px;
   font-family: inherit;
   font-size: var(--size-sm);
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--ink);
-  background: linear-gradient(180deg, #3a332b, #262119);
-  border: var(--border-bright);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius);
   cursor: pointer;
-  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  transition: color var(--transition), background var(--transition);
 }
 
-.btn:hover { background: linear-gradient(180deg, #473e33, #2f281f); border-color: var(--accent-dim); }
-.btn:active { background: #221d17; transform: translateY(1px); }
+.btn:hover { color: var(--highlight); background: rgba(212, 175, 78, 0.12); border-color: var(--panel-edge-bright); }
+.btn:active { background: rgba(0, 0, 0, 0.35); transform: translateY(1px); }
 
 .btn--primary {
   color: var(--accent-ink);
-  background: linear-gradient(180deg, #e0bb42, #b48c1c);
-  border-color: #f0d475;
+  background: linear-gradient(180deg, #dcb95c, #a5822e);
+  border-color: rgba(0, 0, 0, 0.6);
 }
 
-.btn--primary:hover { background: linear-gradient(180deg, #f0cc55, #c39a24); }
+.btn--primary:hover { color: var(--accent-ink); background: linear-gradient(180deg, #eac768, #b58f36); border-color: rgba(0, 0, 0, 0.6); }
 
-.btn--danger { border-color: var(--danger-dim); color: #f3c3b8; }
-.btn--danger:hover { background: linear-gradient(180deg, #4a2a22, #331c17); border-color: var(--danger); }
+.btn--danger { border-color: var(--danger-dim); color: #f3c3b8; background: rgba(126, 53, 39, 0.2); }
+.btn--danger:hover { color: #ffd9cd; background: rgba(126, 53, 39, 0.38); border-color: var(--danger); }
 
 .btn--ghost { background: none; border-color: transparent; color: var(--ink-dim); }
-.btn--ghost:hover { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
+.btn--ghost:hover { background: rgba(255, 255, 255, 0.07); color: var(--ink); border-color: transparent; }
 
 .btn[disabled], .btn[aria-disabled="true"] {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.45;
   filter: saturate(0.4);
 }
 
@@ -310,28 +348,28 @@ html, body {
 .slot-grid {
   display: grid;
   grid-template-columns: repeat(var(--slot-columns, 4), 1fr);
-  gap: var(--space-1);
+  gap: 3px;
 }
 
 .slot {
   position: relative;
   aspect-ratio: 1;
-  min-width: 40px;
+  min-width: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, #211d19, #171412);
-  border: 1px solid #38312a;
+  background: var(--panel-sunken);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: var(--radius);
   box-shadow: var(--inset-well);
   cursor: pointer;
   transition: border-color var(--transition), background var(--transition);
 }
 
-.slot:hover { border-color: var(--accent-dim); background: linear-gradient(180deg, #2b251e, #1b1815); }
+.slot:hover { border-color: var(--panel-edge-bright); background: rgba(212, 175, 78, 0.08); }
 .slot.is-empty { cursor: default; }
-.slot.is-empty:hover { border-color: #38312a; background: linear-gradient(180deg, #211d19, #171412); }
-.slot.is-selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim), var(--inset-well); }
+.slot.is-empty:hover { border-color: rgba(255, 255, 255, 0.07); background: var(--panel-sunken); }
+.slot.is-selected { border-color: var(--accent); box-shadow: 0 0 6px rgba(212, 175, 78, 0.35), var(--inset-well); }
 .slot.is-equipped::after {
   content: "";
   position: absolute;
@@ -341,7 +379,7 @@ html, body {
   pointer-events: none;
 }
 
-.slot__icon { width: 78%; height: 78%; object-fit: contain; image-rendering: auto; pointer-events: none; }
+.slot__icon { width: 82%; height: 82%; object-fit: contain; image-rendering: auto; pointer-events: none; }
 
 .slot__count {
   position: absolute;
@@ -349,7 +387,7 @@ html, body {
   bottom: 1px;
   font-family: var(--font-numeric);
   font-size: var(--size-xs);
-  color: var(--ink);
+  color: #fff;
   text-shadow: 0 1px 2px #000, 0 0 3px #000;
   pointer-events: none;
 }
@@ -360,7 +398,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--size-xs);
+  font-size: 9px;
   color: var(--ink-faint);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -371,10 +409,10 @@ html, body {
 
 .bar {
   position: relative;
-  height: 10px;
-  background: var(--panel-sunken);
-  border: 1px solid #332c25;
-  border-radius: 999px;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 2px;
   overflow: hidden;
   box-shadow: var(--inset-well);
 }
@@ -395,13 +433,13 @@ html, body {
   justify-content: center;
   font-family: var(--font-numeric);
   font-size: var(--size-xs);
-  color: var(--ink);
+  color: #fff;
   text-shadow: 0 1px 2px #000;
 }
 
-.bar--tall { height: 18px; }
-.bar--health { --bar-colour: #b7472f; }
-.bar--health.is-low { --bar-colour: var(--danger); animation: pulse 900ms ease-in-out infinite; }
+.bar--tall { height: 14px; }
+.bar--health { --bar-colour: #c0392b; }
+.bar--health.is-low { --bar-colour: #e74c3c; animation: pulse 900ms ease-in-out infinite; }
 .bar--activity { --bar-colour: var(--accent); }
 .bar--xp { --bar-colour: var(--info); }
 
@@ -423,8 +461,8 @@ html, body {
 .bar--skill { --bar-colour: var(--skill-colour, var(--accent)); }
 .skill-dot {
   display: inline-block;
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 2px;
   background: var(--skill-colour, var(--ink-dim));
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
@@ -433,12 +471,13 @@ html, body {
 
 /* --------------------------------------------------------------- tooltip */
 
+/* The item card: near-opaque glass, brass name, stat deltas in green and red. */
 .tooltip {
   position: fixed;
   max-width: 34ch;
   padding: var(--space-2) var(--space-3);
-  background: var(--panel-solid);
-  border: var(--border-bright);
+  background: rgba(14, 12, 9, 0.96);
+  border: 1px solid rgba(212, 175, 88, 0.3);
   border-radius: var(--radius);
   box-shadow: var(--shadow-pop);
   font-size: var(--size-sm);
@@ -448,7 +487,7 @@ html, body {
   pointer-events: none;
 }
 
-.tooltip__title { font-size: var(--size-md); font-weight: 700; margin-bottom: 2px; }
+.tooltip__title { font-family: var(--font-display); font-size: var(--size-sm); font-weight: 700; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 2px; }
 .tooltip__tier { color: var(--ink-dim); font-size: var(--size-xs); letter-spacing: var(--tracking-wide); }
 .tooltip__body { color: var(--ink-dim); margin-top: var(--space-1); }
 .tooltip__stats { display: grid; grid-template-columns: auto auto; gap: 1px var(--space-3); margin-top: var(--space-2); }
@@ -462,13 +501,13 @@ html, body {
 
 .ctx-menu {
   position: fixed;
-  min-width: 190px;
+  min-width: 180px;
   max-width: 320px;
-  padding: var(--space-1);
-  background: var(--panel-solid);
-  border: var(--border-bright);
+  padding: 2px;
+  background: rgba(14, 12, 9, 0.96);
+  border: 1px solid rgba(212, 175, 88, 0.28);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-panel);
+  box-shadow: var(--shadow-pop);
   z-index: var(--z-menu);
   user-select: none;
 }
@@ -480,19 +519,25 @@ html, body {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-2) var(--space-2);
-  margin-bottom: var(--space-1);
-  border-bottom: var(--border);
+  padding: 3px var(--space-2) 4px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(212, 175, 88, 0.2);
+  font-family: var(--font-display);
+  font-size: var(--size-xs);
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--accent);
-  letter-spacing: 0.02em;
+  text-shadow: var(--shadow-text);
 }
 
 .ctx-menu__subtitle {
+  font-family: var(--font);
   font-weight: 400;
   font-size: var(--size-xs);
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: var(--ink-dim);
-  text-transform: capitalize;
 }
 
 .ctx-menu__item {
@@ -501,10 +546,10 @@ html, body {
   justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
-  padding: 5px var(--space-2);
+  padding: 3px var(--space-2);
   background: none;
   border: none;
-  border-radius: 3px;
+  border-radius: 2px;
   font-family: inherit;
   font-size: var(--size-sm);
   color: var(--ink);
@@ -513,8 +558,10 @@ html, body {
 }
 
 .ctx-menu__item:hover,
-.ctx-menu__item.is-focused { background: rgba(201, 162, 39, 0.16); }
-.ctx-menu__item--danger .ctx-menu__label { color: #f0b4a8; }
+.ctx-menu__item.is-focused { background: rgba(212, 175, 78, 0.14); }
+.ctx-menu__item:hover .ctx-menu__label,
+.ctx-menu__item.is-focused .ctx-menu__label { color: var(--highlight); }
+.ctx-menu__item--danger .ctx-menu__label { color: #f0a08e; }
 
 /*
  * Unavailable entries stay visible and keep their requirement text. This is a product rule, not a
@@ -523,6 +570,8 @@ html, body {
  */
 .ctx-menu__item.is-disabled { cursor: default; }
 .ctx-menu__item.is-disabled .ctx-menu__label { color: var(--ink-faint); }
+.ctx-menu__item.is-disabled:hover .ctx-menu__label,
+.ctx-menu__item.is-disabled.is-focused .ctx-menu__label { color: var(--ink-faint); }
 .ctx-menu__item.is-disabled:hover,
 .ctx-menu__item.is-disabled.is-focused { background: rgba(255, 255, 255, 0.05); }
 
@@ -532,49 +581,49 @@ html, body {
 
 /* ------------------------------------------------------------ hover label */
 
+/* Frameless nameplate at the cursor: the world under it stays untouched. */
 .hover-label {
   position: fixed;
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  padding: 3px var(--space-2);
-  background: rgba(16, 14, 12, 0.88);
-  border: 1px solid var(--panel-edge);
-  border-left: 2px solid var(--accent);
-  border-radius: 3px;
-  font-size: var(--size-sm);
-  color: var(--ink);
-  text-shadow: 0 1px 2px #000;
+  padding: 1px 2px;
+  background: none;
+  border: none;
+  font-size: var(--size-md);
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px #000, 0 0 4px rgba(0, 0, 0, 0.8);
   white-space: nowrap;
   z-index: var(--z-tooltip);
   pointer-events: none;
 }
 
-.hover-label__tier { font-size: var(--size-xs); color: var(--ink-dim); font-family: var(--font-numeric); }
+.hover-label__tier { font-size: var(--size-xs); font-weight: 400; color: var(--accent); font-family: var(--font-numeric); text-shadow: 0 1px 2px #000; }
 
 /* ----------------------------------------------------------------- toasts */
 
-/* Bottom-left strip, 4 lines, 6 s decay. PRD section 5. */
+/* Bottom-left strip, 4 lines, 6 s decay. Frameless lines with a whisper of glass behind them. */
 .toast-strip {
   position: fixed;
-  left: var(--space-4);
-  bottom: var(--space-4);
+  left: var(--space-3);
+  bottom: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
   max-width: 46ch;
   z-index: var(--z-tooltip);
   pointer-events: none;
 }
 
 .toast {
-  padding: 5px var(--space-3);
-  background: rgba(16, 14, 12, 0.9);
-  border-left: 3px solid var(--ink-faint);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.42);
+  border-left: 2px solid var(--ink-faint);
+  border-radius: 2px;
   font-size: var(--size-sm);
   color: var(--ink);
-  text-shadow: 0 1px 2px #000;
+  text-shadow: var(--shadow-text);
   transition: opacity 380ms ease, transform 380ms ease;
 }
 
@@ -599,13 +648,13 @@ html, body {
 .world-label {
   position: absolute;
   transform: translate(-50%, -100%);
-  padding: 3px 8px;
-  border: 1px solid var(--accent, #c9a227);
+  padding: 2px 7px;
+  border: 1px solid var(--accent, #d4af4e);
   border-radius: 3px;
-  background: rgba(18, 16, 14, 0.86);
-  color: var(--ink, #f2ece0);
+  background: rgba(12, 10, 8, 0.82);
+  color: var(--ink, #ece4d2);
   font-family: var(--font, system-ui, sans-serif);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.3;
   white-space: nowrap;
   pointer-events: none;
@@ -632,18 +681,15 @@ html, body {
 .vfx-damage      { color: #ffe08a; font-size: 18px; }
 .vfx-damage-magic{ color: #a8bcff; font-size: 18px; }
 .vfx-damage-in   { color: #ff8a72; font-size: 18px; }
-.vfx-miss        { color: #b8ae9c; font-size: 14px; font-weight: 600; }
-.vfx-xp          { color: #f2ece0; font-size: 13px; }
-.vfx-level       { color: var(--accent, #c9a227); font-size: 20px; letter-spacing: 0.08em; }
+.vfx-miss        { color: #b0a68c; font-size: 14px; font-weight: 600; }
+.vfx-xp          { color: #ece4d2; font-size: 13px; }
+.vfx-level       { color: var(--accent, #d4af4e); font-size: 20px; letter-spacing: 0.08em; font-family: var(--font-display, serif); }
 .vfx-warning     { color: #ff8a72; font-size: 16px; }
 .vfx-muted       { color: #9a9284; font-size: 13px; font-weight: 600; }
 
 /* ==========================================================================
- * Round 2 — HUD and panels. APPEND ONLY, per the rule at the top of this file.
- *
- * Nothing below reorders or rewrites what came before it. The three load-bearing
- * behaviours are untouched: #boot-screen, the #ui-root pointer-events opt-in, and #viewport.
- * Two additions defend that opt-in rather than weakening it:
+ * HUD and panels. The three load-bearing behaviours are untouched: #boot-screen, the
+ * #ui-root pointer-events opt-in, and #viewport. Two rules defend that opt-in:
  *   - `#ui-root > .tooltip` opts the shared tooltip back OUT (it sits under the cursor).
  *   - the HUD carries `.is-passive`, which the existing rule already handles.
  * ========================================================================== */
@@ -663,9 +709,20 @@ html, body {
  * inline by PanelFrame so the short-screen media query below can actually reach it; a panel that
  * needs a different ceiling still passes one through `placement.maxHeight`.
  */
-.panel--float { min-width: 200px; max-height: calc(100vh - 96px); }
-.panel__titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.panel__body { display: flex; flex-direction: column; gap: var(--space-3); }
+.panel--float { min-width: 170px; max-height: calc(100vh - 96px); }
+.panel__titles { display: flex; flex-direction: row; align-items: baseline; gap: var(--space-2); min-width: 0; white-space: nowrap; }
+.panel__titles .panel__title { flex: 0 0 auto; }
+.panel__body { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/*
+ * The two panel slots. `group: "side"` panels share the tab slot above the dock — one at a time,
+ * swapped by the dock or their keys, never overlapping. `group: "center"` panels are the one big
+ * window. Slot positions are inline from PanelPlacement; these rules only shape the chrome.
+ */
+.panel--side .panel__body { scrollbar-width: thin; scrollbar-color: #4a4133 transparent; }
+.panel--side .panel__body::-webkit-scrollbar { width: 7px; }
+.panel--side .panel__body::-webkit-scrollbar-track { background: transparent; }
+.panel--side .panel__body::-webkit-scrollbar-thumb { background: #4a4133; border-radius: 4px; }
 
 /* Slots are buttons now, and a button inherits neither font nor colour. */
 .slot { font: inherit; color: var(--ink); padding: 0; }
@@ -683,7 +740,7 @@ html, body {
 .slot__glyph .item-icon {
   position: relative;
   display: block;
-  width: min(48px, 100%);
+  width: min(44px, 100%);
   aspect-ratio: 1;
   pointer-events: none;
 }
@@ -714,7 +771,7 @@ html, body {
 
 .empty-state {
   margin: 0;
-  padding: var(--space-3) 0;
+  padding: var(--space-2) 0;
   color: var(--ink-dim);
   font-size: var(--size-sm);
   line-height: 1.5;
@@ -729,73 +786,83 @@ html, body {
   z-index: var(--z-hud);
 }
 
-/* Every HUD cluster hugs an edge. The middle of the screen is where the game is. */
+/*
+ * Frameless. HUD text sits directly on the world with a hard shadow; the only backing anywhere
+ * is a low black wash where a bar needs a track. Every cluster hugs an edge — the middle of the
+ * screen is where the game is.
+ */
 .hud__vitals {
   position: absolute;
-  top: var(--space-4);
-  left: var(--space-4);
-  width: 240px;
+  top: var(--space-3);
+  left: var(--space-3);
+  width: 190px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .hud__health { width: 100%; }
-.bar--health.is-combat { border-color: var(--danger-dim); }
+.bar--health.is-combat { border-color: rgba(224, 101, 80, 0.5); }
 
 .hud__activity {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: var(--space-2);
-  background: rgba(16, 14, 12, 0.72);
-  border: var(--border);
+  gap: 2px;
+  padding: 3px 6px 4px;
+  background: rgba(0, 0, 0, 0.32);
+  border: none;
   border-radius: var(--radius);
 }
 
 .hud__activity[hidden] { display: none; }
 .hud__activity-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
-.hud__activity-label { font-size: var(--size-sm); font-weight: 600; letter-spacing: 0.02em; }
+.hud__activity-label { font-size: var(--size-sm); font-weight: 600; letter-spacing: 0.02em; text-shadow: var(--shadow-text); }
 .hud__activity.has-skill .hud__activity-label { color: var(--skill-colour, var(--ink)); }
 .hud__activity.has-skill .bar__fill {
   background: linear-gradient(180deg, var(--skill-colour), color-mix(in srgb, var(--skill-colour) 60%, #000));
 }
-.hud__activity-count { font-size: var(--size-xs); }
+.hud__activity-count { font-size: var(--size-xs); text-shadow: var(--shadow-text); }
 
 .hud__right {
   position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
+  top: var(--space-3);
+  right: var(--space-3);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
+/* Just the number and the mark. No box: it is a purse, not a form field. */
 .hud__currency {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2);
-  padding: 4px var(--space-3);
-  background: rgba(16, 14, 12, 0.72);
-  border: var(--border);
-  border-radius: var(--radius);
+  gap: var(--space-1);
+  padding: 0;
+  background: none;
+  border: none;
 }
 
-.hud__currency-mark { color: var(--accent); font-size: var(--size-md); }
-.hud__currency-value { font-size: var(--size-lg); font-weight: 700; }
+.hud__currency-mark { color: var(--accent); font-size: var(--size-sm); text-shadow: var(--shadow-text); }
+.hud__currency-value {
+  font-family: var(--font-display);
+  font-size: var(--size-md);
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow: var(--shadow-text);
+}
 
 .hud__xp-feed {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: 1px;
   min-height: 1px;
 }
 
 /* The XP number is the skill colour from content/skills.ts, the same colour its panel row uses. */
 .xp-drop {
-  padding: 2px var(--space-2);
+  padding: 1px var(--space-1);
   font-size: var(--size-sm);
   font-weight: 700;
   color: var(--skill-colour, var(--accent));
@@ -810,82 +877,19 @@ html, body {
   100% { opacity: 0; transform: translateY(-14px); }
 }
 
-/* ---- compass. A tape, not a dial: north slides past as the view turns. */
-.hud__compass {
-  position: absolute;
-  top: var(--space-3);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 340px;
-  padding: 3px var(--space-2) 4px;
-  background: rgba(16, 14, 12, 0.7);
-  border: var(--border);
-  border-radius: var(--radius);
-  text-align: center;
-}
-
-.compass__tape {
-  position: relative;
-  height: 16px;
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-}
-
-.compass__tick {
-  position: absolute;
-  top: 1px;
-  transform: translateX(-50%);
-  font-size: var(--size-xs);
-  color: var(--ink-faint);
-  letter-spacing: var(--tracking-wide);
-}
-
-.compass__tick--major { color: var(--ink); font-weight: 700; font-size: var(--size-sm); }
-.compass__tick[hidden] { display: none; }
-
-.compass__pip {
-  position: absolute;
-  top: 3px;
-  width: 7px;
-  height: 7px;
-  transform: translateX(-50%) rotate(45deg);
-  background: var(--accent);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
-}
-
-.compass__pip[hidden] { display: none; }
-
-.compass__needle {
-  position: absolute;
-  left: 50%;
-  top: 3px;
-  width: 1px;
-  height: 16px;
-  background: var(--accent);
-  transform: translateX(-50%);
-  opacity: 0.75;
-}
-
-.compass__target {
-  font-size: var(--size-xs);
-  color: var(--ink-dim);
-  letter-spacing: 0.02em;
-}
-
 /* ------------------------------------------------------------- shared bits */
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .field {
   min-width: 0;
   flex: 1 1 140px;
-  padding: 5px var(--space-2);
+  padding: 3px var(--space-2);
   background: var(--panel-sunken);
   border: var(--border);
   border-radius: var(--radius);
@@ -896,16 +900,16 @@ html, body {
 }
 
 .field::placeholder { color: var(--ink-faint); }
-.field:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.field--qty { flex: 0 0 72px; }
+.field:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+.field--qty { flex: 0 0 64px; }
 
 .qty { display: flex; align-items: center; gap: var(--space-2); }
 .qty__group { display: flex; gap: 2px; }
-.qty__btn { min-width: 32px; min-height: 24px; padding: 2px 6px; }
+.qty__btn { min-width: 28px; min-height: 20px; padding: 1px 5px; }
 .qty__btn.is-active {
   color: var(--accent-ink);
-  background: linear-gradient(180deg, #e0bb42, #b48c1c);
-  border-color: #f0d475;
+  background: linear-gradient(180deg, #dcb95c, #a5822e);
+  border-color: rgba(0, 0, 0, 0.6);
 }
 
 .pager { display: flex; align-items: center; justify-content: center; gap: var(--space-3); }
@@ -913,17 +917,17 @@ html, body {
 
 /* ------------------------------------------------------------------ skills */
 
-.skills__group { display: flex; flex-direction: column; gap: 2px; }
+.skills__group { display: flex; flex-direction: column; gap: 1px; }
 .skills__group-title { margin: var(--space-2) 0 var(--space-1); }
 
 .skill-row {
   display: grid;
-  grid-template-columns: 10px 1fr 26px;
+  grid-template-columns: 9px 1fr 24px;
   grid-template-areas: "dot name level" "bar bar bar" "detail detail detail";
   align-items: center;
-  gap: 2px var(--space-2);
+  gap: 1px var(--space-2);
   width: 100%;
-  padding: var(--space-2);
+  padding: 3px var(--space-1);
   background: none;
   border: 1px solid transparent;
   border-radius: var(--radius);
@@ -937,7 +941,7 @@ html, body {
 .skill-row .skill-dot { grid-area: dot; }
 .skill-row__name { grid-area: name; font-size: var(--size-sm); font-weight: 600; }
 .skill-row__level { grid-area: level; text-align: right; font-weight: 700; color: var(--skill-colour, var(--ink)); }
-.skill-row__bar { grid-area: bar; display: block; height: 8px; }
+.skill-row__bar { grid-area: bar; display: block; height: 5px; }
 .skill-row__detail { grid-area: detail; font-size: var(--size-xs); }
 
 /* --------------------------------------------------------------- equipment */
@@ -949,11 +953,11 @@ html, body {
   position: absolute;
   top: 6%;
   left: 50%;
-  width: 74px;
+  width: 64px;
   height: 88%;
   transform: translateX(-50%);
-  border-radius: 40px 40px 18px 18px;
-  background: radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 40%, transparent 70%);
+  border-radius: 32px 32px 14px 14px;
+  background: radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 40%, transparent 70%);
   border: 1px solid rgba(255, 255, 255, 0.05);
   pointer-events: none;
 }
@@ -961,20 +965,20 @@ html, body {
 .equip-grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 56px);
-  grid-template-rows: repeat(4, 56px);
-  gap: var(--space-2);
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(4, 46px);
+  gap: var(--space-1);
 }
 
 .slot--equip { min-width: 0; }
-.slot--equip.is-empty .slot__label { font-size: 10px; }
+.slot--equip.is-empty .slot__label { font-size: 8px; }
 
 .equip-totals {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 2px var(--space-3);
+  gap: 1px var(--space-3);
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-2);
   background: var(--panel-sunken);
   border: var(--border);
   border-radius: var(--radius);
@@ -988,39 +992,39 @@ html, body {
 
 /* -------------------------------------------------------------------- bank */
 
-.bank-columns { display: flex; gap: var(--space-4); align-items: flex-start; }
+.bank-columns { display: flex; gap: var(--space-3); align-items: flex-start; }
 .bank-column { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .bank-column--bank { flex: 1 1 auto; }
-.bank-column--inventory { flex: 0 0 236px; }
+.bank-column--inventory { flex: 0 0 208px; }
 .bank-column h3 { margin: 0; }
 .bank-grid { max-height: 46vh; overflow: auto; align-content: start; }
 .bank-status:empty { display: none; }
 
 /* -------------------------------------------------------------------- shop */
 
-.shop-columns { display: flex; gap: var(--space-4); align-items: flex-start; }
+.shop-columns { display: flex; gap: var(--space-3); align-items: flex-start; }
 .shop-column { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .shop-column h3 { margin: 0; }
-.shop-list { display: flex; flex-direction: column; gap: 2px; max-height: 52vh; overflow: auto; }
-.shop__marks { margin-left: auto; font-size: var(--size-md); font-weight: 700; color: var(--accent); }
+.shop-list { display: flex; flex-direction: column; gap: 1px; max-height: 52vh; overflow: auto; }
+.shop__marks { margin-left: auto; font-family: var(--font-display); font-size: var(--size-sm); font-weight: 700; color: var(--accent); text-shadow: var(--shadow-text); }
 
 .shop-row {
   display: grid;
-  grid-template-columns: 32px 1fr auto auto;
+  grid-template-columns: 28px 1fr auto auto;
   align-items: center;
   gap: var(--space-2);
-  padding: 4px var(--space-2);
+  padding: 2px var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius);
 }
 
 .shop-row:hover { background: rgba(255, 255, 255, 0.04); border-color: var(--panel-edge); }
-.shop-row__glyph { width: 32px; height: 32px; }
+.shop-row__glyph { width: 28px; height: 28px; }
 .shop-row__text { min-width: 0; }
 .shop-row__name { font-size: var(--size-sm); font-weight: 600; }
 .shop-row__detail { font-size: var(--size-xs); }
 .shop-row__price { color: var(--accent); font-weight: 700; }
-.shop-row__action { min-width: 56px; }
+.shop-row__action { min-width: 52px; }
 /* A blocked row stays readable and keeps its price. Same rule as a greyed context menu entry. */
 .shop-row.is-blocked { opacity: 0.72; }
 .shop-row.is-blocked .shop-row__action { border-color: var(--panel-edge); color: var(--ink-faint); cursor: default; }
@@ -1030,29 +1034,28 @@ html, body {
 /* ------------------------------------------------------------- the dock */
 
 /*
- * The one piece of chrome that is always visible and always says what a key does. It sits along
- * the bottom-right because the bottom-left is the notice channel and the top corners are the
- * vitals and the purse.
+ * An action bar, not a toolbar: six small glass squares, brass when open, each printing its key
+ * in the corner. It sits hard in the bottom-right; the side slot opens directly above it.
  */
 .dock {
   position: absolute;
-  right: var(--space-4);
-  bottom: var(--space-4);
+  right: 10px;
+  bottom: 10px;
   display: flex;
-  gap: var(--space-2);
+  gap: 3px;
   z-index: var(--z-hud);
 }
 
 .dock__btn {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1px;
-  width: 62px;
-  padding: 6px 4px 4px;
-  background: linear-gradient(180deg, #352e26, #211c17);
-  border: var(--border);
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: rgba(16, 13, 10, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
   color: var(--ink-dim);
   font-family: var(--font);
@@ -1060,54 +1063,61 @@ html, body {
   transition: border-color var(--transition), color var(--transition), background var(--transition);
 }
 
-.dock__btn:hover { color: var(--ink); border-color: var(--accent-dim); }
-.dock__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dock__btn:hover { color: var(--ink); border-color: var(--panel-edge-bright); }
+.dock__btn:hover .dock__glyph { color: var(--highlight); }
+.dock__btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 
 .dock__btn.is-active {
   color: var(--ink);
   border-color: var(--accent);
-  background: linear-gradient(180deg, #4a3f2a, #2b2419);
+  background: rgba(212, 175, 78, 0.16);
 }
 
-.dock__glyph { font-size: 18px; line-height: 18px; color: var(--accent); }
-.dock__label { font-size: var(--size-xs); letter-spacing: 0.02em; }
+.dock__btn.is-active .dock__glyph { color: var(--accent); }
 
-/* The key is the whole point of the dock existing, so it is drawn as a key, not as a hint. */
+.dock__glyph { font-size: 16px; line-height: 16px; color: var(--ink-dim); text-shadow: var(--shadow-text); transition: color var(--transition); }
+
+/* Icon-only bar: the hover title still names the panel, the key cap still teaches the key. */
+.dock__label { display: none; }
+
 .dock__key {
-  min-width: 15px;
-  padding: 0 3px;
-  background: var(--panel-sunken);
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  min-width: 0;
+  padding: 0 2px;
+  background: none;
+  border: none;
   font-family: var(--font-numeric);
-  font-size: 9px;
-  line-height: 12px;
+  font-size: 8px;
+  line-height: 10px;
   color: var(--ink-faint);
+  text-shadow: 0 1px 1px #000;
 }
 
 .dock__badge {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  padding: 0 4px;
+  top: -4px;
+  right: -4px;
+  padding: 0 3px;
   background: var(--accent);
   color: var(--accent-ink);
-  border-radius: 999px;
-  font-size: 9px;
+  border-radius: 2px;
+  font-size: 8px;
   font-weight: 700;
-  line-height: 14px;
+  line-height: 12px;
 }
 
 .dock__badge[hidden] { display: none; }
 
 /* ------------------------------------------------------------ the journal */
 
-.quests__summary { margin: 0 0 var(--space-2); font-size: var(--size-xs); }
-.quests__list { display: flex; flex-direction: column; gap: var(--space-2); }
+.quests__summary { margin: 0 0 var(--space-1); font-size: var(--size-xs); }
+.quests__list { display: flex; flex-direction: column; gap: var(--space-1); }
 
 .quests__entry {
-  padding: var(--space-2);
-  background: rgba(255, 255, 255, 0.02);
+  padding: var(--space-1) var(--space-2);
+  background: rgba(255, 255, 255, 0.03);
   border: var(--border);
   border-left: 2px solid var(--panel-edge);
   border-radius: var(--radius);
@@ -1119,27 +1129,27 @@ html, body {
 .quests__entry.is-unstarted { opacity: 0.82; }
 
 .quests__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
-.quests__name { margin: 0; font-size: var(--size-md); font-weight: 600; }
+.quests__name { margin: 0; font-size: var(--size-sm); font-weight: 700; }
 .quests__status { color: var(--ink-dim); white-space: nowrap; }
 .quests__place { font-size: var(--size-xs); margin-top: 1px; }
 
 .quests__objective {
-  margin: var(--space-2) 0 0;
+  margin: var(--space-1) 0 0;
   font-size: var(--size-sm);
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
-.quests__refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.quests__refs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
 
 /* A ref chip prints a NAME, never an id. The ids stay in the API where an agent reads them. */
 .chip {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
-  padding: 1px 6px;
+  gap: 3px;
+  padding: 0 5px;
   background: var(--panel-sunken);
   border: 1px solid var(--panel-edge);
-  border-radius: 999px;
+  border-radius: 2px;
   font-size: var(--size-xs);
 }
 
@@ -1149,23 +1159,20 @@ html, body {
 .chip--enemyFamily .chip__verb { color: var(--danger); }
 .chip--item .chip__verb { color: var(--accent); }
 
-.quests__progress { margin-top: var(--space-2); }
-.bar--thin { height: 4px; }
+.quests__progress { margin-top: var(--space-1); }
+.bar--thin { height: 3px; }
 
 /* --------------------------------------------------------- smaller screens */
 
 /* 1280x720 is the floor. Panels shrink rather than overlap the vitals cluster. */
 @media (max-width: 1440px) {
-  .hud__compass { width: 280px; }
-  .bank-column--inventory { flex-basis: 200px; }
-  .equip-grid { grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(4, 50px); }
+  .bank-column--inventory { flex-basis: 190px; }
 }
 
 @media (max-height: 800px) {
-  .dock__btn { width: 54px; padding-top: 4px; }
   .bank-grid { max-height: 38vh; }
   .shop-list { max-height: 44vh; }
-  .panel--float { max-height: calc(100vh - 72px); }
+  .panel--float { max-height: calc(100vh - 64px); }
 }
 
 /* ---- recovery cache banner. The one clickable thing in the HUD, so it opts back in. */
@@ -1173,25 +1180,211 @@ html, body {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  padding: 4px var(--space-2);
-  background: rgba(16, 14, 12, 0.78);
-  border: var(--border);
+  padding: 2px var(--space-2);
+  background: rgba(0, 0, 0, 0.42);
+  border: none;
   border-left: 2px solid var(--accent);
   border-radius: var(--radius);
   color: var(--ink);
   font: inherit;
+  font-size: var(--size-sm);
   text-align: left;
   cursor: pointer;
   pointer-events: auto;
-  transition: border-color var(--transition), background var(--transition);
+  transition: background var(--transition);
 }
 
 .hud__cache[hidden] { display: none; }
-.hud__cache:hover { background: rgba(30, 26, 21, 0.9); border-color: var(--accent-dim); }
-.hud__cache:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.hud__cache-label { color: var(--accent); }
-.hud__cache-detail { font-size: var(--size-sm); }
+.hud__cache:hover { background: rgba(0, 0, 0, 0.6); }
+.hud__cache:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+.hud__cache-label { color: var(--accent); text-shadow: var(--shadow-text); }
+.hud__cache-detail { font-size: var(--size-sm); text-shadow: var(--shadow-text); }
 
 /* Under two minutes the cache is about to take everything in it with it. */
 .hud__cache.is-urgent { border-left-color: var(--danger); }
 .hud__cache.is-urgent .hud__cache-label { color: var(--danger); }
+
+/* ------------------------------------------------------------ movable panels */
+
+.panel--movable .panel__header { cursor: grab; user-select: none; }
+.panel--movable .panel__header:active { cursor: grabbing; }
+
+/* -------------------------------------------------------------- the minimap */
+
+/*
+ * Top-right cluster: the disc, plus the two controls in the square corners the circle leaves
+ * open — the menu X at the screen corner and the full-map button at the bottom-left. The cluster
+ * root is `.is-passive` so those open corners never eat world clicks; the disc and the buttons
+ * opt back in individually.
+ *
+ * The disc's ring is drawn with box-shadow, not border: a border shrinks the canvas content box
+ * by a fractional pixel at scaled DPIs and the player arrow drifts off the visual centre.
+ */
+.minimap {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 148px;
+  height: 148px;
+  z-index: var(--z-hud);
+}
+
+.minimap__disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #121310;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.85), 0 0 0 2px rgba(212, 175, 88, 0.32), 0 4px 12px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.minimap__disc:hover { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.85), 0 0 0 2px rgba(212, 175, 88, 0.55), 0 4px 12px rgba(0, 0, 0, 0.45); }
+.minimap__disc:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.minimap__disc canvas { display: block; width: 100%; height: 100%; }
+
+/* The corner controls: small glass rounds sitting in the gaps the circle leaves in its square. */
+.minimap__btn {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 13, 10, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink-dim);
+  text-shadow: var(--shadow-text);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.minimap__btn:hover { color: var(--highlight); border-color: var(--panel-edge-bright); }
+.minimap__btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+
+.minimap__btn--menu { top: -4px; right: -4px; font-size: 15px; }
+.minimap__btn--map { bottom: -4px; left: -4px; color: var(--accent); }
+.minimap__btn--map:hover { color: var(--highlight); }
+
+/* The compass: the N always points at true north on screen; brass while the map follows the
+ * view, so a glance says which mode the disc is in. */
+.minimap__btn--compass { top: -4px; left: -4px; }
+.minimap__btn--compass.is-view { color: var(--accent); border-color: var(--accent-dim); }
+.minimap__needle {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: var(--shadow-text);
+}
+
+.minimap__needle svg { display: block; }
+
+/* The purse cluster steps down under the minimap when one exists. */
+.hud.has-minimap .hud__right { top: 166px; }
+
+/* --------------------------------------------------------- the quest tracker */
+
+/*
+ * One pinned quest's card, floating over the world. Defaults to the left middle of the screen;
+ * dragging it sets explicit left/top (`.is-moved` kills the centring transform so the two never
+ * mix). Collapsed, it is just the header line.
+ */
+.quest-tracker {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 216px;
+  background: linear-gradient(180deg, rgba(28, 23, 17, 0.9), rgba(13, 11, 8, 0.88));
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 88, 0.16), 0 4px 14px rgba(0, 0, 0, 0.45);
+  z-index: var(--z-hud);
+}
+
+.quest-tracker[hidden] { display: none; }
+.quest-tracker.is-moved { transform: none; }
+
+.quest-tracker__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 22px;
+  padding: 2px var(--space-1) 2px var(--space-2);
+  background: rgba(0, 0, 0, 0.28);
+  border-bottom: 1px solid rgba(212, 175, 88, 0.2);
+  cursor: grab;
+  user-select: none;
+}
+
+.quest-tracker__header:active { cursor: grabbing; }
+.quest-tracker.is-collapsed .quest-tracker__header { border-bottom: none; }
+
+.quest-tracker__name {
+  flex: 1 1 auto;
+  font-family: var(--font-display);
+  font-size: var(--size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-shadow: var(--shadow-text);
+}
+
+.quest-tracker.is-complete .quest-tracker__name { color: var(--success); }
+
+.quest-tracker__stage { flex: 0 0 auto; font-size: var(--size-xs); color: var(--ink-dim); }
+
+.quest-tracker__btn {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  background: none;
+  border: none;
+  font-size: var(--size-sm);
+  line-height: 1;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.quest-tracker__btn:hover { color: var(--highlight); }
+
+.quest-tracker__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2) var(--space-2);
+}
+
+.quest-tracker__body[hidden] { display: none; }
+
+.quest-tracker__objective {
+  margin: 0;
+  font-size: var(--size-sm);
+  line-height: 1.4;
+  color: var(--ink);
+  text-shadow: var(--shadow-text);
+}
+
+/* ---- the pin toggle on a journal entry */
+
+.quests__pin {
+  flex: 0 0 auto;
+  padding: 0 3px;
+  background: none;
+  border: none;
+  font-size: var(--size-sm);
+  line-height: 1;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.quests__pin:hover { color: var(--highlight); }
+.quests__pin.is-pinned { color: var(--accent); }

@@ -61,7 +61,8 @@ export class EquipmentPanel implements ManagedPanel {
       key: "e",
       keyLabel: "Equipment",
       registry: ctx.registry,
-      placement: { top: "96px", right: "264px", width: "300px" },
+      placement: { right: "10px", bottom: "48px", width: "190px", maxHeight: "calc(100vh - 110px)" },
+      group: "side",
       onOpen: () => this.refresh(true),
     });
 
@@ -128,7 +129,7 @@ export class EquipmentPanel implements ManagedPanel {
       node.classList.toggle("is-zero", value === 0);
     }
 
-    this.frame.setSubtitle(`${filled} of ${EQUIP_SLOTS.length} slots worn`);
+    this.frame.setSubtitle(`${filled}/${EQUIP_SLOTS.length} worn`);
   }
 
   dispose(): void {

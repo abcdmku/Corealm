@@ -28,7 +28,7 @@
      The title screen mounts after this one and wins on DOM order at the same layer. */
   z-index: var(--z-boot);
   /* A vignette rather than a flat scrim: the world behind stays legible, the card does not float. */
-  background: radial-gradient(ellipse at center, rgba(10, 8, 7, 0.42) 0%, rgba(10, 8, 7, 0.78) 100%);
+  background: radial-gradient(ellipse at center, rgba(10, 8, 7, 0.4) 0%, rgba(10, 8, 7, 0.75) 100%);
 }
 
 .death[hidden] { display: none; }
@@ -41,28 +41,30 @@
   /* .panel is absolute; inside the centring flex box it has to be in flow. */
   position: relative;
   pointer-events: auto;
-  width: min(480px, 100%);
+  width: min(420px, 100%);
   max-height: 100%;
-  border-color: var(--panel-edge-bright);
-  box-shadow: var(--shadow-panel), 0 0 0 1px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 88, 0.2), var(--shadow-panel), 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
 
 /* ---- head */
 
 .death__head {
-  padding: var(--space-4) var(--space-4) var(--space-3);
-  background: linear-gradient(180deg, #2e2823, #211d19);
-  border-bottom: var(--border);
-  /* The one red mark on the card. Reads as a wound in the leather at a glance. */
-  border-top: 3px solid var(--danger-dim);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(212, 175, 88, 0.2);
+  /* The one red mark on the card. */
+  border-top: 2px solid var(--danger-dim);
 }
 
 .death__title {
   margin: 0;
-  font-size: var(--size-xl);
+  font-family: var(--font-display);
+  font-size: var(--size-lg);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--ink);
+  text-shadow: var(--shadow-text);
 }
 
 .death__where {
@@ -74,28 +76,28 @@
 .death__body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-3);
   overflow: auto;
 }
 
 .death__lead {
   margin: 0;
   font-size: var(--size-md);
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .death__kept {
   margin: 0;
   font-size: var(--size-sm);
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 /* ---- the two numbers that move */
 
 .death__facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--space-2);
   margin: 0;
 }
@@ -103,8 +105,8 @@
 .death__fact {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--space-2) var(--space-3);
+  gap: 1px;
+  padding: var(--space-1) var(--space-2);
   background: var(--panel-sunken);
   border: var(--border);
   border-radius: var(--radius);
@@ -115,7 +117,8 @@
 
 .death__fact-value {
   margin: 0;
-  font-size: var(--size-lg);
+  font-size: var(--size-md);
+  font-weight: 700;
   color: var(--ink);
   line-height: 1.2;
   /* The distance line is prose-length; the countdown is not. Neither may reflow the card. */
@@ -146,7 +149,7 @@
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border-top: var(--border);
   background: rgba(0, 0, 0, 0.25);
 }
@@ -157,8 +160,8 @@
    card must never grow taller than the screen or the buttons walk off the bottom edge. */
 @media (max-height: 620px) {
   .death { padding: var(--space-3); }
-  .death__head { padding: var(--space-3) var(--space-3) var(--space-2); }
-  .death__title { font-size: var(--size-lg); }
-  .death__body { gap: var(--space-2); padding: var(--space-3); }
-  .death__actions { padding: var(--space-2) var(--space-3); }
+  .death__head { padding: var(--space-2) var(--space-2) var(--space-1); }
+  .death__title { font-size: var(--size-md); }
+  .death__body { gap: var(--space-1); padding: var(--space-2); }
+  .death__actions { padding: var(--space-1) var(--space-2); }
 }

@@ -864,6 +864,8 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     },
     // OrbitCamera yaw is measured from +z clockwise; the compass wants a heading in the same frame.
     getHeadingRad: () => camera.yaw,
+    // The minimap's destination marker. GameApi does not expose the live path; the store does.
+    getDestination: () => store.get().player.movement.destination,
     hasSave: () => loaded.status === "loaded",
     // Declared below. Referenced from inside a closure, so the temporal dead zone never applies:
     // nothing can press "New game" before boot has finished running.

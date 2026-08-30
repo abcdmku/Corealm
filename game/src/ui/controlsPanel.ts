@@ -60,9 +60,9 @@ interface StaticRow {
 /**
  * The mouse, straight out of `input/mouse.ts`.
  *
- * `DRAG_THRESHOLD_PX` is 4, so "click" means the pointer moved less than four pixels between press
- * and release; past that the gesture became a drag and the click is dropped. That is why the right
- * button can both orbit and open a menu without the two fighting.
+ * `DRAG_THRESHOLD_PX` is 4, so pointer travel past four pixels switches the gesture into drag mode.
+ * Left-button world actions begin on press; right-click menus open on release unless the gesture
+ * became a drag.
  */
 const MOUSE_ROWS: StaticRow[] = [
   {
@@ -142,7 +142,8 @@ export class ControlsPanel implements ManagedPanel {
       // Tucked under the purse at the top right and stopping just short of the dock at the bottom
       // right, rather than sliding under either. That is the whole vertical budget; past it the
       // body scrolls, which is also what absorbs a conversation's transient number keys.
-      placement: { top: "56px", right: "24px", width: "680px", maxHeight: "calc(100vh - 132px)" },
+      placement: { top: "56px", left: "50%", width: "640px", maxHeight: "calc(100vh - 112px)" },
+      group: "center",
       onOpen: () => this.refresh(true),
     });
 

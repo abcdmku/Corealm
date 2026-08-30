@@ -2,27 +2,48 @@
 
 #panel-map { transform: translateX(-50%); }
 
+/*
+ * Resizable from the corner handle. The native `resize` writes inline width/height on the panel;
+ * the flex chain below hands that height down to the figure, and MapPanel's ResizeObserver on the
+ * figure re-renders the canvas. Nothing else needs to know it happened.
+ *
+ * The window is one header and one map. The view controls live IN the panel header (MapPanel
+ * inserts them before the close button), the body has no padding, and the readout floats inside
+ * the figure — no second toolbar row, no footer rows.
+ */
+#panel-map {
+  resize: both;
+  min-width: 480px;
+  min-height: 400px;
+}
+
+#panel-map .panel__body { flex: 1 1 auto; min-height: 0; padding: 0; gap: 0; }
+
 .map {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
   min-width: 0;
+  min-height: 0;
 }
 
 .map__toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 30px;
+  gap: 4px;
+  margin-left: auto;
+  min-height: 0;
 }
 
+/* Small glass squares, same recipe as .btn scaled down to header height. */
 .map__control {
-  min-width: 32px;
-  height: 28px;
-  padding: 0 9px;
-  border: var(--border);
+  min-width: 26px;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius);
-  background: var(--panel-raised);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--ink-dim);
   font: 600 var(--size-sm)/1 var(--font);
   cursor: pointer;
@@ -30,13 +51,13 @@
 
 .map__control:hover:not(:disabled),
 .map__control:focus-visible {
-  color: var(--ink);
-  border-color: var(--accent-dim);
-  background: rgba(255, 255, 255, 0.07);
+  color: var(--highlight);
+  border-color: var(--panel-edge-bright);
+  background: rgba(212, 175, 78, 0.12);
 }
 
 .map__control:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -51,32 +72,33 @@
 .map__control--toggle.is-active {
   color: var(--accent);
   border-color: var(--accent-dim);
-  box-shadow: inset 0 0 0 1px rgba(202, 164, 80, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 78, 0.18);
 }
 
 .map__zoom {
-  width: 48px;
+  width: 44px;
   text-align: center;
   font-size: var(--size-xs);
 }
 
+/* The map fills the frame edge to edge; the panel edge is the only line around it. */
 .map__figure {
   position: relative;
   width: 100%;
-  height: clamp(350px, 54vh, 520px);
-  min-height: 280px;
+  flex: 1 1 auto;
+  height: clamp(440px, 64vh, 760px);
+  min-height: 300px;
   overflow: hidden;
   touch-action: none;
   cursor: grab;
   background: #121310;
-  border: var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--inset-well);
+  border: none;
+  border-radius: 0;
   user-select: none;
 }
 
 .map__figure:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -234,13 +256,24 @@
   pointer-events: none;
 }
 
+/* Floats inside the figure's bottom-left: hover feedback without a footer row. Passive — it sits
+ * over pannable map and must never intercept a drag. Empty (nothing hovered), it disappears. */
 .map__readout {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  min-height: 20px;
-  padding: 0 2px;
+  max-width: calc(100% - 12px);
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 2;
 }
+
+.map__readout:not(:has(.map__readout-name:not(:empty))) { display: none; }
 
 .map__readout-name {
   font-weight: 700;
@@ -261,42 +294,15 @@
   white-space: nowrap;
 }
 
-.map__legend {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  font-size: var(--size-xs);
-  letter-spacing: 0.04em;
-}
-
-.map__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.map__swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.55);
-  background: var(--region-tint, var(--panel-edge));
-}
-
-.map__hint {
-  margin-left: auto;
-  font-style: italic;
-}
+/* MapPanel still builds the legend element for its refresh path, but it is never attached: the
+ * region legend was a footer this window no longer spends a row on. */
+.map__legend { display: none; }
 
 @media (max-height: 800px) {
-  #panel-map { top: 58px !important; }
-  .map { gap: var(--space-1); }
-  .map__figure { height: clamp(300px, 50vh, 410px); }
+  #panel-map { top: 44px !important; }
+  .map__figure { height: clamp(340px, 60vh, 520px); }
 }
 
 @media (max-width: 760px) {
-  .map__figure { height: clamp(300px, 48vh, 430px); }
-  .map__legend { gap: var(--space-2); }
-  .map__hint { flex-basis: 100%; margin-left: 0; }
+  .map__figure { height: clamp(300px, 52vh, 430px); }
 }

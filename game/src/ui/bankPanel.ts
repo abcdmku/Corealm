@@ -50,7 +50,8 @@ export class BankPanel implements ManagedPanel {
       id: "bank",
       title: "Bank",
       registry: ctx.registry,
-      placement: { top: "72px", left: "calc(50% - 380px)", width: "760px" },
+      placement: { top: "64px", left: "calc(50% - 350px)", width: "700px" },
+      group: "center",
       onOpen: () => this.refresh(true),
       onClose: () => { this.page = 0; },
     });

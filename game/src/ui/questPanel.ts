@@ -65,7 +65,8 @@ export class QuestPanel implements ManagedPanel {
       key: "j",
       keyLabel: "Quests",
       registry: ctx.registry,
-      placement: { top: "96px", left: "24px", width: "360px" },
+      placement: { right: "10px", bottom: "48px", width: "190px", maxHeight: "calc(100vh - 110px)" },
+      group: "side",
       onOpen: () => this.refresh(true),
     });
 
@@ -78,15 +79,17 @@ export class QuestPanel implements ManagedPanel {
 
   refresh(force = false): void {
     const quests = this.ctx.api.getQuests();
+    // The pinned id is part of the signature: pinning from the tracker or another session must
+    // repaint the pin toggles even though no quest data changed.
     const signature = quests
       .map((quest) => `${quest.id}:${quest.status}:${quest.stage}`)
-      .join("|");
+      .join("|") + `#${this.ctx.pinnedQuestId() ?? ""}`;
     if (!force && signature === this.signature) return;
     this.signature = signature;
 
     const active = quests.filter((quest) => quest.status === "active").length;
     const done = quests.filter((quest) => quest.status === "complete").length;
-    this.frame.setSubtitle(`${active} active · ${done}/${quests.length} complete`);
+    this.frame.setSubtitle(`${active} active · ${done}/${quests.length} done`);
     this.summaryLine.textContent = quests.length === 0
       ? "No quests known yet. Talk to somebody."
       : "Talk to the person who gave it to you when a stage says to report back.";
@@ -117,6 +120,27 @@ export class QuestPanel implements ManagedPanel {
       : STATUS_LABEL[quest.status];
 
     head.append(name, status);
+
+    // Pin an active quest to the floating tracker. Only active: the tracker's whole job is the
+    // current objective, and the other statuses do not have one.
+    if (quest.status === "active") {
+      const pinned = this.ctx.pinnedQuestId() === quest.id;
+      const pin = document.createElement("button");
+      pin.type = "button";
+      pin.className = "quests__pin";
+      pin.classList.toggle("is-pinned", pinned);
+      pin.textContent = pinned ? "◈" : "◇";
+      pin.title = pinned ? "Unpin from tracker" : "Pin to tracker";
+      pin.setAttribute("aria-label", pinned ? `Unpin ${quest.name} from tracker` : `Pin ${quest.name} to tracker`);
+      pin.setAttribute("aria-pressed", pinned ? "true" : "false");
+      pin.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.ctx.pinQuest(pinned ? null : quest.id);
+        this.refresh(true);
+      });
+      head.appendChild(pin);
+    }
+
     entry.appendChild(head);
 
     const place = document.createElement("div");

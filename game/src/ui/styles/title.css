@@ -4,10 +4,8 @@
  * Three things live here, because the same worker owns all three: the title-and-pause screen, the
  * settings panel, and what `.is-compact` actually does.
  *
- * The title screen is continuous with the boot screen on purpose. The player has been staring at
- * #boot-screen — a radial wash, COREALM in brass at 0.42em tracking — for the last second and a
- * half, so the pause menu uses the same wash and the same mark rather than introducing a second
- * identity two seconds into the game.
+ * The title screen is continuous with the boot screen on purpose: the same dark wash, the same
+ * Cinzel mark in brass. A slim glass card, three quiet buttons — a moment, not a menu system.
  *
  * The one rule in here that can break the whole game: `.title` covers the screen and takes pointer
  * events, so `.title[hidden]` MUST put it back to display:none. `#ui-root > *` sets pointer-events
@@ -28,7 +26,7 @@
   justify-content: center;
   padding: var(--space-4);
   /* The boot screen's wash, darkened so the world reads as "behind glass" rather than as clutter. */
-  background: radial-gradient(circle at 50% 42%, rgba(35, 32, 28, 0.86) 0%, rgba(14, 13, 11, 0.95) 68%);
+  background: radial-gradient(circle at 50% 42%, rgba(30, 25, 18, 0.82) 0%, rgba(10, 9, 7, 0.94) 68%);
   /*
    * Above every panel. `PanelFrame.raise()` counts up from --z-panel with each raise and has no
    * ceiling, so matching --z-boot exactly would lose to a long session's worth of panel opens.
@@ -48,16 +46,14 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
-  width: min(520px, 100%);
+  width: min(440px, 100%);
   max-height: 100%;
   overflow: auto;
   padding: var(--space-5) var(--space-5) var(--space-4);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0)),
-    linear-gradient(180deg, rgba(38, 34, 30, 0.95), rgba(20, 18, 16, 0.97));
-  border: var(--border-bright);
+  background: linear-gradient(180deg, rgba(26, 22, 16, 0.94), rgba(12, 10, 8, 0.96));
+  border: 1px solid rgba(0, 0, 0, 0.85);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-panel);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 88, 0.22), var(--shadow-panel);
   text-align: center;
 }
 
@@ -69,14 +65,15 @@
 /* The boot mark, one step down: the same letterform, no longer the only thing on screen. */
 .title__mark {
   margin: 0;
-  font-size: 38px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
   line-height: 1.1;
-  letter-spacing: 0.42em;
+  letter-spacing: 0.34em;
   /* The tracking is trailing space on the last letter; the indent puts the word back on centre. */
-  text-indent: 0.42em;
+  text-indent: 0.34em;
   color: var(--accent);
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
 }
 
 .title__tagline {
@@ -89,7 +86,7 @@
 
 .title__warning {
   margin: 0;
-  font-size: var(--size-lg);
+  font-size: var(--size-md);
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #f0b4a8;
@@ -99,19 +96,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  width: min(280px, 100%);
+  width: min(240px, 100%);
   margin-top: var(--space-2);
 }
 
-/* Menu buttons are big because there are three of them and one of them is the one you always want. */
+/* Menu buttons are the biggest thing on the card because one of them is the one you always want. */
 .title__action {
   width: 100%;
-  min-height: 40px;
-  font-size: var(--size-md);
-  letter-spacing: 0.04em;
+  min-height: 32px;
+  font-size: var(--size-sm);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-weight: 700;
 }
 
-.title__actions--confirm { width: min(320px, 100%); }
+.title__actions--confirm { width: min(280px, 100%); }
 
 .title__hint {
   display: flex;
@@ -124,22 +124,22 @@
   color: var(--ink-faint);
 }
 
-/* A key drawn as a key, same recipe as .dock__key. */
+/* A key drawn as a key, same recipe as the controls panel caps. */
 .title__cap {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  padding: 1px 5px 2px;
-  background: linear-gradient(180deg, #2a2521, var(--panel-sunken));
+  min-width: 17px;
+  padding: 0 4px 1px;
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--panel-edge);
   border-bottom-width: 2px;
-  border-bottom-color: #100e0c;
+  border-bottom-color: rgba(0, 0, 0, 0.7);
   border-radius: 3px;
   font-family: var(--font-numeric);
   font-size: var(--size-xs);
   font-weight: 700;
-  line-height: 14px;
+  line-height: 13px;
   color: var(--ink);
 }
 
@@ -154,10 +154,10 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  width: min(360px, 100%);
+  width: min(320px, 100%);
   margin-top: var(--space-1);
   padding: var(--space-2) var(--space-3);
-  background: rgba(201, 85, 61, 0.08);
+  background: rgba(224, 101, 80, 0.08);
   border: 1px solid var(--danger-dim);
   border-left-width: 2px;
   border-radius: var(--radius);
@@ -170,8 +170,8 @@
 
 .title__ack-box {
   flex: 0 0 auto;
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   margin: 2px 0 0;
   accent-color: var(--accent);
   cursor: pointer;
@@ -198,20 +198,18 @@
 #panel-settings:not([hidden]) ~ .title .title__card { visibility: hidden; }
 
 /*
- * ...and opaque, for the same reason. `.panel` is 92% alpha, which is right for a window over the
- * world and wrong for a window over the pause card: at 92% the mark and the menu buttons ghost
- * through the rows, and a screenshot of it reads as two screens printed on top of each other.
+ * ...and opaque, for the same reason. The shared panel glass is translucent, which is right for a
+ * window over the world and wrong for a window over the pause card: the mark and the menu buttons
+ * would ghost through the rows.
  */
 #panel-settings {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0)),
-    var(--panel-solid);
+  background: linear-gradient(180deg, #1e1912, var(--panel-solid));
 }
 
 .settings {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -223,8 +221,8 @@
 
 .settings__group-title {
   margin: 0 0 var(--space-1);
-  padding-bottom: 3px;
-  border-bottom: var(--border);
+  padding-bottom: 2px;
+  border-bottom: 1px solid rgba(212, 175, 88, 0.18);
 }
 
 /*
@@ -235,7 +233,7 @@
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) 0;
+  padding: var(--space-1) 0;
 }
 
 .settings__row + .settings__row { border-top: 1px solid rgba(255, 255, 255, 0.04); }
@@ -243,20 +241,20 @@
 .settings__text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
 .settings__label { font-size: var(--size-sm); font-weight: 600; color: var(--ink); }
-.settings__hint { font-size: var(--size-xs); line-height: 1.45; color: var(--ink-dim); }
+.settings__hint { font-size: var(--size-xs); line-height: 1.4; color: var(--ink-dim); }
 
 /* Native ranges keep every browser and keyboard interaction, with a fixed-width numeric readout. */
 .volume {
   display: grid;
-  grid-template-columns: minmax(120px, 180px) 42px;
+  grid-template-columns: minmax(110px, 160px) 38px;
   align-items: center;
   gap: var(--space-2);
-  min-width: 196px;
+  min-width: 172px;
 }
 
 .volume__range {
@@ -267,7 +265,7 @@
 }
 
 .volume__range:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -283,7 +281,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
-  padding-top: var(--space-3);
+  padding-top: var(--space-2);
   border-top: var(--border);
 }
 
@@ -295,7 +293,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 3px;
+  padding: 2px;
   background: none;
   border: none;
   border-radius: var(--radius);
@@ -307,8 +305,8 @@
 .switch__track {
   position: relative;
   flex: 0 0 auto;
-  width: 38px;
-  height: 20px;
+  width: 32px;
+  height: 16px;
   background: var(--panel-sunken);
   border: 1px solid var(--panel-edge);
   border-radius: 999px;
@@ -320,8 +318,8 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   background: linear-gradient(180deg, #6b6154, #453e35);
   border-radius: 50%;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
@@ -330,7 +328,7 @@
 
 /* The state is spelled out. Brass says on, and so does the word, for anyone the brass fails. */
 .switch__state {
-  min-width: 62px;
+  min-width: 30px;
   text-align: left;
   font-size: var(--size-xs);
   font-weight: 700;
@@ -338,10 +336,10 @@
   text-transform: uppercase;
 }
 
-.switch:hover .switch__track { border-color: var(--accent-dim); }
-.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.switch.is-on .switch__track { background: linear-gradient(180deg, #6d5615, #4a3a0e); border-color: var(--accent-dim); }
-.switch.is-on .switch__knob { transform: translateX(18px); background: linear-gradient(180deg, #f0d475, var(--accent)); }
+.switch:hover .switch__track { border-color: var(--panel-edge-bright); }
+.switch:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.switch.is-on .switch__track { background: rgba(150, 118, 42, 0.5); border-color: var(--accent-dim); }
+.switch.is-on .switch__knob { transform: translateX(14px); background: linear-gradient(180deg, #eac768, var(--accent)); }
 .switch.is-on .switch__state { color: var(--accent); }
 
 /* ---- segmented choices, following .qty__btn */
@@ -349,16 +347,16 @@
 .seg { display: flex; flex: 0 0 auto; gap: 2px; }
 
 .seg__btn {
-  min-width: 64px;
-  min-height: 26px;
-  padding: 3px var(--space-2);
+  min-width: 52px;
+  min-height: 22px;
+  padding: 1px var(--space-2);
   border-color: var(--panel-edge);
 }
 
 .seg__btn.is-active {
   color: var(--accent-ink);
-  background: linear-gradient(180deg, #e0bb42, #b48c1c);
-  border-color: #f0d475;
+  background: linear-gradient(180deg, #dcb95c, #a5822e);
+  border-color: rgba(0, 0, 0, 0.6);
 }
 
 /* ================================================================= compact density */
@@ -372,77 +370,77 @@
  * carry a fixed pixel size and cannot follow a token.
  *
  * Panel widths are inline styles from `PanelPlacement`, which a stylesheet cannot outrank — but
- * max-width is applied after width, so the edge-anchored panels narrow without !important. The
+ * max-width is applied after width, so the slot panels narrow without !important. The
  * centre-anchored ones (bank, shop, map, dialogue) are left alone: they are positioned from a
  * computed left edge, so narrowing them would push them off centre.
  */
 #ui-root.is-compact {
-  --size-xs: 10px;
-  --size-sm: 11px;
-  --size-md: 12px;
-  --size-lg: 15px;
-  --size-xl: 19px;
+  --size-xs: 9px;
+  --size-sm: 10px;
+  --size-md: 11px;
+  --size-lg: 13px;
+  --size-xl: 16px;
 
-  --space-1: 3px;
-  --space-2: 6px;
+  --space-1: 2px;
+  --space-2: 5px;
   --space-3: 8px;
   --space-4: 11px;
-  --space-5: 16px;
+  --space-5: 15px;
 }
 
 /* ---- HUD clusters hug the edges harder */
-#ui-root.is-compact .hud__vitals { width: 196px; }
-#ui-root.is-compact .hud__compass { width: 252px; }
-#ui-root.is-compact .bar { height: 8px; }
-#ui-root.is-compact .bar--tall { height: 15px; }
+#ui-root.is-compact .minimap { width: 120px; height: 120px; }
+#ui-root.is-compact .minimap__btn { width: 20px; height: 20px; font-size: 12px; }
+#ui-root.is-compact .hud.has-minimap .hud__right { top: 138px; }
+#ui-root.is-compact .quest-tracker { width: 188px; }
+#ui-root.is-compact .hud__vitals { width: 160px; }
+#ui-root.is-compact .bar { height: 7px; }
+#ui-root.is-compact .bar--tall { height: 12px; }
 #ui-root.is-compact .bar--thin { height: 3px; }
-#ui-root.is-compact .compass__tape { height: 14px; }
 
-#ui-root.is-compact .dock { gap: 5px; }
-#ui-root.is-compact .dock__btn { width: 48px; padding: 4px 3px 3px; }
-#ui-root.is-compact .dock__glyph { font-size: 15px; line-height: 15px; }
-#ui-root.is-compact .dock__key { font-size: 8px; line-height: 11px; }
+#ui-root.is-compact .dock { gap: 2px; }
+#ui-root.is-compact .dock__btn { width: 30px; height: 30px; }
+#ui-root.is-compact .dock__glyph { font-size: 14px; line-height: 14px; }
+#ui-root.is-compact .dock__key { font-size: 7px; line-height: 9px; }
 
 /* ---- controls and slots */
-#ui-root.is-compact .btn { min-height: 24px; padding: 4px 9px; }
-#ui-root.is-compact .panel__title { font-size: var(--size-md); }
-#ui-root.is-compact .panel__header { padding: 5px var(--space-3); }
-#ui-root.is-compact .slot { min-width: 32px; }
-#ui-root.is-compact .slot-grid { gap: 3px; }
+#ui-root.is-compact .btn { min-height: 20px; padding: 1px 8px; }
+#ui-root.is-compact .panel__header { min-height: 20px; }
+#ui-root.is-compact .slot { min-width: 30px; }
+#ui-root.is-compact .slot-grid { gap: 2px; }
 #ui-root.is-compact .equip-grid {
-  grid-template-columns: repeat(3, 46px);
-  grid-template-rows: repeat(4, 46px);
-  gap: 5px;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(4, 40px);
+  gap: 2px;
 }
-#ui-root.is-compact .switch__track { width: 34px; height: 18px; }
-#ui-root.is-compact .switch__knob { width: 12px; height: 12px; }
-#ui-root.is-compact .switch.is-on .switch__knob { transform: translateX(16px); }
-#ui-root.is-compact .seg__btn { min-width: 56px; min-height: 22px; }
-#ui-root.is-compact .volume { grid-template-columns: minmax(100px, 150px) 38px; min-width: 164px; }
+#ui-root.is-compact .switch__track { width: 28px; height: 14px; }
+#ui-root.is-compact .switch__knob { width: 8px; height: 8px; }
+#ui-root.is-compact .switch.is-on .switch__knob { transform: translateX(12px); }
+#ui-root.is-compact .seg__btn { min-width: 46px; min-height: 20px; }
+#ui-root.is-compact .volume { grid-template-columns: minmax(90px, 130px) 34px; min-width: 146px; }
 
-/* ---- the edge-anchored panels give the world its width back */
-#ui-root.is-compact #panel-inventory { max-width: 206px; }
-#ui-root.is-compact #panel-skills { max-width: 282px; }
-#ui-root.is-compact #panel-equipment { max-width: 262px; }
-#ui-root.is-compact #panel-quests { max-width: 316px; }
-#ui-root.is-compact #panel-controls { max-width: 298px; }
-#ui-root.is-compact #panel-settings { max-width: 336px; }
+/* ---- the side slot narrows; centre-anchored panels stay put (they centre by transform) */
+#ui-root.is-compact #panel-inventory { max-width: 170px; }
+#ui-root.is-compact #panel-skills { max-width: 170px; }
+#ui-root.is-compact #panel-equipment { max-width: 170px; }
+#ui-root.is-compact #panel-quests { max-width: 170px; }
+#ui-root.is-compact #panel-settings { max-width: 320px; }
 
 /* ---- and the menu itself, since it is inside #ui-root too */
-#ui-root.is-compact .title__card { width: min(460px, 100%); }
-#ui-root.is-compact .title__mark { font-size: 32px; }
-#ui-root.is-compact .title__action { min-height: 34px; }
+#ui-root.is-compact .title__card { width: min(400px, 100%); }
+#ui-root.is-compact .title__mark { font-size: 28px; }
+#ui-root.is-compact .title__action { min-height: 28px; }
 
 /* ================================================================== smaller screens */
 
 /* 1280x720 is the floor: the card must not need to scroll to reach its last button. */
 @media (max-height: 800px) {
   .title__card { gap: var(--space-2); padding: var(--space-4) var(--space-4) var(--space-3); }
-  .title__mark { font-size: 32px; }
+  .title__mark { font-size: 28px; }
   .title__actions { margin-top: var(--space-1); }
-  .title__action { min-height: 34px; }
-  .settings__row { padding: 5px 0; }
-  .settings { gap: var(--space-3); }
+  .title__action { min-height: 28px; }
+  .settings__row { padding: 3px 0; }
+  .settings { gap: var(--space-2); }
 }
 
 @media (max-width: 620px) {
@@ -450,5 +448,5 @@
   .settings__row { grid-template-columns: 1fr; }
   .seg { justify-content: stretch; }
   .seg__btn { flex: 1 1 0; }
-  .volume { width: 100%; grid-template-columns: minmax(0, 1fr) 42px; }
+  .volume { width: 100%; grid-template-columns: minmax(0, 1fr) 38px; }
 }

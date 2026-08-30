@@ -37,17 +37,66 @@ interface ProjectedBounds {
   maxV: number;
 }
 
+interface TerrainLevel {
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+}
+
 interface CachedTerrain {
-  image: CanvasImageSource;
+  /** Pre-downsampled copies, largest first. Render picks the smallest one that is still at
+   * least 1:1 for the current zoom, so a zoomed-out pan never resamples the full-resolution
+   * PNG (17 megapixels) every frame — that was the whole of the map's drag lag. */
+  levels: TerrainLevel[];
   bounds: ProjectedBounds;
 }
 
 const VIEW_PADDING_PX = 18;
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 6;
+
+/**
+ * Zoom 1 fits the whole map; MAP_HOME_ZOOM is the "street level" view the window opens at,
+ * centred on the player, and it is what the toolbar labels 100%. The ceiling is twice home.
+ * Exported so MapPanel's controls and readout stay in the same frame of reference.
+ */
+export const MAP_MIN_ZOOM = 1;
+export const MAP_HOME_ZOOM = 6;
+export const MAP_MAX_ZOOM = 12;
+const MIN_ZOOM = MAP_MIN_ZOOM;
+const MAX_ZOOM = MAP_MAX_ZOOM;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Full resolution plus 1/2 and 1/4 copies, largest first, downsampled once at load. A copy that
+ * cannot get a 2D context (unit tests without a canvas backend) is skipped; the full image is
+ * always level zero, so rendering never depends on the copies existing.
+ */
+function buildLevels(image: HTMLImageElement): TerrainLevel[] {
+  const levels: TerrainLevel[] = [
+    { source: image, width: image.naturalWidth, height: image.naturalHeight },
+  ];
+  let previous: CanvasImageSource = image;
+  let width = image.naturalWidth;
+  let height = image.naturalHeight;
+  for (let step = 0; step < 2; step += 1) {
+    const nextWidth = Math.max(1, Math.round(width / 2));
+    const nextHeight = Math.max(1, Math.round(height / 2));
+    const canvas = document.createElement("canvas");
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
+    const context = canvas.getContext("2d");
+    if (!context) break;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(previous, 0, 0, nextWidth, nextHeight);
+    levels.push({ source: canvas, width: nextWidth, height: nextHeight });
+    previous = canvas;
+    width = nextWidth;
+    height = nextHeight;
+  }
+  return levels;
 }
 
 /**
@@ -79,7 +128,9 @@ export class WorldMapCanvas {
   resize(width: number, height: number): boolean {
     const nextWidth = Math.max(1, Math.round(width));
     const nextHeight = Math.max(1, Math.round(height));
-    const ratio = clamp(window.devicePixelRatio || 1, 1, 2);
+    // Capped at 1.5, not 2: on a 2x display this canvas is the biggest raster in the app, and
+    // the sharpness difference on a painted terrain map does not survive a blind test.
+    const ratio = clamp(window.devicePixelRatio || 1, 1, 1.5);
     if (nextWidth === this.width && nextHeight === this.height && ratio === this.pixelRatio) return false;
 
     this.width = nextWidth;
@@ -108,15 +159,18 @@ export class WorldMapCanvas {
     if (cache) {
       const topLeft = this.toScreen(cache.bounds.minU, cache.bounds.minV);
       const scale = this.screenScale();
+      const level = this.pickLevel(cache, scale);
+      const spanW = (cache.bounds.maxU - cache.bounds.minU) * scale;
+      const spanH = (cache.bounds.maxV - cache.bounds.minV) * scale;
       context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = "high";
-      context.drawImage(
-        cache.image,
-        topLeft.x,
-        topLeft.y,
-        (cache.bounds.maxU - cache.bounds.minU) * scale,
-        (cache.bounds.maxV - cache.bounds.minV) * scale,
-      );
+      // "medium", not "high": at a 2x-DPI megapixel canvas the high-quality resample is the
+      // single most expensive part of a pan frame, and the difference is invisible in motion.
+      context.imageSmoothingQuality = "medium";
+      // The PNG is stored +x-rightward; the display frame is +x-leftward (see project()).
+      context.save();
+      context.scale(-1, 1);
+      context.drawImage(level.source, -(topLeft.x + spanW), topLeft.y, spanW, spanH);
+      context.restore();
     } else {
       this.paintFallback(context);
     }
@@ -129,6 +183,16 @@ export class WorldMapCanvas {
     this.centreV = (bounds.minV + bounds.maxV) / 2;
     this.zoom = MIN_ZOOM;
     this.viewReady = true;
+    this.clampCentre();
+  }
+
+  /** Centre the view on a world position, optionally at a given zoom. Used by "open on player". */
+  centreOn(position: Vec3, zoom?: number): void {
+    if (!this.viewReady) this.resetView();
+    if (zoom !== undefined) this.zoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    const projected = this.project(position[0], position[1], position[2]);
+    this.centreU = projected.u;
+    this.centreV = projected.v;
     this.clampCentre();
   }
 
@@ -197,7 +261,7 @@ export class WorldMapCanvas {
     image.decoding = "async";
     image.onload = () => {
       const projectedBounds = this.projectBounds(WORLD_MAP_IMAGE_BOUNDS);
-      this.cache = { image, bounds: projectedBounds };
+      this.cache = { levels: buildLevels(image), bounds: projectedBounds };
       this.projectedBounds = projectedBounds;
       this.preparing = false;
       if (!this.viewReady) this.resetView();
@@ -214,8 +278,29 @@ export class WorldMapCanvas {
     image.src = imageUrl.href;
   }
 
+  /**
+   * The smallest pre-downsampled copy that still has at least one source pixel per screen pixel
+   * at this zoom (device ratio included). Smaller source, same picture, far cheaper resample.
+   */
+  private pickLevel(cache: CachedTerrain, screenScale: number): TerrainLevel {
+    const spanU = Math.max(1, cache.bounds.maxU - cache.bounds.minU);
+    const needPxPerUnit = screenScale * this.pixelRatio;
+    let chosen = cache.levels[0]!;
+    for (const level of cache.levels) {
+      if (level.width / spanU >= needPxPerUnit) chosen = level;
+      else break;
+    }
+    return chosen;
+  }
+
+  /**
+   * North (+z) up and — deliberately — world +x to the LEFT. The world is right-handed and Y-up:
+   * standing in it facing +z, +x is on your left, so a map that drew +x rightward was mirrored
+   * against everything the player sees. The baked PNG is stored +x-rightward, so render() flips
+   * it horizontally to match this frame; markers, the pip and clicks all come through here.
+   */
   private project(x: number, _height: number, z: number): ProjectedPoint {
-    return { u: x, v: -z };
+    return { u: -x, v: -z };
   }
 
   private projectBounds(bounds: Readonly<{

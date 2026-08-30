@@ -1,20 +1,19 @@
 /**
- * The always-on HUD: vitals, the current activity, the XP feed, toasts, marks, and the compass.
+ * The always-on HUD: vitals, the current activity, the XP feed, toasts, and marks.
  *
  * Everything here is arranged around one constraint from the brief — the middle of the screen is
- * where the game is, so the HUD lives on the edges. Vitals top-left, compass top-centre as a thin
- * strip, marks and the XP feed top-right, toasts bottom-left where the context menu already put
- * them.
+ * where the game is, so the HUD lives on the edges. Vitals top-left, marks and the XP feed
+ * top-right (below the minimap, which owns direction-finding now — the compass lives on its rim),
+ * toasts bottom-left where the context menu already put them.
  *
  * The HUD takes over the notice channel from `ui/contextMenu.ts` via `setNoticeSink` (wired in
  * `panels.ts`), so every failed action, every greyed menu entry, and every game event lands in one
  * strip instead of three competing ones.
  *
  * There is no per-frame work here. `update()` is called on a 100 ms cadence and each channel keeps
- * a signature of what it last wrote; the compass, which costs an `observe()` call, runs slower
- * still. Nothing touches the DOM unless the underlying number changed.
+ * a signature of what it last wrote. Nothing touches the DOM unless the underlying number changed.
  */
-import type { GameEvent, ObservedEntity, SkillId, Vec3 } from "../contracts.js";
+import type { GameEvent, SkillId } from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
 import { SKILLS } from "../content/skills.js";
 import { RECOVERY_CACHE_ID } from "../systems/death.js";
@@ -27,24 +26,7 @@ const TOAST_LIMIT = 4;
 const TOAST_DECAY_MS = 6_000;
 const XP_DROP_LIMIT = 6;
 const XP_DROP_MS = 2_200;
-const COMPASS_INTERVAL_MS = 480;
 const EVENT_INTERVAL_MS = 250;
-/** The compass tape shows this many degrees either side of where you are looking. */
-const COMPASS_HALF_SPAN_DEG = 70;
-
-/** What counts as a "known location" for the compass needle. */
-const LANDMARK_ARCHETYPES = new Set(["landmark", "bank", "shop", "station", "portal", "npc"]);
-
-const CARDINALS: readonly { label: string; bearing: number }[] = [
-  { label: "N", bearing: 0 },
-  { label: "NE", bearing: 45 },
-  { label: "E", bearing: 90 },
-  { label: "SE", bearing: 135 },
-  { label: "S", bearing: 180 },
-  { label: "SW", bearing: 225 },
-  { label: "W", bearing: 270 },
-  { label: "NW", bearing: 315 },
-];
 
 export type AutoOpen = "bank" | "shop" | null;
 
@@ -61,20 +43,15 @@ export class Hud {
   private readonly activityCount: HTMLElement;
   private readonly currencyValue: HTMLElement;
   private readonly xpFeed: HTMLElement;
-  private readonly compass: HTMLElement;
-  private readonly compassTape: HTMLElement;
-  private readonly compassTarget: HTMLElement;
   private readonly cacheBanner: HTMLElement;
   private readonly cacheDetail: HTMLElement;
 
   private healthSig = "";
   private activitySig = "";
   private currencySig = "";
-  private compassSig = "";
 
   private xpBaseline: Partial<Record<SkillId, number>> = {};
   private xpSeeded = false;
-  private lastCompassMs = 0;
   private lastEventMs = 0;
   private eventCursor = 0;
   private eventPollInFlight = false;
@@ -150,17 +127,6 @@ export class Hud {
     this.cacheBanner = cache;
     this.cacheDetail = cacheDetail;
 
-    // ---- compass, top centre
-    const compass = document.createElement("div");
-    compass.className = "hud__compass";
-    compass.setAttribute("role", "img");
-    compass.setAttribute("aria-label", "Compass");
-    const tape = document.createElement("div");
-    tape.className = "compass__tape";
-    const target = document.createElement("div");
-    target.className = "compass__target u-truncate";
-    compass.append(tape, target);
-
     // ---- marks and the XP feed, top right
     const right = document.createElement("div");
     right.className = "hud__right";
@@ -181,7 +147,7 @@ export class Hud {
     xpFeed.className = "hud__xp-feed";
     right.append(currency, xpFeed);
 
-    root.append(vitals, compass, right);
+    root.append(vitals, right);
 
     // The toast strip is a sibling, not a child: #ui-root already styles and positions
     // `.toast-strip`, and the context menu's fallback looks for exactly that selector.
@@ -201,11 +167,6 @@ export class Hud {
     this.activityCount = activityCount;
     this.currencyValue = currencyValue;
     this.xpFeed = xpFeed;
-    this.compass = compass;
-    this.compassTape = tape;
-    this.compassTarget = target;
-
-    this.buildCompassTicks();
   }
 
   mount(parent: HTMLElement): void {
@@ -244,10 +205,6 @@ export class Hud {
     this.updateXpFeed();
     this.updateCache();
 
-    if (nowMs - this.lastCompassMs >= COMPASS_INTERVAL_MS) {
-      this.lastCompassMs = nowMs;
-      this.updateCompass(player.position);
-    }
     if (nowMs - this.lastEventMs >= EVENT_INTERVAL_MS) {
       this.lastEventMs = nowMs;
       this.pollEvents();
@@ -393,86 +350,6 @@ export class Hud {
     this.after(XP_DROP_MS, () => drop.remove());
   }
 
-  // ---------------------------------------------------------------- compass
-
-  private buildCompassTicks(): void {
-    for (const cardinal of CARDINALS) {
-      const tick = document.createElement("span");
-      tick.className = cardinal.label.length === 1 ? "compass__tick compass__tick--major" : "compass__tick";
-      tick.dataset["bearing"] = String(cardinal.bearing);
-      tick.textContent = cardinal.label;
-      this.compassTape.appendChild(tick);
-    }
-    const needle = document.createElement("span");
-    needle.className = "compass__needle";
-    this.compass.appendChild(needle);
-  }
-
-  /**
-   * A tape, not a dial: cardinal letters slide across a strip, north included, and the nearest
-   * known location gets its own pip plus a readout of name, distance, and bearing.
-   */
-  private updateCompass(position: Vec3): void {
-    const headingDeg = radToDeg(this.options.getHeadingRad?.() ?? 0);
-    const nearest = this.nearestLandmark();
-
-    const bearingToTarget = nearest ? bearingDeg(position, nearest.position) : null;
-    const signature = [
-      Math.round(headingDeg / 2),
-      nearest?.id ?? "-",
-      nearest ? Math.round(nearest.distance) : "-",
-      bearingToTarget === null ? "-" : Math.round(bearingToTarget / 2),
-    ].join(":");
-    if (signature === this.compassSig) return;
-    this.compassSig = signature;
-
-    for (const tick of this.compassTape.querySelectorAll<HTMLElement>(".compass__tick")) {
-      const bearing = Number(tick.dataset["bearing"] ?? "0");
-      this.placeOnTape(tick, relativeDeg(bearing, headingDeg));
-    }
-
-    let pip = this.compassTape.querySelector<HTMLElement>(".compass__pip");
-    if (nearest && bearingToTarget !== null) {
-      if (!pip) {
-        pip = document.createElement("span");
-        pip.className = "compass__pip";
-        this.compassTape.appendChild(pip);
-      }
-      this.placeOnTape(pip, relativeDeg(bearingToTarget, headingDeg));
-      this.compassTarget.textContent =
-        `${nearest.name} · ${Math.round(nearest.distance)} m ${cardinalFor(bearingToTarget)}`;
-      this.compass.setAttribute(
-        "aria-label",
-        `Compass. Facing ${cardinalFor(headingDeg)}. ${nearest.name} is ${Math.round(nearest.distance)} metres ${cardinalFor(bearingToTarget)}.`,
-      );
-    } else {
-      pip?.remove();
-      this.compassTarget.textContent = "No known location nearby";
-      this.compass.setAttribute("aria-label", `Compass. Facing ${cardinalFor(headingDeg)}.`);
-    }
-  }
-
-  private placeOnTape(node: HTMLElement, relative: number): void {
-    if (Math.abs(relative) > COMPASS_HALF_SPAN_DEG) {
-      node.hidden = true;
-      return;
-    }
-    node.hidden = false;
-    const percent = 50 + (relative / COMPASS_HALF_SPAN_DEG) * 50;
-    node.style.left = `${percent.toFixed(1)}%`;
-  }
-
-  private nearestLandmark(): ObservedEntity | null {
-    // `observe` returns UNAVAILABLE-equivalent (an empty list) until the entity system is up.
-    const seen = this.ctx.api.observe({ scope: "known", radius: 140, limit: 60 });
-    let best: ObservedEntity | null = null;
-    for (const entity of seen) {
-      if (!LANDMARK_ARCHETYPES.has(entity.archetype)) continue;
-      if (!best || entity.distance < best.distance) best = entity;
-    }
-    return best;
-  }
-
   // ----------------------------------------------------------------- events
 
   /**
@@ -574,30 +451,4 @@ function isSkillId(value: string): value is SkillId {
 
 function titleCase(text: string): string {
   return text.replace(/[_-]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function radToDeg(radians: number): number {
-  return (radians * 180) / Math.PI;
-}
-
-/** 0 is +Z (north), 90 is +X (east). Matches the world's Y-up, +Z-forward convention. */
-function bearingDeg(from: Vec3, to: Vec3): number {
-  const dx = to[0] - from[0];
-  const dz = to[2] - from[2];
-  return normaliseDeg(radToDeg(Math.atan2(dx, dz)));
-}
-
-function normaliseDeg(degrees: number): number {
-  return ((degrees % 360) + 360) % 360;
-}
-
-/** Signed difference in [-180, 180], for placing a marker on the tape. */
-function relativeDeg(bearing: number, heading: number): number {
-  const delta = normaliseDeg(bearing - heading);
-  return delta > 180 ? delta - 360 : delta;
-}
-
-function cardinalFor(bearing: number): string {
-  const index = Math.round(normaliseDeg(bearing) / 45) % 8;
-  return CARDINALS[index]?.label ?? "N";
 }
