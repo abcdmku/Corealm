@@ -8,7 +8,7 @@ description: "Tarn Marchwolf spawn locations, combat stats, and drops."
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Tarn Marchwolf">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#cairn-tarns" style="--map-x:69.0000%;--map-y:55.8333%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Tarn Marchwolf, Cairn Tarns, Karrowmoor" title="Tarn Marchwolf, Cairn Tarns, Karrowmoor"><span>Tarn Marchwolf<small>Cairn Tarns, Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

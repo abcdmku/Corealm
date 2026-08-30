@@ -1,7 +1,4 @@
 import { startGameServer } from "./lib/server.js";
-import { generateWorldMap } from "./generate-world-map.js";
-
-await generateWorldMap();
 
 /**
  * 4173 by default, overridable with PORT.

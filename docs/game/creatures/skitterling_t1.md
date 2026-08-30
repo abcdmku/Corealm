@@ -8,7 +8,7 @@ description: "Rill Skitterling spawn locations, combat stats, and drops."
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Rill Skitterling">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#coldbrace-east-gate" style="--map-x:42.6667%;--map-y:55.8333%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Rill Skitterling, Coldbrace East Gate, Fallowmarch" title="Rill Skitterling, Coldbrace East Gate, Fallowmarch"><span>Rill Skitterling<small>Coldbrace East Gate, Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

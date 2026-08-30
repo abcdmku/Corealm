@@ -8,9 +8,13 @@ on:
       - "docs/game/**"
       - "docs-site/**"
       - "tools/**"
+      - "tests/**"
       - "astro.config.mjs"
       - "package.json"
       - "package-lock.json"
+      - ".node-version"
+      - ".npmrc"
+      - "tsconfig.json"
       - ".github/workflows/docs.yml"
   push:
     branches: [main]
@@ -20,40 +24,54 @@ on:
       - "docs/game/**"
       - "docs-site/**"
       - "tools/**"
+      - "tests/**"
       - "astro.config.mjs"
       - "package.json"
       - "package-lock.json"
+      - ".node-version"
+      - ".npmrc"
+      - "tsconfig.json"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 concurrency:
-  group: corealm-pages-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   GAME_BASE: /${{ github.event.repository.name }}/
   DOCS_BASE: /${{ github.event.repository.name }}/docs
   DOCS_SITE_URL: https://${{ github.repository_owner }}.github.io
+  ASTRO_TELEMETRY_DISABLED: "1"
 
 jobs:
   verify:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version-file: .node-version
           cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm run docs:build
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+      - name: Install Chromium
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Typecheck, test, and build
+        run: npm run check
+      - name: Verify generated guide is committed
+        run: git diff --exit-code -- docs/game
+      - name: Browser smoke test
+        run: npm run smoke -- --run runs/corealm
 
   publish:
-    if: github.event_name != 'pull_request' && !contains(github.event.head_commit.message || '', '[docs-sync]')
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
-      contents: write
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -61,28 +79,22 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+      # Pages must be enabled once in repository settings with "GitHub Actions" as its source.
+      - uses: actions/configure-pages@v6
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version-file: .node-version
           cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run docs:refresh
-
-      - name: Commit refreshed Markdown and captures
-        shell: bash
-        run: |
-          if git diff --quiet -- docs/game; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/game
-          git commit -m "[docs-sync] refresh generated game guide"
-          git push
-
-      - run: npm run build
-      - run: npm run docs:build
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+      - name: Install Chromium
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Typecheck, test, and build
+        run: npm run check
+      - name: Verify generated guide is committed
+        run: git diff --exit-code -- docs/game
+      - name: Browser smoke test
+        run: npm run smoke -- --run runs/corealm
 
       - name: Stage game and guide
         shell: bash
@@ -91,9 +103,8 @@ jobs:
           cp -R game/dist/. pages-dist/
           cp -R dist/. pages-dist/docs/
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: pages-dist
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

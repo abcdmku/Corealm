@@ -32,7 +32,7 @@ Quarrier Vess has been cutting Kaldite for nine years and she has never liked wh
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 1">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#highcairn" style="--map-x:62.0000%;--map-y:55.5000%" data-map-side="right" data-map-kind="settlement" data-map-marker aria-label="Highcairn, Karrowmoor" title="Highcairn, Karrowmoor"><span>Highcairn<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -58,7 +58,7 @@ Every cast eats one Essence Shard and pays Magic XP for the damage. Skitterlings
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 2">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../creatures/skitterling_t10/" style="--map-x:64.1667%;--map-y:63.3333%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Scree Skitterling, Karrowmoor" title="Scree Skitterling, Karrowmoor"><span>Scree Skitterling<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#the-great-cairn" style="--map-x:61.6667%;--map-y:64.6667%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="The Great Cairn, Karrowmoor" title="The Great Cairn, Karrowmoor"><span>The Great Cairn<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#upper-karrow-seam" style="--map-x:66.1667%;--map-y:61.0000%" data-map-side="left" data-map-kind="seam" data-map-marker aria-label="Upper Karrow Seam, Karrowmoor" title="Upper Karrow Seam, Karrowmoor"><span>Upper Karrow Seam<small>Karrowmoor</small></span></a>
@@ -92,7 +92,7 @@ She is at the middle of Highcairn. The handover takes the ore.
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 3">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../npcs/#quarrier-vess" style="--map-x:62.1500%;--map-y:55.7000%" data-map-side="left" data-map-kind="npc" data-map-marker aria-label="Quarrier Vess, Karrowmoor" title="Quarrier Vess, Karrowmoor"><span>Quarrier Vess<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

@@ -8,7 +8,7 @@ description: "Thornbound Husk spawn locations, combat stats, and drops."
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Thornbound Husk">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#the-thornline" style="--map-x:66.3333%;--map-y:37.3333%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Thornbound Husk, The Thornline, Vellenwood" title="Thornbound Husk, The Thornline, Vellenwood"><span>Thornbound Husk<small>The Thornline, Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

@@ -28,7 +28,7 @@ All four are route-graph nodes: `moveTo({ locationId })` reaches each one direct
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Eleven Empty Days, step 1">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#blackwater-pools" style="--map-x:60.6667%;--map-y:43.0000%" data-map-side="right" data-map-kind="water" data-map-marker aria-label="Blackwater Pools, Vellenwood" title="Blackwater Pools, Vellenwood"><span>Blackwater Pools<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#gorge-head" style="--map-x:58.6667%;--map-y:34.0000%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Gorge Head, Vellenwood" title="Gorge Head, Vellenwood"><span>Gorge Head<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#the-thornline" style="--map-x:66.3333%;--map-y:37.3333%" data-map-side="left" data-map-kind="camp" data-map-marker aria-label="The Thornline, Vellenwood" title="The Thornline, Vellenwood"><span>The Thornline<small>Vellenwood</small></span></a>
@@ -62,7 +62,7 @@ They sit around (150, 128) and they are aggressive, so they will find you first.
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Eleven Empty Days, step 2">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../creatures/skitterling_t5/" style="--map-x:62.5000%;--map-y:39.3333%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Bramble Skitterling, Vellenwood" title="Bramble Skitterling, Vellenwood"><span>Bramble Skitterling<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#the-thornline" style="--map-x:66.3333%;--map-y:37.3333%" data-map-side="left" data-map-kind="camp" data-map-marker aria-label="The Thornline, Vellenwood" title="The Thornline, Vellenwood"><span>The Thornline<small>Vellenwood</small></span></a>
 </div>
@@ -94,7 +94,7 @@ Both answers finish the quest. One of them changes what Mott says to you for the
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Eleven Empty Days, step 3">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../npcs/#trapper-mott" style="--map-x:55.7667%;--map-y:40.1167%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Trapper Mott, Vellenwood" title="Trapper Mott, Vellenwood"><span>Trapper Mott<small>Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

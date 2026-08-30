@@ -41,10 +41,7 @@ import {
 } from "../game/src/content/regions.js";
 import { SKILLS } from "../game/src/content/skills.js";
 import { MAX_LEVEL, TIERS, totalXpAt, xpTable } from "../game/src/content/xp.js";
-import {
-  WORLD_MAP_IMAGE_BOUNDS,
-  WORLD_MAP_RENDER_FINGERPRINT,
-} from "../game/src/generated/worldMapFingerprint.js";
+import { WORLD_MAP_IMAGE_BOUNDS } from "../game/src/generated/worldMapFingerprint.js";
 import type { RegionId, SkillId } from "../game/src/contracts.js";
 
 function cleanCell(value: string | number): string {
@@ -212,7 +209,7 @@ function worldMapFigure(
     `<figure class="corealm-location-map${options.className ? ` ${options.className}` : ""}" data-location-map style="--map-image-ratio:${width / height}">`,
     `<div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="${escapeHtml(options.ariaLabel)}">`,
     `<div class="corealm-map-stage" data-map-stage>`,
-    `<img src="${options.assetBase}world-map.webp?v=${WORLD_MAP_RENDER_FINGERPRINT}" alt="Overhead map rendered from the Corealm game world" draggable="false" />`,
+    `<img src="${docsWorldMapUrl(options.assetBase)}" alt="Overhead map rendered from the Corealm game world" draggable="false" />`,
     markers,
     `</div>`,
     `<span class="corealm-map-north" aria-hidden="true">N</span>`,
@@ -226,6 +223,11 @@ function worldMapFigure(
     `<figcaption>${escapeHtml(options.caption)}</figcaption>`,
     `</figure>`,
   ].join("\n");
+}
+
+/** Keep generated Markdown stable when the map image changes. */
+export function docsWorldMapUrl(assetBase: string): string {
+  return `${assetBase}world-map.webp`;
 }
 
 function locationMap(): string {

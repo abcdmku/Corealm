@@ -4,9 +4,25 @@
   "private": true,
   "type": "module",
   "description": "A small agent workflow and browser test harness for building Three.js games.",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=24 <25",
+      "onFail": "error"
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.2": true,
+    "fsevents@2.3.3": true
+  },
   "scripts": {
     "dev": "tsx tools/dev-game.ts",
     "build": "tsx tools/build-game.ts",
+    "check": "npm run typecheck && npm test && npm run build && npm run docs:build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "tsx tools/smoke-test.ts",
@@ -23,12 +39,14 @@
     "gen-docs": "tsx tools/gen-docs.ts",
     "capture-docs": "tsx tools/capture-docs.ts",
     "docs:prepare": "tsx tools/prepare-docs-site.ts",
-    "docs:refresh": "npm run world-map && npm run capture-docs && npm run gen-docs && npm run docs:prepare",
+    "docs:refresh": "npm run gen-docs",
+    "docs:refresh:visuals": "npm run world-map && npm run capture-docs && npm run gen-docs",
     "docs:smoke": "tsx tools/smoke-docs-capture.ts",
-    "docs:dev": "npm run gen-docs && npm run docs:prepare && astro dev",
-    "docs:build": "npm run gen-docs && npm run docs:prepare && astro build",
+    "docs:dev": "npm run docs:refresh && npm run docs:prepare && astro dev",
+    "docs:build": "npm run docs:refresh && npm run docs:prepare && astro build",
     "docs:preview": "astro preview",
     "icons": "tsx tools/generate-item-icons.ts",
+    "assets:refresh": "npm run icons && npm run world-map",
     "icons:verify": "tsx tools/verify-item-icons.ts",
     "gate-check": "tsx tools/gate-check.ts"
   },

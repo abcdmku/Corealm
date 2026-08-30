@@ -26,7 +26,7 @@ Ten trees stand there and Woodcutting 5 is the gate. Logs do not stack, so eight
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Crooked Grain, step 1">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#duskoak-stand" style="--map-x:51.1667%;--map-y:36.1667%" data-map-side="right" data-map-kind="grove" data-map-marker aria-label="Duskoak Stand, Vellenwood" title="Duskoak Stand, Vellenwood"><span>Duskoak Stand<small>Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -57,7 +57,7 @@ It is at (170, 112), east of Rootfall past the Blackwater Pools. `observe({ radi
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Crooked Grain, step 2">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#blackwater-pools" style="--map-x:64.1667%;--map-y:40.6667%" data-map-side="left" data-map-kind="entity" data-map-marker aria-label="The Split Duskoak, Vellenwood" title="The Split Duskoak, Vellenwood"><span>The Split Duskoak<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#blackwater-pools" style="--map-x:60.6667%;--map-y:43.0000%" data-map-side="right" data-map-kind="water" data-map-marker aria-label="Blackwater Pools, Vellenwood" title="Blackwater Pools, Vellenwood"><span>Blackwater Pools<small>Vellenwood</small></span></a>
 </div>
@@ -85,7 +85,7 @@ The handover takes the logs. He counts them; he counts everything from this stan
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Crooked Grain, step 3">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../npcs/#woodward-ansel" style="--map-x:54.7833%;--map-y:39.7667%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Woodward Ansel, Vellenwood" title="Woodward Ansel, Vellenwood"><span>Woodward Ansel<small>Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

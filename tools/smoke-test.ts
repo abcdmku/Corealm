@@ -31,7 +31,15 @@ export async function runSmokeTest(runCandidate: string): Promise<SmokeReport> {
   const started = Date.now();
   const runDir = await prepareRun(runCandidate);
   const server = await startGameServer();
-  const driver = new GameDriver(server);
+  const driver = new GameDriver(server, {
+    // The smoke gate proves renderer startup and gameplay state transitions, not visual quality.
+    // Keep software-rendered CI fast enough to remain a useful per-change check.
+    settings: {
+      renderScale: 0.7, shadowQuality: "off", drawDistance: "near",
+      damageNumbers: true, invertCameraY: false, uiScale: "normal",
+      music: 0, ambient: 0, sfx: 0,
+    },
+  });
   const report: SmokeReport = {
     passed: false,
     checks: {},
@@ -44,7 +52,8 @@ export async function runSmokeTest(runCandidate: string): Promise<SmokeReport> {
 
   try {
     await driver.launch();
-    await driver.open();
+    // Cold SwiftShader boots vary substantially across hosted and local runners.
+    await driver.open(120_000);
     report.initial = await driver.snapshot();
 
     const browserFacts = await driver.page!.evaluate((methods) => {

@@ -31,7 +31,7 @@ Shafts come from Palewood logs, cut at the Palewood Copse in Fallowmarch (locati
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 1">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#palewood-copse" style="--map-x:35.4667%;--map-y:57.5500%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Fletching Bench, Fallowmarch" title="Coldbrace Fletching Bench, Fallowmarch"><span>Coldbrace Fletching Bench<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#palewood-copse" style="--map-x:22.1667%;--map-y:55.3333%" data-map-side="right" data-map-kind="grove" data-map-marker aria-label="Palewood Copse, Fallowmarch" title="Palewood Copse, Fallowmarch"><span>Palewood Copse<small>Fallowmarch</small></span></a>
 </div>
@@ -64,7 +64,7 @@ Shards come off gems. Pale Quartz drops as a bonus while mining Grithe, and Juno
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 2">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#bracken-pit" style="--map-x:35.4667%;--map-y:57.7833%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Crafting Table, Fallowmarch" title="Coldbrace Crafting Table, Fallowmarch"><span>Coldbrace Crafting Table<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#bracken-pit" style="--map-x:36.6667%;--map-y:43.3333%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Bracken Pit, Fallowmarch" title="Bracken Pit, Fallowmarch"><span>Bracken Pit<small>Fallowmarch</small></span></a>
 </div>
@@ -97,7 +97,7 @@ She works the trade post side of the Rootfall stump. The handover takes both.
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 3">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../npcs/#seamer-juno" style="--map-x:54.8667%;--map-y:39.2333%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Seamer Juno, Vellenwood" title="Seamer Juno, Vellenwood"><span>Seamer Juno<small>Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

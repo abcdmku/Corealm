@@ -4,10 +4,11 @@ This is an uninitialized template for an agent-built Three.js browser game. It c
 
 ## Start from a brief
 
-Install the harness once:
+Use Node 24 (other Node majors are rejected), then install the harness once:
 
 ```bash
-npm install
+node --version # v24.x
+npm ci
 npx playwright install chromium
 ```
 
@@ -44,16 +45,16 @@ The game remains a normal Vite application and never imports the harness at runt
 
 ```bash
 npm run dev
-npm run typecheck
-npm test
-npm run build
+npm run check
 npm run smoke -- --run runs/my-game
 npm run play -- --run runs/my-game --scenario tools/scenarios/my-game.json
 npm run screenshot -- --run runs/my-game --name checkpoint
 npm run game-agent -- critic-pack --run runs/my-game
 ```
 
-`dev`, `build`, and browser commands intentionally stop with a clear message while `game/index.html` is absent.
+`npm run check` is the local CI loop: typecheck, all unit tests, and the game and guide production builds. `dev`, `build`, and browser commands intentionally stop with a clear message while `game/index.html` is absent.
+
+Generated icons, world maps, and guide captures are committed inputs to normal development and CI. Refresh text with `npm run docs:refresh`; use `npm run assets:refresh` or `npm run docs:refresh:visuals` only when those generated visuals intentionally need to change. The visual commands boot Chromium and are deliberately not part of `dev`, `build`, `check`, or deployment.
 
 ## Runtime testing contract
 
