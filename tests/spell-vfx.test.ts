@@ -110,6 +110,19 @@ describe("spark size", () => {
 });
 
 describe("spell effect density", () => {
+  it("reserves the production cap of 640 live particle instances", () => {
+    const parent = new THREE.Group();
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 400);
+    const vfx = new SpellVfx({ parent, camera, groundHeightAt: () => 0 });
+    try {
+      const mesh = parent.children.find((child) => (child as THREE.InstancedMesh).isInstancedMesh);
+      expect(mesh, "particle mesh").toBeDefined();
+      expect((mesh as THREE.InstancedMesh).instanceMatrix.count).toBe(640);
+    } finally {
+      vfx.dispose();
+    }
+  });
+
   it("spends its particles a few at the caster, a few in flight, and a lot on impact", () => {
     const vfx = harness();
     try {

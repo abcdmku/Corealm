@@ -22,6 +22,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Page } from "playwright";
 import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun } from "./lib/paths.js";
+import { installTestDeadline } from "./lib/deadline.js";
 import type {} from "./lib/debug-api.js";
 // The reward numbers F3 asserts are read out of the content table and handed to the page, so
 // the check compares the game against its own definition instead of against a number a test
@@ -1275,5 +1276,10 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  const clearDeadline = installTestDeadline("gate check");
+  try {
+    await main();
+  } finally {
+    clearDeadline();
+  }
 }

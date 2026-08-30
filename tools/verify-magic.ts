@@ -1,5 +1,8 @@
 /**
- * Plays the magic ladder in a real Chromium and proves the three claims that source review cannot.
+ * Legacy full-world wiring check for the magic ladder in a real Chromium.
+ *
+ * The persistent feature lab owns detailed presentation proof. This script remains useful for the
+ * three integration claims that an isolated scene cannot make about the shipped world:
  *
  * AGENTS.md rule 7: "Source review is not gameplay proof." A spell effect is exactly the kind of
  * thing that reads correct in a diff and draws nothing on screen — a mis-flipped atlas UV, a
@@ -29,9 +32,10 @@ import { pathToFileURL } from "node:url";
 import { GameDriver } from "./lib/driver.js";
 import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun } from "./lib/paths.js";
+import { installTestDeadline } from "./lib/deadline.js";
 import { SPELLS } from "../game/src/content/spells.js";
 import { SPELL_ELEMENTS } from "../game/src/contracts.js";
-import { PLAYER_SPEED, SPELL_RANGE } from "../game/src/app/config.js";
+import { MELEE_RANGE, SPELL_RANGE } from "../game/src/app/config.js";
 
 interface Metrics { drawCalls: number; programs: number; triangles: number; fps: number; spellParticles: number }
 interface ObservedEnemy { id: string; name: string; distance: number; state: string }
@@ -40,6 +44,10 @@ interface ObservedEnemy { id: string; name: string; distance: number; state: str
 const TEST_MAGIC_LEVEL = 75;
 /** One shard per cast; enough for the whole sweep with room for retries. */
 const SHARDS = 200;
+/** Keep the caster safely inside spell reach while still outside melee reach. */
+const TARGET_DISTANCE_M = 4;
+/** The production SpellVfx instance buffer, also exercised headlessly in tests/spell-vfx.test.ts. */
+const SPELL_PARTICLE_CAP = 640;
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -125,10 +133,11 @@ async function main(): Promise<void> {
       }
 
       // TELEPORTED, not walked, and that is a statement about the harness rather than about the
-      // game. The nearest enemy to spawn is 79.5 m out — 19 s of walking at `PLAYER_SPEED`, except
-      // that the sim only advances with rendered frames (`app/loop.ts` clamps a frame to 250 ms),
+      // game. The nearest enemy to spawn is 79.5 m out — 19 s of walking at the production speed,
+      // except the sim only advances with rendered frames (`app/loop.ts` clamps a frame to 250 ms),
       // and SwiftShader here renders 18.2 M triangles a frame at well under 1 fps. Walking took
-      // roughly 9 m per real minute and every cast then failed OUT_OF_RANGE against a 9 m spell.
+      // roughly 9 m per real minute, making even the walk into the current 15 m spell range take
+      // more than seven real minutes.
       // Casting is what this script tests; pathfinding has `tools/scenarios/movement.json`.
       const target = await driver.callDebug("callTool", ["corealm_inspect", { entityId: enemy.id }]) as
         { position?: [number, number, number] };
@@ -136,10 +145,14 @@ async function main(): Promise<void> {
         failures.push(`could not inspect ${enemy.id} for a position`);
       } else {
         const [tx, ty, tz] = target.position;
-        // 4 m short of the target, inside melee's 1.6 m and well inside a spell's 9 m, so a stray
-        // step cannot take the caster out of range mid-sweep.
+        // Four metres short of the target: outside melee's 1.6 m and well inside a spell's 15 m,
+        // so a stray step cannot take the caster out of range mid-sweep.
         const bearing = Math.atan2(tz, tx);
-        await driver.callDebug("teleport", [[tx - Math.cos(bearing) * 4, ty, tz - Math.sin(bearing) * 4]]);
+        await driver.callDebug("teleport", [[
+          tx - Math.cos(bearing) * TARGET_DISTANCE_M,
+          ty,
+          tz - Math.sin(bearing) * TARGET_DISTANCE_M,
+        ]]);
         await driver.wait(1200);
       }
 
@@ -280,9 +293,11 @@ async function main(): Promise<void> {
 
       const after = await metrics(driver);
       notes.push(`worst case: +${peakDrawCalls} draw calls over the local floor, ${peakParticles} particles`);
-      // Spec section 8: a hard cap of 320 live particles. The draw-call budget is asserted per cast
+      // SpellVfx has a hard cap of 640 live particles. The draw-call budget is asserted per cast
       // above, against that cast's own floor.
-      if (peakParticles > 320) failures.push(`${peakParticles} live particles; the cap is 320`);
+      if (peakParticles > SPELL_PARTICLE_CAP) {
+        failures.push(`${peakParticles} live particles; the cap is ${SPELL_PARTICLE_CAP}`);
+      }
       if (after.spellParticles !== 0) {
         failures.push(`${after.spellParticles} particles still alive after the sweep; casts do not reap`);
       }
@@ -330,7 +345,7 @@ async function settle(driver: GameDriver, budgetMs: number): Promise<void> {
   }
 }
 
-/** Drops the caster four metres from an entity: inside a spell's 9 m, outside melee's 1.6 m. */
+/** Drops the caster four metres from an entity: inside spell reach, outside melee reach. */
 async function teleportBeside(driver: GameDriver, entityId: string): Promise<boolean> {
   const entity = await driver.callDebug("callTool", ["corealm_inspect", { entityId }]) as
     { position?: [number, number, number] };
@@ -338,7 +353,12 @@ async function teleportBeside(driver: GameDriver, entityId: string): Promise<boo
   if (!at) return false;
   const [x, y, z] = at;
   const bearing = Math.atan2(z, x);
-  await driver.callDebug("teleport", [[x - Math.cos(bearing) * 4, y, z - Math.sin(bearing) * 4]]);
+  if (TARGET_DISTANCE_M <= MELEE_RANGE || TARGET_DISTANCE_M >= SPELL_RANGE) return false;
+  await driver.callDebug("teleport", [[
+    x - Math.cos(bearing) * TARGET_DISTANCE_M,
+    y,
+    z - Math.sin(bearing) * TARGET_DISTANCE_M,
+  ]]);
   await driver.wait(1200);
   return true;
 }
@@ -360,5 +380,10 @@ async function nearestEnemy(driver: GameDriver): Promise<ObservedEnemy | null> {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  const clearDeadline = installTestDeadline("magic verification");
+  try {
+    await main();
+  } finally {
+    clearDeadline();
+  }
 }

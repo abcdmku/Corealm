@@ -1,5 +1,6 @@
 /** Real-browser acceptance check for the guide camera and synchronous WebGL frame path. */
 import { pathToFileURL } from "node:url";
+import { installTestDeadline } from "./lib/deadline.js";
 import { GameDriver } from "./lib/driver.js";
 import { startGameServer } from "./lib/server.js";
 
@@ -52,5 +53,10 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  const clearDeadline = installTestDeadline("documentation camera smoke test");
+  try {
+    await main();
+  } finally {
+    clearDeadline();
+  }
 }

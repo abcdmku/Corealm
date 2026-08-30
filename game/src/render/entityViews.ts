@@ -82,7 +82,6 @@ import { clone as cloneRigged } from "three/examples/jsm/utils/SkeletonUtils.js"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Archetype, EntityId, RegionId, SemanticEntity, Vec3 } from "../contracts.js";
 import type { AssetRegistry } from "./assets.js";
-import type { WorldScene } from "./scene.js";
 import type { PaletteSwatch } from "./materials.js";
 import { Rng } from "../core/rng.js";
 import {
@@ -1077,6 +1076,17 @@ export interface EntityMotionSnapshot {
   readonly timeScale: number | null;
 }
 
+/**
+ * The scene surface this renderer owns.
+ *
+ * `WorldScene` satisfies this interface, while focused render labs can supply two lightweight
+ * groups without constructing terrain, scatter, water, or the rest of the production world.
+ */
+export interface EntityViewScene {
+  readonly entityGroup: THREE.Group;
+  readonly overlayGroup: THREE.Group;
+}
+
 export interface EntityViewOptions {
   /**
    * THE cap that matters, expressed in the unit the budget is written in.
@@ -1199,7 +1209,7 @@ export class EntityViews {
   private pipGeometry: THREE.BufferGeometry | null = null;
 
   constructor(
-    private readonly scene: WorldScene,
+    private readonly scene: EntityViewScene,
     private readonly assets: AssetRegistry,
     private readonly materials: MaterialLibrary,
     options: EntityViewOptions = {},

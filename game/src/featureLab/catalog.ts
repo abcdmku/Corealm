@@ -1,0 +1,276 @@
+import {
+  EQUIP_SLOTS,
+  SKILL_IDS,
+  type EntityId,
+  type FeatureLabCatalog,
+  type FeatureLabPreset,
+  type RegionId,
+  type SemanticEntity,
+  type Vec3,
+} from "../contracts.js";
+import { tierSilhouetteScale } from "../core/math.js";
+import { ENEMIES, enemyIdFor } from "../content/enemies.js";
+import { ALL_ITEMS } from "../content/items.js";
+import { QUESTS } from "../content/quests.js";
+import {
+  REGIONS,
+  type EnemyGroupDef,
+  type NpcStandDef,
+} from "../content/regions.js";
+import { SKILLS } from "../content/skills.js";
+import { SPELLS } from "../content/spells.js";
+import { npcOutfitParts } from "../render/characterAppearances.js";
+
+interface NpcTargetSource {
+  readonly kind: "npc";
+  readonly preset: FeatureLabPreset;
+  readonly regionId: RegionId;
+  readonly settlementId: string;
+  readonly npc: NpcStandDef;
+}
+
+interface CreatureTargetSource {
+  readonly kind: "creature";
+  readonly preset: FeatureLabPreset;
+  readonly regionId: RegionId;
+  readonly dungeonName: string | null;
+  readonly group: EnemyGroupDef;
+}
+
+type TargetSource = NpcTargetSource | CreatureTargetSource;
+
+const NPC_SOURCES: readonly NpcTargetSource[] = REGIONS.flatMap((region) => (
+  region.settlement.npcs.map((npc) => ({
+    kind: "npc" as const,
+    preset: {
+      id: npc.id,
+      label: npc.name,
+      kind: "npc" as const,
+      tier: region.tier,
+    },
+    regionId: region.id,
+    settlementId: region.settlement.id,
+    npc,
+  }))
+));
+
+const CREATURE_SOURCES: readonly CreatureTargetSource[] = REGIONS.flatMap((region) => {
+  const surface = region.enemyGroups.map((group) => ({
+    kind: "creature" as const,
+    preset: {
+      id: group.id,
+      label: `${group.name} (tier ${group.tier})`,
+      kind: "creature" as const,
+      tier: group.tier,
+    },
+    regionId: region.id,
+    dungeonName: null,
+    group,
+  }));
+  const dungeon = region.dungeon;
+  if (dungeon === undefined) return surface;
+  return [
+    ...surface,
+    ...dungeon.enemyGroups.map((group) => ({
+      kind: "creature" as const,
+      preset: {
+        id: `${dungeon.id}:${group.id}`,
+        label: `${group.name} (tier ${group.tier}) - ${dungeon.name}`,
+        kind: "creature" as const,
+        tier: group.tier,
+      },
+      regionId: dungeon.id,
+      dungeonName: dungeon.name,
+      group,
+    })),
+  ];
+});
+
+const TARGET_SOURCE_BY_KEY = new Map<string, TargetSource>();
+for (const source of [...NPC_SOURCES, ...CREATURE_SOURCES]) {
+  const key = targetKey(source.preset);
+  if (TARGET_SOURCE_BY_KEY.has(key)) {
+    throw new Error(`Duplicate feature-lab target preset: ${key}`);
+  }
+  TARGET_SOURCE_BY_KEY.set(key, source);
+}
+
+const ENEMY_BY_ID = new Map(ENEMIES.map((enemy) => [enemy.id, enemy] as const));
+
+/**
+ * Every selectable actor, equipment item, skill, and spell in the real-engine lab.
+ *
+ * The rows are projections of production content rather than a second authored catalog. Target
+ * presets intentionally expose only the frozen setup contract; the source placement, rendering,
+ * NPC, and combat data are resolved by `createFeatureLabEntity`.
+ */
+export const FEATURE_LAB_CATALOG = {
+  targets: {
+    npc: NPC_SOURCES.map((source) => source.preset),
+    creature: CREATURE_SOURCES.map((source) => source.preset),
+  },
+  equipment: EQUIP_SLOTS.map((slot) => ({
+    slot,
+    label: titleCaseIdentifier(slot),
+    items: ALL_ITEMS
+      .filter((item) => item.equip?.slot === slot)
+      .map((item) => ({ id: item.id, label: `${item.name} (tier ${item.tier})` })),
+  })),
+  skills: SKILL_IDS.map((id) => ({ id, label: SKILLS[id].name })),
+  spells: SPELLS.map((spell) => ({
+    id: spell.id,
+    label: `${spell.name} - ${spell.element} ${spell.rung}`,
+  })),
+} satisfies FeatureLabCatalog;
+
+/** Placement inputs owned by the empty flat session, not by authored world content. */
+export interface FeatureLabEntityPlacement {
+  /** The caller owns uniqueness so repeated spawns never collide in the entity table. */
+  readonly entityId: EntityId;
+  /** The flat floor point under the asset, in world-space metres. */
+  readonly groundPosition: Vec3;
+  /**
+   * The loaded asset's bounding-box minimum Y, or a resolver for it. The resolver form lets the
+   * catalog keep render data behind the preset id while still using `AssetRegistry.baseY` directly.
+   */
+  readonly baseY: number | ((assetId: string) => number);
+  /** Optional lab-facing override. NPCs otherwise use authored facing; creatures default to zero. */
+  readonly rotationY?: number;
+}
+
+/**
+ * Builds the same semantic NPC/enemy shape as `world/regionBuilder.ts`, at a caller-owned spawn.
+ *
+ * This does not register or simulate the entity. The real lab engine owns insertion, views,
+ * navigation, AI, interaction, and combat after receiving the returned production entity shape.
+ */
+export function createFeatureLabEntity(
+  preset: FeatureLabPreset,
+  placement: FeatureLabEntityPlacement,
+): SemanticEntity {
+  if (placement.entityId.trim().length === 0) {
+    throw new Error("Feature-lab entity id must be non-empty");
+  }
+  assertFiniteVec3("Feature-lab ground position", placement.groundPosition);
+  if (placement.rotationY !== undefined) {
+    assertFinite("Feature-lab rotation", placement.rotationY);
+  }
+
+  const source = TARGET_SOURCE_BY_KEY.get(targetKey(preset));
+  if (source === undefined) {
+    throw new Error(`Unknown feature-lab ${preset.kind} preset: ${preset.id}`);
+  }
+
+  const assetId = source.kind === "npc" ? source.npc.assetId : source.group.assetId;
+  const baseY = typeof placement.baseY === "function"
+    ? placement.baseY(assetId)
+    : placement.baseY;
+  assertFinite(`Feature-lab base Y for ${assetId}`, baseY);
+
+  return source.kind === "npc"
+    ? createNpcEntity(source, placement, baseY)
+    : createCreatureEntity(source, placement, baseY);
+}
+
+function createNpcEntity(
+  source: NpcTargetSource,
+  placement: FeatureLabEntityPlacement,
+  baseY: number,
+): SemanticEntity {
+  const { npc } = source;
+  const questIds = npc.questIds.length > 0
+    ? [...npc.questIds]
+    : QUESTS.filter((quest) => quest.giverNpcId === npc.id).map((quest) => quest.id);
+  return {
+    id: placement.entityId,
+    archetype: "npc",
+    name: npc.name,
+    tier: source.preset.tier,
+    regionId: source.regionId,
+    position: placeOnFlatGround(placement.groundPosition, baseY, 1),
+    state: "idle",
+    interactions: ["inspect", "talk"],
+    npc: {
+      dialogueRootId: npc.dialogueRootId,
+      questIds,
+    },
+    view: {
+      assetId: npc.assetId,
+      partAssetIds: npcOutfitParts(npc.id, npc.assetId),
+      rotationY: placement.rotationY ?? npc.facingRad,
+      labelHeight: 2.2,
+    },
+    meta: { settlementId: source.settlementId },
+  };
+}
+
+function createCreatureEntity(
+  source: CreatureTargetSource,
+  placement: FeatureLabEntityPlacement,
+  baseY: number,
+): SemanticEntity {
+  const { group } = source;
+  const enemy = ENEMY_BY_ID.get(group.id) ?? ENEMY_BY_ID.get(enemyIdFor(group.family, group.tier));
+  const archetype = group.boss ? "boss" as const : "enemy" as const;
+  const viewScale = group.boss ? group.scale * 1.6 : group.scale;
+  const drawnScale = viewScale * tierSilhouetteScale(group.tier);
+  const position = placeOnFlatGround(placement.groundPosition, baseY, drawnScale);
+  return {
+    id: placement.entityId,
+    archetype,
+    name: group.name,
+    tier: group.tier,
+    regionId: source.regionId,
+    position,
+    state: "alive",
+    interactions: ["inspect", "attack"],
+    combat: {
+      health: enemy?.maxHealth ?? group.maxHealth,
+      maxHealth: enemy?.maxHealth ?? group.maxHealth,
+      level: group.level,
+      aggroRadius: enemy?.aggroRadius ?? group.aggroRadius,
+    },
+    view: {
+      assetId: group.assetId,
+      scale: viewScale,
+      rotationY: round2(placement.rotationY ?? 0),
+      materialTier: group.tier,
+      labelHeight: group.boss ? 3.4 : 2.2,
+    },
+    meta: {
+      family: group.family,
+      groupId: group.id,
+      behaviour: group.behaviour,
+      spawnX: round2(position[0]),
+      spawnZ: round2(position[2]),
+    },
+  };
+}
+
+function targetKey(preset: Pick<FeatureLabPreset, "kind" | "id">): string {
+  return `${preset.kind}:${preset.id}`;
+}
+
+function placeOnFlatGround(ground: Vec3, baseY: number, drawnScale: number): Vec3 {
+  return [ground[0], round2(ground[1] - baseY * drawnScale), ground[2]];
+}
+
+function titleCaseIdentifier(value: string): string {
+  const words = value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Za-z])(\d)/g, "$1 $2")
+    .replaceAll("_", " ");
+  return words.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function assertFiniteVec3(label: string, value: Vec3): void {
+  for (const coordinate of value) assertFinite(label, coordinate);
+}
+
+function assertFinite(label: string, value: number): void {
+  if (!Number.isFinite(value)) throw new Error(`${label} must be finite`);
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}

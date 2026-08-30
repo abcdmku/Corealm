@@ -29,8 +29,10 @@ export interface LoadOutcome {
 export class SaveService {
   private available: boolean;
 
-  constructor() {
-    this.available = detectStorage();
+  constructor(persistent = true) {
+    // Focused real-engine sessions must never load or overwrite the player's normal save. Keeping
+    // the same service with persistence disabled also keeps GameLoop's autosave path unchanged.
+    this.available = persistent && detectStorage();
   }
 
   isAvailable(): boolean {

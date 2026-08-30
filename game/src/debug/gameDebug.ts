@@ -5,8 +5,9 @@
  * names, synchrony, and return shapes are not ours to choose (see runs/corealm/architecture.md,
  * correction R1):
  *
- *   - all nine are SYNCHRONOUS: driver.snapshot() calls eight getters inside one page.evaluate and
- *     JSON-serialises the result, so a Promise would serialise to {}
+ *   - all nine are SYNCHRONOUS: the driver reads them inside page.evaluate and JSON-serialises the
+ *     result. Full snapshots include getEntities(); the default lean profile omits those thousands
+ *     of rows. A Promise from any getter would still serialise to {}.
  *   - all nine are JSON-SAFE: callDebug does JSON.parse(JSON.stringify(fn() ?? null))
  *   - getState().ready gates boot detection
  *   - getPlayerPosition() returns {x,y,z}, NOT the Vec3 tuple the contracts use internally

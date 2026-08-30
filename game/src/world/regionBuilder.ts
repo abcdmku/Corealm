@@ -48,14 +48,11 @@ import {
   type BuildingKit, type CompositionId, type PartPlacement,
 } from "../render/buildings.js";
 import { tierSilhouetteScale } from "../core/math.js";
+import { npcOutfitParts } from "../render/characterAppearances.js";
 import type { KnownLocation } from "./entities.js";
 import { WATER_FILL_DEPTH } from "./waterBodies.js";
 
 // ------------------------------------------------------------------ formulas
-
-/** Outfit pieces, in draw order. Measured contents of each part GLB, not a guess. */
-const PEASANT_PART_SLOTS = ["chest", "legs", "boots", "gloves"] as const;
-const RANGER_PART_SLOTS = ["chest", "legs", "boots", "gloves", "hood", "pauldron"] as const;
 
 /**
  * Dresses an NPC: body stays the body, clothes arrive as layered parts.
@@ -74,11 +71,7 @@ const RANGER_PART_SLOTS = ["chest", "legs", "boots", "gloves", "hood", "pauldron
  * so no NPC changes clothes.
  */
 function outfitPartsFor(npcId: string, baseAssetId: string): string[] {
-  const sex = baseAssetId.includes("female") ? "female" : "male";
-  const outdoors = /ranger|trapper|woodward|watcher|quarrier|forema|pitmaster/.test(npcId);
-  const kind = outdoors ? "ranger" : "peasant";
-  const slots = outdoors ? RANGER_PART_SLOTS : PEASANT_PART_SLOTS;
-  return slots.map((slot) => `outfit_${sex}_${kind}_${slot}`);
+  return npcOutfitParts(npcId, baseAssetId);
 }
 
 /** Every quest a given NPC hands out, derived from the quest table rather than duplicated. */

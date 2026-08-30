@@ -5,37 +5,14 @@
  * the tooltip: hovering an inventory item shows the green/red delta against whatever is worn in
  * that slot. This panel is where the player checks the total that delta moves.
  */
-import type { EquipSlot, EquipmentBonuses, ItemStack } from "../contracts.js";
+import type { EquipSlot, EquipmentBonuses, FeatureLabApi, ItemId, ItemStack } from "../contracts.js";
 import { EQUIP_SLOTS } from "../contracts.js";
 import { notify } from "./contextMenu.js";
 import type { ContextMenuItem } from "./contextMenu.js";
+import { EquipmentSlotGrid, EQUIPMENT_SLOT_LABELS } from "./equipmentSlotGrid.js";
+import { createItemIcon } from "./itemIcons.js";
 import type { ManagedPanel, UiContext } from "./panels.js";
-import { PanelFrame, itemDef, itemName, paintSlot, report, stackSignature } from "./panels.js";
-
-const SLOT_LABELS: Record<EquipSlot, string> = {
-  head: "Head",
-  body: "Body",
-  legs: "Legs",
-  feet: "Feet",
-  hands: "Hands",
-  mainHand: "Main",
-  offHand: "Off",
-  accessory1: "Acc 1",
-  accessory2: "Acc 2",
-};
-
-/** Row, column. A three-wide grid with the body down the middle, arms either side. */
-const SLOT_CELLS: Record<EquipSlot, [number, number]> = {
-  head: [1, 2],
-  accessory1: [1, 3],
-  mainHand: [2, 1],
-  body: [2, 2],
-  offHand: [2, 3],
-  hands: [3, 1],
-  legs: [3, 2],
-  accessory2: [3, 3],
-  feet: [4, 2],
-};
+import { PanelFrame, itemDef, itemName, report, stackSignature } from "./panels.js";
 
 const BONUS_ROWS: readonly [keyof EquipmentBonuses, string][] = [
   ["accuracy", "Accuracy"],
@@ -49,12 +26,16 @@ const BONUS_ROWS: readonly [keyof EquipmentBonuses, string][] = [
 
 export class EquipmentPanel implements ManagedPanel {
   readonly frame: PanelFrame;
-  private readonly cells = new Map<EquipSlot, HTMLButtonElement>();
+  private readonly slotGrid: EquipmentSlotGrid;
   private readonly totals = new Map<keyof EquipmentBonuses, HTMLElement>();
   private worn: Record<EquipSlot, ItemStack | null> | null = null;
   private signature = "";
+  private picker: HTMLElement | null = null;
+  private pickerItems: HTMLElement | null = null;
+  private pickerTitle: HTMLElement | null = null;
+  private selectedSlot: EquipSlot | null = null;
 
-  constructor(private readonly ctx: UiContext) {
+  constructor(private readonly ctx: UiContext, private readonly featureLab?: FeatureLabApi) {
     this.frame = new PanelFrame({
       id: "equipment",
       title: "Equipment",
@@ -66,28 +47,30 @@ export class EquipmentPanel implements ManagedPanel {
       onOpen: () => this.refresh(true),
     });
 
-    const figure = document.createElement("div");
-    figure.className = "equip-figure";
-
-    const silhouette = document.createElement("div");
-    silhouette.className = "equip-silhouette";
-    silhouette.setAttribute("aria-hidden", "true");
-    figure.appendChild(silhouette);
-
-    const grid = document.createElement("div");
-    grid.className = "equip-grid";
-    grid.setAttribute("role", "group");
-    grid.setAttribute("aria-label", "Worn equipment");
-
+    this.slotGrid = new EquipmentSlotGrid({
+      resolveItem: itemDef,
+      onActivate: (slot) => featureLab ? this.openPicker(slot) : this.unequip(slot),
+      onContextMenu: (slot, _cell, event) => {
+        event.preventDefault();
+        this.openMenu(slot, event.clientX, event.clientY);
+      },
+    });
+    if (featureLab) this.slotGrid.root.classList.add("equip-figure--lab");
     for (const slot of EQUIP_SLOTS) {
-      const cell = this.buildCell(slot);
-      const position = SLOT_CELLS[slot];
-      cell.style.gridRow = String(position[0]);
-      cell.style.gridColumn = String(position[1]);
-      grid.appendChild(cell);
+      const cell = this.slotGrid.cell(slot);
+      this.ctx.tooltip.attach(cell, () => {
+        const stack = this.worn?.[slot] ?? null;
+        if (!stack) {
+          return {
+            kind: "text",
+            title: EQUIPMENT_SLOT_LABELS[slot],
+            lines: ["Nothing worn in this slot."],
+          };
+        }
+        return { kind: "item", itemId: stack.itemId, quantity: stack.quantity };
+      });
     }
-    figure.appendChild(grid);
-    this.frame.body.appendChild(figure);
+    this.frame.body.appendChild(this.slotGrid.root);
 
     const totals = document.createElement("dl");
     totals.className = "equip-totals";
@@ -101,6 +84,21 @@ export class EquipmentPanel implements ManagedPanel {
       this.totals.set(key, value);
     }
     this.frame.body.appendChild(totals);
+
+    if (featureLab) {
+      const picker = document.createElement("section");
+      picker.className = "equip-chooser";
+      picker.hidden = true;
+      const title = document.createElement("strong");
+      title.className = "equip-chooser__title";
+      const items = document.createElement("div");
+      items.className = "equip-chooser__items";
+      picker.append(title, items);
+      this.frame.body.appendChild(picker);
+      this.picker = picker;
+      this.pickerTitle = title;
+      this.pickerItems = items;
+    }
   }
 
   refresh(force = false): void {
@@ -113,13 +111,8 @@ export class EquipmentPanel implements ManagedPanel {
     this.signature = signature;
     this.worn = equipment.slots;
 
-    let filled = 0;
-    for (const slot of EQUIP_SLOTS) {
-      const stack = equipment.slots[slot];
-      if (stack) filled += 1;
-      const cell = this.cells.get(slot);
-      if (cell) paintSlot(cell, stack, SLOT_LABELS[slot]);
-    }
+    const filled = EQUIP_SLOTS.filter((slot) => equipment.slots[slot] !== null).length;
+    this.slotGrid.render(equipment.slots);
 
     for (const [key] of BONUS_ROWS) {
       const node = this.totals.get(key);
@@ -130,33 +123,11 @@ export class EquipmentPanel implements ManagedPanel {
     }
 
     this.frame.setSubtitle(`${filled}/${EQUIP_SLOTS.length} worn`);
+    if (this.selectedSlot) this.openPicker(this.selectedSlot);
   }
 
   dispose(): void {
     this.frame.dispose();
-  }
-
-  private buildCell(slot: EquipSlot): HTMLButtonElement {
-    const cell = document.createElement("button");
-    cell.type = "button";
-    cell.className = "slot slot--equip is-empty";
-    cell.dataset["equipSlot"] = slot;
-    cell.setAttribute("aria-label", `${SLOT_LABELS[slot]}: empty`);
-
-    cell.addEventListener("click", () => this.unequip(slot));
-    cell.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      this.openMenu(slot, event.clientX, event.clientY);
-    });
-
-    this.ctx.tooltip.attach(cell, () => {
-      const stack = this.worn?.[slot] ?? null;
-      if (!stack) return { kind: "text", title: SLOT_LABELS[slot], lines: ["Nothing worn in this slot."] };
-      return { kind: "item", itemId: stack.itemId, quantity: stack.quantity };
-    });
-
-    this.cells.set(slot, cell);
-    return cell;
   }
 
   private unequip(slot: EquipSlot): void {
@@ -167,9 +138,45 @@ export class EquipmentPanel implements ManagedPanel {
     this.ctx.refresh();
   }
 
+  /** Lab-only setup picker inside the actual production Equipment panel. */
+  private openPicker(slot: EquipSlot): void {
+    if (!this.featureLab || !this.picker || !this.pickerTitle || !this.pickerItems) return;
+    this.selectedSlot = slot;
+    const group = this.featureLab.getCatalog().equipment.find((candidate) => candidate.slot === slot);
+    const current = this.ctx.api.getEquipment().slots[slot]?.itemId ?? null;
+    this.pickerTitle.textContent = `${EQUIPMENT_SLOT_LABELS[slot]}: choose equipment`;
+    this.pickerItems.replaceChildren(
+      this.choice(slot, null, "None (empty slot)", current),
+      ...(group?.items ?? []).map((item) => this.choice(slot, item.id, item.label, current)),
+    );
+    this.picker.hidden = false;
+    for (const [candidate, cell] of this.slotGrid.cells) {
+      cell.classList.toggle("is-selected", candidate === slot);
+    }
+  }
+
+  private choice(slot: EquipSlot, itemId: ItemId | null, label: string, current: ItemId | null): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "equip-chooser__choice";
+    button.dataset["equipmentItem"] = itemId ?? "";
+    button.classList.toggle("is-selected", itemId === current);
+    button.setAttribute("aria-pressed", String(itemId === current));
+    if (itemId) button.appendChild(createItemIcon(itemDef(itemId)));
+    const text = document.createElement("span");
+    text.textContent = label;
+    button.appendChild(text);
+    button.addEventListener("click", () => {
+      void this.featureLab!.equipPlayer(slot, itemId)
+        .then(() => this.ctx.refresh())
+        .catch((cause: unknown) => notify(cause instanceof Error ? cause.message : String(cause), "error"));
+    });
+    return button;
+  }
+
   private openMenu(slot: EquipSlot, clientX: number, clientY: number): void {
     const stack = this.worn?.[slot] ?? null;
-    const label = SLOT_LABELS[slot];
+    const label = EQUIPMENT_SLOT_LABELS[slot];
     const items: ContextMenuItem[] = [];
 
     if (stack) {

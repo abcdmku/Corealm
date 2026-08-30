@@ -8,9 +8,9 @@
  * views, A4's input. Each depends only on frozen contracts, so no worker had to know about another.
  */
 import * as THREE from "three";
-import type { EntityId, RegionId, SemanticEntity, SkillId, Vec3 } from "../contracts.js";
+import type { EntityId, FeatureLabApi, RegionId, SemanticEntity, SkillId, Vec3 } from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
-import { Store, addSkillXp } from "../state/store.js";
+import { Store, addSkillXp, computeMaxHealth } from "../state/store.js";
 import { EventBus } from "../core/events.js";
 import { SimClock } from "../core/time.js";
 import { RngStreams } from "../core/rng.js";
@@ -29,10 +29,9 @@ import { SaveService } from "../persistence/storage.js";
 import { installBootPlaceholder, installGameDebug, type RecordedError } from "../debug/gameDebug.js";
 import { GameLoop } from "./loop.js";
 import { InputController } from "../input/mouse.js";
-import { buildWorldTerrainSpec, startingSpawn } from "./worldSpec.js";
 import { prepareWorldSurface } from "./worldSurface.js";
 import { CAMERA } from "./config.js";
-import { buildWorld, type BuildingBox } from "../world/regionBuilder.js";
+import type { BuildingBox } from "../world/regionBuilder.js";
 import { EntityStore, straightLineDistance } from "../world/entities.js";
 import { InteractionDispatcher } from "../world/interactions.js";
 import { InventorySystem } from "../systems/inventory.js";
@@ -86,13 +85,21 @@ import {
   AudioDirector, AudioEngine, COREALM_AUDIO_CATALOG, CorealmAudioBridge,
   footstepSurfaceAt, type AudioDiagnostic,
 } from "../audio/index.js";
+import { GAME_BOOT_PROFILE, type BootProfile } from "./bootProfile.js";
+import { createFeatureLabRuntime } from "../featureLab/runtime.js";
 
 export interface BootResult {
   loop: GameLoop;
   api: CorealmGameApi;
+  featureLab?: FeatureLabApi;
 }
 
-export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
+export interface BootOptions {
+  profile?: BootProfile;
+}
+
+export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {}): Promise<BootResult> {
+  const profile = options.profile ?? GAME_BOOT_PROFILE;
   const errors: RecordedError[] = [];
   const worldMapCapture = new URLSearchParams(window.location.search).get("world-map-capture") === "1";
   const startedAt = performance.now();
@@ -225,7 +232,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // Flat pads are registered before the terrain mesh is generated, or the ground under a
   // settlement stays as noisy as the moor around it — Coldbrace square measured a metre of tilt
   // across 33 m before this. worldSpec derives the pads from the authored settlement data.
-  const terrainSpec = buildWorldTerrainSpec();
+  const terrainSpec = profile.terrain();
   scene.buildWorld(terrainSpec);
   // One heightfield collider rather than 28 terrain trimeshes: same ground answers, 24 ms instead
   // of a per-chunk trimesh build, and a single collider for the ray queries to walk.
@@ -246,7 +253,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   //     already exists, and the water level has to be sampled off the finished terrain. Supplying
   //     roads here also retires the ribbon path — `scene.buildRoad` returns null once stamps are
   //     provided — so there is exactly one road in the world rather than two that disagree.
-  prepareWorldSurface(scene, store.get().meta.seed);
+  if (profile.worldSurface) prepareWorldSurface(scene, store.get().meta.seed);
 
   // 7c. Water. Fishing spots were authored as interaction markers with a note that the water itself
   //     is the render layer's job — and nothing was building it, so every fishing spot sat on dry
@@ -284,7 +291,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     assetCenterXZ: (assetId: string): { x: number; z: number } | null => assets.assetCenterXZ(assetId),
     roadDistance,
   };
-  const built = buildWorld(store.get().meta.seed, heightAt, worldPorts);
+  const built = profile.buildSemanticWorld(store.get().meta.seed, heightAt, worldPorts);
 
   // The portal arch is intentionally open geometry. From the quarry approach that otherwise
   // frames the bright world behind the hill, turning the promised "black wound" into a gate to
@@ -350,15 +357,17 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // The other half of the quest-ref check in `validateQuestObjectives`: entity and location refs
   // can only be resolved once the world exists. An objective that points an agent at an id nothing
   // built is a dead end no screenshot would ever show.
-  for (const problem of validateQuestRefTargets(entityStore, built.routeNodes.map((node) => node.id))) {
-    errors.push({ atMs: atMs(), source: "content.quests", message: problem });
+  if (profile.validateWorldRefs) {
+    for (const problem of validateQuestRefTargets(entityStore, built.routeNodes.map((node) => node.id))) {
+      errors.push({ atMs: atMs(), source: "content.quests", message: problem });
+    }
   }
 
   // 8a. Dungeon interiors. The Gravelmaw was authored as chamber centres with floor offsets and
   //     nothing underneath, so everything in it hung in mid-air over the moor: entering snapped the
   //     player back to the surface and the boss chased, leashed, and walked home. Built before the
   //     navmesh so the chambers are genuinely walkable.
-  const dungeonSpec = buildDungeonSpec(scene);
+  const dungeonSpec = profile.dungeon ? buildDungeonSpec(scene) : null;
   const dungeon = dungeonSpec ? buildDungeon(dungeonSpec, scene.materials) : null;
   if (dungeon && dungeonSpec) {
     scene.root.add(dungeon.group);
@@ -409,12 +418,14 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   // 10. Procedural dressing, kept clear of anything authored.
   setStatus("dressing the world…");
-  registerExclusions(scene);
   let scatterResults: ScatterResult[] = [];
-  try {
-    scatterResults = await scatterWorld(scene, assets, store.get().meta.seed);
-  } catch (cause) {
-    errors.push({ atMs: atMs(), source: "scatter", message: describeError(cause) });
+  if (profile.scatter) {
+    registerExclusions(scene);
+    try {
+      scatterResults = await scatterWorld(scene, assets, store.get().meta.seed);
+    } catch (cause) {
+      errors.push({ atMs: atMs(), source: "scatter", message: describeError(cause) });
+    }
   }
 
   // 11. Entity views. The render layer reads `SemanticEntity.view`; it never invents an appearance.
@@ -453,12 +464,12 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
 
   // 12. Player.
-  const spawnSpec = startingSpawn();
+  const spawnSpec = profile.spawn;
   const groundY = scene.heightAt(spawnSpec.regionId, spawnSpec.x, spawnSpec.z);
   const spawn: Vec3 = nav.closestPoint([spawnSpec.x, groundY + 0.2, spawnSpec.z]) ?? [spawnSpec.x, groundY, spawnSpec.z];
   // Facing convention matches NpcStandDef and debug/shots.ts: 0 looks toward +z.
   // The camera sits behind the player, so its yaw is the player's facing plus pi.
-  const spawnFacing = getRegion(spawnSpec.regionId)?.spawnFacingRad ?? 0;
+  const spawnFacing = spawnSpec.facingRad;
   store.get().player.position = spawn;
   store.get().player.regionId = spawnSpec.regionId;
   store.get().player.facingRad = spawnFacing;
@@ -482,7 +493,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   camera.update(spawn[0], spawn[1], spawn[2], true);
 
   // 13. Save.
-  const saves = new SaveService();
+  const saves = new SaveService(profile.persistent);
   const loaded = saves.load();
   if (loaded.status === "loaded" && loaded.state) {
     store.replace(loaded.state);
@@ -540,7 +551,13 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       ? equipmentSystem.equip(itemId)
       : { ok: false as const, error: { code: "UNAVAILABLE" as const, message: "Equipment is not ready" } },
   });
-  equipmentSystem = new EquipmentSystem({ store, events, inventory: inventorySystem, now });
+  equipmentSystem = new EquipmentSystem({
+    store,
+    events,
+    inventory: inventorySystem,
+    now,
+    ...(profile.kind === "feature-lab" ? { skillLevel: () => 99 } : {}),
+  });
   const bankSystem = new BankSystem({
     store, events, inventory: inventorySystem, now,
     inRangeOfBank: () => nearArchetype("bank"),
@@ -906,7 +923,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // own update, so the loop needs no change. One InstancedMesh for the whole world.
   const ambience = new Ambience(scene.overlayGroup, { maxParticles: 640 });
   vfx.setAmbience(ambience);
-  for (const emitter of collectAmbienceEmitters(scene, built)) ambience.addEmitter(emitter);
+  if (profile.scatter) {
+    for (const emitter of collectAmbienceEmitters(scene, built)) ambience.addEmitter(emitter);
+  }
   const syncCampfireAmbience = (): void => {
     ambience.removeEmitter("player-campfire-flame");
     ambience.removeEmitter("player-campfire-smoke");
@@ -1016,6 +1035,58 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       distance: position.distanceTo(renderer.camera.position),
     };
   });
+
+  let featureLab: FeatureLabApi | undefined;
+  if (profile.kind === "feature-lab") {
+    const resetLabPlayer = (): void => {
+      const state = store.get();
+      const landed = nav.closestPoint(spawn) ?? [...spawn] as Vec3;
+      state.player.position = [...landed] as Vec3;
+      state.player.regionId = spawnSpec.regionId;
+      state.player.facingRad = spawnFacing;
+      state.player.maxHealth = computeMaxHealth(state, equipmentSystem!.totals().vitality);
+      state.player.health = state.player.maxHealth;
+      movement.stop(state, clock.elapsedMs, "feature-lab-reset");
+      input.clear();
+      overlays.clear(WALK_DESTINATION_HIGHLIGHT_ID);
+      camera.reset();
+      camera.setPose(spawnFacing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
+      camera.update(landed[0], landed[1], landed[2], true);
+      scene.syncPlayer(landed, spawnFacing, true);
+      if (rigged) playerRig.setPosition(landed, spawnFacing);
+      store.markDirty();
+    };
+
+    featureLab = createFeatureLabRuntime({
+      api,
+      store,
+      events,
+      clock,
+      assets,
+      entityStore,
+      entityViews,
+      inventory: inventorySystem,
+      equipment: equipmentSystem!,
+      combat: combatSystem,
+      playerRig,
+      playerRigReady: rigged,
+      canvas,
+      camera: renderer.camera,
+      spawn,
+      spawnRegionId: spawnSpec.regionId,
+      resetPlayer: resetLabPlayer,
+      selectedEntityId: () => selectedEntityId,
+      liveSpellParticles: () => spellVfx.liveParticles(),
+      engineErrors: () => errors.map((entry) => `${entry.source}: ${entry.message}`),
+      groundHeightAt: (x, z) => scene.meshHeightAt(x, z),
+    });
+    const initialTarget = featureLab.getCatalog().targets.creature[0];
+    if (!initialTarget) throw new Error("The production content has no creature for the feature lab");
+    await featureLab.spawnTarget("creature", initialTarget.id);
+    window.__featureLab = featureLab;
+  } else {
+    delete window.__featureLab;
+  }
   // There is exactly ONE KeyboardController, and `InputController` owns it. A second one used to
   // stand here: both listened on `window`, both dispatched the same keydown through the same
   // shared registry, and every panel key therefore fired twice — open, then closed, in one press.
@@ -1044,6 +1115,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     // Declared below. Referenced from inside a closure, so the temporal dead zone never applies:
     // nothing can press "New game" before boot has finished running.
     onNewGame: () => resetWorld(undefined, false),
+    ...(featureLab ? { featureLab } : {}),
   });
   ui.mount(labelRoot);
 
@@ -1190,6 +1262,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.setUi(ui);
   if (rigged) loop.setPlayerRig(playerRig);
   loop.setEntityViews(entityViews, () => {
+    if (profile.kind === "feature-lab") return entityStore.all();
     const inside = playerInDungeon();
     return entityStore.all().filter((entity) => (entity.regionId === "gravelmaw") === inside);
   });
@@ -1220,7 +1293,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
     // Node yields and enemy health are seeded world state, so a reset rebuilds them rather than
     // leaving a half-mined world behind a nominally fresh character.
-    const rebuilt = buildWorld(store.get().meta.seed, heightAt, worldPorts);
+    const rebuilt = profile.buildSemanticWorld(store.get().meta.seed, heightAt, worldPorts);
     entityStore.load(rebuilt.entities);
     entityStore.registerLocations(rebuilt.knownLocations);
     campfireSystem.reconstruct();
@@ -1610,11 +1683,13 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // skips by default — a material only compiles its transparent form when something is actually
   // transparent, and three skips everything under an invisible ancestor, which is the whole dungeon
   // and the +3-point-light variant of every material in it.
-  setStatus("warming the shaders…");
-  renderer.warmup({
-    transparentVariants: [scene.root],
-    temporarilyVisible: dungeon ? [dungeon.group] : [],
-  });
+  if (profile.fullWarmup) {
+    setStatus("warming the shaders…");
+    renderer.warmup({
+      transparentVariants: [scene.root],
+      temporarilyVisible: dungeon ? [dungeon.group] : [],
+    });
+  }
 
   document.getElementById("boot-screen")?.remove();
   if (worldMapCapture) {
@@ -1624,7 +1699,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   } else {
     loop.start();
   }
-  return { loop, api };
+  return { loop, api, ...(featureLab ? { featureLab } : {}) };
 }
 
 /**

@@ -15,6 +15,21 @@ export interface RuntimeSnapshot {
   navigation: unknown;
 }
 
+export type SnapshotProfile = "lean" | "full";
+
+/** Shared low-cost renderer preferences for semantic browser checks. */
+export const FAST_TEST_SETTINGS = {
+  renderScale: 0.7,
+  shadowQuality: "off",
+  drawDistance: "near",
+  damageNumbers: true,
+  invertCameraY: false,
+  uiScale: "normal",
+  music: 0,
+  ambient: 0,
+  sfx: 0,
+} as const;
+
 export interface DriverOptions {
   headless?: boolean;
   viewport?: { width: number; height: number };
@@ -25,10 +40,8 @@ export interface DriverOptions {
    *
    * `ui/settings.ts` reads its store during construction, so a tool that wants the renderer to come
    * up at a lower setting has to write the blob BEFORE navigation — setting it afterwards means a
-   * reload, and a reload costs another full boot (16.7 s measured here). The one caller today is
-   * `tools/verify-magic.ts`: it measures the spell layer, and at default settings this world costs
-   * 527 draw calls and tens of seconds a frame, which is slow enough that a 1.3 s effect can fall
-   * entirely between two sampled frames. Dropped to 193 draw calls, the same sweep sees it.
+   * reload, and a reload costs another full boot (16.7 s measured here). Semantic smoke/play and
+   * effect verification all use this hook; visual capture deliberately retains production quality.
    */
   settings?: Record<string, unknown>;
 }
@@ -141,8 +154,12 @@ export class GameDriver {
     );
   }
 
-  async snapshot(): Promise<RuntimeSnapshot> {
-    return this.requirePage().evaluate(() => {
+  /**
+   * Capture semantic state. Entity detail is opt-in because a full world contains thousands of
+   * rows and used to make every scripted action transfer and persist several megabytes twice.
+   */
+  async snapshot(profile: SnapshotProfile = "lean"): Promise<RuntimeSnapshot> {
+    return this.requirePage().evaluate((includeEntities) => {
       const api = window.__gameDebug;
       if (!api) throw new Error("window.__gameDebug is missing");
       return JSON.parse(JSON.stringify({
@@ -150,12 +167,12 @@ export class GameDriver {
         player: api.getPlayer(),
         playerPosition: api.getPlayerPosition(),
         camera: api.getCamera(),
-        entities: api.getEntities(),
+        entities: includeEntities ? api.getEntities() : null,
         currentActivity: api.getCurrentActivity(),
         objectives: api.getObjectives(),
         navigation: api.getNavigationState(),
       })) as RuntimeSnapshot;
-    });
+    }, profile === "full");
   }
 
   /**
