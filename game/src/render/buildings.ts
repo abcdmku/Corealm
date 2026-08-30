@@ -94,25 +94,19 @@
  *   building's ground position, so a prefab is authored once facing +Z and reused at any bearing.
  */
 import { Rng } from "../core/rng.js";
+import { wallMountedBanner } from "./bannerPlacement.js";
+import { buildCanopyWalkComposition } from "./compositions/canopyWalk.js";
+import {
+  buildGravelmawExitComposition, buildGravelmawMouthComposition,
+} from "./compositions/gravelmawMouth.js";
+import { buildPathWaypointComposition } from "./compositions/pathWaypoint.js";
+import { buildRegionGateComposition } from "./compositions/regionGate.js";
+import { buildRootTunnelComposition } from "./compositions/rootTunnel.js";
+import { applyStructureVariant, structureVariantCount } from "./structures/catalog.js";
 
 // ------------------------------------------------------------------ constants
 
-/**
- * The kit's horizontal module. Snap to this or pieces do not meet.
- *
- * KNOWN BREAK, NOT IN THIS FILE. `world/regionBuilder.ts` emits every prefab part at
- * `scale * (1 / tierSilhouetteScale(tier))` while placing it on this unscaled grid. That
- * compensation was correct in round 1, when `render/entityViews.ts` scaled every archetype by
- * tier; entityViews now applies it only to `TIERED_ARCHETYPES` (ore, tree, fishing_spot,
- * farm_plot, enemy, boss) and a building part's archetype is `landmark`, so nothing cancels it any
- * more. Measured with `getDrawnBounds` on the live game: a 2 m panel draws 2.222 m in Coldbrace
- * (tier 1), 1.860 m in Rootfall (tier 5) and 1.738 m in Highcairn (tier 10). On a 4 m side, which
- * is two modules on exactly 2 m centres, that leaves a full-height slot between the two panels -
- * 0.262 m on every 4 m side of all six Highcairn huts (`highcairn_hut_1#w1_0` z[-57.869,-56.131]
- * against `#w1_1` z[-59.869,-58.131]) and 0.140 m at Rootfall. It also narrows the gate: the
- * Coldbrace south arch collides 2.000 m and draws 1.778 m. Nothing in this file can see the tier,
- * so the fix is one line in `emitParts`: drop `compensation`.
- */
+/** The kit's horizontal module. Structural footprints snap to this so pieces meet cleanly. */
 export const MODULE_METRES = 2;
 
 /** Measured wall height. Stack storeys on this exactly. */
@@ -185,7 +179,7 @@ const CANOPY_DEPTH_METRES = 2;
 /**
  * One placed piece of a prefab. Offsets are metres in the prefab's local frame, before the
  * building's own rotation and translation. `scale` is a true metre multiplier: 1 means the asset's
- * authored size. The caller is responsible for cancelling any global silhouette scaling.
+ * authored size. `scaleAxes`, when present, is a local-axis correction multiplied after it.
  */
 export interface PartPlacement {
   /** Unique within one prefab instance. Becomes the entity id suffix, so it must be stable. */
@@ -197,6 +191,7 @@ export interface PartPlacement {
   /** Added to the parent's rotation. */
   readonly rotationY: number;
   readonly scale: number;
+  readonly scaleAxes?: readonly [number, number, number];
 }
 
 /**
@@ -240,10 +235,14 @@ export type CompositionId =
   | "milestone"
   | "highcairn_crane"
   | "gravelmaw_mouth"
+  | "gravelmaw_exit"
   | "great_cairn"
   | "standing_stones"
   | "rootfall_stump"
   | "region_gate"
+  | "path_waypoint"
+  | "root_tunnel_entrance"
+  | "canopy_walk_entrance"
   | "bank_counter"
   | "forge_yard"
   | "market_pitch"
@@ -252,8 +251,9 @@ export type CompositionId =
   | "farm_yard";
 
 export const COMPOSITION_IDS: readonly CompositionId[] = [
-  "vault_door", "milestone", "highcairn_crane", "gravelmaw_mouth",
-  "great_cairn", "standing_stones", "rootfall_stump", "region_gate",
+  "vault_door", "milestone", "highcairn_crane", "gravelmaw_mouth", "gravelmaw_exit",
+  "great_cairn", "standing_stones", "rootfall_stump", "region_gate", "path_waypoint",
+  "root_tunnel_entrance", "canopy_walk_entrance",
   "bank_counter", "forge_yard", "market_pitch", "wood_pile", "garden", "farm_yard",
 ] as const;
 
@@ -418,9 +418,9 @@ function wallModule(
  * window was `floor(count / 2)` on all four sides and `floor(3 / 2) = 1` faces itself.
  *
  * `onSide` runs side 0 along +X and side 2 along -X, so module `i` of side 0 faces module
- * `count - 1 - i` of side 2; sides 1 and 3 pair the same way. Sides 0 and 1 are drawn first and
- * freely, and 2 and 3 give way to them. The rng is consumed once per module in a fixed order
- * whatever the answer, so the plan is the same for the same building seed.
+ * `count - 1 - i` of side 2; sides 1 and 3 pair the same way. The entry facade (side 2) is planned
+ * first so a rear aperture cannot erase its whole elevation. If its rolls still produce no window,
+ * one eligible bay is selected deterministically; the opposite wall then gives way to it.
  *
  * THE DOORWAY IS AN APERTURE TOO, and it was not in the plan. `skip` marks the modules that do not
  * roll, and the doorway is one of them, so it stayed `false` and side 0 was free to put a window
@@ -443,7 +443,8 @@ function ringWindows(
   const holes: boolean[][] = sides.map((side, s) => (
     Array.from({ length: moduleCount(side.length) }, (_unused, index) => aperture(s, index))
   ));
-  for (const [s, side] of sides.entries()) {
+  for (const s of [2, 1, 0, 3]) {
+    const side = sides[s]!;
     const count = moduleCount(side.length);
     const facing = holes[(s + 2) % 4]!;
     for (let index = 0; index < count; index += 1) {
@@ -453,6 +454,16 @@ function ringWindows(
       const isWindow = roll && !opposite;
       plan[s]![index] = isWindow;
       if (isWindow) holes[s]![index] = true;
+    }
+    if (s === 2 && chance > 0 && !plan[s]!.some(Boolean)) {
+      const eligible = Array.from({ length: count }, (_unused, index) => index).filter((index) => (
+        !skip(s, index) && facing[count - 1 - index] !== true
+      ));
+      const fallback = rng.pick(eligible);
+      if (fallback !== undefined) {
+        plan[s]![fallback] = true;
+        holes[s]![fallback] = true;
+      }
     }
   }
   return plan;
@@ -573,6 +584,8 @@ function largeRoof(kit: BuildingKit, width: number, depth: number): PlacedRoof {
  */
 const GABLE_APEX_METRES = 4.384;
 const GABLE_HALF_AT_BASE = 3.35;
+/** Compact shed roof fit. 0.80 let wall frames and stone corner caps pierce the tile surface. */
+const SHED_ROOF_FIT = 0.88;
 
 /**
  * Close both ends of a pitched roof.
@@ -587,15 +600,10 @@ const GABLE_HALF_AT_BASE = 3.35;
  * sized them off the footprint (`span / 6.694 * 1.08`) rather than off the roof, so they were
  * 0.36 m short of the ridge AND one of each pair faced backwards.
  *
- * SIZING. A part carries one uniform scale, and the gable's own pitch (4.384 / 3.35 = 1.309) is
- * not the roofs' (1.348 on roof_tiles_4x6, 1.185 on roof_tiles_6x8), so the two cannot both be
- * matched. Take the smaller of:
- *   - the scale that puts the gable's apex exactly on the ridge, and
- *   - the scale that keeps the gable inside the roof's own across-ridge silhouette,
- * because a gable taller than the ridge spikes through the tiles and one wider than the eave
- * changes `roofOverhang`, which is the number all three settlements are spaced by. What is left
- * over is at most a 0.07 m slot at the very apex - shell-audit measures 0.053 m2 per end on a
- * plaster cottage against the 9.00 it started at.
+ * SIZING. The shipped gable's pitch (4.384 / 3.35 = 1.309) is not the roofs' (1.348 on
+ * roof_tiles_4x6, 1.185 on roof_tiles_6x8). Uniform fitting therefore either leaves a triangular
+ * hole or pushes the gable through the tiles. Fit local X to the wall-head intersection and local
+ * Y to the ridge independently; local Z follows X so the timber frame keeps a sensible thickness.
  *
  * ORIENTATION. The asset's plaster face looks down its own local -Z, so the two ends need
  * different yaws. They had the same one, so half of Highcairn's gables were inside out.
@@ -605,29 +613,29 @@ function gableEnds(
   width: number,
   depth: number,
   roof: PlacedRoof,
+  kit: BuildingKit,
   baseY = STOREY_METRES,
 ): void {
   // Where the roof crosses the wall head, which is what has to be closed - not the eave, which is
   // out over open air, and not the footprint, which the roof already over-sails.
   const headHalf = roof.acrossHalf * roof.apex / (roof.apex + roof.drop);
-  const scale = Math.min(roof.apex / GABLE_APEX_METRES, roof.acrossHalf / GABLE_HALF_AT_BASE);
+  const acrossScale = headHalf / GABLE_HALF_AT_BASE;
+  const heightScale = roof.apex / GABLE_APEX_METRES;
   const ridgeLength = roof.alongZ ? depth : width;
   for (const [index, sign] of [-1, 1].entries()) {
-    out.push(loose(
+    out.push({
+      ...loose(
       `gable${index}`, "roof_gable_brick",
       roof.alongZ ? 0 : (ridgeLength / 2) * sign,
       baseY,
       roof.alongZ ? (ridgeLength / 2) * sign : 0,
       roof.alongZ ? (sign < 0 ? 0 : Math.PI) : (sign < 0 ? Math.PI / 2 : -Math.PI / 2),
-      scale,
-    ));
+      1,
+      ),
+      scaleAxes: [acrossScale, heightScale, acrossScale],
+    });
   }
-  // A gable that does not reach the wall head leaves a band of daylight the audit would catch, so
-  // assert the relationship the sizing rule is supposed to guarantee rather than trusting it.
-  if (GABLE_HALF_AT_BASE * scale < headHalf - 0.35) {
-    throw new Error(`gable half ${(GABLE_HALF_AT_BASE * scale).toFixed(3)} cannot reach the wall head at ${headHalf.toFixed(3)}`);
-  }
-  eavesPlate(out, width, depth, roof, baseY);
+  eavesPlate(out, width, depth, roof, kit, baseY);
 }
 
 /**
@@ -658,11 +666,9 @@ const EAVES_PLATE_Y = 2.915;
 /**
  * A wall plate along the head of the two GABLE-END walls.
  *
- * One part per end rather than one per module: `wall_bottom_trim` is 2 m long and a part carries
- * one uniform scale, so a plate long enough to span the side is also tall enough to bridge the
- * letterbox, which a per-module plate at scale 1 (0.238 m, drawn 0.207 m at Highcairn) is not.
- * The kit already draws `wall_bottom_trim` under every panel of every building, so this is two more
- * instances of an asset every region has, and no new draw call.
+ * `wall_bottom_trim` carries one uniform scale, so stretching a single piece to the full gable also
+ * made it several times too tall and deep. Tiling authored-size modules keeps the plate slim and
+ * avoids a shelf intersecting the roof.
  *
  * Not on the eave sides: the tiles already cover that band there, and two more parts per building
  * on a hidden face is two more parts per building.
@@ -672,18 +678,34 @@ function eavesPlate(
   width: number,
   depth: number,
   roof: PlacedRoof,
+  kit: BuildingKit,
   baseY = STOREY_METRES,
 ): void {
   const sides = ringSides(width, depth);
   // The gable ends are the two faces the ridge runs INTO, which is the pair `gableEnds` closes.
   for (const [index, s] of (roof.alongZ ? [0, 2] : [1, 3]).entries()) {
     const side = sides[s]!;
-    out.push(part(
-      `plate${index}`, "wall_bottom_trim",
-      onSide(side, 1, 0, baseY - (STOREY_METRES - EAVES_PLATE_Y), 0.01),
-      side.yaw,
-      (side.length + 0.3) / MODULE_METRES,
-    ));
+    const count = moduleCount(side.length);
+    for (let module = 0; module < count; module += 1) {
+      // The shipped gable is a plaster-and-timber triangle even though its asset id says brick.
+      // On Highcairn's stone shells that material change is useful vernacular, but it needs a
+      // masonry collar beneath it or it reads as an accidental swap. kerb_straight is the kit's
+      // low-cost RockTrim course; its rear-edge pivot is pulled 0.46 m into the wall so its 0.7 m
+      // depth caps the brick head without projecting as a shelf. Plaster/timber buildings retain
+      // their slender timber wall plate.
+      const stone = kit.id === "stone";
+      out.push(part(
+        `plate${index}_${module}`, stone ? "kerb_straight" : "wall_bottom_trim",
+        onSide(
+          side,
+          count,
+          module,
+          stone ? baseY - (STOREY_METRES - 2.989) : baseY - (STOREY_METRES - EAVES_PLATE_Y),
+          stone ? -0.46 : 0.01,
+        ),
+        side.yaw,
+      ));
+    }
   }
 }
 
@@ -967,9 +989,10 @@ export function isKitId(value: string): value is KitId {
  * 1.57 x 1.51 m of tile, which is exactly 2 x 0.786 and 2 x 0.757.
  *
  * Local axes: X is the footprint's width, Z its depth, before the building's own `rotationY`.
- * Anything without a tiled roof - a gatehouse, a wall segment, a ruin, a stall, a market row, a
- * porch, an arcade, a wellhead - answers zero, because what those draw above the footprint is a
- * canopy the caller already sized (`CANOPY_DEPTH_METRES`) or nothing at all.
+ * Anything without a tiled roof - a wall segment, ruin, stall, market row, porch, arcade or
+ * wellhead - answers zero, because what those draw above the footprint is a canopy the caller
+ * already sized (`CANOPY_DEPTH_METRES`) or nothing at all. Gatehouses use the same fitted long roof
+ * as civic halls so their authored wall openings transition into a finished silhouette.
  */
 export function roofOverhang(
   prefab: PrefabId,
@@ -1002,10 +1025,12 @@ export function roofOverhang(
       return beyond(kit.roofSmallBox, { scale: fit.scale * 0.98, rotationY: fit.rotationY });
     }
     case "hall":
+    case "farmstead":
+    case "gatehouse":
       return beyond(kit.roofLargeBox, roofFit(width, depth, kit.roofLargeCovers[0], kit.roofLargeCovers[1]));
     case "shed":
       return beyond(kit.roofSmallBox, {
-        scale: 0.8 * (4 / kit.roofSmallCovers[0]),
+        scale: SHED_ROOF_FIT * (4 / kit.roofSmallCovers[0]),
         rotationY: width >= depth ? Math.PI / 2 : 0,
       });
     // roof_tower is 5.651 x 7.361 x 5.427 and `tower` oversizes it by 0.6 m so the eaves clear the
@@ -1028,7 +1053,7 @@ export function roofOverhang(
 export const ROOF_EAVE_BY_KIT: Record<KitId, number> = (() => {
   const authored: readonly (readonly [PrefabId, readonly [number, number]])[] = [
     ["cottage", [6, 4]], ["townhouse", [6, 4]], ["hall", [12, 6]], ["tower", [6, 6]], ["shed", [4, 4]],
-    ["quarry_hut", [5, 4]], ["forge", [6, 5]], ["forge", [4, 4]],
+    ["quarry_hut", [6, 4]], ["forge", [6, 4]], ["forge", [4, 4]], ["farmstead", [10, 6]],
   ];
   const worst = {} as Record<KitId, number>;
   for (const kitId of KIT_IDS) {
@@ -1056,25 +1081,26 @@ export function buildPrefab(
   const depth = Math.max(MODULE_METRES, footprint[1]);
   const rng = new Rng(seed);
   const kit = BUILDING_KITS[kitId];
-
+  let base: PartPlacement[];
   switch (prefab) {
-    case "cottage": return cottage(width, depth, rng, kit);
-    case "townhouse": return townhouse(width, depth, rng, kit);
-    case "hall": return hall(width, depth, rng, kit);
-    case "tower": return tower(width, depth, rng, kit);
-    case "shed": return shed(width, depth, rng, kit);
-    case "quarry_hut": return quarryHut(width, depth, rng, kit);
-    case "gatehouse": return gatehouse(width, depth, kit);
-    case "wall_segment": return wallSegment(width, kit);
-    case "stall": return stall(rng);
-    case "ruin": return ruin(width, depth, rng, kit);
-    case "forge": return forge(width, depth, rng, kit);
-    case "porch": return porch(width, depth, kit);
-    case "arcade": return arcade(width, depth, kit);
-    case "market_row": return marketRow(width, depth, rng);
-    case "well": return well(kit);
-    case "farmstead": return farmstead(width, depth, rng, kit);
+    case "cottage": base = cottage(width, depth, rng, kit); break;
+    case "townhouse": base = townhouse(width, depth, rng, kit); break;
+    case "hall": base = hall(width, depth, rng, kit); break;
+    case "tower": base = tower(width, depth, rng, kit); break;
+    case "shed": base = shed(width, depth, rng, kit); break;
+    case "quarry_hut": base = quarryHut(width, depth, rng, kit); break;
+    case "gatehouse": base = gatehouse(width, depth, kit); break;
+    case "wall_segment": base = wallSegment(width, kit); break;
+    case "stall": base = stall(rng); break;
+    case "ruin": base = ruin(width, depth, rng, kit); break;
+    case "forge": base = forge(width, depth, rng, kit); break;
+    case "porch": base = porch(width, depth, kit); break;
+    case "arcade": base = arcade(width, depth, kit); break;
+    case "market_row": base = marketRow(width, depth, rng); break;
+    case "well": base = well(kit); break;
+    case "farmstead": base = farmstead(width, depth, rng, kit); break;
   }
+  return applyStructureVariant(prefab, footprint, seed, kit, base);
 }
 
 /** Solid height in metres, for the collision box the root builds from the same footprint. */
@@ -1086,7 +1112,9 @@ export function prefabHeight(prefab: PrefabId): number {
     case "townhouse": return 2 * STOREY_METRES + 3.7;
     case "quarry_hut": return STOREY_METRES + 3.2;
     case "shed": return STOREY_METRES + 2.8;
-    case "gatehouse": return 2 * STOREY_METRES;
+    // Active gatehouses are [8,4]. Their 6x12 roof fits at 2/3 scale and rises 3.26 m above the
+    // two-storey wall head. Keep a little clearance for the ridge tiles and regional recolouring.
+    case "gatehouse": return 2 * STOREY_METRES + 3.35;
     case "wall_segment": return STOREY_METRES;
     case "ruin": return STOREY_METRES;
     case "stall": return 2.7;
@@ -1096,8 +1124,8 @@ export function prefabHeight(prefab: PrefabId): number {
     case "porch": return STOREY_METRES;
     case "arcade": return STOREY_METRES;
     case "market_row": return 2.7;
-    // A wellhead is a curb 1 m high. Its roof clears 3.2 m and is deliberately not solid.
-    case "well": return 1;
+    // The low curb is solid; its walk-under roof is handled separately by camera cover.
+    case "well": return 0.25;
     // A barn is one tall storey under the kit's LARGE roof, so it clears the hall by the difference
     // between `roofLargeApex` and the hall's own roof: 3.123 + 5.4 against the hall's 3.123 + 4.9.
     case "farmstead": return STOREY_METRES + 5.4;
@@ -1129,7 +1157,9 @@ function foundationGreenery(
   const modules = moduleCount(side.length);
   out.push(part(
     "foundation_vine", "vine_1",
-    onSide(side, modules, rng.int(0, modules - 1), 1.75, 0.1),
+    // vine_1 reaches 2.121 m below its pivot. Seat the scaled roots on the foundation rather than
+    // leaving a 16 cm strip of daylight beneath every cottage vine.
+    onSide(side, modules, rng.int(0, modules - 1), 2.121 * 0.75, 0.1),
     side.yaw, 0.75,
   ));
 }
@@ -1232,6 +1262,21 @@ function townhouse(width: number, depth: number, rng: Rng, kit: BuildingKit): Pa
     corners(out, width, depth, layer.kit.corner, layer.y, storeyPostScale(layer.kit), `c${storey}_`);
   }
 
+  // The brick corner posts are more than twice the footprint of the upper timber posts. A slim
+  // continuous ledger hides that abrupt step and makes the material change read as a deliberate
+  // jettied storey. Tiling the authored two-metre trim keeps its height and depth unchanged.
+  for (const [s, side] of sides.entries()) {
+    const count = moduleCount(side.length);
+    for (let index = 0; index < count; index += 1) {
+      out.push(part(
+        `belt_${s}_${index}`,
+        "wall_bottom_trim",
+        onSide(side, count, index, STOREY_METRES - 0.0615, 0.01),
+        side.yaw,
+      ));
+    }
+  }
+
   out.push(part("door_ground", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
   out.push(part("door_balcony", kit.door, onSide(entry, entryCount, doorIndex, STOREY_METRES + 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
 
@@ -1273,7 +1318,7 @@ function addRoofline(
   baseY = STOREY_METRES,
   forceDormer = false,
 ): void {
-  gableEnds(out, width, depth, roof, baseY);
+  gableEnds(out, width, depth, roof, kit, baseY);
   const alongZ = roof.alongZ;
   const ridgeLength = alongZ ? depth : width;
   const ridgeY = baseY + roof.apex;
@@ -1293,15 +1338,19 @@ function addRoofline(
   }
 
   if (forceDormer || kit.roofFeature === "roof_dormer") {
-    // Halfway up the eave slope, opposite the chimney: a window looking out of the roof.
-    const outward = (alongZ ? width : depth) / 2 - 0.5;
+    // roof_dormer's window faces local +X. Turn that axis down the entrance-side slope and keep
+    // the pivot near the ridge; its 1.9 m forward reach then lands inside the tiled eave. The old
+    // yaw ran the dormer along the ridge, burying one side and leaving the other floating.
+    const compact = kit.id === "stone";
+    const cross = compact ? 0.58 : 0.5;
+    const dormerScale = compact ? 0.8 : 1;
     out.push(loose(
       "dormer", "roof_dormer",
-      alongZ ? -outward : 0,
-      baseY + 0.55,
-      alongZ ? 0 : -outward,
-      alongZ ? -Math.PI / 2 : Math.PI,
-      1,
+      alongZ ? -cross : 0,
+      baseY + (compact ? 0.58 : 0.19),
+      alongZ ? 0 : -cross,
+      alongZ ? Math.PI : Math.PI / 2,
+      dormerScale,
     ));
   }
 
@@ -1358,9 +1407,14 @@ function hall(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
     onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET),
     entry.yaw,
   ));
-  // banner_1 hangs from its pivot (y -1.549 .. +0.844) with the cloth to its right (x 0 .. 1.612).
-  out.push(part("banner_l", "banner_1", onSide(entry, entryCount, doorIndex, 2.6, 0.12, -2.4), entry.yaw));
-  out.push(part("banner_r", "banner_1", onSide(entry, entryCount, doorIndex, 2.6, 0.12, 1.6), entry.yaw));
+  // The kit banner is a projecting bracket: its rail mounts to the facade and local +X reaches
+  // outward. Equal along offsets mirror the pair around the entry bay at one common height.
+  out.push(wallMountedBanner(
+    "banner_l", "banner_1", onSide(entry, entryCount, doorIndex, 2.6, WALL_FACE + 0.01, -2), entry.yaw,
+  ));
+  out.push(wallMountedBanner(
+    "banner_r", "banner_1", onSide(entry, entryCount, doorIndex, 2.6, WALL_FACE + 0.01, 2), entry.yaw,
+  ));
   out.push(part("lamp_l", "lamp_wall", onSide(entry, entryCount, doorIndex, 1.3, 0.08, -1.2), entry.yaw, 1.1));
   out.push(part("lamp_r", "lamp_wall", onSide(entry, entryCount, doorIndex, 1.3, 0.08, 1.2), entry.yaw, 1.1));
   foundationGreenery(out, width, depth, rng, 4);
@@ -1446,19 +1500,21 @@ function shed(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
   }
 
   corners(out, width, depth, kit.corner, 0, storeyPostScale(kit), "c");
-  // The small roof at 0.8 of the footprint it covers leaves eaves all round a 4 x 4 shed with no
-  // gaps. The ratio is against the kit's own coverage, so the stone kit's wider roof does not
-  // swallow the shed it sits on.
-  const shedScale = 0.8 * (4 / kit.roofSmallCovers[0]);
+  // A 0.80 fit left the high timber frames and stone corner caps above the actual tile surface.
+  // 0.88 is the measured smallest shared fit with a few centimetres of cover in all three kits.
+  // The ratio remains against the kit's own coverage, so the stone roof stays compact.
+  const shedScale = SHED_ROOF_FIT * (4 / kit.roofSmallCovers[0]);
   const shedRoof = placeRoof(
     { scale: shedScale, rotationY: width >= depth ? Math.PI / 2 : 0 },
     kit.roofSmallBox, kit.roofSmallApex, kit.roofSmallDrop,
   );
   out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, shedRoof.rotationY, shedRoof.scale));
   // Gables only: a ridge log and a dormer on a 4 m store shed would out-dress the houses around it.
-  gableEnds(out, width, depth, shedRoof);
+  gableEnds(out, width, depth, shedRoof, kit);
   out.push(part("door", kit.door, onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET), entry.yaw));
-  out.push(loose("crate", "crate_village", width * 0.3, 0, -depth / 2 - 0.65, rng.float(0, Math.PI), 1));
+  const doorAt = onSide(entry, entryCount, doorIndex, 0, 0);
+  const crateX = doorAt.dx >= 0 ? -width * 0.3 : width * 0.3;
+  out.push(loose("crate", "crate_village", crateX, 0, depth / 2 + 0.65, rng.float(0, Math.PI), 1));
 
   return out;
 }
@@ -1552,6 +1608,10 @@ function farmstead(width: number, depth: number, rng: Rng, kit: BuildingKit): Pa
   const roof = largeRoof(kit, width, depth);
   out.push(loose("roof", kit.roofLarge, 0, STOREY_METRES, 0, roof.rotationY, roof.scale));
   addRoofline(out, width, depth, roof, kit);
+
+  // Keep the gable solid. `window_shutters` is only an overlay; placing it here without cutting a
+  // window into `roof_gable_brick` produced the barn's most obvious fake aperture. Farmstead
+  // recipes can still vary the loading facade and roofline without pasting shutters onto masonry.
   for (const index of [...doorIndices].sort((a, b) => a - b)) {
     out.push(part(
       index === doorIndex ? "door" : `door_${index}`,
@@ -1689,18 +1749,6 @@ function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacemen
           const x = (m + 0.5) * MODULE_METRES - gap / 2;
           out.push(loose(`h${name}_${m}`, kit.gatePier, x, y, z, yaw));
         }
-        // The parapet. Two storeys of panel stop dead at 6.246 m with nothing on top, which is why
-        // the gate in runs/corealm/screenshots/w2-town_entrance.png reads as a flat cut-out; the
-        // same `kerb_straight` coping the wall runs carry, laid across the whole elevation, gives
-        // the head a line and a shadow. 0.46 m centres the 0.700 m kerb on the 0.406 m panel.
-        const capModules = Math.round(usable / MODULE_METRES);
-        for (let m = 0; m < capModules; m += 1) {
-          const x = (m + 0.5) * MODULE_METRES - usable / 2;
-          out.push(loose(
-            `k${name}_${m}`, "kerb_straight",
-            x, 2 * STOREY_METRES - 0.134, z - outward * 0.46, yaw,
-          ));
-        }
       }
     }
 
@@ -1714,8 +1762,7 @@ function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacemen
           ));
         }
       }
-      // A post at the joint between the two overlapping side modules keeps the 3 m return from
-      // reading as two panels pushed through one another.
+      // A post at each return-wall module joint keeps the masonry course legible.
       for (let m = 1; m < sideModules; m += 1) {
         const jointX = name === "il"
           ? -gap / 2 - passageJambInset
@@ -1743,9 +1790,9 @@ function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacemen
     }
   }
 
-  // A masonry ceiling over the passage and a flat top deck. `floor_brick` is exactly 2 x 2 m;
-  // the 3 m gate depth takes two overlapping rows, which project 0.25 m beyond each elevation as
-  // a deliberate ledge. X remains on the exact module grid and the passage remains four metres.
+  // A masonry ceiling over the passage and a flat top deck. `floor_brick` is exactly 2 x 2 m, and
+  // authored gate depths snap to that grid. X remains on the same grid and the passage stays four
+  // metres wide.
   const deck = (tag: string, span: number, y: number): void => {
     const columns = Math.max(1, Math.round(span / MODULE_METRES));
     for (let zIndex = 0; zIndex < sideModules; zIndex += 1) {
@@ -1760,27 +1807,23 @@ function gatehouse(width: number, depth: number, kit: BuildingKit): PartPlacemen
   // floor_brick extends 0.01 m below its pivot; lift the roof deck so its underside meets the wall.
   deck("deck", usable, 2 * STOREY_METRES + 0.01);
 
-  // Front and back coping are emitted with the upper facade. Continue that parapet around both
-  // outer returns so the flat deck has no raw side edge.
-  for (const [index, sx] of [-1, 1].entries()) {
-    const yaw = sx < 0 ? -Math.PI / 2 : Math.PI / 2;
-    const x = sx * (usable / 2 - 0.46);
-    for (let m = 0; m < sideModules; m += 1) {
-      const z = (m + 0.5) * sideSpacing - depth / 2;
-      out.push(loose(
-        `ks${index}_${m}`, "kerb_straight",
-        x, 2 * STOREY_METRES - 0.134, z, yaw,
-      ));
-    }
-  }
+  // Finish the gate as a building, not a wall box with its top sliced off. The shared 6x12 civic
+  // roof fits an 8x4 gate at exactly two-thirds scale, giving modest eaves rather than the enormous
+  // front/back overhang the cottage roof produces on this aspect ratio. Its gables and regional
+  // trim use the same kit as the settlement, so the gate belongs to the town while its load-bearing
+  // piers remain masonry.
+  const roof = largeRoof(kit, usable, depth);
+  out.push(loose("roof", kit.roofLarge, 0, 2 * STOREY_METRES, 0, roof.rotationY, roof.scale));
+  gableEnds(out, usable, depth, roof, kit, 2 * STOREY_METRES);
 
   for (const [index, sx] of [-1, 1].entries()) {
     out.push(loose(`lamp${index}`, "lamp_wall", (gap / 2 + 0.45) * sx, 2.3, faceZ + 0.12, 0, 1.2));
-    // banner_1 hangs from its pivot (y -1.549 .. +0.844) with the cloth to its right, so the left
-    // one is offset by its own 1.61 m width to hang symmetrically about the gate.
-    out.push(loose(
-      `banner${index}`, "banner_1",
-      sx < 0 ? -gap / 4 - 1.61 : gap / 4, STOREY_METRES + 2.0, faceZ + 0.14, 0, 1.05,
+    out.push(wallMountedBanner(
+      `banner${index}`,
+      "banner_1",
+      { dx: sx * (gap / 2 + pierWidth / 2), dy: STOREY_METRES + 2.0, dz: faceZ + WALL_FACE + 0.01 },
+      0,
+      1.05,
     ));
   }
 
@@ -1825,6 +1868,7 @@ function ruin(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
   const out: PartPlacement[] = [];
   const count = moduleCount(width);
   const spacing = width / count;
+  const returnZ = depth / 2 - MODULE_METRES / 2;
   for (let index = 0; index < count; index += 1) {
     const x = (index + 0.5) * spacing - width / 2;
     const lean = rng.float(-0.05, 0.05);
@@ -1834,17 +1878,17 @@ function ruin(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
     // lean as the panel above it, or the plinth shears away from the wall it is under.
     out.push(loose(`t${index}`, "wall_bottom_trim", x, 0, depth / 2 + 0.01, lean));
   }
-  out.push(loose("side", kit.wall, -width / 2, 0, 0, -Math.PI / 2));
+  out.push(loose("side", kit.wall, -width / 2, 0, returnZ, -Math.PI / 2));
   // The returning wall had no plinth, so one of the ruin's two standing panels came out of the
   // ground and the other was stuck in it. Same yaw as the panel it sits under, pushed 0.01 out
   // along that panel's own outward normal (-X) so the two faces do not z-fight.
-  out.push(loose("side_trim", "wall_bottom_trim", -width / 2 - 0.01, 0, 0, -Math.PI / 2));
+  out.push(loose("side_trim", "wall_bottom_trim", -width / 2 - 0.01, 0, returnZ, -Math.PI / 2));
   out.push(loose(
     "post", kit.corner, width / 2, 0, depth / 2, Math.PI / 4, storeyPostScale(kit),
   ));
   out.push(loose("rub1", "rubble_brick_1", rng.float(-1.5, 1.5), 0, rng.float(-2, 0), rng.float(0, Math.PI), 2.4));
   out.push(loose("rub2", "rubble_brick_2", rng.float(-1.5, 1.5), 0, rng.float(-2, 0), rng.float(0, Math.PI), 2.2));
-  out.push(loose("vine", "vine_1", -width / 2 + 0.2, 3.0, 0.4, -Math.PI / 2, 1.3));
+  out.push(loose("vine", "vine_1", -width / 2 + 0.2, 3.0, returnZ - 0.6, -Math.PI / 2, 1.3));
   return out;
 }
 
@@ -1971,7 +2015,12 @@ function porch(width: number, depth: number, kit: BuildingKit): PartPlacement[] 
     ));
   }
   out.push(loose("lamp", "lamp_wall", -span / 2 + 0.7, 2.1, backZ + 0.35, 0, 1.15));
-  out.push(loose("banner", "banner_1", span / 2 - 1.75, 2.4, backZ + 0.32, 0, 1.05));
+  out.push(wallMountedBanner(
+    "banner", "banner_1",
+    { dx: span / 2 - 0.55, dy: 2.4, dz: backZ + WALL_FACE + 0.01 },
+    0,
+    1.05,
+  ));
 
   return out;
 }
@@ -2045,11 +2094,11 @@ function marketRow(width: number, depth: number, rng: Rng): PartPlacement[] {
  * posts and trim, two beams across it, a plank roof, a bucket and a coil of chain.
  *
  * Sizes are all measured. `wall_bottom_trim` is 2.000 long, so at 0.7 it is exactly the 1.4 m ring
- * and four of them close it. `support_beam` puts its beam at 1.709 x scale, so 1.4 lands it at
- * 2.39 m, which is the roof line. `roof_wood_plank` is a mono-pitch 2.258 x 1.560 that is high at
- * its own z = 0 and low at z = 1.56, so two of them back to back at the same point make a gable
- * with the ridge over the shaft. The corner posts are scaled to 0.78 (2.34 m) so they stop under
- * the eaves instead of coming through the roof.
+ * and four of them close it. `roof_wood_plank` is a mono-pitch 2.258 x 1.560 that is high at its own
+ * z = 0 and low at z = 1.56, so two of them back to back at the same point make a gable with the
+ * ridge over the shaft. The corner posts are scaled to 0.76 (2.28 m), leaving about 13 mm below
+ * the measured plank underside at their footprints. Those four posts are the complete support system; the old
+ * extra pair of `support_beam` assemblies duplicated them almost from ground to eave.
  */
 function well(kit: BuildingKit): PartPlacement[] {
   const out: PartPlacement[] = [];
@@ -2059,7 +2108,7 @@ function well(kit: BuildingKit): PartPlacement[] {
   for (const [index, sign] of signs.entries()) {
     out.push(loose(
       `post${index}`, kit.corner,
-      ring * sign[0], 0, ring * sign[1], Math.atan2(sign[0], sign[1]), 0.78,
+      ring * sign[0], 0, ring * sign[1], Math.atan2(sign[0], sign[1]), 0.76,
     ));
   }
   const curb: readonly (readonly [number, number, number])[] = [
@@ -2069,10 +2118,6 @@ function well(kit: BuildingKit): PartPlacement[] {
     out.push(loose(`curb${index}`, "wall_bottom_trim", cx, 0, cz, yaw, ring));
   }
 
-  const beam = 1.4;
-  for (const [index, sx] of [-1, 1].entries()) {
-    out.push(loose(`beam${index}`, "support_beam", ring * sx, -1.211 * beam, -beam, 0, beam));
-  }
   // The two halves overlap 0.03 m past the ridge rather than meeting on it: two coincident faces at
   // z = 0 would z-fight along the whole ridge line.
   out.push(loose("roof_f", "roof_wood_plank", 0, 2.4, -0.03, 0, 0.75));
@@ -2103,16 +2148,16 @@ function well(kit: BuildingKit): PartPlacement[] {
  *
  * Every built module gets a `wall_bottom_trim` under it, which is the point of the asset and the
  * reason it was in the manifest unused: without it a 50 m run is 25 panels stuck upright in grass.
- * Every opening gets a `kit.corner` jamb on both sides - a 4 m hole with raw module ends reads as
- * damage, not as a gate - and both ends of the run get one so two runs meeting at a corner share a
- * post instead of leaving a hole.
+ * Gatehouses own the two jambs at every opening. The wall run used to add `kit.corner` posts at
+ * those same coordinates, producing a timber sliver through a masonry gate in Coldbrace and
+ * Rootfall and two almost-coplanar posts in Highcairn. The run now owns only its outer end posts;
+ * the gate's return-wall joint closes each authored cutout exactly once.
  *
- * WHAT BREAKS UP A 52 M RUN. It used to be one asset with one overlay on every module and a string
- * course on every fourth, which at 50 m is `wall_plaster_timber`'s brace repeated 21 times - the
- * "repeating timber Z that reads as wallpaper". Four seeded things now vary along a run: plain or
- * richer solid panels, half-timbering, the string course, and a buttress post at the module joints.
- * The kit's open household-window panels are deliberately excluded. All four choices come out of
- * the run's own `variantSeed`, so adding a run cannot shift anything else's randomness.
+ * WHAT BREAKS UP A 52 M RUN. Seeded per-panel decoration produced isolated dark bars and facade
+ * swaps with no construction logic. These walls now use fixed regional patterns anchored to the
+ * physical two-metre slot: Coldbrace is one continuous plaster/apron wall, Rootfall repeats paired
+ * framed bays followed by two plain bays under one continuous rail, and Highcairn is uninterrupted
+ * masonry with sparse sixteen-metre buttresses. Open household-window panels remain excluded.
  *
  * AND IT IS CAPPED. `kerb_straight` is 2.000 x 0.134 x 0.700 with its body entirely on the +Z side
  * of its pivot; laid along the wall head it overhangs the 0.406 m panel by 0.147 m on each face,
@@ -2124,57 +2169,66 @@ export function buildWallRun(
   length: number,
   openings: readonly { at: number; width: number }[],
   kit: BuildingKit,
-  seed: number,
+  _seed: number,
 ): PartPlacement[] {
   const out: PartPlacement[] = [];
   const modules = wallRunModules(length, openings);
-  const rng = new Rng(seed);
+  // A town wall is one authored construction, not a bag of house panels. The pattern is tied to the
+  // original physical slot rather than this filtered array index, so a gate opening cannot restart
+  // or shift the facade phase on the far side of the road.
 
   for (const [index, module] of modules.entries()) {
     const centre = (module.from + module.to) / 2;
     const scale = (module.to - module.from) / MODULE_METRES;
+    const physicalSlot = Math.round(module.from / MODULE_METRES);
+    const timberPhase = ((physicalSlot % 4) + 4) % 4;
+    const wallAsset = kit.id === "stone"
+      ? kit.wall
+      : kit.id === "timber" && timberPhase !== 0 ? kit.wall : kit.wallFeature;
     // Fortification walls use only solid panels. The kit's window is an unglazed household-sized
     // aperture, not an arrow loop, and a solid collision box behind it makes the opening lie.
-    // Keep one roll so seeds and every later decoration choice remain stable.
-    const roll = rng.float(0, 1);
-    const assetId = roll < 0.28 ? kit.wallFeature : kit.wall;
-    out.push(loose(`w${index}`, assetId, centre, 0, 0, 0, scale));
+    out.push(loose(`w${index}`, wallAsset, centre, 0, 0, 0, scale));
     out.push(loose(`t${index}`, "wall_bottom_trim", centre, 0, 0.01, 0, scale));
     // The coping. Its own y and z are unscaled by the module's length scale in everything but the
     // asset's uniform scale, so a short end module still gets a proportionate cap.
     out.push(loose(`k${index}`, "kerb_straight", centre, STOREY_METRES - 0.134 * scale, -0.11 - 0.35 * scale, 0, scale));
-    // Half-timbering on the solid modules only, same rule as a building's ring wall.
-    if (kit.frame !== null && rng.chance(0.8)) {
+    // Rootfall's frames arrive as deliberate pairs. A frame on every two-metre bay is deterministic
+    // but still wallpaper; two framed and two plain bays make an eight-metre construction rhythm.
+    if (kit.frame !== null && timberPhase < 2) {
       out.push(loose(`f${index}`, kit.frame, centre, 0, 0.02, 0, scale));
     }
-    // A string course two thirds up. Cheap (one more instance of an asset the run already draws)
-    // and it is what stops a long wall reading as one flat panel repeated.
-    if (rng.chance(0.3)) out.push(loose(`s${index}`, "wall_bottom_trim", centre, 1.55, 0.02, 0, scale));
+    if (kit.id === "timber") {
+      // One continuous rail locks framed and plain bays together. This is every module, never a
+      // seeded subset, so the line cannot break into arbitrary dark bars.
+      out.push(loose(
+        `s${index}`, "wall_bottom_trim", centre, 1.55, 0.02, 0, scale,
+      ));
+    }
   }
 
-  // Jambs at both sides of every opening and posts at both ends of the run, in run order so the
-  // tags are stable.
-  const spans = mergeSpans(modules);
-  const posts = new Set<number>();
-  for (const span of spans) {
-    posts.add(r3(span.from));
-    posts.add(r3(span.to));
-  }
-  for (const [postIndex, x] of [...posts].sort((a, b) => a - b).entries()) {
+  // Only the run endpoints belong to the wall. Every current opening is occupied by a gatehouse,
+  // whose outer return joint sits at the exact cutout boundary and supplies the transition post.
+  for (const [postIndex, x] of [0, length].entries()) {
     out.push(loose(
       `p${postIndex}`, kit.corner, x, 0, 0, Math.PI / 4, storeyPostScale(kit),
     ));
   }
 
-  // A buttress on every joint between two modules. It is the vertical rhythm the run had none of,
-  // and it plugs the joint: `world/regionBuilder.ts` draws every part at 1/tierSilhouetteScale(tier)
-  // on unscaled centres, so a 2 m panel is 1.860 m at Rootfall and 1.738 m at Highcairn and each
-  // joint is a full-height slot of daylight (measured: 0.140 m and 0.262 m, shell-audit.ts). Scaled
-  // to the storey because corner_wood is 3.000 m and corner_brick 3.016 against a 3.123 m wall.
+  // Buttresses mark a deliberate cadence rather than every panel joint. The old every-joint stone
+  // rhythm repeated a 3,102-triangle brick post every two metres and made Highcairn's wall read as
+  // a picket fence. Panels now draw at authored scale and meet cleanly, so timber/plaster needs a
+  // post every fourth joint and masonry only every eighth. Gatehouse return joints own openings.
   let buttress = 0;
+  let contiguousJoints = 0;
+  const buttressCadence = kit.id === "stone" ? 8 : 4;
   for (const [index, module] of modules.entries()) {
     const next = modules[index + 1];
-    if (next === undefined || Math.abs(next.from - module.to) > 1e-6) continue;
+    if (next === undefined || Math.abs(next.from - module.to) > 1e-6) {
+      contiguousJoints = 0;
+      continue;
+    }
+    contiguousJoints += 1;
+    if (contiguousJoints % buttressCadence !== 0) continue;
     out.push(loose(`b${buttress}`, kit.corner, r3(module.to), 0, 0, 0, storeyPostScale(kit)));
     buttress += 1;
   }
@@ -2186,10 +2240,9 @@ export function buildWallRun(
  * Collision for the same run in the same local frame: one thin box per built span, so a 26-module
  * wall with one gate is two boxes rather than 26.
  *
- * 0.5 m thick, matching `prefabCollision("wall_segment")`, because the collider should be as thick
- * as the 0.406 m panel and not as deep as a footprint. `dx` is the span's CENTRE measured from the
- * run's start, which is the same origin `buildWallRun` uses - unlike the prefab boxes, whose frame
- * is centred on the footprint.
+ * The measured 0.406 m panel thickness and -0.110 m centre match `prefabCollision("wall_segment")`
+ * exactly. `dx` is the span's CENTRE measured from the run's start, which is the same origin
+ * `buildWallRun` uses - unlike the prefab boxes, whose frame is centred on the footprint.
  */
 export function wallRunCollision(
   length: number,
@@ -2198,9 +2251,9 @@ export function wallRunCollision(
   return mergeSpans(wallRunModules(length, openings)).map((span, index) => ({
     tag: `run${index}`,
     dx: r3((span.from + span.to) / 2),
-    dz: 0,
+    dz: r3(WALL_FACE - WALL_THICKNESS / 2),
     sizeX: r3(span.to - span.from),
-    sizeZ: 0.5,
+    sizeZ: WALL_THICKNESS,
     height: STOREY_METRES,
   }));
 }
@@ -2254,9 +2307,8 @@ function mergeSpans(modules: readonly Span[]): Span[] {
 export function buildComposition(
   id: CompositionId,
   seed: number,
-  // Optional and last, so the existing two-argument call in `world/regionBuilder.ts` keeps
-  // compiling. Only the three settlement compositions read it; the landmarks are region furniture
-  // and belong to the rock they stand on, not to the town's vernacular.
+  // Optional and last for compatibility with tooling. Runtime callers pass the region's settlement
+  // kit so portals, waypoints, traversal anchors and town fixtures share one vernacular.
   kitId: KitId = "plaster",
 ): PartPlacement[] {
   const rng = new Rng(seed);
@@ -2265,11 +2317,15 @@ export function buildComposition(
     case "vault_door": return vaultDoor();
     case "milestone": return milestone();
     case "highcairn_crane": return highcairnCrane();
-    case "gravelmaw_mouth": return gravelmawMouth();
+    case "gravelmaw_mouth": return buildGravelmawMouthComposition(seed, kit);
+    case "gravelmaw_exit": return buildGravelmawExitComposition(seed, kit);
     case "great_cairn": return greatCairn();
     case "standing_stones": return standingStones(rng);
     case "rootfall_stump": return rootfallStump();
-    case "region_gate": return regionGate();
+    case "region_gate": return buildRegionGateComposition(seed, kit);
+    case "path_waypoint": return buildPathWaypointComposition(seed, kit);
+    case "root_tunnel_entrance": return buildRootTunnelComposition(seed, kit);
+    case "canopy_walk_entrance": return buildCanopyWalkComposition(seed, kit);
     case "bank_counter": return bankCounter(kit);
     case "forge_yard": return forgeYard(rng);
     case "market_pitch": return marketPitch(rng);
@@ -2284,8 +2340,10 @@ function vaultDoor(): PartPlacement[] {
   return [
     loose("torch_l", "torch", -1.5, 1.9, 0.4, 0, 2.6),
     loose("torch_r", "torch", 1.5, 1.9, 0.4, 0, 2.6),
-    loose("banner_l", "banner_1", -2.9, 3.3, 0.25, 0, 1.1),
-    loose("banner_r", "banner_1", 1.3, 3.3, 0.25, 0, 1.1),
+    // The composition origin is 0.207 m beyond the tower's south wall. Seat each mounting rail on
+    // that wall and let the bracket project out into the court instead of laying the cloth flat.
+    wallMountedBanner("banner_l", "banner_1", { dx: -2.35, dy: 3.3, dz: -0.19 }, 0, 1.1),
+    wallMountedBanner("banner_r", "banner_1", { dx: 2.35, dy: 3.3, dz: -0.19 }, 0, 1.1),
     loose("kerb_l", "kerb_straight", -1.9, 0, 1.9, Math.PI / 2),
     loose("kerb_r", "kerb_straight", 1.9, 0, 1.9, Math.PI / 2),
   ];
@@ -2312,8 +2370,10 @@ function highcairnCrane(): PartPlacement[] {
   return [
     // roof_log's pivot sits 3.85 m below the beam and the beam runs along local Z.
     loose("jib", "roof_log", 0, 8.4 - 3.85 * 0.85, 3.0, 0, 0.85),
-    loose("brace_l", "support_beam", -1.3, -1.211 * 1.6, 0.4, Math.PI / 2, 1.6),
-    loose("brace_r", "support_beam", 1.3, -1.211 * 1.6, 0.4, -Math.PI / 2, 1.6),
+    // Point away from the mast. The old yaws pointed both long beams inward, overlapping almost
+    // their entire 3.25 m span and producing a flickering knot at the crane's foot.
+    loose("brace_l", "support_beam", -1.3, -1.211 * 1.6, 0.4, -Math.PI / 2, 1.6),
+    loose("brace_r", "support_beam", 1.3, -1.211 * 1.6, 0.4, Math.PI / 2, 1.6),
     loose("drum", "chain_coil", 1.4, 0.05, 2.6, 0.4, 2.2),
     loose("rope", "rope_coil", -0.4, 0.05, 5.4, 1.1, 2.4),
     loose("crate", "crate_metal", -2.4, 0, 1.4, 0.7, 1.3),
@@ -2500,10 +2560,12 @@ function rootfallStump(): PartPlacement[] {
     loose("step_2", "stairs_exterior", 0, 1.2, 1.9, 0, 1.0),
     loose("step_3", "stairs_exterior", 0, 2.4, 0.2, 0, 1.0),
     // Brackets grow ON the trunk: 1.7 m out from the axis puts their inner edge against the bark.
-    loose("shelf_1", "mushroom_bracket", -1.7, 1.5, 0.5, 0.8, 1.6),
-    loose("shelf_2", "mushroom_bracket", 1.6, 2.4, -0.7, 2.4, 1.3),
+    // The old 1.6x caps dominated the square like orange awnings. These are trunk-scale brackets:
+    // still readable from the gate, but subordinate to the stair and cut-stump silhouette.
+    loose("shelf_1", "mushroom_bracket", -1.65, 1.35, 0.45, 0.8, 0.82),
+    loose("shelf_2", "mushroom_bracket", 1.55, 2.15, -0.65, 2.4, 0.72),
     // The vine hangs from the cut face, so its top is at the top and it falls 2.6 m down the side.
-    loose("vine", "vine_1", 1.5, 1.1, 1.0, 1.9, 1.0),
+    loose("vine", "vine_1", 1.45, 0.8, 0.95, 1.9, 0.78),
   ];
 }
 
@@ -2551,7 +2613,9 @@ function bankCounter(kit: BuildingKit): PartPlacement[] {
   out.push(loose("counter", "table_large", 0, 0, -0.15, 0, 1));
   out.push(loose("lamp_l", "lamp_wall", -1.5, 2.1, backZ + 0.32, 0, 1.15));
   out.push(loose("lamp_r", "lamp_wall", 1.5, 2.1, backZ + 0.32, 0, 1.15));
-  out.push(loose("banner", "banner_1", -0.8, 2.55, backZ + 0.3, 0, 1.05));
+  out.push(wallMountedBanner(
+    "banner", "banner_1", { dx: -0.65, dy: 2.55, dz: backZ + WALL_FACE + 0.01 }, 0, 1.05,
+  ));
   out.push(loose("kerb_l", "kerb_straight", -1, 0, 1.05, 0));
   out.push(loose("kerb_r", "kerb_straight", 1, 0, 1.05, 0));
   return out;
@@ -2675,8 +2739,17 @@ function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
   }
 
   // The barn, turned to face the yard. (-dx, -dz) with PI added to the yaw is a half turn about the
-  // composition origin; the translation then puts its centre at local (0, -6.4).
+  // composition origin; the translation then puts its centre at local (0, -6.4). The standalone
+  // farmstead recipes include their own workyard, but this composition authors a larger yard below,
+  // so retain the shell/elevation packet and discard its ground dressing instead of stacking two
+  // wagons, fences and crate piles in the same space.
+  const barnDressingAssets = new Set([
+    "wagon", "farm_crate_empty", "farm_crate_apple", "farm_crate_carrot", "crate_village",
+    "sack", "barrel", "barrel_apples", "fence_wood_single", "fence_wood_extension",
+    "workbench", "bucket_wood", "bucket_metal",
+  ]);
   for (const placement of buildPrefab("farmstead", [8, 4], rng.int(1, 1_000_000), kit.id)) {
+    if (barnDressingAssets.has(placement.assetId)) continue;
     out.push({
       tag: `barn_${placement.tag}`,
       assetId: placement.assetId,
@@ -2736,14 +2809,19 @@ export function prefabCollision(prefab: PrefabId, footprint: readonly [number, n
     // survived erosion and all three arches were impassable.
     const { pierWidth } = gateGeometry(width);
     const usable = Math.max(3 * MODULE_METRES, MODULE_METRES * Math.round(width / MODULE_METRES));
+    // Front and back facade panels project WALL_FACE beyond the authored depth on both sides.
+    const renderedDepth = depth + 2 * WALL_FACE;
     return [
-      { tag: "pier_l", dx: -(usable - pierWidth) / 2, dz: 0, sizeX: pierWidth, sizeZ: depth, height },
-      { tag: "pier_r", dx: (usable - pierWidth) / 2, dz: 0, sizeX: pierWidth, sizeZ: depth, height },
+      { tag: "pier_l", dx: -(usable - pierWidth) / 2, dz: 0, sizeX: pierWidth, sizeZ: renderedDepth, height },
+      { tag: "pier_r", dx: (usable - pierWidth) / 2, dz: 0, sizeX: pierWidth, sizeZ: renderedDepth, height },
     ];
   }
   if (prefab === "wall_segment") {
     // The wall run is only as thick as the panel, not as deep as the authored footprint.
-    return [{ tag: "wall", dx: 0, dz: 0, sizeX: width, sizeZ: 0.5, height }];
+    return [{
+      tag: "wall", dx: 0, dz: r3(WALL_FACE - WALL_THICKNESS / 2),
+      sizeX: width, sizeZ: WALL_THICKNESS, height,
+    }];
   }
   if (prefab === "stall") {
     return [{ tag: "stall", dx: 0, dz: 0, sizeX: width, sizeZ: depth * 0.6, height }];
@@ -2753,10 +2831,25 @@ export function prefabCollision(prefab: PrefabId, footprint: readonly [number, n
     // at its ends, and NOTHING across +Z - that is the entire point of the prefab: the player walks
     // in and stands at the anvil instead of interacting with it through a wall from 8.56 m away.
     const t = 0.6;
+    const wallCentre = WALL_FACE - WALL_THICKNESS / 2;
     return [
-      { tag: "back", dx: 0, dz: -(depth - t) / 2, sizeX: width, sizeZ: t, height },
-      { tag: "left", dx: -(width - t) / 2, dz: t / 2, sizeX: t, sizeZ: depth - t, height },
-      { tag: "right", dx: (width - t) / 2, dz: t / 2, sizeX: t, sizeZ: depth - t, height },
+      { tag: "back", dx: 0, dz: r3(-depth / 2 - wallCentre), sizeX: width, sizeZ: t, height },
+      { tag: "left", dx: r3(-width / 2 - wallCentre), dz: 0, sizeX: t, sizeZ: depth, height },
+      { tag: "right", dx: r3(width / 2 + wallCentre), dz: 0, sizeX: t, sizeZ: depth, height },
+    ];
+  }
+  if (prefab === "ruin") {
+    // Match the actual L-shaped shell. The old full-footprint box blocked the open courtyard.
+    const wallCentre = WALL_FACE - WALL_THICKNESS / 2;
+    return [
+      {
+        tag: "back", dx: 0, dz: r3(depth / 2 + wallCentre),
+        sizeX: width, sizeZ: WALL_THICKNESS, height,
+      },
+      {
+        tag: "return", dx: r3(-width / 2 - wallCentre), dz: r3(depth / 2 - MODULE_METRES / 2),
+        sizeX: WALL_THICKNESS, sizeZ: MODULE_METRES, height,
+      },
     ];
   }
   if (prefab === "porch") {
@@ -2770,7 +2863,7 @@ export function prefabCollision(prefab: PrefabId, footprint: readonly [number, n
     return [
       // The panel draws from the face plane out to WALL_FACE and back to WALL_FACE - 0.406, so the
       // box sits on the panel rather than straddling the footprint edge.
-      { tag: "back", dx: 0, dz: r3(-depth / 2 + WALL_THICKNESS / 2 - WALL_FACE), sizeX: span, sizeZ: WALL_THICKNESS, height },
+      { tag: "back", dx: 0, dz: r3(-depth / 2 + WALL_FACE - WALL_THICKNESS / 2), sizeX: span, sizeZ: WALL_THICKNESS, height },
       { tag: "post_l", dx: -(span / 2 - 0.12), dz: front, sizeX: 0.4, sizeZ: 0.4, height: 3 },
       { tag: "post_r", dx: span / 2 - 0.12, dz: front, sizeX: 0.4, sizeZ: 0.4, height: 3 },
     ];
@@ -2780,7 +2873,7 @@ export function prefabCollision(prefab: PrefabId, footprint: readonly [number, n
     // whole idea of an arcade, so they are deliberately not colliders.
     const span = bayCount(width, 2, 8) * MODULE_METRES;
     return [{
-      tag: "back", dx: 0, dz: r3(-depth / 2 + WALL_THICKNESS / 2 - WALL_FACE),
+      tag: "back", dx: 0, dz: r3(-depth / 2 + WALL_FACE - WALL_THICKNESS / 2),
       sizeX: span, sizeZ: WALL_THICKNESS, height,
     }];
   }
@@ -2798,7 +2891,7 @@ export function prefabCollision(prefab: PrefabId, footprint: readonly [number, n
     }));
   }
   if (prefab === "well") {
-    // 1.6 x 1.6 around a 1.4 m curb, 1 m high. Half-diagonal 1.13 m, comfortably inside
+    // 1.6 x 1.6 around the low 1.4 m curb. Half-diagonal 1.13 m, comfortably inside
     // INTERACT_RANGE 2.4 m, so a well can still be the target of moveTo({ entityId }).
     return [{ tag: "curb", dx: 0, dz: 0, sizeX: 1.6, sizeZ: 1.6, height }];
   }
@@ -2817,16 +2910,20 @@ export function prefabPartAssetIds(): string[] {
   // gatehouse that GATE_GAP_METRES is sized for, the [6,5] forge and [6,3] arcade from the
   // replacement layouts, a two-bay [4,3] porch, a three-pitch market row and a minimum well.
   const probes: readonly (readonly [number, number])[] = [
-    [6, 4], [12, 6], [5, 4], [4, 4], [8, 1], [3, 2],
-    [8, 3], [6, 3], [6, 5], [4, 3], [9, 3], [2, 2], [10, 4], [16, 3],
+    [6, 4], [6, 6], [12, 6], [5, 4], [4, 4], [8, 1], [3, 2],
+    [8, 3], [8, 4], [6, 3], [6, 5], [4, 3], [9, 3], [2, 2], [10, 4], [16, 3],
   ];
   for (const prefab of PREFAB_IDS) {
     for (const footprint of probes) {
       // Several seeds, because window and door choices are seeded.
-      for (const seed of [1, 7, 13, 29, 101, 977]) {
-        // Every kit, or a wall family that only Highcairn uses is never checked against the
-        // manifest and ships as a missing mesh in one region.
-        for (const kit of KIT_IDS) {
+      // Every kit, or a wall family that only Highcairn uses is never checked against the manifest
+      // and ships as a missing mesh in one region. Sequential seeds enumerate every registered
+      // recipe because the selector uses unsigned seed modulo the compatible recipe count.
+      for (const kit of KIT_IDS) {
+        const recipeCount = structureVariantCount(prefab, footprint, BUILDING_KITS[kit]);
+        const seeds = new Set([1, 7, 13, 29, 101, 977]);
+        for (let seed = 0; seed < recipeCount; seed += 1) seeds.add(seed);
+        for (const seed of seeds) {
           for (const placement of buildPrefab(prefab, footprint, seed, kit)) ids.add(placement.assetId);
         }
       }
@@ -2843,7 +2940,7 @@ export function prefabPartAssetIds(): string[] {
     [6, [{ at: 3, width: 8 }]],
   ];
   for (const [length, openings] of runs) {
-    for (const seed of [1, 7, 13, 29, 101, 977]) {
+    for (const seed of [0, 1, 2, 3, 4, 5, 7, 13, 29, 101, 977]) {
       for (const kit of KIT_IDS) {
         for (const placement of buildWallRun(length, openings, BUILDING_KITS[kit], seed)) {
           ids.add(placement.assetId);

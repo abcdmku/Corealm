@@ -1,0 +1,15 @@
+{
+  "name": "waypoint-capture",
+  "actions": [
+    { "waitMs": 1200, "label": "settle after boot" },
+    { "debug": "setCameraPreset", "args": ["west_track"], "label": "view March waypost" },
+    { "waitMs": 600, "label": "settle March waypost" },
+    { "screenshot": "cohesion-west-track", "label": "March waypoint beside its track" },
+    { "debug": "setCameraPreset", "args": ["mire_skirt"], "label": "view forest trailhead" },
+    { "waitMs": 600, "label": "settle forest trailhead" },
+    { "screenshot": "cohesion-mire-skirt", "label": "forest waypoint at its junction" },
+    { "debug": "setCameraPreset", "args": ["lower_quarry_waystone"], "label": "view quarry waystone" },
+    { "waitMs": 600, "label": "settle quarry waystone" },
+    { "screenshot": "cohesion-lower-quarry", "label": "quarry cairn beside the road" }
+  ]
+}

@@ -284,9 +284,14 @@ for (const [plan, row] of uniqueBuildingPlans) {
   const gableHalfAt = (y: number): number => {
     let best = 0;
     for (const gable of gables) {
-      const apex = gable.dy + 4.384 * gable.scale;
+      // Gables are fitted independently across and vertically. A uniform-scale
+      // approximation reports a false opening on long, shallow hall roofs.
+      const acrossScale = gable.scaleAxes?.[0] ?? 1;
+      const heightScale = gable.scaleAxes?.[1] ?? 1;
+      const height = 4.384 * gable.scale * heightScale;
+      const apex = gable.dy + height;
       if (y > apex) continue;
-      best = Math.max(best, 3.35 * gable.scale * (apex - y) / (4.384 * gable.scale));
+      best = Math.max(best, 3.35 * gable.scale * acrossScale * (apex - y) / height);
     }
     return best;
   };

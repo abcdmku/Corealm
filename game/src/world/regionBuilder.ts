@@ -993,6 +993,19 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
     ctx.out.push(entity);
     pushAssetSolid(ctx, obstacle.id, entity.position, obstacle.assetId, scale,
       obstacle.rotationY ?? 0, true);
+    emitComposition(
+      obstacle.composition,
+      ground(obstacle.position),
+      obstacle.rotationY ?? 0,
+      regionId,
+      tier,
+      region.settlement.kit,
+      obstacle.id,
+      obstacle.name,
+      { scenery: true, traversal: true },
+      ctx.out,
+      ctx,
+    );
   }
 
   for (const group of region.enemyGroups) {
@@ -1035,7 +1048,8 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
     // still the clickable, inspectable entity; these parts are what the player navigates by.
     emitComposition(
       landmark.composition, origin, landmark.rotationY ?? 0, regionId, tier,
-      landmark.id, landmark.name, { blurb: landmark.blurb, scenery: true }, ctx.out, ctx,
+      region.settlement.kit, landmark.id, landmark.name,
+      { blurb: landmark.blurb, scenery: true }, ctx.out, ctx,
     );
   }
 
@@ -1064,7 +1078,8 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
     ctx.locationEntity.set(gate.id, gate.id);
     emitComposition(
       gate.composition, origin, gate.rotationY ?? 0, regionId, tier,
-      gate.id, gate.name, { toRegionId: gate.toRegionId, scenery: true }, ctx.out, ctx,
+      region.settlement.kit, gate.id, gate.name,
+      { toRegionId: gate.toRegionId, scenery: true }, ctx.out, ctx,
     );
   }
 }
@@ -1303,6 +1318,7 @@ function emitParts(
       view: {
         assetId: part.assetId,
         scale: round4(part.scale),
+        scaleAxes: part.scaleAxes?.map(round4) as Vec3 | undefined,
         rotationY: round4(rotationY + part.rotationY),
         materialTier: tier,
         labelHeight: 2,
@@ -1333,6 +1349,7 @@ function emitComposition(
   rotationY: number,
   regionId: RegionId,
   tier: number,
+  kitId: BuildingKit["id"],
   ownerId: string,
   name: string,
   meta: Record<string, string | number | boolean>,
@@ -1340,7 +1357,7 @@ function emitComposition(
   ctx?: BuildContext,
 ): void {
   if (!composition) return;
-  const parts = buildComposition(composition, variantSeed(ownerId));
+  const parts = buildComposition(composition, variantSeed(ownerId), kitId);
   emitParts(parts, origin, rotationY, regionId, tier, ownerId, name, meta, out);
   if (!ctx) return;
 
@@ -1445,7 +1462,7 @@ function buildDungeonEntities(
       round2(firstChamber.centre[1] + Math.cos(bearing) * rim),
     ];
     const exitScale = trueScale(2.2, dungeon.tier);
-    const exitPosition = placeOn(exitSpot, firstChamber.floorOffset, "wall_arch", exitScale);
+    const exitPosition = placeOn(exitSpot, firstChamber.floorOffset, "wall_brick_door", exitScale);
     out.push({
       id: "gravelmaw_exit_portal",
       archetype: "portal",
@@ -1455,17 +1472,29 @@ function buildDungeonEntities(
       position: exitPosition,
       state: "open",
       interactions: ["inspect", "enter"],
-      // `wall_arch` is the same 2 x 3 m opening the region gates use. At this scale it reads as
-      // daylight in the rock rather than as another chamber door, which matters because the
-      // chamber already has `door` entities in it and they are not exits.
+      // Mirror the surface mouth's masonry arch so the reciprocal portal belongs to the same
+      // quarry construction rather than reading as a timber room door.
       view: {
-        assetId: "wall_arch",
+        assetId: "wall_brick_door",
         scale: exitScale,
         rotationY: bearing,
         labelHeight: 3.2,
       },
       meta: { toRegionId: region.id, toLocationId: "gravelmaw_entrance" },
     });
+    emitComposition(
+      "gravelmaw_exit",
+      placeAt(exitSpot, firstChamber.floorOffset),
+      bearing,
+      dungeon.id,
+      dungeon.tier,
+      region.settlement.kit,
+      "gravelmaw_exit_portal",
+      `${dungeon.name} Mouth`,
+      { scenery: true, dungeonId: dungeon.id },
+      out,
+      ctx,
+    );
     ctx.portalLinks.push({
       entityId: "gravelmaw_exit_portal",
       fromLocationId: "gravelmaw_chamber1",
@@ -1483,7 +1512,8 @@ function buildDungeonEntities(
   // a hole, and a box across it would seal the entrance to the dungeon.
   emitComposition(
     dungeon.entranceComposition, mouth, mouthRotation, region.id, region.tier,
-    "gravelmaw_mouth_portal", dungeon.name, { scenery: true, dungeonId: dungeon.id }, out, ctx,
+    region.settlement.kit, "gravelmaw_mouth_portal", dungeon.name,
+    { scenery: true, dungeonId: dungeon.id }, out, ctx,
   );
 
   for (const chamber of dungeon.chambers) {

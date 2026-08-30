@@ -45,7 +45,7 @@
  *    well, three benches, a market arcade, a bank counter and a forge yard.
  *  - Every station stood loose on grass, and the Forge Shed's only door faced away from the anvil
  *    and furnace it served. The anvil and furnace are inside an open-fronted `forge` whose mouth is
- *    the square's east kerb; the crafting and fletching benches are under a `porch` on the vault
+ *    the square's east kerb; the crafting and fletching benches are under an `arcade` on the vault
  *    yard; the range is under a cookhouse lean-to. Each names its structure in `attachedTo`, which
  *    `validateRegions` asserts within `ATTACHMENT_MARGIN_METRES`.
  *  - The bank chest stood 5.0 m from the nearest building on open grass with no collider. It is
@@ -55,10 +55,9 @@
  *    touch. Spacing was checked with `roofOverhang(prefab, footprint, kit)` rather than the flat
  *    `ROOF_EAVE_METRES`, because the flat number is the worst case across the game and the real
  *    one varies by prefab: a 6 x 4 plaster cottage is 0.78 / 0.76 m, the 12 x 6 hall 0.83 / 1.13,
- *    the 6 x 5 forge 1.74 / 0.95 (a plan squarer than the roof asset over-runs on the long axis),
- *    and a porch or arcade nothing at all. All of them are then drawn 1.111x larger than authored,
- *    because `regionBuilder.emitParts` still applies a `1 / tierSilhouetteScale(tier)` that nothing
- *    cancels any more, so this layout is spaced against the drawn size. The tightest pair is the
+ *    the 6 x 4 forge 0.79 / 0.76,
+ *    and a porch or arcade nothing at all. Landmark parts are emitted at their authored scales,
+ *    so this layout is spaced against those measured bounds. The tightest pair is the
  *    cookhouse and house_8 at 0.57 m of clear air.
  *  - The cooking range interpenetrated the vault-door torch by 0.22 x 0.59 m and its banner by
  *    0.42 m. It is 22 m from that composition now.
@@ -108,19 +107,20 @@ export const COLDBRACE: SettlementDef = {
 
   buildings: [
     // ---------------------------------------------------------------- gates
-    // [8,3] is the footprint `GATE_GAP_METRES` is sized for: `gateGeometry(8)` gives two 2 m piers
-    // and a 4 m clear arch. At the [6,3] these used to be authored at there is only room for one
+    // [8,4] gives `gateGeometry(8)` two 2 m piers and a 4 m clear arch. Its two-module depth keeps
+    // the wall returns and upper decks from overlapping halfway through a module. At the [6,3]
+    // these used to be authored at there is only room for one
     // 2 m pier a side, so the arch was 2 m; the navmesh erodes 0.45 m per side at the 0.45 m
     // large-world cell, and measured paths detoured 4-5 m around every gate in the game. Each
     // gatehouse stands in the matching 8 m opening in its wall run.
-    { id: "coldbrace_gate_south", name: "South Gatehouse", prefab: "gatehouse", position: [-160, -108], rotationY: 0, footprint: [8, 3] },
-    { id: "coldbrace_gate_east", name: "East Gatehouse", prefab: "gatehouse", position: [-134, -80], rotationY: Math.PI / 2, footprint: [8, 3] },
+    { id: "coldbrace_gate_south", name: "South Gatehouse", prefab: "gatehouse", position: [-160, -108], rotationY: 0, footprint: [8, 4] },
+    { id: "coldbrace_gate_east", name: "East Gatehouse", prefab: "gatehouse", position: [-134, -80], rotationY: Math.PI / 2, footprint: [8, 4] },
     // The `town_center` -> `west_track` road crosses the west wall at (-186,-72.6). The gate used
     // to be centred at z = -74, which left that crossing only 0.15 m inside the passage after the
     // navmesh's 0.45 m erosion. At z = -72 the 4 m clear arch spans z -74..-70 and the road keeps
     // 0.95 m of usable clearance. There is no `coldbrace_west_gate` route node because
     // `content/regions.ts` is not this file's to edit; the authored road is the alignment contract.
-    { id: "coldbrace_gate_west", name: "West Gatehouse", prefab: "gatehouse", position: [-186, -72], rotationY: -Math.PI / 2, footprint: [8, 3] },
+    { id: "coldbrace_gate_west", name: "West Gatehouse", prefab: "gatehouse", position: [-186, -72], rotationY: -Math.PI / 2, footprint: [8, 4] },
 
     // ------------------------------------------------------------ civic core
     // Unmoved. The `march_vault_tower` landmark stands 0.28 m off this tower's south door and
@@ -130,8 +130,8 @@ export const COLDBRACE: SettlementDef = {
     // court. `porch` collides as its back wall plus two 0.4 m posts, so there is no doorway to
     // pinch the navmesh shut. Three bays, because two put the chest and the counter on top of each
     // other. The back panel draws at x -164.72..-164.28 and the tower's own east panel draws out to
-    // x = -164.898 - both at the 1.111x every prefab part is currently emitted at - so they clear
-    // by 0.18 m. The tower's spire, 7.34 m across at y >= 6.25 m, overhangs this canopy's 3.36 m by
+    // x = -164.898 at authored scale, so they clear by 0.18 m. The tower's spire, 7.34 m across at
+    // y >= 6.25 m, overhangs this canopy's 3.36 m by
     // 0.39 m, which is a tower with eaves over its own counter, not an interpenetration.
     { id: "coldbrace_bank_porch", name: "Vault Counter", prefab: "porch", position: [-163, -89], rotationY: Math.PI / 2, footprint: [6, 3] },
     // Moved 8 m south and turned about. Its door was at (-159.55,-57.0) facing NORTH out of the
@@ -143,13 +143,13 @@ export const COLDBRACE: SettlementDef = {
     // ---------------------------------------------------------- work buildings
     // Was `shed` at (-152,-98) rotY 0: its one door faced south at (-152.45,-100.02) while the
     // furnace and anvil it serves stood 6 m away on the far side of it, on grass. `forge` is walled
-    // on three sides with the whole fourth face open, so the mouth IS the square's east kerb at
-    // x = -148 and the player walks in to the anvil instead of reaching through a wall.
-    { id: "coldbrace_forge_shed", name: "The Forge", prefab: "forge", position: [-145.5, -86], rotationY: -Math.PI / 2, footprint: [6, 5] },
-    // The crafting table and the fletching bench, roofed, on the vault yard's west side. A `porch`
-    // rather than a `forge` on purpose: two benches want reaching from the front, not enclosing,
-    // and a walk-under roof cannot trap them behind an eroded doorway.
-    { id: "coldbrace_workshed", name: "Work Shed", prefab: "porch", position: [-174, -92], rotationY: Math.PI / 2, footprint: [6, 3] },
+    // on three sides with the whole fourth face open, so the mouth opens toward the square's east
+    // kerb and the player walks in to the anvil instead of reaching through a wall.
+    { id: "coldbrace_forge_shed", name: "The Forge", prefab: "forge", position: [-145.5, -86], rotationY: -Math.PI / 2, footprint: [6, 4] },
+    // The crafting table and fletching bench occupy separate bays under an open `arcade` on the
+    // vault yard's west side. Its aisle stays walkable without repeating the bank and cookhouse
+    // lean-tos.
+    { id: "coldbrace_workshed", name: "Work Shed", prefab: "arcade", position: [-174, -92], rotationY: Math.PI / 2, footprint: [6, 3] },
     // The town cookhouse: a lean-to on the square's north-east corner.
     { id: "coldbrace_cookhouse", name: "Cookhouse", prefab: "porch", position: [-149, -72.5], rotationY: Math.PI, footprint: [4, 3] },
     // The covered market row on the square's west side. Its colonnade lands on x = -170.0, the
@@ -158,7 +158,7 @@ export const COLDBRACE: SettlementDef = {
     { id: "coldbrace_market", name: "Market Row", prefab: "arcade", position: [-170.5, -80], rotationY: Math.PI / 2, footprint: [8, 3] },
     // The wellhead. 5.0 m from the `town_center` route node, so its 1.6 x 1.6 m curb never contests
     // the spot `moveTo({ locationId: "town_center" })` resolves to.
-    { id: "coldbrace_well", name: "Coldbrace Well", prefab: "well", position: [-164, -77], rotationY: 0.4, footprint: [2, 2] },
+    { id: "coldbrace_well", name: "Coldbrace Well", prefab: "well", position: [-164, -77], rotationY: 0, footprint: [2, 2] },
 
     // --------------------------------------------------------------- houses
     // Every door below opens onto a paved street, the square, or a lane between two houses.
@@ -169,7 +169,7 @@ export const COLDBRACE: SettlementDef = {
     { id: "coldbrace_house_4", name: "Drover's House", prefab: "cottage", position: [-140, -102], rotationY: Math.PI / 2, footprint: [6, 4] },
     // The west street, facing each other across it. These two used to be corner to corner with
     // gapX = gapZ = 0.00 and 1.57 x 1.51 m of interpenetrating roof; they are 8 m apart now.
-    { id: "coldbrace_house_5", name: "Warden's House", prefab: "cottage", position: [-178, -70], rotationY: 0, footprint: [6, 4] },
+    { id: "coldbrace_house_5", name: "Warden's House", prefab: "townhouse", position: [-178, -70], rotationY: 0, footprint: [6, 4] },
     { id: "coldbrace_house_6", name: "Rope House", prefab: "cottage", position: [-178, -78], rotationY: Math.PI, footprint: [6, 4] },
     // The back lane behind the market row.
     { id: "coldbrace_house_7", name: "Old Surveyor's House", prefab: "cottage", position: [-180, -85], rotationY: Math.PI, footprint: [6, 4] },
@@ -191,7 +191,7 @@ export const COLDBRACE: SettlementDef = {
     { id: "coldbrace_wall_w", name: "West Wall", from: [-186, -56], to: [-186, -108], openings: [{ at: 16, width: 8 }] },
   ],
 
-  // 216 tiles of `floor_cobble`. Cobble because Coldbrace is the oldest and plainest of the three
+  // 238 tiles of `floor_cobble`. Cobble because Coldbrace is the oldest and plainest of the three
   // and lays what the river plain gives it; the quarry town pays for brick and the logging town
   // decks in plank. Every bound is an even metre, so the tiles - whose centres sit on the
   // half-module lattice anchored at the world origin - meet across rect boundaries with no half
@@ -204,13 +204,13 @@ export const COLDBRACE: SettlementDef = {
     // the forge mouth at x = -148. 65 tiles.
     { id: "coldbrace_pave_yard", rect: { minX: -174, minZ: -96, maxX: -148, maxZ: -86 }, assetId: "floor_cobble" },
     // The gate street, from under the south arch to the yard. This is the first pavement a new
-    // player ever walks on. 36 tiles.
-    { id: "coldbrace_pave_gate_street", rect: { minX: -166, minZ: -108, maxX: -154, maxZ: -96 }, assetId: "floor_cobble" },
-    // The pit road out of the east gate. 14 tiles.
-    { id: "coldbrace_pave_east_street", rect: { minX: -148, minZ: -82, maxX: -134, maxZ: -78 }, assetId: "floor_cobble" },
+    // player ever walks on. Four metres continue outside the wall as a proper threshold. 48 tiles.
+    { id: "coldbrace_pave_gate_street", rect: { minX: -166, minZ: -112, maxX: -154, maxZ: -96 }, assetId: "floor_cobble" },
+    // The pit road out of the east gate, including its four-metre outer apron. 18 tiles.
+    { id: "coldbrace_pave_east_street", rect: { minX: -148, minZ: -82, maxX: -130, maxZ: -78 }, assetId: "floor_cobble" },
     // The copse track out of the west gate, between houses 5 and 6. Its north row follows the
-    // recentered passage while its south rows retain both houses' doorstep approach. 24 tiles.
-    { id: "coldbrace_pave_west_street", rect: { minX: -186, minZ: -76, maxX: -170, maxZ: -70 }, assetId: "floor_cobble" },
+    // recentered passage while its south rows retain both houses' doorstep approach. 30 tiles.
+    { id: "coldbrace_pave_west_street", rect: { minX: -190, minZ: -76, maxX: -170, maxZ: -70 }, assetId: "floor_cobble" },
   ],
 
   stations: [
@@ -219,9 +219,8 @@ export const COLDBRACE: SettlementDef = {
     // therefore blocks 1.4 m of floor. The first arrangement of this forge put the anvil mid-floor
     // and `getNavPath` to the furnace came back NULL and to the anvil stopped 3.17 m short - the
     // two stations plus the whetstone had sealed their own doorway. Measured now: the forge's
-    // three collision boxes leave an interior of x [-148,-143.6] by z [-88.4,-83.6], the two
-    // stations occupy x >= -145.4, and the free floor in front of them is 2.16 x 3.90 m after
-    // erosion, connected to the yard by the whole 3.9 m eroded mouth. A player at (-146.4,-85.6)
+    // three collision boxes leave both stations against the back wall, with the front half clear
+    // after erosion and connected to the yard through the open mouth. A player at (-146.4,-85.6)
     // is 1.89 m from the anvil and 2.28 m from the furnace, both inside `INTERACT_RANGE` 2.4 m.
     // gate-check's smithing line and Cold Iron stages 2 and 3 walk `moveTo({ entityId })` to these
     // two ids, so this is load-bearing and is verified by
@@ -251,11 +250,14 @@ export const COLDBRACE: SettlementDef = {
 
   shops: [
     // Under the market row's canopy, 0.22 m off its back wall.
-    { id: "coldbrace_general", name: "Coldbrace General Supplies", shopKind: "general", position: [-171, -81], rotationY: Math.PI / 2, assetId: "market_stall", attachedTo: "coldbrace_market" },
-    // 2.6 m off the forge's south-west corner. `market_stall_cart` is 3.02 x 1.06 m and grows to
+    // market_stall's counter opens along local -Z, opposite the arcade prefab's +Z mouth. This
+    // quarter turn presents the counter and goods east toward the square instead of its rear roof.
+    { id: "coldbrace_general", name: "Coldbrace General Supplies", shopKind: "general", position: [-171, -81], rotationY: -Math.PI / 2, assetId: "market_stall", attachedTo: "coldbrace_market" },
+    // Clear of the forge's south-west corner. `market_stall_cart` is 3.02 x 1.06 m and grows to
     // 3.92 x 1.96 m once the navmesh erodes around it, so parked square in the mouth it walls the
-    // forge off; parked here it leaves a 3.19 m eroded corridor into the opening.
-    { id: "coldbrace_smith", name: "Harrow's Metal", shopKind: "smith", position: [-150.6, -89.2], rotationY: -Math.PI / 2, assetId: "market_stall_cart", attachedTo: "coldbrace_forge_shed" },
+    // forge off; parked here it leaves a wide eroded corridor into the opening while remaining
+    // within the forge's attachment margin.
+    { id: "coldbrace_smith", name: "Harrow's Metal", shopKind: "smith", position: [-150.4, -89.2], rotationY: -Math.PI / 2, assetId: "market_stall_cart", attachedTo: "coldbrace_forge_shed" },
   ],
 
   // Every one of these stands on a doorstep, at a counter or at a work face now, looking at
@@ -292,7 +294,7 @@ export const COLDBRACE: SettlementDef = {
     { id: "coldbrace_prop_bench_n", assetId: "bench", position: [-156, -74.5], rotationY: 0 },
     { id: "coldbrace_prop_bench_s", assetId: "bench", position: [-156, -84.5], rotationY: Math.PI },
     { id: "coldbrace_prop_bench_w", assetId: "bench", position: [-166, -74.5], rotationY: 0 },
-    { id: "coldbrace_prop_flowers", assetId: "flower_a_group", position: [-165, -83], rotationY: 0.4 },
+    { id: "coldbrace_prop_flowers", assetId: "flower_a_group", position: [-165, -83], rotationY: 0.4, scale: 0.35 },
 
     // ---- Under the market row: what a general store in a farming village actually sells.
     { id: "coldbrace_prop_market_apples", assetId: "barrel_apples", position: [-170.6, -78.4], rotationY: 0.3, solid: true },
@@ -317,8 +319,6 @@ export const COLDBRACE: SettlementDef = {
     // south end and the chest is what stops either of them boxing the other in.
     { id: "coldbrace_prop_bank_counter", assetId: "table_large", position: [-163.6, -87.8], rotationY: Math.PI / 2, solid: true },
     { id: "coldbrace_prop_bank_lamp", assetId: "lamp_wall", position: [-164.2, -89], rotationY: Math.PI / 2, dy: 1.4 },
-    { id: "coldbrace_prop_vault_banner", assetId: "banner_1", position: [-164.85, -91.4], rotationY: Math.PI / 2, dy: 2.8 },
-
     // ---- The vault forecourt, clear of the landmark's kerbed approach at z = -95.2.
     { id: "coldbrace_prop_vault_bench", assetId: "bench", position: [-172, -92], rotationY: Math.PI / 2 },
     { id: "coldbrace_prop_vault_crate", assetId: "crate_village", position: [-164.8, -95.6], rotationY: 0.7, solid: true },

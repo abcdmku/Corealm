@@ -17,6 +17,8 @@ export interface CameraShot {
   id: string;
   /** Route-node id to stand at. Resolved through the navmesh so the pose lands on walkable ground. */
   locationId: string;
+  /** Optional authored inspection point when the subject deliberately sits off the route shoulder. */
+  position?: readonly [x: number, z: number];
   regionId: RegionId;
   /** Camera yaw in radians. 0 looks toward +z; increases clockwise seen from above. */
   yaw: number;
@@ -130,6 +132,47 @@ export const SHOTS: readonly CameraShot[] = [
     id: "march_road", locationId: "north_milestone", regionId: "fallowmarch",
     yaw: SOUTH, pitch: 0.44, distance: 24,
     intent: "The road as a travel affordance: it should be obvious which way leads to town.",
+  },
+  {
+    id: "region_gate", locationId: "fallowmarch_north_gate", regionId: "fallowmarch",
+    yaw: EAST, pitch: 0.48, distance: 18,
+    intent: "A region boundary gate with a readable arch, threshold, and road through it.",
+  },
+  {
+    id: "west_track", locationId: "west_track", regionId: "fallowmarch",
+    position: [-233, -64],
+    yaw: 1.8, pitch: 0.5, distance: 15,
+    intent: "The West Track waypost beside the three-way road.",
+  },
+  {
+    id: "mire_skirt", locationId: "mire_skirt", regionId: "vellenwood",
+    position: [0, 124],
+    yaw: EAST, pitch: 0.5, distance: 16,
+    intent: "The Mire Skirt trailhead on the dry shoulder beside the standing water.",
+  },
+  {
+    id: "lower_quarry_waystone", locationId: "karrowmoor_terraces", regionId: "karrowmoor",
+    // Stand just beyond the cairn from the camera so the marker, rather than the avatar, owns
+    // the centre of the inspection frame.
+    position: [73.7, -10.2],
+    yaw: 1.5, pitch: 0.48, distance: 16,
+    intent: "The Lower Quarry waystone marking the split toward Highcairn and the Gravelmaw.",
+  },
+  {
+    id: "root_tunnel", locationId: "rootfall_hamlet", regionId: "vellenwood",
+    // Inspect from the open trail side. The arch is nearly symmetric front-to-back, while this
+    // target keeps the camera clear of the postern and lets the complete structure stay in frame.
+    position: [89, 136.5],
+    yaw: EAST, pitch: 0.4, distance: 16,
+    intent: "The Root Tunnel entrance, with its arch and root bracing at the trail split.",
+  },
+  {
+    id: "canopy_walk", locationId: "rootfall_hamlet", regionId: "vellenwood",
+    // Stay outside the west wall on the approach from its gate, with the trailhead beyond the
+    // player rather than between the camera and its collision target.
+    position: [40.5, 134.8],
+    yaw: 3.1, pitch: 0.36, distance: 15,
+    intent: "The Canopy Walk trailhead, with its raised balcony and clear approach.",
   },
 ];
 

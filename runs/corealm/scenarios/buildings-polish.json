@@ -1,0 +1,28 @@
+{
+  "name": "buildings-polish-acceptance",
+  "actions": [
+    { "waitMs": 1500, "label": "settle after boot" },
+    { "inspect": "getNavigationState", "label": "navigation ready before camera moves" },
+
+    { "debug": "setCameraPreset", "args": ["town_center"], "label": "view Coldbrace" },
+    { "waitMs": 500, "label": "settle Coldbrace" },
+    { "debug": "getDrawnBounds", "args": ["coldbrace_house_5#roof"], "label": "Coldbrace Warden townhouse roof" },
+    { "screenshot": "buildings-polish-coldbrace", "label": "Coldbrace structure pass" },
+
+    { "debug": "setCameraPreset", "args": ["rootfall"], "label": "view Rootfall" },
+    { "waitMs": 500, "label": "settle Rootfall" },
+    { "debug": "getDrawnBounds", "args": ["rootfall_house_7#roof"], "label": "Rootfall Warden townhouse roof" },
+    { "screenshot": "buildings-polish-rootfall", "label": "Rootfall structure pass" },
+
+    { "debug": "setCameraPreset", "args": ["highcairn"], "label": "view Highcairn" },
+    { "waitMs": 500, "label": "settle Highcairn" },
+    { "debug": "getDrawnBounds", "args": ["highcairn_hut_4#spire"], "label": "Highcairn watch tower" },
+    { "screenshot": "buildings-polish-highcairn", "label": "Highcairn structure pass" },
+
+    { "debug": "setCameraPreset", "args": ["marchfield_farm"], "label": "view Marchfield farm" },
+    { "waitMs": 500, "label": "settle Marchfield" },
+    { "debug": "getDrawnBounds", "args": ["marchfield_farmstead#barn_roof"], "label": "Marchfield barn roof" },
+    { "inspect": "getEntityViewStats", "label": "final structure render stats" },
+    { "screenshot": "buildings-polish-marchfield", "label": "Marchfield farm structure pass" }
+  ]
+}

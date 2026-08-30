@@ -267,8 +267,8 @@ export interface NpcStandDef {
 /**
  * A gap in a wall run: a gate, a postern, a collapsed span.
  *
- * `at` is metres along the run measured from `from`, at the CENTRE of the gap. `width` is the full
- * clear span, so a gate authored as `{ at: 26, width: 8 }` on a 52 m run leaves the wall standing
+ * `at` is metres along the run measured from `from`, at the CENTRE of the gap. `width` is the wall
+ * cutout occupied by the whole gate structure, so `{ at: 26, width: 8 }` on a 52 m run leaves wall
  * from 0-22 m and 30-52 m. Author the opening's centre at the gatehouse's own position projected
  * onto the run, and its width at the gatehouse footprint's width, or the arch and the hole in the
  * wall will not line up.
@@ -276,7 +276,7 @@ export interface NpcStandDef {
 export interface WallOpeningDef {
   /** Metres along the run from `from`, at the centre of the gap. */
   at: number;
-  /** Full clear span in metres. Rounds outward to whole 2 m modules; there is no half panel. */
+  /** Full wall cutout in metres. Rounds outward to whole 2 m modules; there is no half panel. */
   width: number;
 }
 
@@ -481,6 +481,8 @@ export interface ObstacleDef {
   /** Measured: the walking route this replaces, minus the walking the shortcut still costs. */
   savesMeters: number;
   assetId: string;
+  /** Regional architectural dressing around the semantic traversal anchor. */
+  composition?: CompositionId;
   scale?: number;
   rotationY?: number;
   fromLocationId: string;
@@ -910,6 +912,15 @@ const FALLOWMARCH: RegionDef = {
       blurb: "Snapped off at the knee. Whatever it counted down to, nobody here has been there.",
     },
     {
+      // Five metres off the three-way junction, facing the road back to Coldbrace. The compact
+      // marker stays about 3.8 m from the nearest stamped lane centre, close enough to read as a
+      // shoulder waypost without putting its post in the 3.2 m cart track.
+      id: "west_track", name: "West Track Waypost", position: [-233, -64],
+      assetId: "corner_wood", scale: 0.9, rotationY: 1.8,
+      composition: "path_waypoint",
+      blurb: "Three weathered arms: Coldbrace, Palewood, and the Open March.",
+    },
+    {
       id: "lone_dead_palewood", name: "The Lone Palewood", position: [-196, 24],
       assetId: "tree_dead_3", scale: 0.85,
       blurb: "One dead Palewood at the top of the rise. Every direction from here looks the same.",
@@ -1050,7 +1061,10 @@ const VELLENWOOD: RegionDef = {
       id: "canopy_walk", name: "Canopy Walk", reqLevel: 6,
       position: [40, 138], exitPosition: [24, 172],
       durationMs: 4000, savesMeters: 78,
-      assetId: "balcony_straight", scale: 1.4,
+      // The straight line to Rootfall crosses its west wall, so face the stair down the actual
+      // approach from the west gate at (44,124): obstacle -> gate is (+4,-14), bearing 2.86.
+      // A stair hero reads as an actual climb start; the former balcony hero was a loose fence.
+      assetId: "stairs_exterior", composition: "canopy_walk_entrance", scale: 1.4, rotationY: 2.86,
       fromLocationId: "rootfall_hamlet", toLocationId: "vellenwood_canopy",
       interaction: "climb",
     },
@@ -1069,11 +1083,14 @@ const VELLENWOOD: RegionDef = {
     },
     {
       // Rootfall -> Thornline on foot goes round the gorge head: 84.4 + 100.3 = 184.7 m.
-      // Through the roots: 21.3 + 8.2 = 29.5 m + 3.5 s. Saves 155.2 m. PRD quoted 110 m.
+      // The entrance now stands outside the Hollowcut Postern instead of being pinched between
+      // the forge, townhouse and gate. Through the roots: 31.6 + 8.2 = 39.8 m + 3.5 s, saving
+      // about 145 m while giving the authored arch an unobstructed approach.
       id: "root_tunnel", name: "Root Tunnel", reqLevel: 8,
-      position: [76, 134], exitPosition: [188, 154],
-      durationMs: 3500, savesMeters: 155,
-      assetId: "wall_arch", scale: 1.2, rotationY: 0.6,
+      position: [86, 138], exitPosition: [188, 154],
+      durationMs: 3500, savesMeters: 145,
+      // Local +Z faces west through the postern, the direction players actually approach from.
+      assetId: "wall_arch", composition: "root_tunnel_entrance", scale: 1.2, rotationY: -Math.PI / 2,
       fromLocationId: "rootfall_hamlet", toLocationId: "thornline_camp",
       interaction: "enter",
     },
@@ -1152,6 +1169,15 @@ const VELLENWOOD: RegionDef = {
       id: "split_duskoak", name: "The Split Duskoak", position: [170, 112],
       assetId: "tree_twisted_2", scale: 0.8, rotationY: 1.1,
       blurb: "Split top to root by something, a long time ago. It is still alive on one side.",
+    },
+    {
+      // The dry wedge between the east-west trail and the canopy branch. Both stamped lane
+      // centrelines stay about four metres away, so the marker reads as the junction's shoulder
+      // without blocking either route.
+      id: "mire_skirt", name: "Mire Skirt Trailhead", position: [0, 124],
+      assetId: "corner_wood", scale: 1.0, rotationY: Math.PI / 2,
+      composition: "path_waypoint",
+      blurb: "A moss-dark trail marker where the dry path skirts the standing water.",
     },
     {
       id: "thornline_stones", name: "The Thornline Stones", position: [206, 168],
@@ -1405,6 +1431,22 @@ const KARROWMOOR: RegionDef = {
 
   landmarks: [
     {
+      // North shoulder of the long Moor Road descent, 4.5 m from its centreline and outside the
+      // Kaldite cluster. A slate post over a cairn foot now reads as part of the quarry arrival.
+      id: "lower_quarry_waystone", name: "Lower Quarry Waystone", position: [76, -10],
+      assetId: "corner_brick", scale: 0.85, rotationY: 1.5,
+      composition: "path_waypoint",
+      blurb: "A quarry cairn marking the split between Highcairn and the Gravelmaw road.",
+    },
+    {
+      // Southwest shoulder of the upper-ramp junction. The actual route node remains at
+      // (118,-138); this marker is offset far enough that its side cairns cannot pinch either leg.
+      id: "karrow_ramp_three", name: "Third Ramp Waystone", position: [110, -146],
+      assetId: "corner_brick", scale: 0.78, rotationY: Math.PI / 4,
+      composition: "path_waypoint",
+      blurb: "A low slate marker at the last sheltered turn before the upper moor.",
+    },
+    {
       id: "highcairn_crane", name: "The Highcairn Crane", position: [156, -64],
       // No crane mesh. Round 1 used `support_beam` at 3x, which floats: that asset's pivot is
       // 1.211 m BELOW the post, so a 3x copy started 3.6 m in the air. `corner_wood` is the only
@@ -1441,11 +1483,11 @@ const KARROWMOOR: RegionDef = {
     name: "The Gravelmaw",
     tier: 10,
     entrance: [46, -24],
-    // `wall_arch` is 2 x 3 m. At 3x it fits inside the dressed rock face; the composition, rather
-    // than a bare timber-coloured panel protruding above it, carries the twelve-metre silhouette.
+    // `wall_brick_door` is a real masonry arch module. At 3x it fits inside the dressed rock face;
+    // the surrounding quarry composition carries the broader twelve-metre silhouette.
     // Round 1 drew it unrotated and unaccompanied, which is why it read as a wooden door frame on
     // open ground. It now faces the approach from the Lower Quarry (60,-16): atan2(14,8) = 1.05.
-    entranceAssetId: "wall_arch",
+    entranceAssetId: "wall_brick_door",
     entranceRotationY: 1.05,
     entranceScale: 3,
     entranceComposition: "gravelmaw_mouth",
@@ -1706,6 +1748,12 @@ export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
         problems.push(`${region.id}: obstacle ${obstacle.id} ends at unknown location ${obstacle.toLocationId}`);
       }
       if (obstacle.durationMs <= 0) problems.push(`${region.id}: obstacle ${obstacle.id} has no duration`);
+      if (obstacle.composition !== undefined && !isCompositionId(obstacle.composition)) {
+        problems.push(
+          `${region.id}: obstacle ${obstacle.id} names unknown composition ` +
+          `"${String(obstacle.composition)}"`,
+        );
+      }
     }
 
     for (const gate of region.gates) {
@@ -1911,6 +1959,12 @@ export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
           problems.push(`${dungeon.id}: obstacle ${obstacle.id} is wired to a location that does not exist`);
         }
         checkAsset(`${dungeon.id}: obstacle ${obstacle.id}`, obstacle.assetId);
+        if (obstacle.composition !== undefined && !isCompositionId(obstacle.composition)) {
+          problems.push(
+            `${dungeon.id}: obstacle ${obstacle.id} names unknown composition ` +
+            `"${String(obstacle.composition)}"`,
+          );
+        }
       }
       checkAsset(`${dungeon.id}: entrance`, dungeon.entranceAssetId);
       if (dungeon.entranceComposition !== undefined && !isCompositionId(dungeon.entranceComposition)) {

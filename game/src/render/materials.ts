@@ -193,7 +193,10 @@ export const ARCHITECTURE_PALETTES: Record<RegionId, ArchitecturePalette> = {
   },
   karrowmoor: {
     roof: 0x505861,
-    plaster: 0x97958c,
+    // The only available triangular gable face is authored as plaster. Keep it a half-step lighter
+    // than the quarry masonry, but in the same cool slate family so stone shells do not end in a
+    // pale foreign-looking triangle.
+    plaster: 0x777b7d,
     stone: 0x626a73,
     timber: 0x403d39,
     moss: 0x566047,
@@ -208,7 +211,7 @@ export const ARCHITECTURE_PALETTES: Record<RegionId, ArchitecturePalette> = {
 };
 
 /**
- * Resolves the kit's stable `MI_*` names to an architectural surface.
+ * Resolves stable source-material names to an architectural surface.
  *
  * Architecture variants append an `@architecture:*` suffix so the batch key can never merge two
  * region styles. Splitting before that suffix lets the same classifier serve source and derived
@@ -221,11 +224,44 @@ export function architectureMaterialRole(materialName: string): ArchitectureMate
     case "MI_Plaster": return "plaster";
     case "MI_Brick":
     case "MI_UnevenBrick":
-    case "MI_RockTrim": return "stone";
-    case "MI_WoodTrim": return "timber";
+    case "MI_RockTrim":
+    // Textured Stylized Nature rocks build the Gravelmaw, cairns and moor waypoints. Only the
+    // architecture carrier archetypes consume this role, so mineable ore nodes keep their normal
+    // tier treatment while built stone landmarks take on their region's slate or fieldstone hue.
+    case "Rock":
+    case "Rocks":
+    case "PathRocks": return "stone";
+    // The architecture kit splits its wood across three stable materials. Wall studs and roof
+    // braces use MI_WoodTrim, doors/windows/wagons use the weathered variant, and small built-in
+    // furniture such as benches, buckets and crates uses MI_Trim_Furniture. Treating only the
+    // first as architectural timber left every facade with orange doors and shutters against a
+    // region-tinted frame. Keeping the family together gives each settlement one wood language
+    // while preserving the grain, wear and roughness authored into each source material.
+    case "MI_WoodTrim":
+    case "MI_WoodTrim_Wear":
+    case "MI_Trim_Furniture": return "timber";
     case "MI_Vine": return "moss";
     default: return null;
   }
+}
+
+/**
+ * Correct a pair of misleading source-material labels before regional architecture tinting.
+ *
+ * `stairs_stone` ships its masonry in a primitive named `MI_WoodTrim`. Treating that label
+ * literally turns the dungeon stair into settlement timber. The exception belongs to the
+ * asset/material pair, not to the global role table, because genuine doors, windows, frames and
+ * furniture use the same material name and must continue to follow the local wood palette.
+ */
+export function architectureMaterialRoleForAsset(
+  assetId: string,
+  materialName: string,
+): ArchitectureMaterialRole | null {
+  const sourceName = materialName.split("@architecture:", 1)[0];
+  if (assetId === "stairs_stone" && sourceName === "MI_WoodTrim") {
+    return "stone";
+  }
+  return architectureMaterialRole(materialName);
 }
 
 /**

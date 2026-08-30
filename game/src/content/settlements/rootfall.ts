@@ -7,7 +7,7 @@
  *
  * Three coordinates here are load-bearing and are measured, not chosen. The bank chest at (60,128)
  * is 38.0 m from the Hollowcut Seam, which is the tier-5 half of the route-optimisation flip in
- * the DISTANCE LEDGER at the top of `regions.ts`. The Root Tunnel entrance at (76,134) and the
+ * the DISTANCE LEDGER at the top of `regions.ts`. The Root Tunnel entrance at (86,138) and the
  * Canopy Walk entrance at (40,138) are Agility obstacles authored in `regions.ts`; a building
  * footprint or a palisade module that swallows either one deletes a shortcut.
  *
@@ -29,7 +29,7 @@
  *   140 |#  SSS  aaa    HHH   fff #       S drying shed   a sawpit arcade
  *   138 |#  SSS  ,,,    HHH   fff #       H north house   f forge (mouth south)
  *   136 |#  ,,,  ,,,    HHH   fff #
- *   134 |#  111  ,,,          rrr #       1 Stumpside House   r Root Tunnel entrance
+ *   134 |#  111  ,,,              #       1 Stumpside House   r Root Tunnel is east of the postern
  *   132 |#  111  ,,,  ppp     777 #       p bank + trade counter under a porch
  *   130 |#  111  ,,,,,,,,,,   777 #       7 Warden's House
  *   128 |g  ,,,,,,,,,,,,,,,   777 #       , plank decking (green / yards / roads)
@@ -58,14 +58,15 @@
  * real per-axis figure. For the timber kit that is 0.786 x 0.757 m on a 6x4 cottage and
  * 1.029 x 0.205 m on the 4x4 shed. A 6x5 forge is the trap: `roofFit` scales uniformly off the
  * tighter of the two ratios, so a 6x5 plan on the 4x6 roof asset fits at 1.25 and draws a 9.47 m
- * roof — an eave of 1.733 m, which clipped the Root Tunnel arch's drawn AABB (x 74.99..77.01 at
- * scale 1.2, yaw 0.6) by 0.24 x 1.16 m. At 6x4 the forge takes the cottage's own fit and clears
- * the arch by 0.70 m. Measured across all 17 buildings, worst roof-to-roof interpenetration is
+ * roof — an eave of 1.733 m that previously clipped the old, inside-wall Root Tunnel placement.
+ * At 6x4 the forge takes the cottage's own fit and leaves a readable lane to the postern. Measured
+ * across all 17 buildings, worst roof-to-roof interpenetration is
  * now zero; the Canopy Walk platform at (40,138) clears the west palisade by 2.80 m.
  *
  * Gate openings are authored at the gatehouse footprint's own width, 8 m, so `wallRunModules` cuts
- * exactly four 2 m modules and the two piers of the [8,3] gatehouse fill the outer two slots. That
- * leaves the full `GATE_GAP_METRES` 4 m clear span the navmesh needs. 124 m of the 156 m circuit
+ * exactly four 2 m modules and the two piers of the [8,4] gatehouse fill the outer two slots. Its
+ * 4 m depth also keeps the return walls and decks on native 2 m modules. That leaves the full
+ * `GATE_GAP_METRES` 4 m clear span the navmesh needs. 124 m of the 156 m circuit
  * is built wall, all four corners are shared by two runs, and every opening carries either a
  * gatehouse or the postern the bank road leaves by. It was 0 m of wall on 140 m before.
  *
@@ -96,7 +97,7 @@ export const ROOTFALL: SettlementDef = {
    * height from the ground at `from`, would bury one end and float the other.
    *
    * The core covers x [38,82] z [94,146], which contains every wall corner (x 44/80, z 102/144)
-   * and all three gatehouse footprints (the Log Gate reaches z 145.5, the Cart Gate x 81.5). The
+   * and all four gatehouse footprints (the Log Gate reaches z 146, the Cart Gate x 82). The
    * rectangle is symmetric about the settlement centre while the circuit is not, so it levels
    * about 8 m of ground south of the south wall and 6 m west of the west wall that nothing stands
    * on; that is the price of one rectangle rather than two.
@@ -107,8 +108,9 @@ export const ROOTFALL: SettlementDef = {
     // ---- the ring, all doors facing in ------------------------------------------------------
     // Door world positions are the prefab's side-2 face: local -Z, so world facing is
     // rotationY + PI and the door lands 0.55 m off the footprint's centre line.
-    { id: "rootfall_house_1", name: "Stumpside House", prefab: "cottage", position: [49, 131], rotationY: -Math.PI / 2, footprint: [6, 4] },
-    { id: "rootfall_house_2", name: "Woodward's House", prefab: "cottage", position: [49, 117], rotationY: -Math.PI / 2, footprint: [6, 4] },
+    // One metre of breathing room keeps both eaves clear of the west gate crown and return wall.
+    { id: "rootfall_house_1", name: "Stumpside House", prefab: "cottage", position: [50, 131], rotationY: -Math.PI / 2, footprint: [6, 4] },
+    { id: "rootfall_house_2", name: "Woodward's House", prefab: "cottage", position: [50, 117], rotationY: -Math.PI / 2, footprint: [6, 4] },
     // Houses 3, 4 and 5 were rotationY 0 and showed the green a blank gable end. PI turns the door
     // north onto it.
     { id: "rootfall_house_3", name: "Trapper's House", prefab: "cottage", position: [52, 108], rotationY: Math.PI, footprint: [6, 4] },
@@ -117,11 +119,11 @@ export const ROOTFALL: SettlementDef = {
     // (z 108..112) rather than 3 m in front of it.
     { id: "rootfall_house_5", name: "Root House", prefab: "cottage", position: [72, 106], rotationY: Math.PI, footprint: [6, 4] },
     { id: "rootfall_house_6", name: "Seamer's House", prefab: "cottage", position: [72, 118], rotationY: Math.PI / 2, footprint: [6, 4] },
-    // Still clear of the Root Tunnel entrance at (76,134): its roof stops at z 131.79 and x 74.76,
-    // measured 1.52 m from the arch's drawn AABB.
-    { id: "rootfall_house_7", name: "Warden's House", prefab: "cottage", position: [72, 128], rotationY: Math.PI / 2, footprint: [6, 4] },
+    // Its roof stops at z 131.79 and x 74.76, clear of both the forge and postern approach.
+    { id: "rootfall_house_7", name: "Warden's House", prefab: "townhouse", position: [72, 128], rotationY: Math.PI / 2, footprint: [6, 4] },
     { id: "rootfall_house_8", name: "North House", prefab: "cottage", position: [61, 138], rotationY: 0, footprint: [6, 4] },
-    { id: "rootfall_shed", name: "Drying Shed", prefab: "shed", position: [46, 140], rotationY: 0, footprint: [4, 4] },
+    // The widened fitted roof stays 0.35 m inside the west palisade at this authored position.
+    { id: "rootfall_shed", name: "Drying Shed", prefab: "shed", position: [48, 140], rotationY: 0, footprint: [4, 4] },
 
     // ---- the open structures ----------------------------------------------------------------
     // These are the answer to "a random bank chest and anvil just tossed in the middle of town".
@@ -133,9 +135,8 @@ export const ROOTFALL: SettlementDef = {
     // 4.8 x 3.4 m interior open along z = 135.
     //
     // 6x4, not the diagnosis's 6x5. `roofFit` scales uniformly off the tighter of the two ratios,
-    // so a 6x5 plan on a 4x6 roof asset fits at 1.25 and draws a 9.47 m roof: an eave of 1.733 m,
-    // which clips the Root Tunnel arch's drawn AABB (x 74.99..77.01) by 0.24 m. At 6x4 the roof is
-    // the cottage's own fit and the eave is 0.786 m, which leaves 0.70 m of air.
+    // so a 6x5 plan on a 4x6 roof asset fits at 1.25 and draws a 9.47 m roof: an eave of 1.733 m
+    // into the postern lane. At 6x4 the roof is the cottage's own fit and the eave is 0.786 m.
     { id: "rootfall_forge", name: "Rootfall Forge", prefab: "forge", position: [70.5, 137], rotationY: Math.PI, footprint: [6, 4] },
     // Three covered bays over one back wall: the sawpit's work row. Back wall at z 138.5, canopy
     // out to z 136.5, and the only solid is the wall behind the benches.
@@ -155,16 +156,17 @@ export const ROOTFALL: SettlementDef = {
     // already has the stump, the counter, the cook shelter and two benches on it.
 
     // ---- the gates, standing in the wall openings --------------------------------------------
-    // [8,3] is the footprint `GATE_GAP_METRES` is sized for: two whole 2 m piers and a 4 m clear
-    // span. Authored at 6 m the span collapses to 2 m, which is what made all three of the old
-    // arches impassable.
-    { id: "rootfall_gate_west", name: "West Gate", prefab: "gatehouse", position: [44, 124], rotationY: -Math.PI / 2, footprint: [8, 3] },
-    { id: "rootfall_gate_east", name: "Cart Gate", prefab: "gatehouse", position: [80, 110], rotationY: Math.PI / 2, footprint: [8, 3] },
-    { id: "rootfall_gate_north", name: "Log Gate", prefab: "gatehouse", position: [74, 144], rotationY: 0, footprint: [8, 3] },
+    // [8,4] keeps the two 2 m piers and 4 m clear span that `GATE_GAP_METRES` is sized for. The
+    // 4 m depth also seats the return walls and decks on whole 2 m modules. Authored at 6 m wide,
+    // the span collapses to 2 m, which is what made all three of the old arches impassable.
+    { id: "rootfall_gate_west", name: "West Gate", prefab: "gatehouse", position: [44, 124], rotationY: -Math.PI / 2, footprint: [8, 4] },
+    { id: "rootfall_gate_east", name: "Cart Gate", prefab: "gatehouse", position: [80, 110], rotationY: Math.PI / 2, footprint: [8, 4] },
+    // Two metres west leaves a 0.70 m roof seam between this crown and the east-wall postern.
+    { id: "rootfall_gate_north", name: "Log Gate", prefab: "gatehouse", position: [72, 144], rotationY: 0, footprint: [8, 4] },
     // The bank -> Hollowcut road already crossed the east wall here, but the old 6 m opening was
-    // only a raw gap between two jambs. This full gatehouse retains a 4 m clear passage. Its west
-    // edge starts at x = 78.5, 1.49 m clear of the Root Tunnel arch's measured east edge at 77.01.
-    { id: "rootfall_postern", name: "Hollowcut Postern", prefab: "gatehouse", position: [80, 138], rotationY: Math.PI / 2, footprint: [8, 3] },
+    // only a raw gap between two jambs. This full gatehouse retains a 4 m clear passage, and the
+    // Root Tunnel now begins four metres beyond its east edge instead of occupying the inner lane.
+    { id: "rootfall_postern", name: "Hollowcut Postern", prefab: "gatehouse", position: [80, 138], rotationY: Math.PI / 2, footprint: [8, 4] },
   ],
 
   /**
@@ -177,7 +179,7 @@ export const ROOTFALL: SettlementDef = {
    */
   walls: [
     { id: "rootfall_wall_west", name: "West Palisade", from: [44, 102], to: [44, 144], openings: [{ at: 22, width: 8 }] },
-    { id: "rootfall_wall_north", name: "North Palisade", from: [44, 144], to: [80, 144], openings: [{ at: 30, width: 8 }] },
+    { id: "rootfall_wall_north", name: "North Palisade", from: [44, 144], to: [80, 144], openings: [{ at: 28, width: 8 }] },
     {
       id: "rootfall_wall_east", name: "East Palisade", from: [80, 144], to: [80, 102],
       // z 138 is the Hollowcut Postern and z 110 is the Cart Gate. Both use the gatehouse's full
@@ -190,8 +192,8 @@ export const ROOTFALL: SettlementDef = {
 
   /**
    * Plank decking, because this is a town that mills timber and has no stone. `floor_wood` is
-   * 2.00 x 0.02 x 2.00 and tiles the module grid with no authoring; the four rects below are 106
-   * tiles and one instanced group.
+   * 2.00 x 0.02 x 2.00 and tiles the module grid with no authoring; the six rects below are 125
+   * tiles in one instanced group. Every gate path continues four metres outside the palisade.
    *
    * The green is the only rect with a kerb: a kerb along a working cart road is a thing to trip
    * over, and it would read as a pavement in a place that has none.
@@ -200,12 +202,16 @@ export const ROOTFALL: SettlementDef = {
     { id: "rootfall_paving_green", rect: { minX: 52, minZ: 114, maxX: 68, maxZ: 128 }, assetId: "floor_wood", kerb: true },
     // Green -> Cart Gate. Meets the green along its whole z = 114 edge, and its last tile row lies
     // under the gate arch.
-    { id: "rootfall_paving_cart_road", rect: { minX: 60, minZ: 110, maxX: 80, maxZ: 114 }, assetId: "floor_wood" },
+    { id: "rootfall_paving_cart_road", rect: { minX: 60, minZ: 110, maxX: 84, maxZ: 114 }, assetId: "floor_wood" },
     // West Gate -> green. Threads between house_2 (z <= 120) and house_1 (z >= 128).
-    { id: "rootfall_paving_log_road", rect: { minX: 44, minZ: 122, maxX: 52, maxZ: 126 }, assetId: "floor_wood" },
+    { id: "rootfall_paving_log_road", rect: { minX: 40, minZ: 122, maxX: 52, maxZ: 126 }, assetId: "floor_wood" },
     // The sawpit's working yard, north off the green: timber comes in here and goes under the
     // arcade's canopy, whose front edge is at z 136.5.
     { id: "rootfall_paving_sawpit_yard", rect: { minX: 52, minZ: 128, maxX: 58, maxZ: 138 }, assetId: "floor_wood" },
+    // Two compact trailheads make the less-used wall openings read as deliberate entrances while
+    // leaving the centre of each four-metre gate corridor free of kerbs and props.
+    { id: "rootfall_paving_north_gate", rect: { minX: 70, minZ: 138, maxX: 74, maxZ: 148 }, assetId: "floor_wood" },
+    { id: "rootfall_paving_postern", rect: { minX: 76, minZ: 136, maxX: 84, maxZ: 140 }, assetId: "floor_wood" },
   ],
 
   stations: [
@@ -252,7 +258,8 @@ export const ROOTFALL: SettlementDef = {
     // canopy soffits at 2.68, so it fits under the roof rather than beside it.
     {
       id: "rootfall_general", name: "Rootfall Trade Post", shopKind: "general",
-      position: [62, 128.8], rotationY: Math.PI, assetId: "market_stall",
+      // The stall opens along local -Z; yaw zero faces its counter south toward the green.
+      position: [62, 128.8], rotationY: 0, assetId: "market_stall",
       attachedTo: "rootfall_counter",
     },
   ],
@@ -296,7 +303,7 @@ export const ROOTFALL: SettlementDef = {
     // ---- forge yard --------------------------------------------------------------------------
     { id: "rootfall_prop_whetstone", assetId: "whetstone", position: [67.6, 133.2], rotationY: 0.5, solid: true },
     { id: "rootfall_prop_forge_barrel_1", assetId: "barrel", position: [68.6, 132.2], rotationY: 0.3, solid: true },
-    // Under the forge's east eave (roof to x 74.29) and 0.6 m clear of the Root Tunnel arch.
+    // Under the forge's east eave (roof to x 74.29) and clear of the postern approach.
     { id: "rootfall_prop_forge_barrel_2", assetId: "barrel", position: [74.0, 136.2], rotationY: 1.1, solid: true },
     { id: "rootfall_prop_forge_crate", assetId: "crate_village", position: [73.0, 132.6], rotationY: 0.8, solid: true },
     { id: "rootfall_prop_forge_sack", assetId: "sack", position: [68.2, 131.6], rotationY: 2.1 },

@@ -67,11 +67,10 @@
  *
  * ROOF CLEARANCE. `ROOF_EAVE_METRES` in render/buildings.ts is 0.79, but that is measured off
  * `roof_tiles_4x6`. This kit roofs with `roof_tiles_6x8` (8.250 x 9.683 for a nominal 6 x 8 cover)
- * and `roofFit` scales it to `max(short/6, long/8)`, so the real overhang differs per prefab:
- * a [5,4] quarry_hut draws 6.33 x 5.39 of roof over 5 x 4, i.e. 0.67 / 0.70 per side, and the
- * [6,5] forge draws 8.07 x 6.88 over 6 x 5, i.e. 1.03 / 0.94. Every gap below is checked against
- * those ROOF rectangles rather than the footprints. The tightest pair in the settlement is the
- * Tool Hut's roof edge at x = 139.53 against the forge's at x = 139.97, which clears by 0.44 m.
+ * and `roofFit` scales it to `max(short/6, long/8)`. A [6,4] quarry_hut draws 7.12 x 6.07 of roof
+ * after its deliberate 0.98 tightening, while the [6,4] forge draws 7.26 x 6.19. Every gap below
+ * is checked against those ROOF rectangles rather than the footprints. The Tool Hut and forge
+ * retain about 0.61 m between their roof edges.
  */
 import type { SettlementDef } from "../regions.js";
 
@@ -88,8 +87,7 @@ export const HIGHCAIRN: SettlementDef = {
 
   // A 44 x 28 m rectangle, x [120,164] z [-75,-47]. Terrace two runs z [-76,-40], so the pad's
   // south edge stops 1 m short of the riser instead of a 35 m disc reaching 26 m past it. The
-  // gatehouses are the outermost things on it: the east one reaches x = 163.5, the postern
-  // x = 120.5.
+  // gatehouses are the outermost things on it: the east one reaches x = 164, the postern x = 120.
   padShape: { halfX: 22, halfZ: 14, rotationY: 0 },
 
   // A closed circuit, 132 m, of which 116 m is built wall (88%) and the two 8 m gaps are the two
@@ -119,25 +117,25 @@ export const HIGHCAIRN: SettlementDef = {
   ],
 
   buildings: [
-    // NORTH ROW. rotationY 0 puts the door leaf on -Z at (x + 0.55, z - 2.02), so all three open
-    // south onto the yard's north edge. Roofs are 6.33 m wide against a 9 m spacing.
-    { id: "highcairn_hut_1", name: "Crew Hut", prefab: "quarry_hut", position: [137, -52], rotationY: 0, footprint: [5, 4] },
-    { id: "highcairn_hut_3", name: "Store Hut", prefab: "quarry_hut", position: [146, -52], rotationY: 0, footprint: [5, 4] },
+    // NORTH ROW. rotationY 0 keeps all three entrances on local -Z, facing south onto the yard.
+    // The quarry hut, compact shed, and tower roofs clear one another at their 9 m spacing.
+    { id: "highcairn_hut_1", name: "Crew Hut", prefab: "quarry_hut", position: [137, -52], rotationY: 0, footprint: [6, 4] },
+    { id: "highcairn_hut_3", name: "Store Hut", prefab: "shed", position: [146, -52], rotationY: 0, footprint: [4, 4] },
     // Moved off the crane, whose jib reaches (156.89,-61.13) and whose barrel part lands at
     // (158.62,-63.97) — the hut used to stand at (156,-68), 2 m from it.
-    { id: "highcairn_hut_4", name: "Watch Hut", prefab: "quarry_hut", position: [155, -52], rotationY: 0, footprint: [5, 4] },
+    { id: "highcairn_hut_4", name: "Watch Hut", prefab: "tower", position: [155, -52], rotationY: 0, footprint: [4, 4] },
 
-    // SOUTH ROW. rotationY PI puts the door at (x - 0.55, z + 2.02), facing north across the yard.
-    // Roof rectangles reach z = -73.20 against a wall face at z = -73.75.
-    { id: "highcairn_hut_6", name: "Long Hut", prefab: "quarry_hut", position: [126, -70.5], rotationY: Math.PI, footprint: [5, 4] },
-    { id: "highcairn_hut_5", name: "Tool Hut", prefab: "quarry_hut", position: [136.2, -70.5], rotationY: Math.PI, footprint: [5, 4] },
+    // SOUTH ROW. rotationY PI turns each closed-building entrance north across the yard. The two
+    // quarry roofs reach z = -73.53 and the cottage reaches z = -73.60 against a wall at -73.75.
+    { id: "highcairn_hut_6", name: "Long Hut", prefab: "quarry_hut", position: [126, -70.5], rotationY: Math.PI, footprint: [6, 4] },
+    { id: "highcairn_hut_5", name: "Tool Hut", prefab: "quarry_hut", position: [136.2, -70.5], rotationY: Math.PI, footprint: [6, 4] },
     {
       // The forge's open face is LOCAL +Z, so rotationY 0 points the mouth NORTH at the yard. The
-      // mouth is `width - 1.2` = 4.8 m of clear opening at z = -67.5, which is 3.9 m after the
+      // mouth is `width - 1.2` = 4.8 m of clear opening at z = -68.0, which is 3.9 m after the
       // navmesh erodes 0.45 m a side — the anvil is genuinely walked up to, not reached through a
       // wall from 8 m away.
       id: "highcairn_forge", name: "Camp Forge", prefab: "forge",
-      position: [144, -70], rotationY: 0, footprint: [6, 5],
+      position: [144, -70], rotationY: 0, footprint: [6, 4],
     },
     {
       // Two bays of canopy on two posts over the bank chest, which stays at (150,-70). The porch
@@ -146,7 +144,7 @@ export const HIGHCAIRN: SettlementDef = {
       id: "highcairn_bank_porch", name: "Bank Counter", prefab: "porch",
       position: [150.8, -69.6], rotationY: 0, footprint: [4, 3],
     },
-    { id: "highcairn_hut_2", name: "Foreman's Hut", prefab: "quarry_hut", position: [157, -70.5], rotationY: Math.PI, footprint: [5, 4] },
+    { id: "highcairn_hut_2", name: "Foreman's Hut", prefab: "cottage", position: [157, -70.5], rotationY: Math.PI, footprint: [6, 4] },
 
     {
       // Three bays of covered row standing IN the yard rather than against a wall, which is what
@@ -161,39 +159,42 @@ export const HIGHCAIRN: SettlementDef = {
       position: [136.6, -63.4], rotationY: 0, footprint: [6, 3],
     },
 
-    // GATEHOUSES, both moved into their wall run's opening. [8,3] is what reaches the full
-    // GATE_GAP_METRES = 4 clear span; at the old [6,3] there was only room for one 2 m pier a side
-    // and a 2 m gap, of which 0.20 m survived navmesh erosion.
-    { id: "highcairn_gate", name: "Highcairn Gate", prefab: "gatehouse", position: [162, -58], rotationY: Math.PI / 2, footprint: [8, 3] },
-    { id: "highcairn_postern", name: "Quarry Postern", prefab: "gatehouse", position: [122, -58], rotationY: -Math.PI / 2, footprint: [8, 3] },
+    // GATEHOUSES, both moved into their wall run's opening. [8,4] reaches the full
+    // GATE_GAP_METRES = 4 clear span and gives the returns two native 2 m depth modules. At the
+    // old [6,3] there was only room for one 2 m pier a side and a 2 m gap, of which 0.20 m survived
+    // navmesh erosion.
+    { id: "highcairn_gate", name: "Highcairn Gate", prefab: "gatehouse", position: [162, -58], rotationY: Math.PI / 2, footprint: [8, 4] },
+    { id: "highcairn_postern", name: "Quarry Postern", prefab: "gatehouse", position: [122, -58], rotationY: -Math.PI / 2, footprint: [8, 4] },
   ],
 
   // floor_brick, because the quarry town paves in its own stone, and because the farm plot beds
   // already emit floor_brick at this tier — the whole yard is therefore zero new instanced groups.
   // No `kerb`: `emitPaving` rings the entire rect, and every edge of this yard is either a hut
-  // doorstep at z = -54.02, the forge mouth at z = -67.5, or a gate road. A 13 cm lip across any of
+  // doorstep at z = -54.02, the forge mouth at z = -68.0, or a gate road. A 13 cm lip across any of
   // those is a snag and reads as a mistake, so the yard's edge is drawn by what stands on it.
   paving: [
     { id: "highcairn_yard", rect: { minX: 134, minZ: -70, maxX: 156, maxZ: -54 }, assetId: "floor_brick" },
-    { id: "highcairn_gate_road", rect: { minX: 156, minZ: -60, maxX: 162, maxZ: -56 }, assetId: "floor_brick" },
-    // Three tiles only. Anything longer would be laid on top of the farm plot beds, which are
-    // themselves floor_brick at the same height: plot 1 is at (129.76,-57.82) with a 2 m rail ring.
+    { id: "highcairn_gate_road", rect: { minX: 156, minZ: -60, maxX: 166, maxZ: -56 }, assetId: "floor_brick" },
+    // Three inner tiles only. Anything farther east would be laid on top of the farm plot beds,
+    // which are themselves floor_brick at the same height: plot 1 is at (129.76,-57.82) with a
+    // 2 m rail ring. A separate four-tile apron continues west outside the wall.
     { id: "highcairn_postern_apron", rect: { minX: 122, minZ: -60, maxX: 128, maxZ: -58 }, assetId: "floor_brick" },
+    { id: "highcairn_postern_outer_apron", rect: { minX: 118, minZ: -60, maxX: 122, maxZ: -56 }, assetId: "floor_brick" },
   ],
 
   stations: [
     {
       // Inside the forge, against the west wall. cauldron at 2.0 draws 1.98 x 1.89, and the forge's
-      // interior after its three 0.6 m collision walls is x [141.6,146.4] z [-71.9,-67.5].
+      // interior after its three 0.6 m collision walls is x [141.6,146.4] z [-71.4,-68.0].
       id: "highcairn_furnace", name: "Highcairn Furnace", kind: "furnace", skill: "smithing",
-      position: [142.7, -70.6], rotationY: 0, assetId: "cauldron", recipeIds: [],
+      position: [142.7, -70.6], rotationY: 0, assetId: "cauldron", scale: 2, recipeIds: [],
       attachedTo: "highcairn_forge",
     },
     {
-      // In the mouth, 1.7 m inside the open face, so the player walks in and stands at it. anvil at
+      // In the mouth, 1.2 m inside the open face, so the player walks in and stands at it. anvil at
       // 1.4 draws 1.52 x 0.56 and clears the furnace by 0.55 m.
       id: "highcairn_anvil", name: "Highcairn Anvil", kind: "anvil", skill: "smithing",
-      position: [145, -69.2], rotationY: 0, assetId: "anvil", recipeIds: [],
+      position: [145, -69.2], rotationY: 0, assetId: "anvil", scale: 1.4, recipeIds: [],
       attachedTo: "highcairn_forge",
     },
     {
@@ -218,11 +219,12 @@ export const HIGHCAIRN: SettlementDef = {
     {
       // Under the west bay of the covered row, facing the yard.
       id: "highcairn_general", name: "Highcairn Camp Store", shopKind: "general",
-      position: [135.9, -63.9], rotationY: 0, assetId: "market_stall",
+      // The stall's local -Z counter faces north into the yard at this half turn.
+      position: [135.9, -63.9], rotationY: Math.PI, assetId: "market_stall",
       attachedTo: "highcairn_market",
     },
     {
-      // In front of the forge, north of the roof line: the forge roof reaches z = -66.56 and the
+      // In front of the forge, north of the roof line: the forge roof reaches z = -66.90 and the
       // cart is 2.63 m tall, so it has to clear the eave rather than sit under it.
       id: "highcairn_smith", name: "Quarry Smith", shopKind: "smith",
       position: [148, -65.6], rotationY: 0, assetId: "market_stall_cart",
@@ -234,9 +236,8 @@ export const HIGHCAIRN: SettlementDef = {
   // these is `atan2(dx, dz)` toward the thing the NPC is actually attending to, so nobody stands
   // with their back to their own counter.
   npcs: [
-    // Under the porch on the chest's WEST side, looking across the counter. Not the east side:
-    // `porch()` hangs its banner_1 at local dx +0.25, which at this footprint puts 1.61 m of cloth
-    // across x [151.05,152.66] hanging down to y 0.85, i.e. through anyone standing there.
+    // Under the porch on the chest's west side, looking across the counter while leaving the
+    // customer approach and the projecting post-mounted banner clear.
     { id: "npc_foreman_arden", name: "Foreman Arden", position: [148.7, -70.3], facingRad: 0.92, assetId: "base_male", dialogueRootId: "arden_root", questIds: [] },
     // Inside the forge, on the anvil's east side, looking at it.
     { id: "npc_quarrier_vess", name: "Quarrier Vess", position: [145.8, -68.4], facingRad: -2.36, assetId: "base_female", dialogueRootId: "vess_root", questIds: [] },
@@ -262,11 +263,9 @@ export const HIGHCAIRN: SettlementDef = {
    * the same reason, so the dressing costs 13 new instanced groups rather than 19.
    */
   props: [
-    // --- The gate. Two sconces on the piers' INNER faces only. `gatehouse()` already hangs two
-    // banner_1 and two lamp_wall on its outward face, and the piers are 2 m across with a 0.53 m
-    // corner jamb at each end, so a 1.61 m banner cannot be fitted between them on the inner face
-    // without cutting into both jambs (measured, 0.20 x 0.23 m into each). The piers stand at
-    // z = -55 and z = -61 with the 4 m passage between them.
+    // --- The gate. Two sconces on the piers' inner faces only. The gatehouse owns its exterior
+    // projecting standards, so duplicating banners inside the passage would clutter the opening.
+    // The piers stand at z = -55 and z = -61 with the 4 m passage between them.
     { id: "highcairn_gate_torch_n", assetId: "torch", position: [160.4, -56.3], rotationY: -Math.PI / 2, scale: 2.2, dy: 1.8 },
     { id: "highcairn_gate_torch_s", assetId: "torch", position: [160.4, -59.7], rotationY: -Math.PI / 2, scale: 2.2, dy: 1.8 },
 

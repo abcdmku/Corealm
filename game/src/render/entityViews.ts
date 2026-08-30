@@ -85,7 +85,12 @@ import type { AssetRegistry } from "./assets.js";
 import type { WorldScene } from "./scene.js";
 import type { PaletteSwatch } from "./materials.js";
 import { Rng } from "../core/rng.js";
-import { architectureMaterialRole, MaterialLibrary, tierSilhouetteScale } from "./materials.js";
+import {
+  architectureMaterialRole,
+  architectureMaterialRoleForAsset,
+  MaterialLibrary,
+  tierSilhouetteScale,
+} from "./materials.js";
 import {
   assembleDressedCharacter,
   headCapHeightFor,
@@ -430,9 +435,15 @@ const TINTABLE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "
 
 /**
  * Architecture is emitted as scenery landmarks, while a gate's inspectable arch is a portal.
- * Material-name matching remains mandatory, so an ordinary rock landmark is left as authored.
+ * Material-name matching remains mandatory, so unrelated materials on the same archetypes retain
+ * their authored colour.
  */
-const ARCHITECTURE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["landmark", "portal"]);
+// Traversal structures and town fixtures are part of the same built vernacular as landmarks and
+// portals. Keeping them out of this set left Rootfall's timber arch, market counters and Canopy
+// Walk in raw orange wood while the walls, doors and roadside structures used the regional palette.
+const ARCHITECTURE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>([
+  "landmark", "portal", "obstacle", "bank", "shop", "station",
+]);
 
 /** Quantised per-building value shifts. Stored as instance colour, so they add no material buckets. */
 const ARCHITECTURE_VALUE_STEPS: readonly number[] = [0.96, 0.98, 1, 1.02, 1.04];
@@ -880,6 +891,8 @@ interface ViewRecord {
   /** Raised only while playAction tries to move this record to the front of the rig pool. */
   actionPriority: boolean;
   scale: number;
+  /** Per-axis shape correction authored on the semantic view, in asset-local coordinates. */
+  scaleAxes: readonly [number, number, number];
   /**
    * Per-entity dye lots, resolved once from the entity id. Null for anything not a character.
    *
@@ -1347,6 +1360,7 @@ export class EntityViews {
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
+    const scaleAxes = view.scaleAxes ?? NO_BUILD;
     const rotationY = view.rotationY ?? 0;
     const normal = view.groundNormal ?? null;
     const tilt = normal ? (view.tiltStrength ?? DEFAULT_TILT[entity.archetype] ?? 0) : 0;
@@ -1355,7 +1369,7 @@ export class EntityViews {
     // stops walking stops changing position, so a signature built from position alone would never
     // notice the stop and the walk pose would stick forever.
     const moving = this.updateMoving(entity);
-    const signature = `${groupKey}|${spent ? 1 : 0}|${moving ? 1 : 0}|${round(entity.position[0])},${round(entity.position[1])},${round(entity.position[2])}|${round(rotationY)}|${round(scale)}|${tiltKey(normal, tilt)}`;
+    const signature = `${groupKey}|${spent ? 1 : 0}|${moving ? 1 : 0}|${round(entity.position[0])},${round(entity.position[1])},${round(entity.position[2])}|${round(rotationY)}|${round(scale)}|${scaleAxes.map(round).join(",")}|${tiltKey(normal, tilt)}`;
 
     let existing = this.records.get(entity.id);
 
@@ -1389,12 +1403,15 @@ export class EntityViews {
     record.targetRotationY = rotationY;
     record.rotationY = rotationY;
     record.scale = scale;
+    record.scaleAxes = scaleAxes;
     record.spent = spent;
     record.normal = normal;
     record.tilt = tilt;
     record.labelHeight = view.labelHeight ?? 1.6;
     record.radius = Math.max(
-      this.minHighlightRadius, this.assetRadius(view.assetId) * scale * record.build[0]);
+      this.minHighlightRadius,
+      this.assetRadius(view.assetId) * scale * record.build[0] * Math.max(...scaleAxes),
+    );
 
     const group = this.groups.get(groupKey);
     if (!group) return;
@@ -1481,8 +1498,9 @@ export class EntityViews {
       movingTicks: 0,
       actionPriority: false,
       scale: 1,
+      scaleAxes: NO_BUILD,
       tints: tintsFor(entity.id, entity.archetype, character),
-      architectureValue: regionId ? architectureValueFor(entity.id) : 1,
+      architectureValue: regionId ? architectureValueFor(regionId) : 1,
       build: buildFor(entity.id, entity.archetype),
       spent: false,
       normal: null,
@@ -1961,7 +1979,7 @@ export class EntityViews {
       if (!base) return;
       parts.push({
         geometry: mesh.geometry,
-        material: this.variantFor(base, archetype, tier, regionId, spent),
+        material: this.variantFor(base, assetId, archetype, tier, regionId, spent),
         matrix: mesh.matrixWorld.clone(),
         triangles: triangleCount(mesh.geometry),
       });
@@ -2021,7 +2039,7 @@ export class EntityViews {
         if (!mesh.isMesh || !mesh.geometry) return;
         const base = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
         if (!base) return;
-        const material = this.variantFor(base, archetype, tier, regionId, spent);
+        const material = this.variantFor(base, assetId, archetype, tier, regionId, spent);
 
         if (skinned.isSkinnedMesh && skinned.skeleton) {
           const frozen = freezeSkin(skinned);
@@ -2190,13 +2208,14 @@ export class EntityViews {
   /** Which tier treatment a given source material on a given archetype gets. */
   private variantFor(
     base: THREE.Material,
+    assetId: string,
     archetype: Archetype,
     tier: number,
     regionId: RegionId | null,
     spent: boolean,
   ): THREE.Material {
     if (regionId && ARCHITECTURE_ARCHETYPES.has(archetype)) {
-      const architectureRole = architectureMaterialRole(base.name);
+      const architectureRole = architectureMaterialRoleForAsset(assetId, base.name);
       if (architectureRole) return this.materials.architecture(base, regionId, architectureRole);
     }
 
@@ -2300,7 +2319,7 @@ export class EntityViews {
         const mesh = child as THREE.Mesh;
         if (!mesh.isMesh || !mesh.geometry) return;
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-          if (material && architectureMaterialRole(material.name)) architecture = true;
+          if (material && architectureMaterialRoleForAsset(assetId, material.name)) architecture = true;
         }
       });
       this.architectureAssets.set(assetId, architecture);
@@ -2876,7 +2895,11 @@ export class EntityViews {
     const placement = SCRATCH_PLACEMENT.compose(
       record.position,
       orientation(record.rotationY, record.normal, record.tilt, SCRATCH_QUATERNION),
-      SCRATCH_SCALE.set(record.scale * build[0], record.scale * build[1], record.scale * build[2]),
+      SCRATCH_SCALE.set(
+        record.scale * build[0] * record.scaleAxes[0],
+        record.scale * build[1] * record.scaleAxes[1],
+        record.scale * build[2] * record.scaleAxes[2],
+      ),
     );
     const transform = SCRATCH_TRANSFORM;
 
@@ -2997,7 +3020,9 @@ export class EntityViews {
     );
     const build = record.build;
     record.unique.scale.set(
-      record.scale * build[0], record.scale * build[1], record.scale * build[2],
+      record.scale * build[0] * record.scaleAxes[0],
+      record.scale * build[1] * record.scaleAxes[1],
+      record.scale * build[2] * record.scaleAxes[2],
     );
   }
 
@@ -3565,10 +3590,9 @@ function pickFrom<T>(values: readonly T[], seed: string): T {
   return picked ?? values[0]!;
 }
 
-/** One coherent value shift for every modular entity emitted under the same building id. */
-function architectureValueFor(entityId: EntityId): number {
-  const parentId = entityId.split("#", 1)[0] ?? entityId;
-  return pickFrom(ARCHITECTURE_VALUE_STEPS, `architectureValue:${parentId}`);
+/** One coherent value shift for every built surface in a region, so a town reads as one kit. */
+function architectureValueFor(regionId: RegionId): number {
+  return pickFrom(ARCHITECTURE_VALUE_STEPS, `architectureValue:${regionId}`);
 }
 
 /** Deterministic coin flip at probability `p`, from a seed string. */

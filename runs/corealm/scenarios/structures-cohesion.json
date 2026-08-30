@@ -1,0 +1,55 @@
+{
+  "name": "structures-cohesion-acceptance",
+  "actions": [
+    { "waitMs": 1500, "label": "settle after boot" },
+    { "inspect": "getNavigationState", "label": "navigation ready" },
+
+    { "debug": "setCameraPreset", "args": ["town_entrance"], "label": "view Coldbrace south gate" },
+    { "waitMs": 500, "label": "settle town gate" },
+    { "debug": "getDrawnBounds", "args": ["coldbrace_gate_south#pennant_left"], "label": "front pennant visible" },
+    { "debug": "getDrawnBounds", "args": ["coldbrace_gate_south#pennant_back"], "label": "rear pennant visible" },
+    { "screenshot": "cohesion-town-gate", "label": "gate, wall returns and apron" },
+
+    { "debug": "setCameraPreset", "args": ["rootfall"], "label": "view Rootfall palette" },
+    { "waitMs": 500, "label": "settle Rootfall" },
+    { "screenshot": "cohesion-rootfall", "label": "timber town palette and wall rhythm" },
+
+    { "debug": "setCameraPreset", "args": ["highcairn"], "label": "view Highcairn palette" },
+    { "waitMs": 500, "label": "settle Highcairn" },
+    { "screenshot": "cohesion-highcairn", "label": "stone town palette and gable seams" },
+
+    { "debug": "setCameraPreset", "args": ["region_gate"], "label": "view regional boundary gate" },
+    { "waitMs": 500, "label": "settle regional gate" },
+    { "debug": "getDrawnBounds", "args": ["fallowmarch_north_gate#wing_left"], "label": "regional gate wing" },
+    { "screenshot": "cohesion-region-gate", "label": "regional town gate treatment" },
+
+    { "debug": "setCameraPreset", "args": ["west_track"], "label": "view March waypost" },
+    { "waitMs": 500, "label": "settle March waypost" },
+    { "debug": "getDrawnBounds", "args": ["west_track#wp_march_post"], "label": "March waypoint post" },
+    { "screenshot": "cohesion-west-track", "label": "March path waypoint" },
+
+    { "debug": "setCameraPreset", "args": ["mire_skirt"], "label": "view forest trailhead" },
+    { "waitMs": 500, "label": "settle forest trailhead" },
+    { "screenshot": "cohesion-mire-skirt", "label": "forest path waypoint" },
+
+    { "debug": "setCameraPreset", "args": ["lower_quarry_waystone"], "label": "view quarry waystone" },
+    { "waitMs": 500, "label": "settle quarry waystone" },
+    { "debug": "getDrawnBounds", "args": ["lower_quarry_waystone#wp_quarry_base_l"], "label": "grounded quarry cairn" },
+    { "screenshot": "cohesion-lower-quarry", "label": "quarry path waypoint" },
+
+    { "debug": "setCameraPreset", "args": ["root_tunnel"], "label": "view Root Tunnel" },
+    { "waitMs": 500, "label": "settle Root Tunnel" },
+    { "screenshot": "cohesion-root-tunnel", "label": "root and timber shortcut entrance" },
+
+    { "debug": "setCameraPreset", "args": ["canopy_walk"], "label": "view Canopy Walk" },
+    { "waitMs": 500, "label": "settle Canopy Walk" },
+    { "screenshot": "cohesion-canopy-walk", "label": "canopy shortcut trailhead" },
+
+    { "debug": "setCameraPreset", "args": ["gravelmaw_entrance"], "label": "view Gravelmaw entrance" },
+    { "waitMs": 500, "label": "settle Gravelmaw" },
+    { "debug": "getDrawnBounds", "args": ["gravelmaw_mouth_portal#masonry_l"], "label": "Gravelmaw masonry jaw" },
+    { "inspect": "getEntityViewStats", "label": "final structure render stats" },
+    { "inspect": "getErrors", "label": "runtime error check" },
+    { "screenshot": "cohesion-gravelmaw", "label": "dungeon entrance silhouette" }
+  ]
+}

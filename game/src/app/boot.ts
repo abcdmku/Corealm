@@ -249,14 +249,21 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   const gravelmawMouth = built.entities.find((entity) => entity.id === "gravelmaw_mouth_portal");
   if (gravelmawMouth) {
     const yaw = gravelmawMouth.view?.rotationY ?? 0;
+    const scale = gravelmawMouth.view?.scale ?? 3;
+    // Cover the complete 72%-wide arch aperture. The former fixed 3.35 m plane was narrower than
+    // the 4.32 m opening at scale three, so its straight vertical edges showed inside the curved
+    // reveal and the dungeon read as a black rectangular card. Oversizing it behind the masonry
+    // lets the arch itself mask the darkness into the intended wound shape.
+    const shadowWidth = scale * 1.52;
+    const shadowHeight = scale * 2.3;
     const backdrop = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.35, 6.9),
+      new THREE.PlaneGeometry(shadowWidth, shadowHeight),
       new THREE.MeshBasicMaterial({ color: 0x050709, toneMapped: false }),
     );
     backdrop.name = "gravelmaw-shadow-mouth";
     backdrop.position.set(
       gravelmawMouth.position[0] - Math.sin(yaw) * 0.18,
-      gravelmawMouth.position[1] + 3.45,
+      gravelmawMouth.position[1] + shadowHeight * 0.5,
       gravelmawMouth.position[2] - Math.cos(yaw) * 0.18,
     );
     backdrop.rotation.y = yaw;
@@ -1145,7 +1152,14 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       if (!shot) return false;
       const node = nav.routeNode(shot.locationId);
       if (!node) return false;
-      const landed = nav.closestPoint(node.position) ?? node.position;
+      const target = shot.position === undefined
+        ? node.position
+        : [
+          shot.position[0],
+          scene.heightAt(shot.regionId, shot.position[0], shot.position[1]) + 0.2,
+          shot.position[1],
+        ] as Vec3;
+      const landed = nav.closestPoint(target) ?? target;
       store.get().player.position = landed;
       store.get().player.regionId = scene.regionAt(landed[0], landed[2]);
       audioDirector.setRegion(store.get().player.regionId);

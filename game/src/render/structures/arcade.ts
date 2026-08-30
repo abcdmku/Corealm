@@ -1,0 +1,292 @@
+import type { PartPlacement } from "../buildings.js";
+import { wallMountedBanner } from "../bannerPlacement.js";
+import { inset, variantPart, withDetails } from "./parts.js";
+import type { StructureVariantContext, StructureVariantRecipe } from "./types.js";
+
+const CANOPY_DEPTH = 2;
+const BRACE_SCALE = 0.92;
+// overhang_brick's top is 0.058 m below its pivot; this height lines it up with the plaster canopy
+// top at 3.028 m when a combined plaster bay has to be split around a real aperture.
+const CANOPY_SLAB_Y = 3.086;
+const CANOPY_SLAB_FORWARD_SHIFT = 0.99;
+const BANNER_SCALE = 0.75;
+const BANNER_Y = 2.38;
+const BANNER_ASSET = "banner_1" as const;
+// Kit wall panels place their outward face 0.093 m past the authored back-wall anchor.  The
+// additional centimetre leaves the banner rail clear of the facade while its bracket projects
+// into the covered bay.
+const BANNER_WALL_FACE_OFFSET = 0.103;
+const WINDOW_INSERT_SCALE = 0.72;
+const WINDOW_INSERT_OUT = 0.03;
+const SHUTTER_SCALE = 0.72;
+const SHUTTER_OUT = 0.08;
+const SHUTTER_Y = 0.05;
+
+function frontPosts(base: readonly PartPlacement[]): PartPlacement[] {
+  return base
+    .filter((part) => /^post\d+$/.test(part.tag))
+    .sort((left, right) => left.dx - right.dx);
+}
+
+function bayCentres(base: readonly PartPlacement[]): number[] {
+  const posts = frontPosts(base);
+  return posts.slice(0, -1).map((post, index) => (post.dx + posts[index + 1]!.dx) / 2);
+}
+
+/**
+ * Select a restrained, centred banner rhythm for the arcade back wall.  A one-bay arcade gets a
+ * single centre mark; wider rows get the closest mirrored pair around the row midpoint.  Keeping
+ * the pair on matching bays prevents the old every-other-bay run from reading as noisy signage.
+ */
+function bannerBays(base: readonly PartPlacement[]): readonly number[] {
+  const centres = bayCentres(base);
+  if (centres.length <= 1) return centres;
+
+  const middle = (centres.length - 1) / 2;
+  if (Number.isInteger(middle)) {
+    const offset = Math.min(1, middle);
+    return [centres[middle - offset]!, centres[middle + offset]!];
+  }
+
+  const left = Math.floor(middle);
+  return [centres[left]!, centres[left + 1]!];
+}
+
+interface ArcadeBay {
+  readonly index: number;
+  readonly centre: number;
+  readonly left: number;
+  readonly right: number;
+  readonly wall?: PartPlacement;
+  readonly canopy?: PartPlacement;
+}
+
+function arcadeBays(base: readonly PartPlacement[]): ArcadeBay[] {
+  const posts = frontPosts(base);
+  return posts.slice(0, -1).map((post, index) => {
+    const next = posts[index + 1]!;
+    const prefix = `b${index}_`;
+    return {
+      index,
+      centre: (post.dx + next.dx) / 2,
+      left: post.dx,
+      right: next.dx,
+      wall: base.find((part) => part.tag === `${prefix}w`),
+      canopy: base.find((part) => part.tag === `${prefix}o`),
+    };
+  });
+}
+
+function halfSpan(base: readonly PartPlacement[], context: StructureVariantContext): number {
+  const posts = frontPosts(base);
+  return posts.length === 0
+    ? context.width / 2
+    : Math.max(...posts.map((post) => Math.abs(post.dx)));
+}
+
+function withoutBaseLamps(base: readonly PartPlacement[]): PartPlacement[] {
+  return base.filter((part) => part.assetId !== "lamp_wall");
+}
+
+function wallAttachment(
+  anchor: PartPlacement,
+  tag: string,
+  assetId: string,
+  out: number,
+  dy: number,
+  scale: number,
+): PartPlacement {
+  return variantPart(
+    tag,
+    assetId,
+    anchor.dx + Math.sin(anchor.rotationY) * out,
+    anchor.dy + dy,
+    anchor.dz + Math.cos(anchor.rotationY) * out,
+    anchor.rotationY,
+    scale,
+  );
+}
+
+/**
+ * Convert the selected back bays before adding any facade insert.  Plaster/timber bays use one
+ * combined `overhang_plaster` part, so the old canopy tag becomes the kit aperture and its stable
+ * trim tag carries a measured slab.  Stone already has separate wall, trim and canopy tags; only
+ * its wall tag changes.  Keeping this as the shared conversion path prevents narrow windows from
+ * becoming decoration pasted onto a solid wall while the shuttered variant remains intact.
+ */
+function convertBackWindowBays(
+  context: StructureVariantContext,
+  base: readonly PartPlacement[],
+  selected: readonly ArcadeBay[],
+): PartPlacement[] {
+  const bays = arcadeBays(base);
+  const selectedByIndex = new Set(selected.map((bay) => bay.index));
+  // Stone bays already separate their wall (`bN_w`) from the canopy slab (`bN_o`). Plaster and
+  // timber use one combined `overhang_plaster`, so split that exact bay by reusing its stable wall
+  // tag for the kit aperture and its stable trim tag for the measured slab. This keeps the canopy,
+  // collision box and open front unchanged while ensuring shutters never sit on solid masonry.
+  const shell = base.map((part) => {
+    const match = /^(?:b)(\d+)_(w|o|t)$/.exec(part.tag);
+    if (match === null) return part;
+    const index = Number(match[1]);
+    if (!selectedByIndex.has(index)) return part;
+    const bay = bays[index];
+    if (bay === undefined) return part;
+
+    if (match[2] === "w" || (match[2] === "o" && bay.wall === undefined)) {
+      return { ...part, assetId: context.kit.wallWindow };
+    }
+    if (match[2] === "t" && bay.wall === undefined) {
+      return {
+        ...part,
+        assetId: "overhang_brick",
+        dy: CANOPY_SLAB_Y,
+        dz: part.dz + CANOPY_SLAB_FORWARD_SHIFT,
+      };
+    }
+    return part;
+  });
+
+  return shell;
+}
+
+function shutteredBack(
+  context: StructureVariantContext,
+  base: readonly PartPlacement[],
+): PartPlacement[] {
+  const bays = arcadeBays(base);
+  const selected = bays.filter((_bay, index) => index % 2 === 0);
+  const shell = convertBackWindowBays(context, base, selected);
+
+  const details = selected.flatMap((bay) => {
+    const anchor = bay.wall ?? bay.canopy;
+    if (anchor === undefined) return [];
+    return [
+      wallAttachment(anchor, `window_${bay.index}`, "window_wide", WINDOW_INSERT_OUT, 0, WINDOW_INSERT_SCALE),
+      wallAttachment(anchor, `shutters_${bay.index}`, "window_shutters", SHUTTER_OUT, SHUTTER_Y, SHUTTER_SCALE),
+    ];
+  });
+  return withDetails(shell, ...details);
+}
+
+export const ARCADE_VARIANTS: readonly StructureVariantRecipe[] = [
+  {
+    id: "arcade:braced-bays",
+    label: "Braced bays",
+    family: "open_air",
+    prefab: "arcade",
+    detailBudget: 4,
+    build: (context, base) => {
+      const posts = frontPosts(base);
+      const edge = halfSpan(base, context);
+      const frontZ = -context.depth / 2 + CANOPY_DEPTH;
+      const braces = posts.slice(1, -1)
+        .filter((_post, index) => index % 2 === 0)
+        .map((post, index) => variantPart(
+          `brace_${index}`,
+          "support_beam",
+          inset(post.dx, edge, 0.1),
+          -1.211 * BRACE_SCALE,
+          frontZ - 0.1,
+          Math.PI,
+          BRACE_SCALE,
+        ));
+      return withDetails(base, ...braces);
+    },
+  },
+  {
+    id: "arcade:banner-run",
+    label: "Banner run",
+    family: "open_air",
+    prefab: "arcade",
+    detailBudget: 2,
+    fits: (context) => context.width >= 8,
+    build: (context, base) => {
+      const backZ = -context.depth / 2;
+      const banners = bannerBays(base).map((centre, index) => wallMountedBanner(
+        `v_banner_${index}`,
+        BANNER_ASSET,
+        {
+          // The rail is fixed to the back-wall bay centre; outwardYaw=0 turns the projecting
+          // bracket into the +Z arcade, keeping the cloth perpendicular to the facade.
+          dx: centre,
+          dy: BANNER_Y,
+          dz: backZ + BANNER_WALL_FACE_OFFSET,
+        },
+        0,
+        BANNER_SCALE,
+      ));
+      return withDetails(base, ...banners);
+    },
+  },
+  {
+    id: "arcade:lantern-rhythm",
+    label: "Lantern rhythm",
+    family: "open_air",
+    prefab: "arcade",
+    detailBudget: 2,
+    build: (context, base) => {
+      const centres = bayCentres(base);
+      const edge = halfSpan(base, context);
+      const middle = Math.floor(centres.length / 2);
+      const litBays = centres.length % 2 === 0
+        ? [centres[middle - 1]!, centres[middle]!]
+        : [centres[middle]!];
+      const lamps = litBays.map((centre, index) => variantPart(
+        `lamp_${index}`,
+        "lamp_wall",
+        inset(centre, edge, 0.5),
+        2.1,
+        -context.depth / 2 + 0.35,
+        0,
+        1.15,
+      ));
+      return withDetails(withoutBaseLamps(base), ...lamps);
+    },
+  },
+  {
+    id: "arcade:shuttered-back",
+    label: "Shuttered back wall",
+    family: "open_air",
+    prefab: "arcade",
+    detailBudget: 8,
+    build: shutteredBack,
+  },
+  {
+    id: "arcade:narrow-back-windows",
+    label: "Narrow back windows",
+    family: "open_air",
+    prefab: "arcade",
+    detailBudget: 8,
+    build: (context, base) => {
+      const bays = arcadeBays(base);
+      // Preserve the authored all-bay rhythm, but turn each selected bay into a genuine aperture
+      // first.  This is deliberately the same shell conversion as `arcade:shuttered-back`: on
+      // plaster/timber the combined canopy is split into `wallWindow` + measured slab, while
+      // stone swaps only its stable `bN_w` wall tag.  The thin insert is then seated on that wall
+      // face instead of floating in front of `overhang_plaster`.
+      const shell = convertBackWindowBays(context, base, bays);
+      const windows = bays.flatMap((bay) => {
+        const anchor = bay.wall ?? bay.canopy;
+        if (anchor === undefined) return [];
+        return [wallAttachment(
+          anchor,
+          `window_${bay.index}`,
+          "window_thin",
+          WINDOW_INSERT_OUT,
+          0.05,
+          0.88,
+        )];
+      });
+      return withDetails(shell, ...windows);
+    },
+  },
+  {
+    id: "arcade:plain-colonnade",
+    label: "Plain colonnade",
+    family: "open_air",
+    prefab: "arcade",
+    detailBudget: 0,
+    build: (_context, base) => withDetails(withoutBaseLamps(base)),
+  },
+];

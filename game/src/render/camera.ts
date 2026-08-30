@@ -32,7 +32,7 @@
 import * as THREE from "three";
 import type { Vec3 } from "../contracts.js";
 import { CAMERA } from "../app/config.js";
-import { clamp, tierSilhouetteScale } from "../core/math.js";
+import { clamp } from "../core/math.js";
 import { REGIONS, type PrefabId } from "../content/regions.js";
 import type { KitId } from "./buildings.js";
 
@@ -97,10 +97,8 @@ const COVER_RANGE_METRES = 26;
  *
  * The bands below are measured, in the running game, with `__gameDebug.getDrawnBounds` on the
  * emitted part entities minus `__gameDebug.groundHeight` at the building's own origin — see
- * runs/corealm/audit/cam-cover2.ts. Building parts are drawn at `1 / tierSilhouetteScale(tier)`
- * (world/regionBuilder.ts `emitParts`) while the layout grid is not scaled at all, so every height
- * here is an asset-space number multiplied by that same factor, and the three settlements come out
- * at 1.111x, 0.930x and 0.869x.
+ * runs/corealm/audit/cam-cover2.ts. `world/regionBuilder.ts` now emits each authored part scale
+ * unchanged, so these rectangles use the same 1:1 dimensions as the building generator.
  */
 let coverCache: readonly CoverSlab[] | null = null;
 
@@ -108,11 +106,9 @@ function overheadCover(): readonly CoverSlab[] {
   if (coverCache) return coverCache;
   const slabs: CoverSlab[] = [];
   for (const region of REGIONS) {
-    // The exact factor `emitParts` applies to every building part in this region.
-    const partScale = 1 / tierSilhouetteScale(region.tier);
     const kit = region.settlement.kit;
     for (const building of region.settlement.buildings) {
-      const rect = coverRect(building.prefab, building.footprint, kit, partScale);
+      const rect = coverRect(building.prefab, building.footprint, kit);
       if (!rect) continue;
       const cos = Math.cos(building.rotationY);
       const sin = Math.sin(building.rotationY);
@@ -138,10 +134,10 @@ function overheadCover(): readonly CoverSlab[] {
  * box already includes its roof volume, which is every other prefab.
  *
  * Measured bands, above the building's own ground:
- *   porch/arcade, plaster (Coldbrace, 1.111x)  canopy mesh 0.00..3.36, soffit 2.68 * scale
- *   porch/arcade, timber  (Rootfall,  0.930x)  canopy mesh 0.00..2.82, soffit 2.68 * scale
- *   porch/arcade, stone   (Highcairn, 0.869x)  slab 3.17..3.40 over a separate 0.00..2.72 wall
- *   well                  (Coldbrace only)     roof 2.26..3.30
+ *   porch/arcade, plaster or timber  canopy soffit 2.68, top 3.03
+ *   porch/arcade, stone              slab 3.13..3.39 over a separate wall
+ *   well                              roof soffit 2.03, top 3.30
+ *   gatehouse passage                 deck soffit 3.113, top 3.133
  * The 2.68 soffit is buildings.ts's own measurement of both canopy meshes ("both canopies soffit
  * at 2.68 or higher"); the drawn bounds cannot supply it, because `overhang_plaster` is one mesh
  * holding the wall and the canopy together and its box therefore starts at the ground.
@@ -164,28 +160,33 @@ function coverRect(
   prefab: PrefabId,
   footprint: readonly [number, number],
   kit: KitId,
-  scale: number,
 ): { dz: number; hx: number; hz: number; soffit: number; top: number } | null {
   const width = footprint[0];
   const depth = footprint[1];
   switch (prefab) {
+    case "gatehouse":
+      // Only the first passage deck is a flat overhead slab. The new pitched crown is deliberately
+      // excluded: representing its whole ridge as a box would pull the camera in through empty air.
+      return { dz: 0, hx: Math.min(2, width / 2), hz: depth / 2, soffit: 3.113, top: 3.133 };
     case "porch":
     case "arcade": {
-      // The canopy hangs off the back wall and stops 2 m out (`CANOPY_DEPTH_METRES`), drawn at
-      // `scale`. On a 3 m footprint the front 0.8 m is open sky, and covering it would make the
-      // camera duck lower than the real eave needs.
+      // The canopy hangs off the back wall and stops 2 m out (`CANOPY_DEPTH_METRES`). On a 3 m
+      // footprint the front 0.8 m is open sky, and covering it would make the camera duck lower
+      // than the real eave needs.
       const back = -depth / 2 - 0.25;
-      const front = -depth / 2 + 2 * scale + 0.25;
+      const front = -depth / 2 + 2 + 0.25;
       const band = kit === "stone"
-        // `coveredBay` puts `overhang_brick` at an UNSCALED dy of STOREY_METRES + 0.324 = 3.447 and
-        // the slab hangs below its own pivot, so only the hang scales. Solved against the Highcairn
-        // measurement of 3.17..3.40 at 0.869x.
-        ? { soffit: 3.447 - 0.318 * scale, top: 3.447 - 0.054 * scale }
-        : { soffit: 2.68 * scale, top: 3.03 * scale };
+        // `coveredBay` puts `overhang_brick` at STOREY_METRES + 0.324 = 3.447, and the slab hangs
+        // below its pivot. These are the resulting authored-scale bounds.
+        ? { soffit: 3.129, top: 3.393 }
+        : { soffit: 2.68, top: 3.03 };
       return { dz: (back + front) / 2, hx: width / 2 + 0.2, hz: (front - back) / 2, ...band };
     }
     case "well":
-      return { dz: 0, hx: width / 2 + 0.6, hz: depth / 2 + 0.6, soffit: 2.03 * scale, top: 2.97 * scale };
+      // Both the paired plank canopy and the compact tiled variant stay inside 1.8 x 2.4 m. The
+      // old footprint + 0.6 box claimed an extra 0.7 m2 of empty air and made the camera duck when
+      // it passed beside, rather than beneath, a well roof.
+      return { dz: 0, hx: 0.9, hz: 1.2, soffit: 2.03, top: 3.3 };
     default:
       return null;
   }
@@ -664,10 +665,10 @@ export class OrbitCamera {
    * `atan2(soffit - focus height - clearance, exit)`. The most restrictive slab wins.
    *
    * Worked, at the `bank` pose, against the numbers this file already records: the Coldbrace bank
-   * porch soffits at 2.68 x 1.111 = 2.978 m and the sight line leaves its 6 x 3 footprint 5.4 m
-   * out, so the pitch is atan(1.528 / 5.4) = 0.27 rad against an authored 0.62 — and at 19 m that
-   * seats the camera 5.1 m up, looking under the porch's front edge at the chest beneath it,
-   * instead of at 2.80 m of clearance with its lens inside the beams.
+   * porch soffits at 2.68 m and the sight line leaves its 6 x 3 footprint 5.4 m out. The solved
+   * pitch is atan(1.23 / 5.4) = 0.22 rad against an authored 0.62. At 19 m that seats the camera
+   * 4.2 m above focus, looking under the porch's front edge instead of parking its lens in the
+   * beams.
    *
    * Never RAISES the pitch: clamped to the authored pitch above and `CAMERA.minPitch` below. A
    * canopy the segment already clears returns the authored pitch and the caller skips it. The

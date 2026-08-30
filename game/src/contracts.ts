@@ -102,6 +102,36 @@ export type InteractionId =
   | "attack" | "cast" | "talk" | "open" | "enter" | "climb" | "vault"
   | "loot" | "take" | "produce" | "bank" | "trade" | "equip" | "unequip";
 
+// ---------------------------------------------------------- structure library
+
+/**
+ * Broad visual families used by the deterministic structure-variant library.
+ *
+ * A family describes why a recipe exists, not how it collides. Structure variants may change
+ * facades, rooflines, trim and exterior dressing, but they keep the owning prefab's footprint,
+ * doorway topology and walk-under cover unchanged. `prefabCollision` intentionally has no seed or
+ * kit input, so a variant that moves structural mass would make the visible building disagree with
+ * navigation and camera occlusion.
+ */
+export type StructureFamily =
+  | "domestic"
+  | "civic"
+  | "workshop"
+  | "fortification"
+  | "open_air"
+  | "ruin";
+
+/** Public, renderer-independent metadata for one curated structure recipe. */
+export interface StructureVariantDescriptor<TPrefab extends string = string> {
+  /** Stable id within its prefab, for diagnostics and deterministic snapshots. */
+  readonly id: string;
+  readonly label: string;
+  readonly family: StructureFamily;
+  readonly prefab: TPrefab;
+  /** Maximum number of optional part placements this recipe may add. */
+  readonly detailBudget: number;
+}
+
 // ---------------------------------------------------------- items, equipment
 
 export interface ItemStack { itemId: ItemId; quantity: number }
@@ -169,6 +199,12 @@ export interface SemanticEntity {
     assetId: string;
     /** Uniform scale. Assets are authored in metres, so this is usually near 1. */
     scale?: number;
+    /**
+     * Optional per-axis shape correction, multiplied after `scale` in the asset's local frame.
+     * Most entities omit this. Modular architecture uses it when a shipped mesh has the right
+     * material and silhouette but the wrong fixed aspect ratio for the roof it must close.
+     */
+    scaleAxes?: Vec3;
     rotationY?: number;
     /** Swapped in when `state` is "depleted" or "dead". Falls back to a desaturated material. */
     depletedAssetId?: string;
