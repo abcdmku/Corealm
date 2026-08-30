@@ -103,7 +103,7 @@ export const SHOTS: readonly CameraShot[] = [
   },
   {
     id: "highcairn", locationId: "highcairn_outpost", regionId: "karrowmoor",
-    yaw: SOUTH, pitch: 0.5, distance: 26,
+    yaw: SOUTH, pitch: 0.72, distance: 28,
     intent: "The tier 10 outpost as a working quarry camp.",
   },
   {

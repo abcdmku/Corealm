@@ -1247,19 +1247,39 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       const entity = entityStore.get(entityId);
       if (!entity) return false;
       const dungeonEntity = entity.regionId === "gravelmaw";
+      const contextualNpc = entity.archetype === "npc" && !dungeonEntity;
       const switchingRealm = (store.get().player.regionId === "gravelmaw") !== dungeonEntity;
       // The dungeon's boss and puzzle door are composed inside the dungeon renderer rather than
       // exclusively by EntityViews, so keep the complete interior for those two photographs.
       if (switchingRealm) entityViews.setCaptureSubject(null);
-      scene.scatterGroup.visible = false;
+      scene.scatterGroup.visible = contextualNpc;
       scene.terrainGroup.visible = !dungeonEntity;
       if (dungeon) dungeon.group.visible = dungeonEntity;
-      const yaw = entity.view?.rotationY ?? stableCaptureYaw(entity.id);
-      const baseDistance = entity.archetype === "boss" ? 7 : entity.archetype === "npc" ? 3.9 : 4.8;
+      // Photograph settlement NPCs from the square side of their stand: that is the authored open
+      // player approach, while the opposite side is commonly a forge, stall, or house wall.
+      const authoredYaw = entity.view?.rotationY ?? stableCaptureYaw(entity.id);
+      const settlementRegion = contextualNpc
+        ? REGIONS.find((region) => region.id === entity.regionId)
+        : undefined;
+      const settlementCentre = settlementRegion?.settlement.centre;
+      const centreYaw = settlementCentre
+        ? Math.atan2(settlementCentre[0] - entity.position[0], settlementCentre[1] - entity.position[2])
+        : authoredYaw;
+      const centreDistance = settlementCentre
+        ? Math.hypot(entity.position[0] - settlementCentre[0], entity.position[2] - settlementCentre[1])
+        : Number.POSITIVE_INFINITY;
+      const centreHasLandmark = settlementRegion?.landmarks.some((landmark) =>
+        settlementCentre
+        && Math.hypot(landmark.position[0] - settlementCentre[0], landmark.position[1] - settlementCentre[1]) < 3
+      ) ?? false;
+      // Rootfall's square is itself a giant stump. A keeper standing beside that landmark needs a
+      // tangent view; a camera on the literal centre line would photograph the inside of the stump.
+      const contextualYaw = centreHasLandmark && centreDistance < 6 ? centreYaw + Math.PI / 2 : centreYaw;
+      const baseDistance = entity.archetype === "boss" ? 7 : contextualNpc ? 6.5 : 4.8;
       if (switchingRealm) {
-        frameDocumentationTarget(entity.position, yaw, 0.25, baseDistance, "focus-entity-region");
+        frameDocumentationTarget(entity.position, contextualYaw, 0.25, baseDistance, "focus-entity-region");
       }
-      entityViews.setCaptureSubject(dungeonEntity ? null : entityId);
+      entityViews.setCaptureSubject(dungeonEntity || contextualNpc ? null : entityId);
       const bounds = entityViews.drawnBounds(entityId);
       const width = bounds ? bounds.max[0] - bounds.min[0] : 0;
       const height = bounds ? bounds.max[1] - bounds.min[1] : 0;
@@ -1272,16 +1292,22 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
           (bounds.min[2] + bounds.max[2]) / 2,
         ]
         : entity.position;
-      const pitch = 0.25;
-      frameDocumentationTarget(target, yaw, pitch, distance, "focus-entity");
+      const pitch = contextualNpc ? 0.38 : 0.25;
+      frameDocumentationTarget(target, contextualYaw, pitch, distance, "focus-entity");
       return true;
     },
     focusLocation: (locationId: string) => {
       entityViews.setCaptureSubject(null);
-      scene.scatterGroup.visible = true;
-      scene.terrainGroup.visible = true;
-      const dungeonLocation = REGIONS.some((region) =>
-        region.dungeon?.locations.some((location) => location.id === locationId));
+      const locationRegion = REGIONS.find((region) =>
+        region.locations.some((location) => location.id === locationId)
+        || region.dungeon?.locations.some((location) => location.id === locationId));
+      const location = locationRegion?.locations.find((entry) => entry.id === locationId)
+        ?? locationRegion?.dungeon?.locations.find((entry) => entry.id === locationId);
+      const dungeonLocation = locationRegion?.dungeon?.locations.some(
+        (location) => location.id === locationId,
+      ) ?? false;
+      scene.scatterGroup.visible = !dungeonLocation;
+      scene.terrainGroup.visible = !dungeonLocation;
       if (dungeon) dungeon.group.visible = dungeonLocation;
       const authored = SHOTS.find((shot) => shot.id === locationId || shot.locationId === locationId);
       if (authored) {
@@ -1298,11 +1324,20 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       }
       const node = nav.routeNode(locationId);
       if (!node) return false;
+      const centre = locationRegion?.settlement.centre;
+      const contextX = centre ? node.position[0] - centre[0] : 0;
+      const contextZ = centre ? node.position[2] - centre[1] : 0;
+      const bankLocation = location?.kind === "bank" && locationRegion;
+      const yaw = bankLocation
+        ? bankLocation.settlement.bank.rotationY
+        : !dungeonLocation && centre && Math.hypot(contextX, contextZ) > 2
+          ? Math.atan2(contextX, contextZ)
+          : stableCaptureYaw(locationId);
       frameDocumentationTarget(
         node.position,
-        stableCaptureYaw(locationId),
-        dungeonLocation ? 0.22 : 0.44,
-        dungeonLocation ? 7 : 20,
+        yaw,
+        dungeonLocation ? 0.28 : bankLocation ? 0.32 : 0.44,
+        dungeonLocation ? 8 : bankLocation ? 6 : 22,
         "focus-location",
       );
       return true;
