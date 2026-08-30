@@ -6,7 +6,7 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <figure class="corealm-location-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Interactive map of Corealm locations">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="#march-road-end" style="--map-x:36.6667%;--map-y:59.8333%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="March Road End, Fallowmarch" title="March Road End, Fallowmarch"><span>March Road End<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#coldbrace-south-gate" style="--map-x:36.6667%;--map-y:59.0000%" data-map-side="right" data-map-kind="gate" data-map-marker aria-label="Coldbrace South Gate, Fallowmarch" title="Coldbrace South Gate, Fallowmarch"><span>Coldbrace South Gate<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#coldbrace-square" style="--map-x:36.6667%;--map-y:56.6667%" data-map-side="right" data-map-kind="settlement" data-map-marker aria-label="Coldbrace Square, Fallowmarch" title="Coldbrace Square, Fallowmarch"><span>Coldbrace Square<small>Fallowmarch</small></span></a>

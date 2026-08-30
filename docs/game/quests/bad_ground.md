@@ -26,7 +26,7 @@ Five Kaldite faces on terrace one, next to the Gravelmaw mouth. Mining 10 is the
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bad Ground, step 1">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#lower-quarry" style="--map-x:55.0000%;--map-y:51.3333%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Lower Quarry, Karrowmoor" title="Lower Quarry, Karrowmoor"><span>Lower Quarry<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -57,7 +57,7 @@ It runs from the Highcairn bank at (170, -74) up to the Upper Karrow Seam and ne
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bad Ground, step 2">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#highcairn-bank" style="--map-x:64.1667%;--map-y:56.1667%" data-map-side="left" data-map-kind="entity" data-map-marker aria-label="Sunder Ledge, Karrowmoor" title="Sunder Ledge, Karrowmoor"><span>Sunder Ledge<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#upper-karrow-seam" style="--map-x:66.1667%;--map-y:61.0000%" data-map-side="left" data-map-kind="seam" data-map-marker aria-label="Upper Karrow Seam, Karrowmoor" title="Upper Karrow Seam, Karrowmoor"><span>Upper Karrow Seam<small>Karrowmoor</small></span></a>
 </div>
@@ -90,7 +90,7 @@ The Upper Karrow Seam is only three nodes and genuinely runs dry above Mining 20
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bad Ground, step 3">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#highcairn-bank" style="--map-x:62.5000%;--map-y:55.8333%" data-map-side="left" data-map-kind="entity" data-map-marker aria-label="Highcairn Bank, Karrowmoor" title="Highcairn Bank, Karrowmoor"><span>Highcairn Bank<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -116,7 +116,7 @@ He is at the middle of the camp. He will have the figure already; he always does
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bad Ground, step 4">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../npcs/#foreman-arden" style="--map-x:62.3917%;--map-y:55.8583%" data-map-side="left" data-map-kind="npc" data-map-marker aria-label="Foreman Arden, Karrowmoor" title="Foreman Arden, Karrowmoor"><span>Foreman Arden<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

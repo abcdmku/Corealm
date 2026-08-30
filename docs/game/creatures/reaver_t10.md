@@ -9,7 +9,7 @@ description: "Karrow Reaver spawn locations, combat stats, and drops."
 <figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Karrow Reaver">
 <div class="corealm-map-stage" data-map-stage>
-<img src="../../assets/world-map.webp?v=6f4962309cad0f1a9a8e41dee7712a06e55f23c35ad89776a3a4fb564b81f3a8" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<img src="../../assets/world-map.webp?v=14f5aa5e68863076c507b002d6d1d30bf77ae9e848977ebf918a48de026b9dce" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../regions/#third-ramp" style="--map-x:62.3333%;--map-y:60.6667%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Karrow Reaver, Third Ramp, Karrowmoor" title="Karrow Reaver, Third Ramp, Karrowmoor"><span>Karrow Reaver<small>Third Ramp, Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#the-lit-gallery" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="Gravelmaw Reaver, The Gravelmaw, The Lit Gallery" title="Gravelmaw Reaver, The Gravelmaw, The Lit Gallery"><span>Gravelmaw Reaver<small>The Gravelmaw, The Lit Gallery</small></span></a>
 </div>
