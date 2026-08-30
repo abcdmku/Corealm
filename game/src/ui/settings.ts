@@ -44,7 +44,7 @@ export const DEFAULT_SETTINGS: UiSettings = {
   shadowQuality: "high",
   drawDistance: "far",
   damageNumbers: true,
-  invertCameraY: false,
+  invertCameraY: true,
   uiScale: "normal",
 };
 

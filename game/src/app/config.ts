@@ -58,6 +58,8 @@ export const LOW_HEALTH_FRACTION = 0.3;
 export interface CameraConfig {
   minDistance: number;
   maxDistance: number;
+  /** Hard limit for named screenshot poses, which may frame more of the world than player zoom. */
+  maxAuthoredDistance: number;
   defaultDistance: number;
   minPitch: number;
   maxPitch: number;
@@ -70,8 +72,9 @@ export interface CameraConfig {
 
 export const CAMERA: CameraConfig = {
   minDistance: 6,
-  maxDistance: 34,
-  defaultDistance: 18,
+  maxDistance: 11,
+  maxAuthoredDistance: 34,
+  defaultDistance: 11,
   minPitch: 0.18,
   maxPitch: 1.32,
   // 0.72 put the camera 11.9 m above every roofline, so the occlusion probe had nothing to hit:

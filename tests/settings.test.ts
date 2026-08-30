@@ -30,6 +30,7 @@ describe("graphics settings", () => {
   it("starts at high quality and persists live changes", () => {
     const store = new SettingsStore();
     expect(store.get()).toEqual(DEFAULT_SETTINGS);
+    expect(store.get().invertCameraY).toBe(true);
 
     const seen: number[] = [];
     const unsubscribe = store.subscribe((settings) => { seen.push(settings.renderScale); });

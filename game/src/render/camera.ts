@@ -87,8 +87,8 @@ interface CoverSlab {
  *
  * Two reasons, and both are real. The slab's Y band is relative to the player's own ground, so a
  * canopy on a terrace 20 m below would be tested at the wrong height entirely. And the camera
- * never sits further than `CAMERA.maxDistance` 34 m from the player, so a roof 26 m away can only
- * be on the sight line when it is nearly behind the camera.
+ * never sits further than `CAMERA.maxAuthoredDistance` 34 m from the player, so a roof 26 m away
+ * can only be on the sight line when it is nearly behind the camera.
  */
 const COVER_RANGE_METRES = 26;
 
@@ -412,7 +412,7 @@ export class OrbitCamera {
   setPose(yaw: number, pitch: number, distance: number): void {
     this.yaw = yaw;
     this.pitch = clamp(pitch, CAMERA.minPitch, CAMERA.maxPitch);
-    this.distance = clamp(distance, CAMERA.minDistance, CAMERA.maxDistance);
+    this.distance = clamp(distance, CAMERA.minDistance, CAMERA.maxAuthoredDistance);
   }
 
   /**
