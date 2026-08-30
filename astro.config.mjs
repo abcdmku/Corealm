@@ -1,7 +1,8 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import { sites } from "@openai/sites-vite-plugin";
-import { mkdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const base = process.env.DOCS_BASE ?? "/";
@@ -13,12 +14,29 @@ const sitesStaticWorker = {
   name: "corealm-sites-static-worker",
   hooks: {
     "astro:build:done": async ({ dir }) => {
-      const serverDir = new URL("./server/", dir);
-      await mkdir(fileURLToPath(serverDir), { recursive: true });
+      const outDir = fileURLToPath(dir);
+      const clientDir = path.join(outDir, "client");
+      const serverDir = path.join(outDir, "server");
+      await mkdir(clientDir, { recursive: true });
+      await mkdir(serverDir, { recursive: true });
+
+      for (const entry of await readdir(outDir, { withFileTypes: true })) {
+        if ([".openai", "client", "server"].includes(entry.name)) continue;
+        await cp(path.join(outDir, entry.name), path.join(clientDir, entry.name), { recursive: true });
+      }
+
       await writeFile(
-        new URL("index.js", serverDir),
+        path.join(serverDir, "index.js"),
         `export default {\n  async fetch(request, env) {\n    const direct = await env.ASSETS.fetch(request);\n    if (direct.status !== 404 || !["GET", "HEAD"].includes(request.method)) return direct;\n\n    const url = new URL(request.url);\n    const cleanPath = url.pathname.endsWith("/")\n      ? \`\${url.pathname}index.html\`\n      : \`\${url.pathname}/index.html\`;\n    const cleanUrl = new URL(cleanPath, url);\n    return env.ASSETS.fetch(new Request(cleanUrl, request));\n  },\n};\n`,
       );
+      await writeFile(path.join(serverDir, "wrangler.json"), JSON.stringify({
+        name: "corealm-codex",
+        main: "index.js",
+        compatibility_date: "2026-05-15",
+        no_bundle: true,
+        rules: [{ type: "ESModule", globs: ["**/*.js", "**/*.mjs"] }],
+        assets: { directory: "../client" },
+      }));
     },
   },
 };
