@@ -1,0 +1,425 @@
+[
+ {
+  "id": "coldbrace_gate_south",
+  "prefab": "gatehouse",
+  "x": -160,
+  "z": -108,
+  "width": 8,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "coldbrace_gate_east",
+  "prefab": "gatehouse",
+  "x": -134,
+  "z": -80,
+  "width": 8,
+  "depth": 4,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "coldbrace_gate_west",
+  "prefab": "gatehouse",
+  "x": -186,
+  "z": -72,
+  "width": 8,
+  "depth": 4,
+  "rotationY": -1.5707963267948966
+ },
+ {
+  "id": "coldbrace_vault",
+  "prefab": "tower",
+  "x": -168,
+  "z": -90,
+  "width": 6,
+  "depth": 6,
+  "rotationY": 0
+ },
+ {
+  "id": "coldbrace_bank_porch",
+  "prefab": "porch",
+  "x": -163,
+  "z": -89,
+  "width": 6,
+  "depth": 3,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "coldbrace_hall",
+  "prefab": "hall",
+  "x": -160,
+  "z": -68,
+  "width": 12,
+  "depth": 6,
+  "rotationY": 0
+ },
+ {
+  "id": "coldbrace_forge_shed",
+  "prefab": "forge",
+  "x": -145.5,
+  "z": -86,
+  "width": 6,
+  "depth": 4,
+  "rotationY": -1.5707963267948966
+ },
+ {
+  "id": "coldbrace_workshed",
+  "prefab": "arcade",
+  "x": -174,
+  "z": -92,
+  "width": 6,
+  "depth": 3,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "coldbrace_cookhouse",
+  "prefab": "porch",
+  "x": -149,
+  "z": -72.5,
+  "width": 4,
+  "depth": 3,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "coldbrace_market",
+  "prefab": "arcade",
+  "x": -170.5,
+  "z": -80,
+  "width": 8,
+  "depth": 3,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "coldbrace_well",
+  "prefab": "well",
+  "x": -164,
+  "z": -77,
+  "width": 2,
+  "depth": 2,
+  "rotationY": 0
+ },
+ {
+  "id": "coldbrace_house_1",
+  "prefab": "townhouse",
+  "x": -170,
+  "z": -102,
+  "width": 6,
+  "depth": 4,
+  "rotationY": -1.5707963267948966
+ },
+ {
+  "id": "coldbrace_house_2",
+  "prefab": "cottage",
+  "x": -180,
+  "z": -102,
+  "width": 6,
+  "depth": 4,
+  "rotationY": -1.5707963267948966
+ },
+ {
+  "id": "coldbrace_house_3",
+  "prefab": "cottage",
+  "x": -150,
+  "z": -102,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "coldbrace_house_4",
+  "prefab": "cottage",
+  "x": -140,
+  "z": -102,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "coldbrace_house_5",
+  "prefab": "townhouse",
+  "x": -178,
+  "z": -70,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "coldbrace_house_6",
+  "prefab": "cottage",
+  "x": -178,
+  "z": -78,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "coldbrace_house_7",
+  "prefab": "cottage",
+  "x": -180,
+  "z": -85,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "coldbrace_house_8",
+  "prefab": "townhouse",
+  "x": -142,
+  "z": -74,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "rootfall_house_1",
+  "prefab": "cottage",
+  "x": 50,
+  "z": 131,
+  "width": 6,
+  "depth": 4,
+  "rotationY": -1.5707963267948966
+ },
+ {
+  "id": "rootfall_house_2",
+  "prefab": "cottage",
+  "x": 50,
+  "z": 117,
+  "width": 6,
+  "depth": 4,
+  "rotationY": -1.5707963267948966
+ },
+ {
+  "id": "rootfall_house_3",
+  "prefab": "cottage",
+  "x": 52,
+  "z": 108,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "rootfall_house_4",
+  "prefab": "cottage",
+  "x": 62,
+  "z": 108,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "rootfall_house_5",
+  "prefab": "cottage",
+  "x": 72,
+  "z": 106,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "rootfall_house_6",
+  "prefab": "cottage",
+  "x": 72,
+  "z": 118,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "rootfall_house_7",
+  "prefab": "townhouse",
+  "x": 72,
+  "z": 128,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "rootfall_house_8",
+  "prefab": "cottage",
+  "x": 61,
+  "z": 138,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "rootfall_shed",
+  "prefab": "shed",
+  "x": 48,
+  "z": 140,
+  "width": 4,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "rootfall_forge",
+  "prefab": "forge",
+  "x": 70.5,
+  "z": 137,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "rootfall_sawpit",
+  "prefab": "arcade",
+  "x": 54,
+  "z": 137,
+  "width": 6,
+  "depth": 3,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "rootfall_counter",
+  "prefab": "porch",
+  "x": 60,
+  "z": 128.6,
+  "width": 6,
+  "depth": 2.2,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "rootfall_cookhouse",
+  "prefab": "porch",
+  "x": 57,
+  "z": 112.5,
+  "width": 4,
+  "depth": 2.2,
+  "rotationY": 0
+ },
+ {
+  "id": "rootfall_gate_west",
+  "prefab": "gatehouse",
+  "x": 44,
+  "z": 124,
+  "width": 8,
+  "depth": 4,
+  "rotationY": -1.5707963267948966
+ },
+ {
+  "id": "rootfall_gate_east",
+  "prefab": "gatehouse",
+  "x": 80,
+  "z": 110,
+  "width": 8,
+  "depth": 4,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "rootfall_gate_north",
+  "prefab": "gatehouse",
+  "x": 72,
+  "z": 144,
+  "width": 8,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "rootfall_postern",
+  "prefab": "gatehouse",
+  "x": 80,
+  "z": 138,
+  "width": 8,
+  "depth": 4,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "highcairn_hut_1",
+  "prefab": "quarry_hut",
+  "x": 137,
+  "z": -52,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "highcairn_hut_3",
+  "prefab": "shed",
+  "x": 146,
+  "z": -52,
+  "width": 4,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "highcairn_hut_4",
+  "prefab": "tower",
+  "x": 155,
+  "z": -52,
+  "width": 4,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "highcairn_hut_6",
+  "prefab": "quarry_hut",
+  "x": 126,
+  "z": -70.5,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "highcairn_hut_5",
+  "prefab": "quarry_hut",
+  "x": 136.2,
+  "z": -70.5,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "highcairn_forge",
+  "prefab": "forge",
+  "x": 144,
+  "z": -70,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 0
+ },
+ {
+  "id": "highcairn_bank_porch",
+  "prefab": "porch",
+  "x": 150.8,
+  "z": -69.6,
+  "width": 4,
+  "depth": 3,
+  "rotationY": 0
+ },
+ {
+  "id": "highcairn_hut_2",
+  "prefab": "cottage",
+  "x": 157,
+  "z": -70.5,
+  "width": 6,
+  "depth": 4,
+  "rotationY": 3.141592653589793
+ },
+ {
+  "id": "highcairn_market",
+  "prefab": "arcade",
+  "x": 136.6,
+  "z": -63.4,
+  "width": 6,
+  "depth": 3,
+  "rotationY": 0
+ },
+ {
+  "id": "highcairn_gate",
+  "prefab": "gatehouse",
+  "x": 162,
+  "z": -58,
+  "width": 8,
+  "depth": 4,
+  "rotationY": 1.5707963267948966
+ },
+ {
+  "id": "highcairn_postern",
+  "prefab": "gatehouse",
+  "x": 122,
+  "z": -58,
+  "width": 8,
+  "depth": 4,
+  "rotationY": -1.5707963267948966
+ }
+]

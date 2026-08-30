@@ -925,8 +925,10 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
   for (const run of settlement.walls ?? []) {
     emitWallRun(ctx, regionId, tier, settlement, run, kit, ground);
   }
+  const pavedTiles = settlementTileLattice(settlement);
+  const pavedEmitted = new Set<string>();
   for (const paving of settlement.paving ?? []) {
-    emitPaving(ctx, regionId, tier, settlement, paving);
+    emitPaving(ctx, regionId, tier, settlement, paving, pavedTiles, pavedEmitted);
   }
   for (const prop of settlement.props ?? []) {
     emitProp(ctx, regionId, tier, settlement, prop, place);
@@ -1202,12 +1204,50 @@ function emitWallRun(
  * Cost is one instanced group per (assetId, tier): a whole square is one draw call, and the kerb
  * adds two more.
  */
+/** Tile centre key on the shared half-module lattice. Two rects that meet share their seam. */
+function tileKey(cx: number, cz: number): string {
+  return `${Math.round(cx)},${Math.round(cz)}`;
+}
+
+/** Every tile centre the settlement's paving rects would fill, before any edge is frayed. */
+function settlementTileLattice(settlement: SettlementDef): Set<string> {
+  const keys = new Set<string>();
+  const half = MODULE_METRES / 2;
+  for (const paving of settlement.paving ?? []) {
+    const { minX, minZ, maxX, maxZ } = paving.rect;
+    if (!(maxX > minX) || !(maxZ > minZ)) continue;
+    const firstX = Math.ceil((minX - half) / MODULE_METRES) * MODULE_METRES + half;
+    const firstZ = Math.ceil((minZ - half) / MODULE_METRES) * MODULE_METRES + half;
+    for (let cz = firstZ; cz + half <= maxZ + 1e-6; cz += MODULE_METRES) {
+      for (let cx = firstX; cx + half <= maxX + 1e-6; cx += MODULE_METRES) keys.add(tileKey(cx, cz));
+    }
+  }
+  return keys;
+}
+
+/**
+ * Deterministic 0..1 for one tile centre. Stable under array reordering and under adding a rect,
+ * because it is a hash of the world coordinate and nothing else.
+ */
+function tileNoise(cx: number, cz: number): number {
+  let hash = 0x811c9dc5 ^ (Math.round(cx) * 73_856_093);
+  hash = Math.imul(hash ^ (Math.round(cz) * 19_349_663), 0x01000193) >>> 0;
+  hash = (hash ^ (hash >>> 15)) >>> 0;
+  return (Math.imul(hash, 2_246_822_519) >>> 0) / 4_294_967_296;
+}
+
+/** Fraction of unkerbed edge tiles left out, and of fringe tiles laid beyond the rect. */
+const PAVING_FRAY_DROP = 0.3;
+const PAVING_FRAY_ADD = 0.34;
+
 function emitPaving(
   ctx: BuildContext,
   regionId: RegionId,
   tier: number,
   settlement: SettlementDef,
   paving: PavingDef,
+  lattice: ReadonlySet<string>,
+  emitted: Set<string>,
 ): void {
   const { minX, minZ, maxX, maxZ } = paving.rect;
   if (!(maxX > minX) || !(maxZ > minZ)) return;
@@ -1217,17 +1257,52 @@ function emitPaving(
   // meet do not produce a seam of half tiles.
   const firstX = Math.ceil((minX - half) / MODULE_METRES) * MODULE_METRES + half;
   const firstZ = Math.ceil((minZ - half) / MODULE_METRES) * MODULE_METRES + half;
+  const neighbours: readonly (readonly [number, number])[] = [
+    [MODULE_METRES, 0], [-MODULE_METRES, 0], [0, MODULE_METRES], [0, -MODULE_METRES],
+  ];
+  const interior = (cx: number, cz: number): boolean =>
+    neighbours.every(([dx, dz]) => lattice.has(tileKey(cx + dx, cz + dz)));
+  const lay = (cx: number, cz: number, index: number): void => {
+    const key = tileKey(cx, cz);
+    if (emitted.has(key)) return;
+    emitted.add(key);
+    ctx.out.push(sceneryEntity(
+      `${paving.id}#t${index}`, paving.id, tier, regionId,
+      [round2(cx), round2(ctx.heightAt(regionId, cx, cz) + PAVING_LIFT_METRES), round2(cz)],
+      paving.assetId, 1, 0, 0.3, meta,
+    ));
+  };
+
   let index = 0;
   for (let cz = firstZ; cz + half <= maxZ + 1e-6; cz += MODULE_METRES) {
     for (let cx = firstX; cx + half <= maxX + 1e-6; cx += MODULE_METRES) {
-      ctx.out.push(sceneryEntity(
-        `${paving.id}#t${index}`, paving.id, tier, regionId,
-        [round2(cx), round2(ctx.heightAt(regionId, cx, cz) + PAVING_LIFT_METRES), round2(cz)],
-        paving.assetId, 1, 0, 0.3, meta,
-      ));
-      index += 1;
+      // A KERBED rect keeps its straight edge: a kerb is a deliberate boundary and the paving is
+      // meant to run right up to it. Everything else frays, because a yard or a street does not
+      // stop on a surveyed line - and a 22 x 14 m rectangle of 2 m slabs ending dead against
+      // grass is the single hardest edge in the game, which is what a player called out.
+      if (paving.kerb || interior(cx, cz) || tileNoise(cx, cz) > PAVING_FRAY_DROP) {
+        lay(cx, cz, index);
+        index += 1;
+      }
     }
   }
+
+  // ...and a scatter of slabs one module beyond it, so the paving thins out into the ground
+  // instead of stopping. Only outside the whole settlement's lattice, so this can never punch a
+  // hole in, or double-lay a tile on, a neighbouring rect.
+  if (!paving.kerb) {
+    for (let cz = firstZ - MODULE_METRES; cz - half <= maxZ + 1e-6; cz += MODULE_METRES) {
+      for (let cx = firstX - MODULE_METRES; cx - half <= maxX + 1e-6; cx += MODULE_METRES) {
+        const key = tileKey(cx, cz);
+        if (lattice.has(key) || emitted.has(key)) continue;
+        if (!neighbours.some(([dx, dz]) => lattice.has(tileKey(cx + dx, cz + dz)))) continue;
+        if (tileNoise(cx + 0.5, cz + 0.5) > PAVING_FRAY_ADD) continue;
+        lay(cx, cz, index);
+        index += 1;
+      }
+    }
+  }
+
   if (!paving.kerb) return;
 
   // Kerbs ring the rect on the OUTSIDE: `kerb_straight` is 2.00 x 0.134 x 0.70 with its origin

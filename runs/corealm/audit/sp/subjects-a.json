@@ -1,0 +1,7 @@
+[
+ {"tag":"regiongate-fallowmarch","x":-26,"y":2,"z":118,"distance":22,"pitch":0.28},
+ {"tag":"regiongate-marchgate","x":-12,"y":2,"z":122,"distance":22,"pitch":0.28},
+ {"tag":"regiongate-cairn","x":250,"y":2,"z":24,"distance":22,"pitch":0.28},
+ {"tag":"standingstones","x":206,"y":2,"z":168,"distance":20,"pitch":0.35},
+ {"tag":"greatcairn","x":140,"y":3,"z":-176,"distance":24,"pitch":0.3}
+]

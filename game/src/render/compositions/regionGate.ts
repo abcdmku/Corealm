@@ -2,22 +2,55 @@ import type { BuildingKit, PartPlacement } from "../buildings.js";
 import { wallMountedBanner } from "../bannerPlacement.js";
 
 /**
- * A small, reusable surround for the `wall_arch` portal entity.
+ * A border crossing: two masonry piers under slate caps, the `wall_arch` portal spanning between
+ * them, and a stretch of wall running off each side.
  *
  * The portal is deliberately not emitted here: the world owns the hero mesh and its interaction
- * state. These parts are the gate's wings, returns, crowns, and a little dressing around it.
- * They are authored in the same local frame as the building prefabs: +X is right, +Y is up, and
- * +Z points toward the approaching road.
+ * state. These parts are the gate's piers, wings, crowns and dressing around it. They are authored
+ * in the same local frame as the building prefabs: +X is right, +Y is up, and +Z points toward the
+ * approaching road.
+ *
+ * WHY THIS WAS REBUILT. The first version was two free-standing 2 m wall panels at x = +-2.7 with a
+ * `roof_tower` cap balanced on each, a shallow return behind, and a pair of banners at +-3.7. Three
+ * things were wrong with it and all three are visible from the road:
+ *
+ *   1. THE PIERS WERE CARDS. A wall panel is 0.406 m thick and the cap is 1.92 x 1.85 m, so each
+ *      "tower" was a spire overhanging a 0.4 m sliver by 0.7 m front and back. From any oblique
+ *      angle - which is every angle, because the camera orbits - the gate read as two flats with
+ *      hats on. Each pier is now a closed 2 x 2 m box of four panels with a post at each corner,
+ *      which is exactly the plan the 0.34 cap was already sized for.
+ *   2. THE ARCH DID NOT MEET ANYTHING. `wall_arch` draws at 1.4x, so it is 2.8 m across and its
+ *      jambs stand at |x| = 1.4; the wings stood at |x| = 1.7. That left a 0.3 m slot of daylight
+ *      up each side of a 4.2 m arch, with the arch's own jamb hanging in it. The piers' road faces
+ *      are now at |x| = 1.35, so each jamb is buried 0.05 m into masonry and the passage is the
+ *      arch's opening rather than the arch plus two slots.
+ *   3. THE BANNERS HUNG ON AIR. They anchored at the return's outer corner, 0.35 m clear of any
+ *      surface. They mount on the pier's road-facing shoulder now.
  */
 
 const STOREY_METRES = 3.123;
-const WALL_WIDTH = 2;
+/** Where a wall panel's outward face sits relative to its pivot, measured on the GLBs. */
+const WALL_FACE = 0.093;
 
-/** The wing spacing leaves 3.4 m between the inner edges of the two 2 m wall panels. */
-const WING_X = 2.7;
-const RETURN_X = WING_X + WALL_WIDTH / 2;
-const RETURN_Z = -0.85;
-/** `roof_tower` starts at y = -0.572; this seats its scaled base on a 3.123 m wing. */
+/**
+ * Plan of one pier, in metres from the gate centre line.
+ *
+ * `PIER_INNER` is 0.05 m inside the drawn arch's jamb (`wall_arch` at 1.4x reaches |x| = 1.4), so
+ * the timber arch dies into masonry instead of standing in a gap. That leaves a 2.70 m passage:
+ * against the world's 0.45 m navmesh erosion per side and a 0.35 m player radius, 1.80 m of
+ * walkable floor down the middle of a portal the player only has to reach, never fight in.
+ */
+const PIER_INNER = 1.35;
+const PIER_WIDTH = 2;
+const PIER_OUTER = PIER_INNER + PIER_WIDTH;
+const PIER_CENTRE = PIER_INNER + PIER_WIDTH / 2;
+const PIER_HALF_DEPTH = 1;
+
+/** One module of wall running off each pier, plus its end post. */
+const WING_CENTRE = PIER_OUTER + 1;
+const WING_END = PIER_OUTER + 2;
+
+/** `roof_tower` starts at y = -0.572; at 0.34 this seats its base on a 3.123 m pier head. */
 const TOWER_CROWN_Y = 3.3175;
 const TOWER_CROWN_SCALE = 0.34;
 
@@ -28,6 +61,8 @@ const WALL_PLASTER_STRAIGHT_BASE_Y = -0.002;
 const POST_GROUND_LIFT = 0.01;
 /** Door leaves use a left-jamb pivot; this centres their one-metre body in a wall-door aperture. */
 const DOOR_LEAF_OFFSET = -0.55;
+/** `kerb_straight` is 2.000 x 0.134 x 0.700 with its body entirely on the +Z side of its pivot. */
+const COPING_DEPTH = 0.7;
 
 type GateVariant = 0 | 1 | 2;
 
@@ -92,11 +127,72 @@ function torchY(scale: number): number {
   return -TORCH_BASE_Y * scale + 0.78;
 }
 
-function addTowerCrowns(out: PartPlacement[]): void {
-  // At 0.34 scale the cap is 2.50 m high and its y = -0.572 base offset lands on the 3.123 m
-  // wing head. Matching caps leave the corridor open while their ridges reach about 5.626 m.
-  out.push(placement("crown_left", "roof_tower", -WING_X, TOWER_CROWN_Y, 0, 0, TOWER_CROWN_SCALE));
-  out.push(placement("crown_right", "roof_tower", WING_X, TOWER_CROWN_Y, 0, 0, TOWER_CROWN_SCALE));
+/**
+ * One closed masonry pier: four panels round a 2 x 2 m plan, a post at each corner, a plinth on the
+ * three faces anyone walks past, and the slate cap.
+ *
+ * `side` is -1 for the left pier and +1 for the right. Every face is placed by its OUTWARD surface
+ * and then pulled back by `WALL_FACE`, so the pier's drawn envelope is exactly the plan above and
+ * the cap lands on it rather than over air.
+ */
+function addPier(out: PartPlacement[], kit: BuildingKit, side: -1 | 1, faceAsset: string): void {
+  const name = side < 0 ? "l" : "r";
+  const centre = side * PIER_CENTRE;
+  const y = wallY(faceAsset);
+  const trimY = wallY("wall_bottom_trim");
+
+  // Road elevation and settlement elevation. These two carry the vernacular; the returns are plain.
+  out.push(placement(`pier_${name}_front`, faceAsset, centre, y, PIER_HALF_DEPTH - WALL_FACE, 0));
+  out.push(placement(`pier_${name}_back`, faceAsset, centre, y, -(PIER_HALF_DEPTH - WALL_FACE), Math.PI));
+  // The two returns close the box. Local +Z is a panel's outward normal, so the yaw that turns it
+  // onto +X is +PI/2 and onto -X is -PI/2.
+  out.push(placement(
+    `pier_${name}_outer`, kit.wall, side * (PIER_OUTER - WALL_FACE), wallY(kit.wall), 0, side * Math.PI / 2,
+  ));
+  out.push(placement(
+    `pier_${name}_inner`, kit.wall, side * (PIER_INNER + WALL_FACE), wallY(kit.wall), 0, -side * Math.PI / 2,
+  ));
+
+  // A post on each plan corner, turned to face its diagonal, which is what stops four panels
+  // meeting in mid-air from reading as four panels.
+  for (const [index, corner] of ([[PIER_INNER, 1], [PIER_OUTER, 1], [PIER_OUTER, -1], [PIER_INNER, -1]] as const).entries()) {
+    out.push(placement(
+      `pier_${name}_post${index}`, kit.corner,
+      side * corner[0], POST_GROUND_LIFT, corner[1] * PIER_HALF_DEPTH,
+      Math.atan2(side * corner[0], corner[1]), postScale(kit),
+    ));
+  }
+
+  // Plinth on the road face, the settlement face and the outer return. The inner return faces into
+  // the passage under the arch and is the one course the player never sees a footing line on.
+  out.push(placement(`pier_${name}_trim_f`, "wall_bottom_trim", centre, trimY, PIER_HALF_DEPTH - WALL_FACE + 0.01, 0));
+  out.push(placement(`pier_${name}_trim_b`, "wall_bottom_trim", centre, trimY, -(PIER_HALF_DEPTH - WALL_FACE + 0.01), Math.PI));
+  out.push(placement(
+    `pier_${name}_trim_o`, "wall_bottom_trim",
+    side * (PIER_OUTER - WALL_FACE + 0.01), trimY, 0, side * Math.PI / 2,
+  ));
+
+  out.push(placement(`crown_${name}`, "roof_tower", centre, TOWER_CROWN_Y, 0, 0, TOWER_CROWN_SCALE));
+}
+
+/**
+ * One module of wall running outboard of each pier, capped like a town wall.
+ *
+ * The gate has to say "there is a border here", and two piers on their own say "there is a gate
+ * here". `kerb_straight` along the head is the same coping `buildWallRun` uses, so a region gate
+ * and a settlement wall are visibly the same construction.
+ */
+function addWing(out: PartPlacement[], kit: BuildingKit, side: -1 | 1, asset: string): void {
+  const name = side < 0 ? "l" : "r";
+  out.push(placement(`wing_${name}`, asset, side * WING_CENTRE, wallY(asset), 0, 0));
+  out.push(placement(`wing_${name}_trim`, "wall_bottom_trim", side * WING_CENTRE, 0, 0.01, 0));
+  out.push(placement(
+    `wing_${name}_coping`, "kerb_straight",
+    side * WING_CENTRE, STOREY_METRES - 0.134, -0.11 - COPING_DEPTH / 2, 0,
+  ));
+  out.push(placement(
+    `wing_${name}_end`, kit.corner, side * WING_END, POST_GROUND_LIFT, 0, side * Math.PI / 4, postScale(kit),
+  ));
 }
 
 function addBanners(
@@ -106,100 +202,80 @@ function addBanners(
   single: boolean,
 ): void {
   const y = bannerY(assetId, scale);
-  // The gate's outer corner posts are the mounting supports. These banners are projecting
-  // standards, so their rail sits on the post and the cloth runs out toward the approach. Do not
-  // shift either anchor by the cloth width: that would put a perpendicular banner along the wall.
-  const leftX = -RETURN_X;
-  const rightX = RETURN_X;
-  const supportZ = 0.18;
-  if (single) {
-    out.push(wallMountedBanner(
-      "banner_right", assetId, { dx: rightX, dy: y, dz: supportZ }, 0, scale,
-    ));
-    return;
+  // The banners hang on the piers' road elevation, a third of the way in from the passage, with
+  // their rail on the masonry and the cloth running out over the approach. Do not shift either
+  // anchor by the cloth width: that would put a perpendicular banner along the wall.
+  const dz = PIER_HALF_DEPTH + 0.02;
+  if (!single) {
+    out.push(wallMountedBanner("banner_left", assetId, { dx: -PIER_CENTRE, dy: y, dz }, 0, scale));
   }
-  out.push(wallMountedBanner(
-    "banner_left", assetId, { dx: leftX, dy: y, dz: supportZ }, 0, scale,
-  ));
-  out.push(wallMountedBanner(
-    "banner_right", assetId, { dx: rightX, dy: y, dz: supportZ }, 0, scale,
-  ));
+  out.push(wallMountedBanner("banner_right", assetId, { dx: PIER_CENTRE, dy: y, dz }, 0, scale));
 }
 
 function addTorches(out: PartPlacement[], scale: number, single: boolean): void {
   const y = torchY(scale);
-  if (single) {
-    out.push(placement("torch_right", "torch", WING_X + 0.05, y, 0.19, 0, scale));
-    return;
-  }
-  // The torch is a wall-side accent, never a central obstacle. Both heads look down the +Z road.
-  out.push(placement("torch_left", "torch", -WING_X - 0.05, y, 0.19, 0, scale));
-  out.push(placement("torch_right", "torch", WING_X + 0.05, y, 0.19, 0, scale));
+  // On the passage jambs, where a gate watch would actually want light. Both heads look down the
+  // +Z road and neither is in the corridor: the bracket is 0.11 m wide against a 2.70 m gap.
+  const dx = PIER_INNER + 0.12;
+  const dz = PIER_HALF_DEPTH - 0.25;
+  if (!single) out.push(placement("torch_left", "torch", -dx, y, dz, 0, scale));
+  out.push(placement("torch_right", "torch", dx, y, dz, 0, scale));
 }
 
 /**
  * Builds one of three deterministic regional gate treatments for the supplied settlement kit.
  *
- * Variant 0 is a pair of standards, variant 1 is a torch-watch, and variant 2 adds a side wicket
- * and a single standard when the part budget allows. Timber kits receive their frame overlay on
- * the front wings; the side wicket leaves one overlay off so the total stays within ten parts.
+ * Variant 0 is a pair of standards, variant 1 is a torch-watch, and variant 2 puts a wicket door in
+ * the left wing under a single standard. Timber kits receive their frame overlay on the two pier
+ * road elevations, which is where a player standing under the arch is looking.
  */
 export function buildRegionGateComposition(seed: number, kit: BuildingKit): PartPlacement[] {
   const variant = variantFor(seed, kit);
   const out: PartPlacement[] = [];
-  const timberFrame = kit.frame;
   const bannerAsset: "banner_1" | "banner_2" = kit.id === "timber" ? "banner_2" : "banner_1";
   const bannerScale = kit.id === "timber" ? 0.88 : 0.82;
   const torchScale = kit.id === "stone" ? 1.18 : 1.12;
   const sideWicket = variant === 2;
 
-  // The front wings deliberately sit outside the 3.2 m corridor requirement and outside the
-  // wall_arch hero's 1.4x outer jambs. A feature wall on variant 1 adds the kit's richer apron
-  // without changing the envelope or closing the road.
-  const wingAsset = variant === 1 ? kit.wallFeature : kit.wall;
-  const leftWingAsset = sideWicket ? kit.wallDoor : wingAsset;
-  out.push(placement("wing_left", leftWingAsset, -WING_X, wallY(leftWingAsset), 0));
-  out.push(placement("wing_right", wingAsset, WING_X, wallY(wingAsset), 0));
-  addTowerCrowns(out);
+  // Variant 1 puts the kit's richer apron on the road elevations. The envelope never changes: a
+  // gate is a fixed piece of infrastructure and the variation is what is hung on it.
+  const faceAsset = variant === 1 ? kit.wallFeature : kit.wall;
+  addPier(out, kit, -1, faceAsset);
+  addPier(out, kit, 1, faceAsset);
 
-  // One module of each shallow return turns the wings back toward the settlement. They are outside
-  // the arch's silhouette, so the hero remains the first thing read from the approach.
-  out.push(placement("return_left", kit.wall, -RETURN_X, wallY(kit.wall), RETURN_Z, Math.PI / 2));
-  out.push(placement("return_right", kit.wall, RETURN_X, wallY(kit.wall), RETURN_Z, -Math.PI / 2));
+  addWing(out, kit, -1, sideWicket ? kit.wallDoor : kit.wall);
+  addWing(out, kit, 1, kit.wall);
 
-  // A centimetre of lift clears the measured sub-centimetre post pivot offset in every kit while
-  // keeping the foot visually planted at the gate threshold.
-  const postY = POST_GROUND_LIFT;
-  const postRotationLeft = -Math.PI / 4;
-  const postRotationRight = Math.PI / 4;
-  out.push(placement("corner_left", kit.corner, -RETURN_X, postY, 0.12, postRotationLeft, postScale(kit)));
-  out.push(placement("corner_right", kit.corner, RETURN_X, postY, 0.12, postRotationRight, postScale(kit)));
+  // Two more ribs behind the hero arch, so the crossing is a PASSAGE and not a card.
+  //
+  // `wall_arch` is 2.000 x 3.000 x 0.064 and the world draws it at 1.4x, which is 0.09 m of timber
+  // spanning a 2 m deep gate. Head on it reads fine; from the road shoulder - which is where the
+  // player walks up to it - it is a cardboard cutout between two solid piers, and that mismatch is
+  // more obvious now the piers have mass than it was when they were cards too. Three ribs on the
+  // same 1.4x the world uses turn it into an arched opening two metres deep. Their jambs land
+  // 0.05 m inside the pier faces, so the passage is masonry, timber, masonry all the way through.
+  for (const [index, dz] of [-0.58, 0.52].entries()) {
+    out.push(placement(`arch_rib_${index}`, "wall_arch", 0, 0, dz, 0, 1.4));
+  }
 
-  // Half-timbered kits keep the solid wall body and put the open-frame asset proud of it. Stone and
-  // plaster kits have no frame overlay, so their corner posts remain visible as the vernacular cue.
-  if (timberFrame !== null) {
-    if (!sideWicket) out.push(placement("frame_left", timberFrame, -WING_X, wallY(timberFrame), 0.02));
-    out.push(placement("frame_right", timberFrame, WING_X, wallY(timberFrame), 0.02));
+  // Half-timbered kits keep the solid panel and put the open-frame asset 0.02 m proud of it. Stone
+  // and plaster kits have no frame overlay, so their corner posts remain the vernacular cue.
+  if (kit.frame !== null) {
+    for (const [name, side] of [["l", -1], ["r", 1]] as const) {
+      out.push(placement(
+        `pier_${name}_frame`, kit.frame,
+        side * PIER_CENTRE, wallY(kit.frame), PIER_HALF_DEPTH - WALL_FACE + 0.02, 0,
+      ));
+    }
   }
 
   if (sideWicket) {
-    // A side wicket is beyond the portal's inner face, never across the road. The kit door is kept
-    // on the same +Z elevation as the wallDoor panel and remains ground-safe at its authored pivot.
-    out.push(placement("wicket_leaf", kit.door, -WING_X + DOOR_LEAF_OFFSET, 0.02, 0.21));
+    // The wicket is in the left wing, beyond the pier and never across the road.
+    out.push(placement("wicket_leaf", kit.door, -WING_CENTRE + DOOR_LEAF_OFFSET, 0.02, 0.13));
   }
 
-  const detailBudget = 10 - out.length;
-  if (detailBudget <= 0) return out;
-
-  if (variant === 0) {
-    addBanners(out, bannerAsset, bannerScale, detailBudget < 2);
-  } else if (variant === 1) {
-    addTorches(out, torchScale, detailBudget < 2);
-  } else {
-    // Variant 2's wicket already signals a staffed crossing; a single standard keeps the facade
-    // readable without crowding the arch or exceeding the two-detail budget.
-    addBanners(out, bannerAsset, bannerScale, true);
-  }
+  if (variant === 1) addTorches(out, torchScale, false);
+  else addBanners(out, bannerAsset, bannerScale, sideWicket);
 
   return out;
 }

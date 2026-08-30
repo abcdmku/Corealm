@@ -1512,6 +1512,26 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       frameDocumentationTarget(target, contextualYaw, pitch, distance, "focus-entity", playerTarget);
       return true;
     },
+    inspectPose: (target: Vec3, yaw: number, pitch: number, distance: number) => {
+      const regionId = regionAtPoint(target);
+      entityViews.setCaptureSubject(null);
+      scene.scatterGroup.visible = true;
+      scene.terrainGroup.visible = true;
+      if (dungeon) dungeon.group.visible = regionId === "gravelmaw";
+      const stand: Vec3 = [target[0], scene.heightAt(regionId, target[0], target[2]), target[2]];
+      store.get().player.position = stand;
+      store.get().player.regionId = regionId;
+      store.get().player.facingRad = yaw + Math.PI;
+      entityViews.sync(entityStore.all().filter((entity) =>
+        (entity.regionId === "gravelmaw") === (regionId === "gravelmaw")));
+      audioDirector.setRegion(regionId);
+      movement.stop(store.get(), clock.elapsedMs, "inspect-pose");
+      scene.syncPlayer(stand, yaw + Math.PI, true);
+      camera.setPose(yaw, pitch, distance);
+      camera.update(target[0], target[1], target[2], true);
+      renderer.followShadow(renderer.camera.position.clone().setY(stand[1]));
+      return true;
+    },
     focusLocation: (locationId: string) => {
       entityViews.setCaptureSubject(null);
       const locationRegion = REGIONS.find((region) =>

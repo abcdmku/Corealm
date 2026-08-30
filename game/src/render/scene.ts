@@ -2271,10 +2271,27 @@ export class WorldScene {
       roadWear = dirt;
     }
 
+    // Paving. The signed distance to the nearest authored rectangle, pushed by a low-frequency
+    // wobble so the boundary is not a straight line, and ramped across the edge rather than from
+    // it. `pavedEdge` is kept so the gravel shoulder below can sit outside whatever the wobble did.
     let cobble = 0;
+    let pavedEdge = Number.POSITIVE_INFINITY;
+    const pavingWobble = noise
+      ? (noise(x / 7.3, z / 7.3) * 0.7 + noise((x - 233) / 2.6, (z + 91) / 2.6) * 0.3)
+        * PAVING_EDGE_WOBBLE
+      : 0;
     for (const pad of this.paving) {
-      const distance = rectDistance(x, z, pad.centre, pad.halfExtents, pad.rotationY ?? 0);
-      cobble = Math.max(cobble, 1 - smoothstep01(distance / PAVING_FEATHER));
+      const distance = rectDistance(x, z, pad.centre, pad.halfExtents, pad.rotationY ?? 0)
+        + pavingWobble;
+      if (distance < pavedEdge) pavedEdge = distance;
+      cobble = Math.max(cobble, 1 - smoothstep01((distance + PAVING_FEATHER * 0.4) / PAVING_FEATHER));
+    }
+    // Grit and broken stone where the paving gives out, which is the same shoulder a worn road
+    // gets and the reason a town square stops looking like a rug thrown on a lawn.
+    if (pavedEdge < PAVING_FEATHER + PAVING_VERGE_METRES) {
+      const shoulder = (1 - cobble)
+        * (1 - smoothstep01((pavedEdge - PAVING_FEATHER * 0.6) / PAVING_VERGE_METRES));
+      verge = Math.max(verge, clamp(shoulder, 0, 1));
     }
 
     let wet = 0;
@@ -3277,8 +3294,29 @@ const SURFACE_MACRO_RANGE = 0.34;
 /** Bucket size for the road segment grid, in metres. One bucket covers the whole fade width. */
 const ROAD_CELL = 8;
 
-/** How far a paved edge feathers into the ground around it, in metres. */
-const PAVING_FEATHER = 1.2;
+/**
+ * How far a paved edge feathers into the ground around it, in metres.
+ *
+ * 1.2 m of ramp starting exactly ON the authored rectangle, which is what this was, draws a hard
+ * axis-aligned line: the cobble swatch at full strength right up to a straight edge and then a
+ * metre of gradient. Against a green field that reads as a decal, which is what a player sees
+ * looking north out of Coldbrace's square. The band is wider now and STRADDLES the edge - it
+ * begins 0.4 x this inside the rect and ends 0.6 x outside - so the paving thins before it stops.
+ */
+const PAVING_FEATHER = 2.4;
+
+/**
+ * How far the paved edge wanders off the authored rectangle, in metres.
+ *
+ * Two octaves of the surface noise: 7.3 m sets which stretch of the edge has crept out into the
+ * grass and which has been worn back, and 2.6 m breaks the line between them so it is a coastline
+ * rather than one soft gradient. Nothing else in the ground stamp is axis-aligned, and a town
+ * square is the one place the player stands still and looks at the boundary.
+ */
+const PAVING_EDGE_WOBBLE = 0.9;
+
+/** Gravel shoulder outside the paved edge, in metres. The verge a worn approach actually has. */
+const PAVING_VERGE_METRES = 1.7;
 
 /** How far past a water body's radius the bank treatment reaches, in metres. */
 const WATER_BANK_METRES = 6;

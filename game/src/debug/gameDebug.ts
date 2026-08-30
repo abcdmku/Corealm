@@ -84,6 +84,15 @@ export interface DebugDeps {
   focusEntity(entityId: EntityId): boolean;
   /** Frames a route-graph location, using its authored shot when one exists. */
   focusLocation(locationId: string): boolean;
+  /**
+   * Free orbit pose around an arbitrary world point, for structure inspection.
+   *
+   * `focusCamera` and `focusLocation` both snap their target to the navmesh, which is right for a
+   * gameplay pose and wrong for photographing a roof: the interesting half of a structure audit is
+   * above head height and off the walkable surface. This one places the orbit centre exactly where
+   * it is asked to.
+   */
+  inspectPose(target: Vec3, yaw: number, pitch: number, distance: number): boolean;
   /** Freezes simulation and hides the player while documentation captures run. */
   setCaptureMode(enabled: boolean): void;
   /** Renders and returns the current gameplay canvas before another frame can clear it. */
@@ -678,6 +687,16 @@ export function installGameDebug(deps: DebugDeps): void {
     /** Alias. `tools/screenshot.ts --preset` calls this name. */
     setCameraPreset(shotId: string): boolean {
       return deps.focusCamera(shotId);
+    },
+
+    /** Orbit an arbitrary world point. Structure audits need poses no route node offers. */
+    inspectPose(pose: {
+      x: number; y: number; z: number; yaw?: number; pitch?: number; distance?: number;
+    }): boolean {
+      return deps.inspectPose(
+        [Number(pose.x), Number(pose.y), Number(pose.z)],
+        Number(pose.yaw ?? 0), Number(pose.pitch ?? 0.35), Number(pose.distance ?? 14),
+      );
     },
 
     listShots(): string[] {

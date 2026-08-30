@@ -341,9 +341,18 @@ export function surfaceColour(
     case "dirt": return mixHex(palette.soil, palette.rock, 0.32, 1.02);
     // Churned wet earth at a waterline. Dark, and the only place in the palette that goes there.
     case "mud": return mixHex(palette.soil, palette.water, 0.3, 0.72);
-    // Laid stone. Rock pulled hard toward its own grey and lifted, so a paved square separates
-    // from the natural rock on the hillside behind it.
-    case "cobble": return mixHex(palette.rock, 0x9a978f, 0.55, 1.06);
+    // Laid stone: the BED the paving is set in, so it has to match the paving.
+    //
+    // This was `mixHex(palette.rock, 0x9a978f, 0.55, 1.06)` - the region's natural rock lifted
+    // toward a warm grey - and it gave Fallowmarch #9d978d against `floor_cobble` tiles that the
+    // architecture layer tints toward `ARCHITECTURE_PALETTES.stone`, #6f787c at 0.86 brightness.
+    // A warm pale tan under cool dark slate. Every metre of a settlement's paving stamp that a
+    // 2 m tile does not sit on - the frayed edges, the gaps a player walks past, the whole apron
+    // outside the tiled rectangle - therefore read as SAND next to the cobbles, which is the hard
+    // cutoff a player called out looking north out of Coldbrace's square. Derived from the same
+    // architecture stone the tiles take, dragged a quarter toward the region's soil and darkened,
+    // so a gap in the paving reads as the earth the stones are bedded into.
+    case "cobble": return mixHex(ARCHITECTURE_PALETTES[regionId].stone, palette.soil, 0.26, 0.9);
     // Saturated ground just above the waterline.
     default: return mixHex(palette.soil, palette.water, 0.55, 0.85);
   }

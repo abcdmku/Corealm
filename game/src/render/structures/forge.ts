@@ -67,13 +67,27 @@ function crate(context: StructureVariantContext, tag: string, sign: -1 | 1, asse
   );
 }
 
-function brace(context: StructureVariantContext, tag: string, sign: -1 | 1, insetX: number, scale: number): PartPlacement {
+/**
+ * One raking prop against a side wall of the open mouth.
+ *
+ * `dzBack` moves it along the wall rather than in off it. The pair of "inner" braces used to be
+ * placed by insetX alone, which stood them 0.19 m clear of both the wall and the outer brace: two
+ * posts in mid-air in the middle of the forge mouth, touching nothing. A prop leans on something.
+ */
+function brace(
+  context: StructureVariantContext,
+  tag: string,
+  sign: -1 | 1,
+  insetX: number,
+  scale: number,
+  dzBack = 0,
+): PartPlacement {
   return variantPart(
     tag,
     "support_beam",
     sideX(context, sign, insetX),
     -1.211 * scale,
-    frontZ(context),
+    frontZ(context) - dzBack,
     Math.PI,
     scale,
   );
@@ -248,8 +262,9 @@ export const FORGE_VARIANTS: readonly StructureVariantRecipe[] = [
       curatedBase(base, true),
       brace(context, "outer_brace_left", -1, 0.3, 1.2),
       brace(context, "outer_brace_right", 1, 0.3, 1.2),
-      brace(context, "inner_brace_left", -1, 0.68, 0.72),
-      brace(context, "inner_brace_right", 1, 0.68, 0.72),
+      // Set back along the same wall, not inboard of the outer pair.
+      brace(context, "inner_brace_left", -1, 0.3, 0.72, 1.5),
+      brace(context, "inner_brace_right", 1, 0.3, 0.72, 1.5),
       chimney(context, "stack_rear", -1),
       lamp(context, 1),
     ),

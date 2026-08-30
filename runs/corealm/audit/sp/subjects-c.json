@@ -1,0 +1,14 @@
+[
+ {"tag":"a-regiongate","x":-26,"y":2,"z":118,"distance":18,"pitch":0.24},
+ {"tag":"a-marchgate","x":-12,"y":2,"z":122,"distance":16,"pitch":0.22},
+ {"tag":"a-milestone","x":-108,"y":1.5,"z":-8,"distance":9,"pitch":0.3},
+ {"tag":"a-farmstead","x":-96,"y":3,"z":-28.4,"distance":22,"pitch":0.3},
+ {"tag":"a-well","x":-164,"y":1.2,"z":-77,"distance":8,"pitch":0.32},
+ {"tag":"a-square-edge","x":-160,"y":1,"z":-95,"distance":28,"pitch":0.5},
+ {"tag":"a-gate-street","x":-160,"y":1,"z":-104,"distance":26,"pitch":0.48},
+ {"tag":"a-cottage","x":-180,"y":3,"z":-102,"distance":16,"pitch":0.3},
+ {"tag":"a-hall","x":-160,"y":3,"z":-68,"distance":24,"pitch":0.28},
+ {"tag":"a-highcairn-shed","x":146,"y":3,"z":-52,"distance":13,"pitch":0.3},
+ {"tag":"a-stones","x":206,"y":3,"z":168,"distance":18,"pitch":0.22},
+ {"tag":"a-vault","x":-168,"y":4,"z":-91,"distance":16,"pitch":0.3}
+]

@@ -13,6 +13,15 @@ interface WellStyle {
 const HALF_FOOTPRINT = 1;
 const CURB_LINE = inset(0.68, HALF_FOOTPRINT, 0.25);
 const FLOWER_EDGE = inset(0.82, HALF_FOOTPRINT, 0.12);
+/**
+ * Top of the wellhead curb, mirroring `WELL_CURB_SHOW` in render/buildings.ts.
+ *
+ * The curb used to be a 0.167 m trim ring, so "on the curb" and "on the ground" were the same
+ * height and every offering, flower and coin in these recipes was authored at y ~= 0.01. The curb
+ * is 0.55 m of masonry now: anything authored inside the 0.70 m ring at ground level is at the
+ * bottom of the shaft, where nobody can see it.
+ */
+const CURB_TOP = 0.55;
 
 /** Keep the fixed curb and post placements, but use the slender post mesh in every regional kit. */
 function dressWell(base: readonly PartPlacement[], style: WellStyle = {}): PartPlacement[] {
@@ -52,8 +61,11 @@ export const WELL_VARIANTS: readonly StructureVariantRecipe[] = [
       // The two dark plank slopes read as an upright rack from Coldbrace's square camera. Replace
       // them with the kit's smallest complete tiled roof, scaled to the same measured envelope.
       dressWell(base, { bucket: "bucket_metal", rigging: "rope_coil", roof: false }),
-      variantPart("tiled_canopy", "roof_tiles_4x6", 0, 2.18, 0, 0, 0.3),
-      variantPart("winch_axle", "roof_log", 0, 1.07, 0, Math.PI / 2, 0.13),
+      // 0.30 drew a 1.65 m tile over posts standing 1.56 m apart with 0.08 m caps, so both front
+      // posts came through the roof by 0.14 m. At 0.38 the tile plane crosses the post line 0.24 m
+      // above the placement height, which clears the caps by 0.06 m. The base already carries the
+      // windlass drum; a second `roof_log` here drew two axles in the same 0.15 m of space.
+      variantPart("tiled_canopy", "roof_tiles_4x6", 0, 2.1, 0, 0, 0.38),
     ),
   },
   {
@@ -111,10 +123,11 @@ export const WELL_VARIANTS: readonly StructureVariantRecipe[] = [
         Math.PI,
         0.34,
       ),
-      variantPart("offering_books", "book_stack", -0.35, 0.09, -CURB_LINE, 0.2, 0.75),
-      variantPart("offering_coins", "coin_pile", -0.08, 0.09, -CURB_LINE, -0.3, 0.9),
-      variantPart("offering_vial", "potion_1", 0.18, 0.09, -CURB_LINE, 0.4, 0.9),
-      variantPart("votive", "candle_stand", 0.48, 0.09, -CURB_LINE, 0, 0.25),
+      // Laid along the south coping, not on the floor of the shaft.
+      variantPart("offering_books", "book_stack", -0.35, CURB_TOP, -CURB_LINE, 0.2, 0.75),
+      variantPart("offering_coins", "coin_pile", -0.08, CURB_TOP, -CURB_LINE, -0.3, 0.9),
+      variantPart("offering_vial", "potion_1", 0.18, CURB_TOP, -CURB_LINE, 0.4, 0.9),
+      variantPart("votive", "candle_stand", 0.48, CURB_TOP, -CURB_LINE, 0, 0.25),
     ),
   },
 ];

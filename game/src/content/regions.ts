@@ -1152,7 +1152,10 @@ const VELLENWOOD: RegionDef = {
     },
     {
       id: "thornline_stones", name: "The Thornline Stones", position: [206, 168],
-      assetId: "boulder_medium", scale: 1.1,
+      // Was `boulder_medium` at 1.1, which is one of the six untextured platformer rocks: a 5.3 m
+      // smooth tan cone standing in the middle of four textured grey ones. `rock_medium_2` carries
+      // TEXCOORD_0 and the shared Rocks atlas, so the hero belongs to its own ring.
+      assetId: "rock_medium_2", scale: 1.35,
       composition: "standing_stones",
       blurb: "Standing stones at the clearing edge. The Thornbound will not cross them.",
     },
@@ -1323,7 +1326,9 @@ const KARROWMOOR: RegionDef = {
       id: "cairn_leap", name: "Cairn Leap", reqLevel: 14,
       position: [246, -104], exitPosition: [272, -118],
       durationMs: 3000, savesMeters: 63,
-      assetId: "boulder_medium", scale: 1.1,
+      // Same swap as `thornline_stones`: `boulder_medium` has no UVs and cannot be tinted or
+      // textured at any tier. `rock_medium_3` at 1.5 is the same 5.1 m mass and reads as stone.
+      assetId: "rock_medium_3", scale: 1.5,
       fromLocationId: "ridge_pines", toLocationId: "far_tarn",
       interaction: "vault",
     },

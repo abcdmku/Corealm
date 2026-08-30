@@ -1,0 +1,146 @@
+[
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door plaster",
+  "tag": "kerb_r",
+  "assetId": "kerb_straight",
+  "metres": 0.9578634682446167,
+  "note": "nearest other part is 0.96 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door timber",
+  "tag": "kerb_r",
+  "assetId": "kerb_straight",
+  "metres": 0.9578634682446167,
+  "note": "nearest other part is 0.96 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door stone",
+  "tag": "kerb_r",
+  "assetId": "kerb_straight",
+  "metres": 0.9578634682446167,
+  "note": "nearest other part is 0.96 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door plaster",
+  "tag": "kerb_l",
+  "assetId": "kerb_straight",
+  "metres": 0.957861418331862,
+  "note": "nearest other part is 0.96 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door timber",
+  "tag": "kerb_l",
+  "assetId": "kerb_straight",
+  "metres": 0.957861418331862,
+  "note": "nearest other part is 0.96 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door stone",
+  "tag": "kerb_l",
+  "assetId": "kerb_straight",
+  "metres": 0.957861418331862,
+  "note": "nearest other part is 0.96 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition root_tunnel_entrance timber",
+  "tag": "root_b_threshold",
+  "assetId": "floor_wood",
+  "metres": 0.500179316447523,
+  "note": "nearest other part is 0.50 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition root_tunnel_entrance stone",
+  "tag": "root_a_threshold",
+  "assetId": "floor_wood",
+  "metres": 0.4780771991922165,
+  "note": "nearest other part is 0.48 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition root_tunnel_entrance plaster",
+  "tag": "root_c_threshold",
+  "assetId": "floor_wood",
+  "metres": 0.46597508193690984,
+  "note": "nearest other part is 0.47 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition canopy_walk_entrance timber",
+  "tag": "canopy_c_deck",
+  "assetId": "floor_wood",
+  "metres": 0.378017427043042,
+  "note": "nearest other part is 0.38 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition canopy_walk_entrance stone",
+  "tag": "canopy_c_deck",
+  "assetId": "floor_wood",
+  "metres": 0.378017427043042,
+  "note": "nearest other part is 0.38 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition gravelmaw_exit plaster",
+  "tag": "exit_floor_threshold",
+  "assetId": "floor_brick",
+  "metres": 0.2983243919976848,
+  "note": "nearest other part is 0.30 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition path_waypoint stone",
+  "tag": "hero",
+  "assetId": "corner_wood",
+  "metres": 0.24119266419834218,
+  "note": "nearest other part is 0.24 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition gravelmaw_exit timber",
+  "tag": "exit_floor_threshold",
+  "assetId": "floor_brick",
+  "metres": 0.21973053208055915,
+  "note": "nearest other part is 0.22 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition gravelmaw_exit stone",
+  "tag": "exit_floor_threshold",
+  "assetId": "floor_brick",
+  "metres": 0.21973053208055915,
+  "note": "nearest other part is 0.22 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door plaster",
+  "tag": "hero",
+  "assetId": "door_frame_round",
+  "metres": 0.15460952686667562,
+  "note": "nearest other part is 0.15 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door timber",
+  "tag": "hero",
+  "assetId": "door_frame_round",
+  "metres": 0.15460952686667562,
+  "note": "nearest other part is 0.15 m away"
+ },
+ {
+  "kind": "ORPHAN",
+  "subject": "composition vault_door stone",
+  "tag": "hero",
+  "assetId": "door_frame_round",
+  "metres": 0.15460952686667562,
+  "note": "nearest other part is 0.15 m away"
+ }
+]

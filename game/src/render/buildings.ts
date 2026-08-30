@@ -540,6 +540,10 @@ interface PlacedRoof {
   drop: number;
   /** Half the roof's span ACROSS the ridge, measured at the eave. */
   acrossHalf: number;
+  /** Metres up to where the STRAIGHT tile plane extrapolates. See `RoofPitch`. */
+  pitchApex: number;
+  /** Half-span where the same straight tile plane crosses the placement height. */
+  pitchHalf: number;
 }
 
 function placeRoof(
@@ -547,6 +551,7 @@ function placeRoof(
   box: readonly [number, number],
   apex: number,
   drop: number,
+  pitch: RoofPitch,
 ): PlacedRoof {
   // box[0] is the asset's X bbox, which is always the across-ridge span; the quarter turn swaps
   // which world axis that lands on but not which of the asset's own axes it is.
@@ -557,6 +562,8 @@ function placeRoof(
     apex: apex * fit.scale,
     drop: drop * fit.scale,
     acrossHalf: (box[0] / 2) * fit.scale,
+    pitchApex: pitch[0] * fit.scale,
+    pitchHalf: pitch[1] * fit.scale,
   };
 }
 
@@ -565,27 +572,81 @@ function smallRoof(kit: BuildingKit, width: number, depth: number, tighten = 1):
   const fit = roofFit(width, depth, kit.roofSmallCovers[0], kit.roofSmallCovers[1]);
   return placeRoof(
     { scale: fit.scale * tighten, rotationY: fit.rotationY },
-    kit.roofSmallBox, kit.roofSmallApex, kit.roofSmallDrop,
+    kit.roofSmallBox, kit.roofSmallApex, kit.roofSmallDrop, kit.roofSmallPitch,
   );
 }
 
 /** The hall roof fitted to a footprint. */
 function largeRoof(kit: BuildingKit, width: number, depth: number): PlacedRoof {
   const fit = roofFit(width, depth, kit.roofLargeCovers[0], kit.roofLargeCovers[1]);
-  return placeRoof(fit, kit.roofLargeBox, kit.roofLargeApex, kit.roofLargeDrop);
+  return placeRoof(
+    fit, kit.roofLargeBox, kit.roofLargeApex, kit.roofLargeDrop, kit.roofLargePitch,
+  );
 }
 
 /**
- * `roof_gable_brick` rasterised (runs/corealm/audit/gable-silhouette.mjs): a SOLID triangle, not a
- * frame. Its apex is 4.384 m above its pivot and its raking edges extrapolate to |x| = 3.35 at the
- * pivot height, where a bottom rail runs the full 3.347 m. Despite the id the materials are
- * MI_Plaster and MI_WoodTrim - a plastered, timber-framed gable - which is why all three kits can
- * close their gables with it and only the region tint tells them apart.
+ * `roof_gable_brick` sliced off the GLB (runs/corealm/audit/sp/probe-slice.ts): a SOLID triangle,
+ * not a frame. Its plaster face runs from |x| = 3.123 at y = 0.30 down to |x| = 0.053 at y = 4.30,
+ * so the raking line is |x| = 3.353 - 0.7675 y: half-width 3.353 at the pivot, apex at 4.369. The
+ * bbox is slightly bigger than both (3.347 at the bottom rail, 4.384 at the finial) and fitting to
+ * the BBOX rather than to the rake is a 0.3% error, which is not the one that mattered. Despite the
+ * id the materials are MI_Plaster and MI_WoodTrim - a plastered, timber-framed gable - which is why
+ * all three kits close their gables with it and only the region tint tells them apart.
  */
-const GABLE_APEX_METRES = 4.384;
-const GABLE_HALF_AT_BASE = 3.35;
+const GABLE_RAKE_APEX = 4.369;
+const GABLE_RAKE_HALF = 3.353;
+
+/**
+ * How far inside the tile plane a gable is set, as a fraction.
+ *
+ * The rake and the tiles are the same straight line once the gable is fitted to `RoofPitch`, and
+ * two coplanar surfaces z-fight. 0.96 drops the rake about 0.14 m below the tiles on a cottage and
+ * 0.18 m on a hall, which is inside the tile slab's own thickness, so the gable disappears under
+ * the roof instead of flickering along it. It also pulls the gable's bottom rail - a 0.28 m band at
+ * the full half-width, and the one part of the asset that is not on the rake - back under the
+ * fascia, which at a flush fit stood 0.11 m proud at each eave corner.
+ *
+ * Swept against the form audit: 0.97 leaves 34 pierces of up to 0.042 m where the pantile
+ * corrugation runs shallow, 0.96 leaves none, and by 0.70 the gable has shrunk far enough that
+ * 20-23% of the end is see-through again - which is the hole `gableEnds` was written to close, so
+ * the margin is bounded on both sides and this is measured, not chosen.
+ */
+const GABLE_TILE_INSET = 0.96;
+
+/**
+ * The straight tile plane of one roof asset: `[apex, half]` in metres at scale 1.
+ *
+ * A `roof_tiles_*` is NOT a triangle, and assuming it was is why every pitched roof in the game had
+ * plaster sticking through it. Measured with runs/corealm/audit/sp/probe-pitch.ts, which fits a
+ * line to the slope between a fifth and nine tenths of the half-span - the part that is actually
+ * straight - and extrapolates: `roof_tiles_4x6` runs at 1.387 and extrapolates to 3.441 m over a
+ * 2.479 m half-span, but its bbox tops out at 3.718 because the ridge is a rounded CAP standing
+ * 0.28 m above the plane the tiles were heading for. The 6-wide roofs are worse: 4.396 against a
+ * bbox 4.890, so the cap is 0.49 m.
+ *
+ * `roofSmallApex` is that bbox number, and `gableEnds` used it, so every gable was fitted to the
+ * cap and its rake rode 0.09-0.26 m over the tiles for its whole length (form audit, PIERCE). A
+ * gable is a wall under a roof plane, so it is sized to the PLANE.
+ */
+type RoofPitch = readonly [apex: number, half: number];
+
 /** Compact shed roof fit. 0.80 let wall frames and stone corner caps pierce the tile surface. */
 const SHED_ROOF_FIT = 0.88;
+
+/**
+ * Uniform scale of a shed's roof: the compact fit, floored at what covers the shed's own posts.
+ *
+ * One function so `shed()` and `roofOverhang("shed", ...)` cannot disagree, which they would have
+ * to have done otherwise - a settlement author spaces buildings by `roofOverhang` and the shed now
+ * draws a bigger roof in the stone kit than the old constant claimed.
+ */
+function shedRoofScale(kit: BuildingKit, width: number, depth: number): number {
+  const tighten = SHED_ROOF_FIT * (4 / kit.roofSmallCovers[0]);
+  const cover = (
+    Math.min(width, depth) / 2 + kit.cornerReach * storeyPostScale(kit) + 0.08
+  ) / kit.roofSmallPitch[1];
+  return Math.max(tighten, cover);
+}
 
 /**
  * Close both ends of a pitched roof.
@@ -600,10 +661,18 @@ const SHED_ROOF_FIT = 0.88;
  * sized them off the footprint (`span / 6.694 * 1.08`) rather than off the roof, so they were
  * 0.36 m short of the ridge AND one of each pair faced backwards.
  *
- * SIZING. The shipped gable's pitch (4.384 / 3.35 = 1.309) is not the roofs' (1.348 on
- * roof_tiles_4x6, 1.185 on roof_tiles_6x8). Uniform fitting therefore either leaves a triangular
- * hole or pushes the gable through the tiles. Fit local X to the wall-head intersection and local
- * Y to the ridge independently; local Z follows X so the timber frame keeps a sensible thickness.
+ * SIZING. The shipped gable's rake (4.369 / 3.353 = 1.303) is not the roofs' (1.387 on
+ * roof_tiles_4x6, 1.237 on the 6-wide pair). Uniform fitting therefore either leaves a triangular
+ * hole or pushes the gable through the tiles. Fit local X and local Y independently; local Z
+ * follows X so the timber frame keeps a sensible thickness.
+ *
+ * AND FIT IT TO THE TILE PLANE, NOT TO THE BOUNDING BOX. This was wrong for as long as the function
+ * has existed. `headHalf` modelled the roof as a triangle from the eave corner to the top of the
+ * bbox and put the gable's apex on that top - but the top of the bbox is the rounded RIDGE CAP,
+ * which stands 0.28 m (4x6) to 0.49 m (6-wide) above the straight plane the tiles run in. The gable
+ * IS straight, so a rake pinned to the cap rides over the tiles for its whole length: measured at
+ * 0.169 m on a plaster cottage, 0.224 m on a stone one, 0.264 m on the March Company Hall, on every
+ * building in all three settlements. `RoofPitch` is the measured plane and this fits to it.
  *
  * ORIENTATION. The asset's plaster face looks down its own local -Z, so the two ends need
  * different yaws. They had the same one, so half of Highcairn's gables were inside out.
@@ -616,11 +685,9 @@ function gableEnds(
   kit: BuildingKit,
   baseY = STOREY_METRES,
 ): void {
-  // Where the roof crosses the wall head, which is what has to be closed - not the eave, which is
-  // out over open air, and not the footprint, which the roof already over-sails.
-  const headHalf = roof.acrossHalf * roof.apex / (roof.apex + roof.drop);
-  const acrossScale = headHalf / GABLE_HALF_AT_BASE;
-  const heightScale = roof.apex / GABLE_APEX_METRES;
+  // The straight tile plane, set a little inside the tiles so the two surfaces do not z-fight.
+  const acrossScale = (roof.pitchHalf / GABLE_RAKE_HALF) * GABLE_TILE_INSET;
+  const heightScale = (roof.pitchApex / GABLE_RAKE_APEX) * GABLE_TILE_INSET;
   const ridgeLength = roof.alongZ ? depth : width;
   for (const [index, sign] of [-1, 1].entries()) {
     out.push({
@@ -843,6 +910,14 @@ export interface BuildingKit {
    * proud of the tiles.
    */
   roofSmallDrop: number;
+  /**
+   * The straight tile plane of the small roof: `[apex, half]` at scale 1. See `RoofPitch`.
+   *
+   * NOT `[roofSmallApex, roofSmallBox[0] / 2]`. Those two are the bounding box, which is the top of
+   * the ridge cap and the outer tip of the fascia; the plane the tiles actually run in is lower and
+   * narrower, and it is the plane a gable has to lie in.
+   */
+  roofSmallPitch: RoofPitch;
   /** The long roof, for halls. */
   roofLarge: string;
   roofLargeCovers: readonly [number, number];
@@ -852,11 +927,23 @@ export interface BuildingKit {
   roofLargeApex: number;
   /** Metres the long roof's lowest point hangs below its placement height, at scale 1. */
   roofLargeDrop: number;
+  /** The straight tile plane of the long roof: `[apex, half]` at scale 1. See `RoofPitch`. */
+  roofLargePitch: RoofPitch;
   /**
    * Height of `corner`, at scale 1. `corner_wood` is 3.000 and `corner_brick` 3.016 against a
    * 3.123 m storey, so a post has to be scaled to reach the wall head rather than left 0.12 m short.
    */
   cornerHeight: number;
+  /**
+   * How far `corner` reaches past the footprint corner it stands on, at scale 1, in metres.
+   *
+   * `corners()` turns each post to face its own diagonal, so the reach is not half the bbox: on
+   * `corner_brick` (x -0.353..0.178, z -0.199..0.377) a quarter turn puts the far edge at
+   * (0.377 + 0.353) / sqrt(2) = 0.516 m from the pivot, against 0.159 m for `corner_wood`. A roof
+   * fitted to the footprint alone therefore covers a plaster shed and leaves brick corner caps
+   * standing through the tiles, which is what `shed[4x4] stone` did by 0.24 m.
+   */
+  cornerReach: number;
   /** Trim laid along the ridge line. Empty when the kit has none. */
   ridge: string | null;
   /** A dormer or gable end that changes the roofline. Empty when the kit has none. */
@@ -890,12 +977,15 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
     roofSmallBox: [5.513, 7.572],
     roofSmallApex: 3.718,
     roofSmallDrop: 0.516,
+    roofSmallPitch: [3.441, 2.479],
     roofLarge: "roof_tiles_6x12",
     roofLargeCovers: [6, 12],
     roofLargeBox: [8.25, 13.658],
     roofLargeApex: 4.89,
     roofLargeDrop: 0.782,
+    roofLargePitch: [4.367, 3.538],
     cornerHeight: 3,
+    cornerReach: 0.159,
     ridge: null,
     roofFeature: null,
   },
@@ -924,12 +1014,15 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
     roofSmallBox: [5.513, 7.572],
     roofSmallApex: 3.718,
     roofSmallDrop: 0.516,
+    roofSmallPitch: [3.441, 2.479],
     roofLarge: "roof_tiles_6x12",
     roofLargeCovers: [6, 12],
     roofLargeBox: [8.25, 13.658],
     roofLargeApex: 4.89,
     roofLargeDrop: 0.782,
+    roofLargePitch: [4.367, 3.538],
     cornerHeight: 3,
+    cornerReach: 0.159,
     ridge: "roof_log",
     roofFeature: "roof_dormer",
   },
@@ -959,12 +1052,15 @@ export const BUILDING_KITS: Record<KitId, BuildingKit> = {
     roofSmallBox: [8.25, 9.683],
     roofSmallApex: 4.89,
     roofSmallDrop: 0.782,
+    roofSmallPitch: [4.396, 3.555],
     roofLarge: "roof_tiles_6x12",
     roofLargeCovers: [6, 12],
     roofLargeBox: [8.25, 13.658],
     roofLargeApex: 4.89,
     roofLargeDrop: 0.782,
+    roofLargePitch: [4.367, 3.538],
     cornerHeight: 3.016,
+    cornerReach: 0.516,
     ridge: null,
     // Was "roof_gable_brick". Closing the gable is no longer a stone-kit FEATURE, it is what every
     // pitched roof in the game now does (`gableEnds`), because leaving it open is what made the
@@ -1030,7 +1126,7 @@ export function roofOverhang(
       return beyond(kit.roofLargeBox, roofFit(width, depth, kit.roofLargeCovers[0], kit.roofLargeCovers[1]));
     case "shed":
       return beyond(kit.roofSmallBox, {
-        scale: SHED_ROOF_FIT * (4 / kit.roofSmallCovers[0]),
+        scale: shedRoofScale(kit, width, depth),
         rotationY: width >= depth ? Math.PI / 2 : 0,
       });
     // roof_tower is 5.651 x 7.361 x 5.427 and `tower` oversizes it by 0.6 m so the eaves clear the
@@ -1124,8 +1220,10 @@ export function prefabHeight(prefab: PrefabId): number {
     case "porch": return STOREY_METRES;
     case "arcade": return STOREY_METRES;
     case "market_row": return 2.7;
-    // The low curb is solid; its walk-under roof is handled separately by camera cover.
-    case "well": return 0.25;
+    // The curb is solid; its walk-under roof is handled separately by camera cover. 0.25 was the
+    // old flat trim ring; the curb now stands 0.55 m out of the ground, so the box has to as well
+    // or the player walks through masonry they can see.
+    case "well": return WELL_CURB_SHOW;
     // A barn is one tall storey under the kit's LARGE roof, so it clears the hall by the difference
     // between `roofLargeApex` and the hall's own roof: 3.123 + 5.4 against the hall's 3.123 + 4.9.
     case "farmstead": return STOREY_METRES + 5.4;
@@ -1500,13 +1598,16 @@ function shed(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPla
   }
 
   corners(out, width, depth, kit.corner, 0, storeyPostScale(kit), "c");
-  // A 0.80 fit left the high timber frames and stone corner caps above the actual tile surface.
-  // 0.88 is the measured smallest shared fit with a few centimetres of cover in all three kits.
-  // The ratio remains against the kit's own coverage, so the stone roof stays compact.
-  const shedScale = SHED_ROOF_FIT * (4 / kit.roofSmallCovers[0]);
+  // A 0.80 fit left the high timber frames and stone corner caps above the actual tile surface, and
+  // 0.88 only looked like enough because it was measured against the roof's BOUNDING BOX. Against
+  // the tile plane (`RoofPitch`) the stone kit's 0.88 x 4/6 = 0.587 drew a 3.52 m roof over a 4 m
+  // shed: both brick corner caps and a joint stud stood 0.18-0.24 m through the tiles, and the
+  // walls themselves were outside the covered span. A tightened roof is a look choice; a roof
+  // narrower than its own building is a defect, so the fit is floored at what the posts need.
+  const shedScale = shedRoofScale(kit, width, depth);
   const shedRoof = placeRoof(
     { scale: shedScale, rotationY: width >= depth ? Math.PI / 2 : 0 },
-    kit.roofSmallBox, kit.roofSmallApex, kit.roofSmallDrop,
+    kit.roofSmallBox, kit.roofSmallApex, kit.roofSmallDrop, kit.roofSmallPitch,
   );
   out.push(loose("roof", kit.roofSmall, 0, STOREY_METRES, 0, shedRoof.rotationY, shedRoof.scale));
   // Gables only: a ridge log and a dormer on a 4 m store shed would out-dress the houses around it.
@@ -1916,11 +2017,31 @@ function coveredBay(
     out.push(loose(`${tag}w`, kit.wall, dx, 0, backZ, 0));
     out.push(loose(`${tag}t`, "wall_bottom_trim", dx, 0, backZ + 0.01, 0));
     // + 0.324 puts the slab's underside on the wall head at 3.123 rather than through it.
-    out.push(loose(`${tag}o`, "overhang_brick", dx, STOREY_METRES + 0.324, backZ + 1, 0));
+    //
+    // AND IT HAS TO REACH THE BACK OF THE WALL. `overhang_brick` is 2.022 m of slab spanning
+    // z -1.022 .. +1.000 about its pivot, and placed at backZ + 1 it started at backZ - 0.022 -
+    // inside the panel's 0.406 m thickness, with 0.29 m of bare wall head left uncovered behind
+    // it. Looked at from above, which is where this game's camera is, that is a slab, a step, a
+    // strip of wall top and then daylight: four stacked edges instead of a roof. The canopy is
+    // stretched along Z only, so the bay stays exactly one 2 m module wide and adjacent slabs
+    // still meet without overlapping.
+    const reach = CANOPY_DEPTH_METRES + WALL_THICKNESS - WALL_FACE;
+    const stretch = r4(reach / 2.022);
+    out.push({
+      ...loose(
+        `${tag}o`, "overhang_brick",
+        dx, STOREY_METRES + 0.324, r3(backZ - WALL_THICKNESS + WALL_FACE + 1.022 * stretch), 0,
+      ),
+      scaleAxes: [1, 1, stretch],
+    });
     return;
   }
   out.push(loose(`${tag}o`, "overhang_plaster", dx, 0, backZ, 0));
-  out.push(loose(`${tag}t`, "wall_bottom_trim", dx, 0, backZ + 0.01, 0));
+  // `overhang_plaster` carries its own wall, whose face is at z + 0.2 rather than the kit panel's
+  // z + 0.093. The plinth was placed on the kit convention and therefore sat 0.072 m BEHIND the
+  // face of the wall it was supposed to foot: invisible on every porch, arcade and bank counter in
+  // the plaster and timber towns, while the stone versions had one.
+  out.push(loose(`${tag}t`, "wall_bottom_trim", dx, 0, backZ + 0.2 - 0.118 + 0.01, 0));
 }
 
 /** How many whole 2 m bays a covered structure of this width gets, at least `low`, at most `high`. */
@@ -2090,6 +2211,33 @@ function marketRow(width: number, depth: number, rng: Rng): PartPlacement[] {
 }
 
 /**
+ * Scale of the four wall panels that make the wellhead curb. 1.4 m a side on a 2 m module.
+ */
+const WELL_CURB_SCALE = 0.7;
+
+/**
+ * The curb is masonry in every vernacular, like a gatehouse pier.
+ *
+ * Built from `kit.wall` it came out of Coldbrace as a lime-plaster box in the middle of a cobbled
+ * square: a rendered planter, not a well. A shaft is lined with stone wherever the houses around it
+ * are made of plaster, timber or brick, and `wall_brick_straight` is the kit's only full-height
+ * masonry panel - the same reasoning `gatePier` already carries.
+ */
+const WELL_CURB_ASSET = "wall_brick_straight";
+
+/**
+ * How much of `kerb_straight`'s 0.7 m depth the coping keeps, as a fraction.
+ *
+ * The full depth at 0.7 scale is 0.49 m laid on a 0.284 m wall, which closed a 1.4 m wellhead down
+ * to a 0.42 m hole and read as a bench. 0.82 caps the wall with about 3 cm of overhang inside and
+ * 8 cm out, and leaves a 0.76 m mouth: a well you could actually drop a bucket down.
+ */
+const WELL_COPING_DEPTH = 0.82;
+
+/** Metres of curb standing out of the ground. Mirrored by `prefabHeight("well")`. */
+const WELL_CURB_SHOW = 0.55;
+
+/**
  * A wellhead. There is no well asset in the library, so it is composed: a 1.4 m curb of kit corner
  * posts and trim, two beams across it, a plank roof, a bucket and a coil of chain.
  *
@@ -2111,20 +2259,51 @@ function well(kit: BuildingKit): PartPlacement[] {
       ring * sign[0], 0, ring * sign[1], Math.atan2(sign[0], sign[1]), 0.76,
     ));
   }
-  const curb: readonly (readonly [number, number, number])[] = [
-    [0, ring, 0], [ring, 0, Math.PI / 2], [0, -ring, Math.PI], [-ring, 0, -Math.PI / 2],
-  ];
-  for (const [index, [cx, cz, yaw]] of curb.entries()) {
-    out.push(loose(`curb${index}`, "wall_bottom_trim", cx, 0, cz, yaw, ring));
+
+  // THE CURB HAD NO HEIGHT. Four `wall_bottom_trim` at 0.7 is a 0.167 m band, and on a cobbled
+  // square that is entirely lost in the paving: the wellhead read as a roof on four sticks with a
+  // bucket beside it, which is the whole landmark missing. A kit wall panel at 0.7 is 1.40 x 2.19 x
+  // 0.28 - the right plan and far too tall - so it is SUNK 1.64 m and only the top 0.55 m stands
+  // out of the ground. The buried courses are under the terrain mesh, which occludes them, and the
+  // result is a real masonry curb of the right section at no new asset and no new draw call.
+  const curbSink = r3(WELL_CURB_SHOW - STOREY_METRES * WELL_CURB_SCALE);
+  const face = WALL_FACE * WELL_CURB_SCALE;
+  // `kerb_straight` is 0.134 tall and 0.700 deep at scale 1, with its body entirely on +Z of its
+  // pivot; at 0.7 that is a 0.094 x 0.490 coping, laid pointing INWARD from 0.08 m outside the
+  // curb face so it caps the masonry with a shadow line under its outer edge.
+  const copingOverhang = 0.08;
+  for (const [index, yaw] of [0, Math.PI / 2, Math.PI, -Math.PI / 2].entries()) {
+    const outX = Math.sin(yaw);
+    const outZ = Math.cos(yaw);
+    out.push(loose(
+      `curb${index}`, WELL_CURB_ASSET,
+      outX * (ring - face), curbSink, outZ * (ring - face), yaw, WELL_CURB_SCALE,
+    ));
+    out.push({
+      ...loose(
+        `coping${index}`, "kerb_straight",
+        outX * (ring + copingOverhang), r3(WELL_CURB_SHOW - 0.134 * WELL_CURB_SCALE),
+        outZ * (ring + copingOverhang),
+        yaw + Math.PI, WELL_CURB_SCALE,
+      ),
+      scaleAxes: [1, 1, WELL_COPING_DEPTH],
+    });
   }
+
+  // The windlass: a drum carried on the two front posts, which is what the bucket and chain are
+  // for and what turns a roof on sticks into a well. `roof_log` pivots 3.849 m below its own axis
+  // and runs along local Z, so 0.135 gives a 1.44 m drum 0.155 m thick - just long enough to land
+  // on both posts - and the dy puts its axis at 1.55 m, a comfortable winding height.
+  const drum = 0.135;
+  out.push(loose("windlass", "roof_log", 0, r3(1.55 - 3.849 * drum), ring, Math.PI / 2, drum));
 
   // The two halves overlap 0.03 m past the ridge rather than meeting on it: two coincident faces at
   // z = 0 would z-fight along the whole ridge line.
   out.push(loose("roof_f", "roof_wood_plank", 0, 2.4, -0.03, 0, 0.75));
   out.push(loose("roof_b", "roof_wood_plank", 0, 2.4, 0.03, Math.PI, 0.75));
-  // The curb's top is 0.117 x 0.7 = 0.082 m, so the bucket stands on it rather than in the air.
-  out.push(loose("bucket", "bucket_wood", 0.1, 0.08, 0.62, 0.6));
-  out.push(loose("chain", "chain_coil", -0.62, 0, -0.62, 1.2, 0.95));
+  // The coping's top is `WELL_CURB_SHOW`, so both stand on the curb rather than in the air.
+  out.push(loose("bucket", "bucket_wood", 0.1, WELL_CURB_SHOW, 0.62, 0.6));
+  out.push(loose("chain", "chain_coil", -0.62, WELL_CURB_SHOW, -0.62, 1.2, 0.95));
 
   return out;
 }
@@ -2344,20 +2523,59 @@ function vaultDoor(): PartPlacement[] {
     // that wall and let the bracket project out into the court instead of laying the cloth flat.
     wallMountedBanner("banner_l", "banner_1", { dx: -2.35, dy: 3.3, dz: -0.19 }, 0, 1.1),
     wallMountedBanner("banner_r", "banner_1", { dx: 2.35, dy: 3.3, dz: -0.19 }, 0, 1.1),
-    loose("kerb_l", "kerb_straight", -1.9, 0, 1.9, Math.PI / 2),
-    loose("kerb_r", "kerb_straight", 1.9, 0, 1.9, Math.PI / 2),
+    // ONE threshold step, not two rails out in the court.
+    //
+    // The kerbs were a pair at +-1.9 m turned the same way, so the left one laid its 0.7 m body
+    // into the approach and the right one laid it away: a 3.1 m path whose centre line missed the
+    // door by 0.35 m, made of two 13 cm plates that touched nothing and read as paving slabs
+    // dropped on the square. `kerb_straight` at 1.6 is a 3.2 x 1.12 m stone doorstep; sunk 0.10 m
+    // it stands 0.11 m proud, runs the full width of the vault's masonry, and meets the door frame
+    // it belongs to.
+    loose("threshold", "kerb_straight", 0, -0.1, 0.3, 0, 1.6),
   ];
 }
 
-/** A snapped March Company marker: the broken-off top on the ground beside it, and the road kerb. */
+/**
+ * A snapped March Company marker: a masonry stump, its broken top in the grass, and a kerbed verge.
+ *
+ * WHAT WAS WRONG. The hero mesh is `wall_brick_straight` at 0.7 - a 1.40 x 2.19 x 0.28 m panel - so
+ * the marker was a CARD, and from the road you saw it edge on as a 28 cm line of brick. Around it
+ * the composition put a `corner_brick` standing upright 0.57 m from anything else (the "broken-off
+ * top", drawn as a second, thinner pillar) and two `kerb_straight` plates 5.2 m apart facing the
+ * same way, which read as two paving slabs dropped in a field. Nothing touched anything.
+ *
+ * WHAT IT IS NOW. The hero panel is the front course of a real pier: a second course behind it and
+ * a quoin at each end make a 1.40 x 0.70 m section with corners, and a coping course caps it. The
+ * broken-off top is masonry rubble at the pier's foot, where a snapped stone would actually land -
+ * `PartPlacement` carries yaw only, so a toppled post cannot be laid on its side and pretending
+ * otherwise is what produced the second standing pillar. The verge kerb is one continuous 6 m run
+ * on the road side, sunk 0.06 m, which is a kerb rather than three unrelated plates.
+ */
 function milestone(): PartPlacement[] {
+  const stump = 0.7;
+  const head = STOREY_METRES * stump;
   return [
-    loose("top", "corner_brick", 1.1, 0, 0.35, 0.95, 0.75),
-    loose("rub1", "rubble_brick_1", -0.75, 0, 0.55, 0.6, 2.6),
-    loose("rub2", "rubble_brick_2", 0.45, 0, -0.85, 2.3, 2.3),
-    loose("stone", "rock_medium_1", -1.9, 0, -0.7, 1.2, 0.45),
-    loose("kerb_l", "kerb_straight", -2.6, 0, 0.4, Math.PI / 2),
-    loose("kerb_r", "kerb_straight", 2.6, 0, 0.4, Math.PI / 2),
+    // The pier. The hero panel stands at z = 0 facing +Z; this is the course behind it.
+    loose("back", "wall_brick_straight", 0, 0, -0.42, 0, stump),
+    loose("trim_f", "wall_bottom_trim", 0, 0, 0.1, 0, stump),
+    loose("trim_b", "wall_bottom_trim", 0, 0, -0.52, Math.PI, stump),
+    loose("quoin_l", "corner_brick", -0.63, 0, -0.21, -Math.PI / 4, head / 3.016),
+    loose("quoin_r", "corner_brick", 0.63, 0, -0.21, Math.PI / 4, head / 3.016),
+    // `kerb_straight`'s body sits entirely on the +Z side of its pivot, so this lands the coping
+    // across the pier's 0.70 m section with a 3 cm shadow line on each face.
+    loose("cap", "kerb_straight", 0, r3(head - 0.02), -0.66, 0, stump),
+    // The top, snapped off and lying where it fell.
+    loose("shard_l", "rubble_brick_2", -1.1, 0, 0.7, 0.6, 3.1),
+    loose("shard_r", "rubble_brick_3", -1.65, 0, 0.25, 2.3, 2.5),
+    loose("chip", "rubble_brick_1", 0.8, 0, 0.75, 1.4, 2.0),
+    loose("stone", "rock_medium_1", -2.5, -0.2, -1.0, 1.2, 0.5),
+    // A footing course at the base, and NOT a kerb along the road.
+    //
+    // Three `kerb_straight` in a row put a 6 m dark ribbon 1.5 m from the marker, on a dirt track
+    // that has no kerbs anywhere else in the world: from above it read as a painted stripe with a
+    // stone next to it, which is the same isolated-flat-plate look the old two-kerb version had.
+    // One course at the marker's own foot grounds it instead, and touches the thing it belongs to.
+    loose("footing", "kerb_straight", 0, -0.05, 0.1, 0, 0.9),
   ];
 }
 
@@ -2508,12 +2726,18 @@ function greatCairn(): PartPlacement[] {
 }
 
 /**
- * Four uprights in a ring around the hero boulder. The edge the Thornbound will not cross.
+ * A ring of four stacked uprights around the hero stone. The edge the Thornbound will not cross.
  *
  * `cliff_tall` was the upright and it is one of the six untextured platformer rocks
- * (`gravelmawMouth` carries the measurement), so all four read as smooth tan cones.
- * `rock_medium_*` are the textured alternative and they are boulders rather than menhirs, which is
- * the trade this library forces.
+ * (`gravelmawMouth` carries the measurement), so all four read as smooth tan cones. Swapping to the
+ * textured `rock_medium_*` fixed the material and lost the silhouette: a single 3.2 m boulder at
+ * 1.15-1.45 is 2.6-3.3 m tall and 4 m wide, which is a boulder field and not a stone ring, and it
+ * is what the clearing looked like - six lumps in the fern, with a pale untextured cone in the
+ * middle of them because the LANDMARK's own hero was still `boulder_medium`.
+ *
+ * Each station is now TWO rocks, a base and a cap bedded 1.75 m into it, which is the same trick
+ * `greatCairn` uses and the only way this library makes anything taller than it is wide. Four of
+ * those reach 4.2-4.6 m against a 1.8 m player: uprights, seen over the ferns, in a ring.
  *
  * Each stone carries its own dy because the ground here is NOT level: measured at (206, 168) on the
  * ring radius the four bearings differ by 1.88 m (-0.94, +0.26, +0.23, +0.94), and one shared dy
@@ -2521,23 +2745,31 @@ function greatCairn(): PartPlacement[] {
  */
 function standingStones(rng: Rng): PartPlacement[] {
   const out: PartPlacement[] = [];
-  const stones: readonly (readonly [string, number])[] = [
-    ["rock_medium_1", -1.49],
-    ["rock_medium_3", -0.29],
-    ["rock_medium_1", -0.32],
-    ["rock_medium_3", 0.39],
+  const stones: readonly (readonly [string, string, number, number])[] = [
+    ["rock_medium_1", "rock_medium_3", -1.49, 1.30],
+    ["rock_medium_3", "rock_medium_2", -0.29, 1.18],
+    ["rock_medium_1", "rock_medium_2", -0.32, 1.24],
+    ["rock_medium_3", "rock_medium_1", 0.39, 1.12],
   ];
+  const radius = 5.1;
   for (const [index, entry] of stones.entries()) {
-    const [assetId, dy] = entry;
+    const [baseAsset, capAsset, dy, scale] = entry;
     const angle = (index / stones.length) * Math.PI * 2 + 0.4;
+    const dx = Math.cos(angle) * radius;
+    const dz = Math.sin(angle) * radius;
+    out.push(loose(`stone${index}`, baseAsset, dx, dy, dz, rng.float(0, Math.PI * 2), scale));
+    // The cap is bedded into the base rather than balanced on it, and offset a little so the two
+    // silhouettes do not stack into one smooth cone.
     out.push(loose(
-      `stone${index}`, assetId,
-      Math.cos(angle) * 5.4, dy, Math.sin(angle) * 5.4,
-      rng.float(0, Math.PI * 2), rng.float(1.15, 1.45),
+      `cap${index}`, capAsset,
+      r3(dx + rng.float(-0.28, 0.28)), r3(dy + 1.75 * scale), r3(dz + rng.float(-0.28, 0.28)),
+      rng.float(0, Math.PI * 2), r4(scale * 0.78),
     ));
   }
-  out.push(loose("low_1", "rock_medium_2", 2.6, -0.35, 3.4, 1.1, 1.0));
-  out.push(loose("low_2", "rock_medium_1", -3.1, -0.35, -2.8, 2.5, 0.8));
+  // One of them came down. `wall_bottom_trim` is MI_WoodTrim, so the fallen stone is a rock too:
+  // a low boulder half sunk in the turf where the fifth upright used to stand.
+  out.push(loose("fallen", "rock_medium_2", 2.6, -0.9, 3.4, 1.1, 1.35));
+  out.push(loose("stump", "rock_medium_1", -3.1, -0.55, -2.8, 2.5, 0.8));
   return out;
 }
 
@@ -2751,13 +2983,16 @@ function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
   for (const placement of buildPrefab("farmstead", [8, 4], rng.int(1, 1_000_000), kit.id)) {
     if (barnDressingAssets.has(placement.assetId)) continue;
     out.push({
+      // Spread the placement rather than listing its fields. The hand-written copy this replaces
+      // dropped `scaleAxes`, and `gableEnds` is the one thing in the file that emits it, so both
+      // of the barn's gables were re-emitted at scale 1: a 6.69 x 4.52 m plaster triangle on a
+      // roof sized for 2.4 x 3.4, standing 1.32 m proud of the tiles with 84 of its vertices
+      // outside the roof outline entirely. That is the pair of huge grey wedges over Marchfield.
+      ...placement,
       tag: `barn_${placement.tag}`,
-      assetId: placement.assetId,
       dx: r3(-placement.dx),
-      dy: placement.dy,
       dz: r3(-placement.dz - 6.4),
       rotationY: r4(placement.rotationY + Math.PI),
-      scale: placement.scale,
     });
   }
 

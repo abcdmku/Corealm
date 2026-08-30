@@ -1,0 +1,18 @@
+[
+ {"tag":"b-milestone","x":-108,"y":1.5,"z":-8,"distance":9,"pitch":0.3},
+ {"tag":"b-farmstead","x":-96,"y":3,"z":-28.4,"distance":22,"pitch":0.3},
+ {"tag":"b-well","x":-164,"y":1.2,"z":-77,"distance":8,"pitch":0.32},
+ {"tag":"b-square-edge","x":-160,"y":1,"z":-95,"distance":28,"pitch":0.5},
+ {"tag":"b-gate-street","x":-160,"y":1,"z":-104,"distance":26,"pitch":0.48},
+ {"tag":"b-cottage","x":-180,"y":3,"z":-102,"distance":16,"pitch":0.3},
+ {"tag":"b-hall","x":-160,"y":3,"z":-68,"distance":24,"pitch":0.28},
+ {"tag":"b-bankporch","x":-163,"y":2.5,"z":-89,"distance":13,"pitch":0.32},
+ {"tag":"b-hc-shed","x":146,"y":3,"z":-52,"distance":13,"pitch":0.3},
+ {"tag":"b-hc-porch","x":150.8,"y":2.5,"z":-69.6,"distance":12,"pitch":0.32},
+ {"tag":"b-hc-market","x":136.6,"y":2.5,"z":-63.4,"distance":15,"pitch":0.32},
+ {"tag":"b-stones","x":206,"y":3,"z":168,"distance":18,"pitch":0.22},
+ {"tag":"b-vault","x":-168,"y":4,"z":-91,"distance":16,"pitch":0.3},
+ {"tag":"b-rootfall","x":60,"y":3,"z":120,"distance":30,"pitch":0.45},
+ {"tag":"b-rf-counter","x":60,"y":2.5,"z":128.6,"distance":12,"pitch":0.32},
+ {"tag":"b-crane","x":156,"y":4,"z":-64,"distance":18,"pitch":0.28}
+]

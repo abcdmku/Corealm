@@ -1,0 +1,20 @@
+[
+ {"tag":"milestone","x":-108,"y":1.5,"z":-8,"distance":11,"pitch":0.34},
+ {"tag":"farmstead","x":-96,"y":3,"z":-28.4,"distance":22,"pitch":0.3},
+ {"tag":"cottage","x":-180,"y":3,"z":-102,"distance":16,"pitch":0.3},
+ {"tag":"hall","x":-160,"y":3,"z":-68,"distance":24,"pitch":0.3},
+ {"tag":"vault","x":-168,"y":5,"z":-90,"distance":24,"pitch":0.3},
+ {"tag":"well","x":-164,"y":1.5,"z":-77,"distance":9,"pitch":0.35},
+ {"tag":"bankporch","x":-163,"y":2.5,"z":-89,"distance":13,"pitch":0.32},
+ {"tag":"market-arcade","x":-170.5,"y":2.5,"z":-80,"distance":15,"pitch":0.32},
+ {"tag":"square-edge","x":-160,"y":1,"z":-95,"distance":26,"pitch":0.55},
+ {"tag":"gate-street","x":-160,"y":1,"z":-105,"distance":26,"pitch":0.5},
+ {"tag":"forge","x":-145.5,"y":2.5,"z":-86,"distance":15,"pitch":0.32},
+ {"tag":"gatehouse","x":-160,"y":3,"z":-108,"distance":20,"pitch":0.3},
+ {"tag":"rootfall-centre","x":60,"y":3,"z":120,"distance":30,"pitch":0.45},
+ {"tag":"rootfall-cottage","x":72,"y":3,"z":106,"distance":16,"pitch":0.3},
+ {"tag":"highcairn-centre","x":140,"y":3,"z":-62,"distance":30,"pitch":0.45},
+ {"tag":"highcairn-hut","x":137,"y":3,"z":-52,"distance":16,"pitch":0.3},
+ {"tag":"highcairn-shed","x":146,"y":3,"z":-52,"distance":13,"pitch":0.3},
+ {"tag":"crane","x":156,"y":4,"z":-64,"distance":18,"pitch":0.3}
+]
