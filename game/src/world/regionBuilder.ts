@@ -1754,7 +1754,13 @@ function buildEnemyGroup(
       regionId,
       position,
       state: "alive",
-      interactions: ["inspect", "attack", "cast"],
+      // "attack" only. It used to be "attack" and "cast" side by side, which made the player
+      // re-declare their weapon on every click and still got it wrong — "Attack" with a staff in
+      // hand swung the staff like a club. `systems/combat.ts` now reads the main hand and casts or
+      // swings accordingly, so one verb covers both. `GameApi.cast` still names a specific spell for
+      // an agent that wants to choose one; that is a different question and does not come through
+      // an entity's interaction list.
+      interactions: ["inspect", "attack"],
       // Stats come from `content/enemies.ts`, which solves them backwards from the PRD's
       // time-to-kill rows. `regions.ts` carried its own maxHealth as a placement hint from before
       // that table existed; where the two disagree the derived block wins, or the balance work is

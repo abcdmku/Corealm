@@ -1107,3 +1107,74 @@ export function disposeGraph(
   root.removeFromParent();
   root.clear();
 }
+
+// ---------------------------------------------------------------- mirroring
+
+/**
+ * The other side's bone name, or null for a bone that sits on the centre line.
+ *
+ * The 65-joint rig this project shares suffixes every paired joint `_l` or `_r` (hand_l, upperarm_r,
+ * index_01_r, ball_leaf_r) and leaves the spine unsuffixed (root, pelvis, spine_01..03, neck_01,
+ * Head). Nothing else in the set uses those endings, so the swap is a suffix test.
+ */
+export function mirroredBoneName(name: string): string | null {
+  if (name.endsWith("_l")) return `${name.slice(0, -2)}_r`;
+  if (name.endsWith("_r")) return `${name.slice(0, -2)}_l`;
+  return null;
+}
+
+/**
+ * A left-right mirrored copy of an animation clip.
+ *
+ * WHY THIS EXISTS. The free tier of the Universal Animation Library ships exactly one casting
+ * animation, `Spell_Simple_Shoot`, and measured by forward kinematics it raises the LEFT hand (peak
+ * 0.086 m below the head) while the right stays down at 0.594 m below. Staves are main-hand items
+ * and belong in the right hand, so played as authored the caster raises an empty hand and the staff
+ * hangs at their side. There is no right-handed variant to switch to — the pack's remaining
+ * animations are the paid Pro tier — so the clip is mirrored instead.
+ *
+ * THE MATHS, because "mirror it" hides two easy mistakes. Reflection through the YZ plane is the
+ * matrix `M = diag(-1, 1, 1)`. A bone's local rotation `R` becomes `M R M`, which for a rotation of
+ * angle t about axis n is a rotation of -t about `M n` — so in quaternion terms `(x, y, z, w)`
+ * becomes `(x, -y, -z, w)`. Checked against all three axes: a rotation about X is unchanged (the
+ * axis is perpendicular to the mirror, and negating both the axis and the angle cancels), about Y
+ * and about Z it reverses. Positions mirror the other way round: `(x, y, z)` becomes `(-x, y, z)`.
+ * Getting these two rules the same way round is the classic error and produces a character that
+ * turns itself inside out.
+ *
+ * THE ASSUMPTION, stated because it is not free: this is only correct if the skeleton's bind pose is
+ * itself symmetric about x. It is here — `runs/corealm/stack-findings.md` measured the four humanoid
+ * rigs as carrying the same 65 joints in the same order, and `tests/skinning.test.ts` asserts the
+ * mirror reproduces the original's reach on the opposite side. A rig with an asymmetric bind pose
+ * would need retargeting, not reflection.
+ */
+export function mirrorAnimationClip(clip: THREE.AnimationClip, name: string): THREE.AnimationClip {
+  const tracks: THREE.KeyframeTrack[] = [];
+
+  for (const track of clip.tracks) {
+    const split = track.name.lastIndexOf(".");
+    if (split < 0) { tracks.push(track.clone()); continue; }
+    const bone = track.name.slice(0, split);
+    const property = track.name.slice(split + 1);
+    const target = `${mirroredBoneName(bone) ?? bone}.${property}`;
+    const values = Float32Array.from(track.values);
+
+    if (property === "quaternion") {
+      for (let i = 0; i < values.length; i += 4) {
+        values[i + 1] = -values[i + 1]!;
+        values[i + 2] = -values[i + 2]!;
+      }
+      tracks.push(new THREE.QuaternionKeyframeTrack(target, Array.from(track.times), Array.from(values)));
+      continue;
+    }
+    if (property === "position") {
+      for (let i = 0; i < values.length; i += 3) values[i] = -values[i]!;
+      tracks.push(new THREE.VectorKeyframeTrack(target, Array.from(track.times), Array.from(values)));
+      continue;
+    }
+    // Scale and anything else is mirror-invariant on this rig; retarget it and leave the data alone.
+    tracks.push(new THREE.VectorKeyframeTrack(target, Array.from(track.times), Array.from(values)));
+  }
+
+  return new THREE.AnimationClip(name, clip.duration, tracks, clip.blendMode);
+}

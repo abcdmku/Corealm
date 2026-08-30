@@ -9,6 +9,9 @@ import {
   GEAR_APPEARANCE_IDS, GEAR_ASSET_GAPS, VISIBLE_EQUIP_SLOTS,
   applyGearAppearance, gearAppearance, gearAppearanceParts, weaponAttachment, weaponSocket,
 } from "../game/src/render/equipmentVisuals.js";
+import {
+  PROCEDURAL_GEAR_ASSETS, STAFF_LOOKS, buildStaff, isProceduralGearAsset,
+} from "../game/src/render/proceduralGear.js";
 import { iconShapeFor } from "../game/src/ui/itemIcons.js";
 
 /**
@@ -47,9 +50,11 @@ function kitTotals(kit: keyof typeof KITS): EquipmentBonuses {
 }
 
 describe("the gear ladder", () => {
-  it("has 58 rows, one per id, all of them equippable", () => {
-    expect(EQUIPMENT).toHaveLength(58);
-    expect(BY_ID.size).toBe(58);
+  it("has 59 rows, one per id, all of them equippable", () => {
+    // 58 before the magic ladder, plus `worn_staff` — the tier-0 mate of `worn_sword`, so the magic
+    // line now starts in the first minute the way the melee line always did.
+    expect(EQUIPMENT).toHaveLength(59);
+    expect(BY_ID.size).toBe(59);
     for (const def of EQUIPMENT) {
       expect(def.equip, `${def.id} has no equip block`).toBeDefined();
       expect(def.category).toBe("equipment");
@@ -136,25 +141,75 @@ describe("gear appearance", () => {
 
   // This is the check that stops a typo shipping as an invisible sword: a bad asset id fails
   // AssetRegistry.load at runtime, the rig catches it, and the player just wears nothing.
-  it("names only assets that exist in the manifest, for both body variants", () => {
+  it("names only assets that exist in the manifest or are built at boot, for both body variants", () => {
+    // Two legitimate sources now, and the check has to know the difference. A manifest id must be a
+    // real file — that is what stops a typo shipping as an invisible sword. A `proc_staff_*` id is
+    // GENERATED: `render/proceduralGear.ts` builds the mesh and `AssetRegistry.registerBuilt`
+    // publishes it into the same cache `load()` reads, so it will never appear in a manifest that
+    // `tools/build-assets.ts` derives from files on disk. Excusing it by prefix would let any typo
+    // starting "proc_" through, so it is checked against the real registration list instead.
+    const built = new Set(PROCEDURAL_GEAR_ASSETS.map((asset) => asset.assetId));
     for (const body of ["male", "female"] as const) {
       for (const def of EQUIPMENT) {
         for (const part of gearAppearanceParts(def.id, body)) {
-          expect(MANIFEST_IDS.has(part.assetId), `${def.id} (${body}) -> ${part.assetId}`).toBe(true);
+          const known = MANIFEST_IDS.has(part.assetId) || built.has(part.assetId);
+          expect(known, `${def.id} (${body}) -> ${part.assetId}`).toBe(true);
         }
       }
     }
   });
 
-  it("shows something for every visible slot except the declared gaps", () => {
+  it("grows the staff silhouette monotonically up the tier ladder", () => {
+    // Tier reads through silhouette for the melee line via `tierSilhouetteScale`; the staff line has
+    // no shared GLB to scale, so its tier read is the authored length plus whatever the crown adds
+    // on top. Those are two independent numbers, and the first pass got them out of step: the cage
+    // crown reached 26 cm over the shaft against the cluster's 11 cm, which put the tier-5 duskoak
+    // staff at 1.854 m and the tier-10 cairnpine at 1.851 m — the ONE step where the upgrade is
+    // supposed to be visible, and it went backwards. Heights are measured over the built geometry
+    // rather than read off `StaffLook.length`, because `length` is the shaft and the bug was in
+    // the part `length` does not describe.
+    const order = ["worn_staff", "palewood_staff", "duskoak_staff", "cairnpine_staff"];
+    const heights = order.map((id) => {
+      const look = STAFF_LOOKS[id];
+      expect(look, `${id} has no STAFF_LOOKS entry`).toBeDefined();
+      const size = new THREE.Box3().setFromObject(buildStaff(look!)).getSize(new THREE.Vector3());
+      return { id, height: size.y };
+    });
+    for (let index = 1; index < heights.length; index += 1) {
+      const previous = heights[index - 1]!;
+      const current = heights[index]!;
+      expect(
+        current.height,
+        `${current.id} (${current.height.toFixed(3)} m) must stand taller than ${previous.id} `
+        + `(${previous.height.toFixed(3)} m)`,
+      ).toBeGreaterThan(previous.height + 0.05);
+    }
+  });
+
+  it("builds a mesh for every staff, since the library has none", () => {
+    // The gap this closes was real and measured: there is no staff in the 213-asset library, so all
+    // three staffs rendered NOTHING and a mage held empty air. `worn_staff` would have been the
+    // fourth, and it is the first weapon a Magic character is ever handed.
+    for (const def of EQUIPMENT) {
+      if (!def.id.endsWith("_staff")) continue;
+      const parts = gearAppearanceParts(def.id);
+      expect(parts, `${def.id} draws nothing`).toHaveLength(1);
+      expect(isProceduralGearAsset(parts[0]!.assetId), `${def.id} -> ${parts[0]!.assetId}`).toBe(true);
+      expect(weaponSocket(parts[0]!.assetId), `${def.id} has no socket`).not.toBeNull();
+    }
+  });
+
+  it("shows something for every visible slot, with no gaps left", () => {
     const empty = EQUIPMENT
       .filter((def) => def.equip && VISIBLE_EQUIP_SLOTS.includes(def.equip.slot))
       .filter((def) => gearAppearance(def.id) === null)
       .map((def) => def.id);
-    // Exactly the three staffs. There is no staff mesh in the 213-asset library and a sword in a
-    // mage's hand would misreport what is held, so they render nothing on purpose.
-    expect(empty.sort()).toEqual(Object.keys(GEAR_ASSET_GAPS).sort());
-    expect(empty).toHaveLength(3);
+    // Was "exactly the three staffs", which rendered nothing because the library has no staff mesh.
+    // `render/proceduralGear.ts` builds them now, so the honest assertion is that NOTHING in a
+    // visible slot draws nothing — and `GEAR_ASSET_GAPS` is empty rather than deleted, so the next
+    // item the library cannot dress has somewhere to be declared instead of silently vanishing.
+    expect(empty).toEqual([]);
+    expect(Object.keys(GEAR_ASSET_GAPS)).toEqual([]);
   });
 
   it("leaves rings and pendants unrendered, because they are not visible slots", () => {

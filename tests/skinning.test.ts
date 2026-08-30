@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import {
+  mirrorAnimationClip,
+  mirroredBoneName,
   applyHeadCap,
   assembleDressedCharacter,
   clipSkinnedGeometry,
@@ -464,5 +466,80 @@ describe("hairAssetFor", () => {
     const ids = Array.from({ length: 40 }, (_, index) => `npc-${index}`);
     expect(new Set(ids.map((id) => hairAssetFor(id, "male"))).size).toBe(2);
     expect(new Set(ids.map((id) => hairAssetFor(id, "female"))).size).toBe(2);
+  });
+});
+
+/**
+ * The clip mirror, which exists because the animation library's only cast is left-handed and staves
+ * are main-hand items. See `mirrorAnimationClip` for the reflection maths and why it is exact here.
+ */
+describe("mirrorAnimationClip", () => {
+  it("swaps paired bone names and leaves centre-line bones alone", () => {
+    expect(mirroredBoneName("hand_l")).toBe("hand_r");
+    expect(mirroredBoneName("index_01_r")).toBe("index_01_l");
+    expect(mirroredBoneName("ball_leaf_r")).toBe("ball_leaf_l");
+    expect(mirroredBoneName("spine_01")).toBeNull();
+    expect(mirroredBoneName("Head")).toBeNull();
+    // "_leaf" is not a side. A greedy contains-check would have mangled it.
+    expect(mirroredBoneName("root")).toBeNull();
+  });
+
+  it("retargets tracks to the opposite bone", () => {
+    const clip = new THREE.AnimationClip("Cast", 1, [
+      new THREE.QuaternionKeyframeTrack("hand_l.quaternion", [0], [0, 0, 0, 1]),
+      new THREE.VectorKeyframeTrack("spine_01.position", [0], [1, 2, 3]),
+    ]);
+    const mirrored = mirrorAnimationClip(clip, "Cast_Mirror");
+    expect(mirrored.name).toBe("Cast_Mirror");
+    expect(mirrored.tracks.map((t) => t.name).sort())
+      .toEqual(["hand_r.quaternion", "spine_01.position"]);
+  });
+
+  it("reflects a rotation about Y and Z but not about X", () => {
+    // The rule is (x, y, z, w) -> (x, -y, -z, w). Reflection reverses handedness, so a turn about an
+    // axis IN the mirror plane reverses and a turn about the axis PERPENDICULAR to it does not.
+    const about = (axis: THREE.Vector3): number[] => {
+      const q = new THREE.Quaternion().setFromAxisAngle(axis, 0.7);
+      const clip = new THREE.AnimationClip("t", 1, [
+        new THREE.QuaternionKeyframeTrack("hand_l.quaternion", [0], [q.x, q.y, q.z, q.w]),
+      ]);
+      return Array.from(mirrorAnimationClip(clip, "m").tracks[0]!.values);
+    };
+    const x = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.7);
+    expect(about(new THREE.Vector3(1, 0, 0))[0]).toBeCloseTo(x.x, 6);
+
+    const z = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.7);
+    expect(about(new THREE.Vector3(0, 0, 1))[2]).toBeCloseTo(-z.z, 6);
+
+    const y = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.7);
+    expect(about(new THREE.Vector3(0, 1, 0))[1]).toBeCloseTo(-y.y, 6);
+  });
+
+  it("mirrors a position across x and leaves y and z", () => {
+    const clip = new THREE.AnimationClip("t", 1, [
+      new THREE.VectorKeyframeTrack("hand_l.position", [0], [0.4, 1.2, -0.3]),
+    ]);
+    // toBeCloseTo, not toEqual: keyframe values live in a Float32Array, so 0.4 comes back as
+    // 0.4000000059604645 and an exact compare fails on the storage format rather than the maths.
+    const values = Array.from(mirrorAnimationClip(clip, "m").tracks[0]!.values);
+    for (const [index, expected] of [-0.4, 1.2, -0.3].entries()) {
+      expect(values[index]!).toBeCloseTo(expected, 6);
+    }
+  });
+
+  it("is its own inverse", () => {
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0.3, 0.5, 0.8).normalize(), 1.1);
+    const clip = new THREE.AnimationClip("t", 1, [
+      new THREE.QuaternionKeyframeTrack("hand_l.quaternion", [0], [q.x, q.y, q.z, q.w]),
+      new THREE.VectorKeyframeTrack("hand_l.position", [0], [0.4, 1.2, -0.3]),
+    ]);
+    const twice = mirrorAnimationClip(mirrorAnimationClip(clip, "a"), "b");
+    expect(twice.tracks.map((t) => t.name).sort()).toEqual(["hand_l.position", "hand_l.quaternion"]);
+    for (const track of twice.tracks) {
+      const source = clip.tracks.find((t) => t.name === track.name)!;
+      for (const [index, value] of Array.from(track.values).entries()) {
+        expect(value).toBeCloseTo(source.values[index]!, 6);
+      }
+    }
   });
 });

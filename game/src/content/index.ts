@@ -13,7 +13,7 @@
  * FROZEN. Only the root edits this file.
  */
 import type {
-  EquipSlot, ItemDef, ItemId, RecipeId, SkillId, SpellId,
+  EquipSlot, ItemDef, ItemId, RecipeId, SkillId, SpellElement, SpellId, SpellRung,
 } from "../contracts.js";
 
 // ---------------------------------------------------------------- resources
@@ -57,6 +57,10 @@ export interface RecipeDef {
 export interface SpellDef {
   id: SpellId;
   name: string;
+  /** Tint and sound family. Purely presentational; see `SpellElement` for why. */
+  element: SpellElement;
+  /** Silhouette, scale and particle budget of the effect. See `SpellRung`. */
+  rung: SpellRung;
   reqLevel: number;
   tier: number;
   baseMax: number;
@@ -149,6 +153,35 @@ class ContentRegistry {
   allSpells(): readonly SpellDef[] { return this.tables.spells; }
   allEnemies(): readonly EnemyDef[] { return this.tables.enemies; }
   allShops(): readonly ShopDef[] { return this.tables.shops; }
+
+  /**
+   * Every spell of one element, weakest first.
+   *
+   * The spellbook is the only caller that needs this shape, and it needs it per element rather than
+   * per rung: a player picks "I cast fire" once and then wants the strongest fire spell they
+   * qualify for, which is the last row here that passes their Magic level.
+   */
+  spellsOfElement(element: SpellElement): SpellDef[] {
+    return this.tables.spells
+      .filter((row) => row.element === element)
+      .sort((a, b) => a.reqLevel - b.reqLevel);
+  }
+
+  /**
+   * The strongest spell of an element a Magic level unlocks, or undefined below the first.
+   *
+   * Level only. Affordability lives in `systems/combat.ts`, which is the layer that can see the
+   * pack; a registry that took an inventory port would make content depend on state.
+   */
+  bestSpellOfElement(element: SpellElement, magicLevel: number): SpellDef | undefined {
+    let best: SpellDef | undefined;
+    for (const spell of this.tables.spells) {
+      if (spell.element !== element) continue;
+      if (magicLevel < spell.reqLevel) continue;
+      if (!best || spell.reqLevel > best.reqLevel) best = spell;
+    }
+    return best;
+  }
 
   /** Recipes a station can make, for the production UI. */
   recipesForStation(station: RecipeDef["station"]): RecipeDef[] {

@@ -13,7 +13,7 @@ import type {
   ActivitySummary, BankView, DialogueView, DocHit, EntityId, EquipSlot, EquipmentBonuses,
   GameApi as GameApiContract, GameEvent, GameEventType, InteractionId, InventorySlot, ItemId,
   ItemStack, MoveTarget, ObserveFilter, ObservedEntity, PlayerView, QuestSummary, RecipeId, TimeView,
-  Result, SemanticEntity, SkillId, SkillView, SpellId, Vec3, OverlaySpec,
+  Result, SemanticEntity, SkillId, SkillView, SpellbookView, SpellId, SpellRow, Vec3, OverlaySpec,
 } from "../contracts.js";
 import { EQUIP_SLOTS, SKILL_IDS, err, ok } from "../contracts.js";
 import type { GameState, Store } from "../state/store.js";
@@ -25,6 +25,26 @@ import type { SimClock } from "../core/time.js";
 import { levelProgress, xpToNextLevel } from "../content/xp.js";
 import { distanceXZ } from "../core/math.js";
 import { INTERACT_RANGE, PLAYER_SPEED } from "../app/config.js";
+import { content } from "../content/index.js";
+import { magicMaxHit } from "../systems/combat.js";
+
+/** What every attack spell is paid for in. One id, because PRD section 0 decision 3 says so. */
+const ESSENCE_SHARD_ITEM_ID = "essence_shard";
+
+/**
+ * Metres of reach given up when walking into range of a ranged interaction.
+ *
+ * Stopping exactly on the range boundary puts the player one footstep from being out of it, and a
+ * wandering enemy would then bounce them between "in range" and "walk closer" for the whole fight.
+ */
+const RANGED_APPROACH_SLACK = 1.5;
+
+/** Total quantity of one item across inventory slots, ignoring the empty ones. */
+function countIn(slots: readonly (InventorySlot | null)[], itemId: ItemId): number {
+  let total = 0;
+  for (const slot of slots) if (slot && slot.itemId === itemId) total += slot.quantity;
+  return total;
+}
 
 /**
  * Systems register themselves here as they come online in later build rounds. The API surface is
@@ -53,6 +73,7 @@ export interface SystemHooks {
   combat?: {
     attack(entityId: EntityId): Result<{ targetId: EntityId; attackSpeedMs: number }>;
     cast(spellId: SpellId, entityId: EntityId): Result<{ targetId: EntityId; castMs: number }>;
+    setPreferredSpell(spellId: SpellId | null): void;
   };
   dialogue?: { op(op: "state" | "choose" | "end", optionId?: string): Result<DialogueView | null> };
   bank?: {
@@ -65,7 +86,18 @@ export interface SystemHooks {
   overlays?: { set(spec: OverlaySpec): number; clear(id?: string): number };
   docs?: { search(query: string, limit: number): DocHit[] };
   activity?: { summary(): ActivitySummary | null };
-  interactions?: { run(entityId: EntityId, interaction: InteractionId): Result<{ started: string }> };
+  interactions?: {
+    run(entityId: EntityId, interaction: InteractionId): Result<{ started: string }>;
+    /**
+     * How close this verb needs the player before its handler runs.
+     *
+     * `world/interactions.ts` has owned per-verb reach since round 4 and `interact` did not consult
+     * it: it walked to a hardcoded INTERACT_RANGE for everything, so a nine-metre spell marched the
+     * caster into melee before the first cast and the dispatcher's own SPELL_RANGE never came into
+     * play. Optional, so a partially-registered hook still behaves exactly as before.
+     */
+    rangeFor?(interaction: InteractionId): number;
+  };
 }
 
 type ShopViewLike = import("../contracts.js").ShopView;
@@ -198,6 +230,18 @@ export class CorealmGameApi implements GameApiContract {
   // --------------------------------------------------------------- movement
 
   moveTo(target: MoveTarget): Result<{ pathLength: number; etaMs: number }> {
+    return this.walkTo(target, 0);
+  }
+
+  /**
+   * `moveTo`, but allowed to stop short.
+   *
+   * `stopDistance` is metres of the tail to leave unwalked, which `Movement.startPath` implements by
+   * trimming the path. It exists for ranged interactions: a click on an enemy fifteen metres off
+   * used to path all the way ONTO the target and only then check range, so a caster jogged into
+   * melee to cast a spell that already had line of sight from where they were standing.
+   */
+  private walkTo(target: MoveTarget, stopDistance: number): Result<{ pathLength: number; etaMs: number }> {
     const state = this.store.get();
     if (state.player.health <= 0) return err("DEAD", "The player is dead");
     if (!this.nav.isReady()) return err("UNAVAILABLE", "Navigation is not ready");
@@ -226,6 +270,7 @@ export class CorealmGameApi implements GameApiContract {
     // `navigation.failed` must not hear it while the route below is walking the player out.
     const started = this.movement.startPath(state, destination, entityId, this.clock.elapsedMs, {
       quietFailure: true,
+      stopDistance,
     });
     if (started) {
       this.store.markDirty();
@@ -317,11 +362,22 @@ export class CorealmGameApi implements GameApiContract {
       return err("INVALID_ARGUMENT", `${entity.name} has no "${interaction}" interaction`, entityId);
     }
 
+    // The VERB's reach, not one constant for all of them. A staff attack is allowed to start from
+    // nine metres; a chop still needs the player at the tree.
+    const reach = this.hooks.interactions?.rangeFor?.(interaction) ?? INTERACT_RANGE;
     const gap = distanceXZ(state.player.position, entity.position);
-    if (gap > INTERACT_RANGE) {
+    if (gap > reach) {
       // One click walks into range and THEN acts. The interaction is remembered and re-fired by
       // `resumePending` when navigation completes.
-      const moved = this.moveTo({ entityId });
+      //
+      // Walk only as far as the verb needs. A short-reach verb still walks onto its target — you
+      // chop a tree from arm's length — but anything with real reach stops at the edge of it, less
+      // a metre and a half of slack so a target that drifts a step does not immediately fall out of
+      // range and restart the approach.
+      const moved = this.walkTo(
+        { entityId },
+        reach > INTERACT_RANGE ? Math.max(0, reach - RANGED_APPROACH_SLACK) : 0,
+      );
       if (!moved.ok) return moved as Result<{ started: string }>;
       this.pending = {
         entityId,
@@ -376,6 +432,79 @@ export class CorealmGameApi implements GameApiContract {
     const hook = this.hooks.combat;
     if (!hook) return err("UNAVAILABLE", "Combat system is not available yet");
     return hook.cast(spellId, entityId);
+  }
+
+  /**
+   * The whole spellbook, resolved against the player standing here right now.
+   *
+   * Assembled in this class rather than in `ui/spellbookPanel.ts` for the reason the header gives:
+   * a human opening the panel and an agent calling the tool must see the SAME sixteen rows with the
+   * same max hits. Doing the arithmetic in the UI would put the agent one refactor away from a
+   * different answer.
+   *
+   * `maxHit` reuses `magicMaxHit` from `systems/combat.ts` rather than restating PRD 2.4's formula,
+   * because a second copy of a damage formula is a second thing to get wrong.
+   */
+  getSpellbook(): SpellbookView {
+    const state = this.store.get();
+    const magicLevel = state.skills.magic.level;
+    const gear = equipmentTotalsOf(state.equipment);
+    const inventory = this.hooks.inventory;
+
+    // Shard counts come from the inventory slots directly. The `inventory` hook exposes `slots()`
+    // but no count helper, and reaching for `countItem` on the combat system would make the read
+    // path depend on a system that is allowed to be absent.
+    const slots = inventory ? inventory.slots() : state.inventory.slots;
+
+    const spells = content.allSpells().map((spell) => {
+      const shards = countIn(slots, spell.cost.itemId);
+      const unlocked = magicLevel >= spell.reqLevel;
+      return {
+        id: spell.id,
+        name: spell.name,
+        element: spell.element,
+        rung: spell.rung,
+        reqLevel: spell.reqLevel,
+        maxHit: magicMaxHit(magicLevel, gear.magicPower, spell),
+        baseXp: spell.baseXp,
+        castMs: spell.castMs,
+        costItemId: spell.cost.itemId,
+        costQuantity: spell.cost.quantity,
+        unlocked,
+        castable: unlocked && shards >= spell.cost.quantity,
+        description: spell.description,
+      };
+    });
+
+    const preferredSpellId = state.combat.preferredSpellId ?? null;
+    const preferred = spells.find((row) => row.id === preferredSpellId);
+    // What "Cast at" would throw: the standing choice when it is castable, else the strongest that
+    // is. This mirrors `CombatSystem.preferredSpellId` and the two must not drift; the panel prints
+    // this as "automatic", so a wrong answer here teaches the player something false.
+    const active = preferred?.castable
+      ? preferred
+      : spells.reduce<SpellRow | undefined>(
+        (best, row) => (row.castable && (!best || row.reqLevel > best.reqLevel) ? row : best),
+        undefined,
+      );
+
+    return {
+      spells,
+      preferredSpellId,
+      activeSpellId: active?.id ?? null,
+      magicLevel,
+      shards: countIn(slots, ESSENCE_SHARD_ITEM_ID),
+    };
+  }
+
+  setPreferredSpell(spellId: SpellId | null): Result<{ preferredSpellId: SpellId | null }> {
+    const hook = this.hooks.combat;
+    if (!hook) return err("UNAVAILABLE", "Combat system is not available yet");
+    if (spellId !== null && !content.spell(spellId)) {
+      return err("NOT_FOUND", `No spell with id ${spellId}`);
+    }
+    hook.setPreferredSpell(spellId);
+    return ok({ preferredSpellId: spellId });
   }
 
   // ------------------------------------------------------- npc, bank, shop
@@ -437,9 +566,20 @@ export class CorealmGameApi implements GameApiContract {
 
     const entity = this.hooks.entities?.get(pending.entityId);
     if (!entity) return null;
-    // The world moves while the player walks: a node can deplete or an enemy die en route.
+    // The world moves while the player walks: a node can deplete or an enemy die en route, and a
+    // click that lands minutes later on something that has wandered off is worse than no click.
+    //
+    // Measured against the VERB's reach, not one constant. This used to be `INTERACT_RANGE * 1.6`
+    // (3.84 m) for everything, which was invisible while every walk ended on top of its target — and
+    // became a silent dead end the moment ranged approach landed: a caster walked thirty metres,
+    // stopped correctly at the edge of spell range, and had the queued attack thrown away here
+    // because 13.5 m is not 3.84 m. The click did nothing at all, with no error.
+    //
+    // The 1.6 slack is kept as-is. It is a "has the world moved too much" guard, not a range check;
+    // `world/interactions.ts` applies the real range immediately below.
+    const reach = this.hooks.interactions?.rangeFor?.(pending.interaction) ?? INTERACT_RANGE;
     const gap = distanceXZ(this.store.get().player.position, entity.position);
-    if (gap > INTERACT_RANGE * 1.6) return null;
+    if (gap > reach * 1.6) return null;
 
     const runner = this.hooks.interactions;
     if (!runner) return null;

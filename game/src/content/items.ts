@@ -321,7 +321,7 @@ const TOOLS: readonly ItemDef[] = [
   },
 ];
 
-/** Everything except equipment. 45 rows. */
+/** Everything except equipment. 48 rows; the "45" this comment used to claim was three stale. */
 export const ITEMS: readonly ItemDef[] = [
   ...CURRENCY,
   ...RESOURCE_ITEMS,
@@ -332,7 +332,7 @@ export const ITEMS: readonly ItemDef[] = [
   ...TOOLS,
 ];
 
-/** The table the root registers as `items`. 45 + 57 = 102 rows. */
+/** The table the root registers as `items`. 48 + 59 = 107 rows. */
 export const ALL_ITEMS: readonly ItemDef[] = [...ITEMS, ...EQUIPMENT];
 
 /** The currency item id, so nothing else has to spell it. PRD 2.10: currency is marks. */
@@ -349,14 +349,39 @@ export const CURRENCY_ITEM_ID = "marks";
  * (runs/corealm/architecture.md, simplification 2), so a starting weapon in the pack would be gone
  * the first time a Marchwolf caught the player, at the point in the game where they can least
  * afford to replace it.
+ *
+ * The staff is CARRIED, and is therefore droppable, and that asymmetry is a decision rather than an
+ * oversight: `mainHand` holds one thing, the sword holds it, and worn-and-worn is not an option.
+ * Starting the staff worn instead would only move the loss onto the melee line. What makes it
+ * survivable is that a dead player's staff is cheap to replace and their sword is not — the
+ * replacement for `worn_staff` is `palewood_staff`, fletched at Fletching 1 from 3 palewood shafts
+ * (Coldbrace General stocks 100 of them at 4 marks) and 1 pale quartz, which drops off any Grithe
+ * node. That is about 32 marks of inputs for a strictly better staff, against 90 marks minimum for
+ * a blade if the sword ever became droppable. If death-drop later learns to protect a second item,
+ * this is the row that should get the protection.
+ *
+ * It is listed FIRST, i.e. at pack slot 0, because it is the only starting item the player has to
+ * notice: the three tools work from the pack unequipped (they add effective levels while carried,
+ * PRD 2.5) and are exercised by clicking a node, whereas the staff does nothing whatsoever until
+ * somebody opens the pack and puts it in a hand.
  */
 export const STARTING_INVENTORY: readonly ItemStack[] = [
+  { itemId: "worn_staff", quantity: 1 },
+  // Twenty casts, and the staff is useless without them.
+  //
+  // Every spell in `content/spells.ts` costs one Essence Shard, and a new character starts with
+  // `currency: 0` (`state/store.ts createInitialState`) and nothing to sell. So handing out
+  // `worn_staff` and stopping there ships a weapon that cannot be fired once: the player equips it,
+  // clicks Cast, and gets "You have no spell you can cast" with no way to act on that. Twenty is
+  // enough to kill a few Marchwolves and feel what Magic does, and far short of enough to live on —
+  // the shard economy (Crafting a gem plus a log, or a general store) still has to be found.
+  { itemId: "essence_shard", quantity: 20 },
   { itemId: "worn_hatchet", quantity: 1 },
   { itemId: "worn_pickaxe", quantity: 1 },
   { itemId: "worn_rod", quantity: 1 },
 ];
 
-/** Worn at spawn. See `STARTING_INVENTORY` for why the weapon is here and not in the pack. */
+/** Worn at spawn. See `STARTING_INVENTORY` for why the sword is here and the staff is not. */
 export const STARTING_EQUIPMENT: Readonly<Partial<Record<EquipSlot, ItemStack>>> = {
   mainHand: { itemId: "worn_sword", quantity: 1 },
 };

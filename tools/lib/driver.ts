@@ -20,6 +20,17 @@ export interface DriverOptions {
   viewport?: { width: number; height: number };
   /** Optional browser launch flags. Deterministic gameplay checks keep the SwiftShader default. */
   browserArgs?: string[];
+  /**
+   * Client preferences seeded into `localStorage` before the page loads.
+   *
+   * `ui/settings.ts` reads its store during construction, so a tool that wants the renderer to come
+   * up at a lower setting has to write the blob BEFORE navigation — setting it afterwards means a
+   * reload, and a reload costs another full boot (16.7 s measured here). The one caller today is
+   * `tools/verify-magic.ts`: it measures the spell layer, and at default settings this world costs
+   * 527 draw calls and tens of seconds a frame, which is slow enough that a 1.3 s effect can fall
+   * entirely between two sampled frames. Dropped to 193 draw calls, the same sweep sees it.
+   */
+  settings?: Record<string, unknown>;
 }
 
 export class GameDriver {
@@ -45,6 +56,12 @@ export class GameDriver {
       viewport: this.options.viewport ?? { width: 1280, height: 720 },
       deviceScaleFactor: 1,
     });
+    const settings = this.options.settings;
+    if (settings) {
+      await this.context.addInitScript((blob: string) => {
+        globalThis.localStorage?.setItem("corealm.settings.v1", blob);
+      }, JSON.stringify(settings));
+    }
     this.page = await this.context.newPage();
     this.page.on("console", (message) => {
       if (message.type() === "error") this.consoleErrors.push(message.text().slice(0, 1000));
@@ -141,9 +158,20 @@ export class GameDriver {
     });
   }
 
+  /**
+   * Playwright's 30 s default is not enough for this world on a software rasteriser.
+   *
+   * `screenshot()` forces a fresh paint, and Chromium here runs on SwiftShader — measured at boot:
+   * 524 draw calls and 18.2 M triangles a frame, with the page taking 16.7 s just to reach
+   * `ready()`. Against that a single composite regularly runs past 30 s and the call rejects with a
+   * TimeoutError, which is a harness fault reported as if the game were broken. `animations:
+   * "disabled"` also stops it waiting on CSS transitions that a paused sim never finishes.
+   */
   async screenshot(directory: string, name: string): Promise<string> {
     const file = path.join(directory, `${safeName(name)}.png`);
-    await this.requirePage().screenshot({ path: file, type: "png" });
+    await this.requirePage().screenshot({
+      path: file, type: "png", timeout: 180_000, animations: "disabled",
+    });
     return file;
   }
 

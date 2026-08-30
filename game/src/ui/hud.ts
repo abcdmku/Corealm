@@ -22,8 +22,19 @@ import type { NoticeTone } from "./contextMenu.js";
 import type { UiContext, UiOptions } from "./panels.js";
 import { formatQuantity } from "./panels.js";
 
-const TOAST_LIMIT = 4;
-const TOAST_DECAY_MS = 6_000;
+/**
+ * Lines kept in the message log.
+ *
+ * Eight, not the four this was as a toast strip. The log is read AFTER the fact — the point of
+ * making it a log rather than a set of expiring toasts is that a message which arrived while the
+ * player was looking at a fight is still there when they look down. Four lines is one busy exchange.
+ */
+const MESSAGE_LIMIT = 8;
+/**
+ * Quiet time before the panel dims. It does NOT delete anything — the lines stay until pushed out
+ * by newer ones, which is the whole difference between this and the toast strip it replaced.
+ */
+const MESSAGE_IDLE_MS = 14_000;
 const XP_DROP_LIMIT = 6;
 const XP_DROP_MS = 2_200;
 const EVENT_INTERVAL_MS = 250;
@@ -33,6 +44,8 @@ export type AutoOpen = "bank" | "shop" | null;
 export class Hud {
   readonly element: HTMLElement;
   private readonly toastStrip: HTMLElement;
+  /** Live quiet-timer for the message log, so it can be replaced rather than stacked. */
+  private messageIdleTimer: number | null = null;
 
   private readonly healthBar: HTMLElement;
   private readonly healthFill: HTMLElement;
@@ -149,11 +162,11 @@ export class Hud {
 
     root.append(vitals, right);
 
-    // The toast strip is a sibling, not a child: #ui-root already styles and positions
-    // `.toast-strip`, and the context menu's fallback looks for exactly that selector.
+    // The message log is a sibling, not a child: #ui-root already styles and positions `.msglog`,
+    // and the context menu's pre-HUD fallback looks for exactly that selector.
     const toastStrip = document.createElement("div");
-    toastStrip.className = "toast-strip";
-    toastStrip.setAttribute("role", "status");
+    toastStrip.className = "msglog";
+    toastStrip.setAttribute("role", "log");
     toastStrip.setAttribute("aria-live", "polite");
 
     this.element = root;
@@ -173,18 +186,49 @@ export class Hud {
     parent.append(this.element, this.toastStrip);
   }
 
-  /** The notice sink. Everything the player is told arrives here. */
+  /**
+   * The notice sink. Everything the game says to the player in words arrives here.
+   *
+   * Every input path already funnels through `ui/contextMenu.ts notify()` — a failed click, a
+   * rejected `Result`, a described event — so anything that wants to talk to the player says it
+   * once, in one place, and lands in this log. Nothing else should grow its own message strip.
+   *
+   * Repeats are COLLAPSED rather than stacked. "You have no essence shards" fires on every combat
+   * tick that tries to cast, and eight identical lines would push out the context that explains
+   * them; a counter says the same thing and keeps the history.
+   */
   pushNotice(message: string, tone: NoticeTone = "info"): void {
+    const last = this.toastStrip.lastElementChild as HTMLElement | null;
+    if (last && last.dataset["message"] === message) {
+      const seen = Number(last.dataset["count"] ?? "1") + 1;
+      last.dataset["count"] = String(seen);
+      last.textContent = `${message} (x${seen})`;
+      this.markMessageActivity();
+      return;
+    }
+
     const line = document.createElement("div");
-    line.className = `toast toast--${tone}`;
+    line.className = `msglog__line msglog__line--${tone}`;
+    line.dataset["message"] = message;
     line.textContent = message;
     this.toastStrip.appendChild(line);
-    while (this.toastStrip.childElementCount > TOAST_LIMIT) this.toastStrip.firstElementChild?.remove();
+    while (this.toastStrip.childElementCount > MESSAGE_LIMIT) this.toastStrip.firstElementChild?.remove();
+    this.markMessageActivity();
+  }
 
-    this.after(TOAST_DECAY_MS, () => {
-      line.classList.add("toast--leaving");
-      this.after(400, () => line.remove());
-    });
+  /**
+   * Wakes the log and restarts the quiet timer.
+   *
+   * The timer is replaced rather than stacked, so a burst of messages dims once, `MESSAGE_IDLE_MS`
+   * after the LAST of them, instead of the panel flickering back and forth as older timers fire.
+   */
+  private markMessageActivity(): void {
+    this.toastStrip.classList.remove("is-idle");
+    if (this.messageIdleTimer !== null) window.clearTimeout(this.messageIdleTimer);
+    this.messageIdleTimer = window.setTimeout(() => {
+      this.toastStrip.classList.add("is-idle");
+      this.messageIdleTimer = null;
+    }, MESSAGE_IDLE_MS);
   }
 
   /** Consumed by `createUi`: a bank or shop interaction landed and the window should come up. */
@@ -254,6 +298,10 @@ export class Hud {
   dispose(): void {
     for (const timer of this.timers) window.clearTimeout(timer);
     this.timers.clear();
+    // Not in `this.timers`: the quiet timer is replaced on every message rather than accumulated,
+    // so it is held as a single handle and has to be cleared on its own.
+    if (this.messageIdleTimer !== null) window.clearTimeout(this.messageIdleTimer);
+    this.messageIdleTimer = null;
     this.element.remove();
     this.toastStrip.remove();
   }
@@ -424,6 +472,22 @@ export class Hud {
       }
       case "navigation.failed":
         return { text: "There is no route to that place.", tone: "error" };
+      case "combat.ended": {
+        // Only the endings the player did not ask for. A fight that ends because the target died,
+        // or because they clicked something else, explains itself on screen — saying so in words is
+        // noise. An engagement that stops on its own does NOT explain itself, and running dry of
+        // essence shards mid-fight was the worst of them: `systems/combat.ts` disengaged silently,
+        // so the character simply stopped attacking with nothing said anywhere.
+        const reason = typeof data["reason"] === "string" ? data["reason"] : "";
+        if (reason === "out-of-essence") {
+          return {
+            text: "You are out of Essence Shards. Buy more at a general store, or craft them from a gem and a log.",
+            tone: "error",
+          };
+        }
+        if (reason === "out-of-range") return { text: "Your target moved out of reach.", tone: "info" };
+        return null;
+      }
       default:
         return null;
     }

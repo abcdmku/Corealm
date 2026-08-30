@@ -30,6 +30,7 @@ import type { Renderer } from "../render/renderer.js";
 import type { OrbitCamera } from "../render/camera.js";
 import type { AssetRegistry } from "../render/assets.js";
 import { addSkillXp, setSkillLevel as applySkillLevel } from "../state/store.js";
+import { PROCEDURAL_GEAR_ASSETS } from "../render/proceduralGear.js";
 import { roundVec3 } from "../core/math.js";
 import { keybindings } from "../input/keyboard.js";
 
@@ -51,6 +52,16 @@ export interface DebugDeps {
   camera: OrbitCamera;
   assets: AssetRegistry;
   errors: RecordedError[];
+  /**
+   * Live particle count in the spell effect layer, when one is wired.
+   *
+   * Exists because the alternative is guessing. `render/spellVfx.ts` draws through ONE additive
+   * InstancedMesh, so from outside the only evidence a cast produced anything is `drawCalls` moving
+   * by one — and that number also moves when the player crosses a streaming boundary or a building
+   * fades, which is most of what happens while walking to a fight. `tools/verify-magic.ts` was
+   * reading draw calls and calling a streamed-in hedge a spell. This answers the question directly.
+   */
+  spellParticles?(): number;
   /** JSON-safe audio playback state and evidence; absent only in boot-fallback tests. */
   audioState?(): unknown;
   audioHistory?(limit?: number): unknown;
@@ -295,6 +306,11 @@ export function installGameDebug(deps: DebugDeps): void {
         triangles: stats.triangles,
         programs: stats.programs,
         entityCount: api.hooks.entities?.all().length ?? 0,
+        // Lives here and NOT in `getState`. `tools/play-game.ts` diffs state snapshots between
+        // actions, and a per-frame particle count in that object would report a difference on every
+        // comparison forever — the same reason `clock` and `renderer` are called out as volatile and
+        // stripped there. Metrics are already understood to be a live reading.
+        spellParticles: deps.spellParticles?.() ?? 0,
         heapMB: memory ? Math.round(memory.usedJSHeapSize / 1048576) : 0,
       };
     },
@@ -671,6 +687,41 @@ export function installGameDebug(deps: DebugDeps): void {
 
     giveItem(itemId: ItemId, quantity: number, to: "inventory" | "bank" = "inventory"): unknown {
       return deps.giveItem(itemId, quantity, to);
+    },
+
+    /**
+     * Sets the character up to exercise the whole magic ladder in one call.
+     *
+     * Magic 70 (the top of the ladder — Kilnsurge unlocks exactly there), every staff, and enough
+     * Essence Shards that the pouch is not the thing under test. The best staff is equipped, because
+     * a staff sitting in the pack casts nothing: `systems/combat.ts` reads the MAIN HAND to decide
+     * whether "attack" swings or casts.
+     *
+     * A setup helper, and only that. It grants items and levels, which under the rules in
+     * `tools/gate-check.ts` may set a check up but can never satisfy one — nothing here fights,
+     * casts or earns anything.
+     *
+     * Returns what it did, so a console caller sees the result rather than `undefined`.
+     */
+    seedMagic(magicLevel = 70, shards = 5000): Record<string, unknown> {
+      applySkillLevel(store.get(), "magic", magicLevel);
+      deps.giveItem("essence_shard", Math.max(1, Math.floor(shards)), "inventory");
+      const staffIds = PROCEDURAL_GEAR_ASSETS.map((asset) => asset.itemId);
+      for (const itemId of staffIds) deps.giveItem(itemId, 1, "inventory");
+      // Best last so it wins the main hand: the ladder is authored weakest-first.
+      const best = staffIds[staffIds.length - 1];
+      const equipped = best ? api.equipItem(best) : null;
+      store.markDirty();
+
+      const book = api.getSpellbook();
+      return {
+        magic: store.get().skills.magic.level,
+        shards: book.shards,
+        staffs: staffIds,
+        equipped: equipped?.ok === true ? best : `not equipped: ${equipped?.ok === false ? equipped.error.message : "no staff"}`,
+        castable: book.spells.filter((row) => row.castable).length,
+        activeSpellId: book.activeSpellId,
+      };
     },
   };
 

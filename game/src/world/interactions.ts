@@ -22,7 +22,7 @@ import type {
 } from "../contracts.js";
 import { err, ok } from "../contracts.js";
 import { SKILLS } from "../content/skills.js";
-import { INTERACT_RANGE, MELEE_RANGE, SPELL_RANGE } from "../app/config.js";
+import { INTERACT_RANGE, SPELL_RANGE } from "../app/config.js";
 import { distanceXZ } from "../core/math.js";
 
 export interface InteractionContext {
@@ -43,16 +43,23 @@ export interface InteractionDeps {
 }
 
 /**
- * Range per verb. `cast` reaches nine metres, everything else is the normal interaction range.
+ * Range per verb: how close the player is walked before the handler runs.
  *
- * `attack` deliberately uses INTERACT_RANGE rather than MELEE_RANGE here: `GameApi.interact` walks
- * the player to within INTERACT_RANGE before it calls this, so a stricter melee range would make
- * every click-to-attack fail on arrival. Round 4's combat handler applies MELEE_RANGE at the swing,
- * which is where it belongs - the dispatcher gates *starting* an action, not landing a hit.
+ * `attack` reaches SPELL_RANGE, not melee range, and that is the whole of "magic is a ranged
+ * attack". This layer cannot see what the player is holding — `world/` never imports content or
+ * equipment — so it gates on the FURTHEST either weapon can reach and lets `systems/combat.ts`,
+ * which can see the main hand, decide from there. A caster who clicks a distant target walks only
+ * until the target is inside SPELL_RANGE and opens fire from there; a swordsman keeps walking,
+ * closed the rest of the way by `CombatSystem.pursue`, which applies MELEE_RANGE at the swing.
+ * Gating this at 2.4 m instead marched every mage into melee before their first cast, which is the
+ * opposite of what a fifteen-metre spell is for.
+ *
+ * The dispatcher gates *starting* an action, not landing a hit; the tighter range still applies
+ * where it belongs.
  */
 const DEFAULT_RANGES: Partial<Record<InteractionId, number>> = {
   cast: SPELL_RANGE,
-  attack: Math.max(MELEE_RANGE, INTERACT_RANGE),
+  attack: Math.max(SPELL_RANGE, INTERACT_RANGE),
 };
 
 /** Gathering verbs, so a depleted node is refused with DEPLETED rather than a vague failure. */

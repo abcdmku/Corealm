@@ -1,0 +1,414 @@
+/* spellbook — owned with spellbookPanel.ts. Nothing else writes to this file. */
+
+/*
+ * The spellbook is a ladder drawn as a table: four element columns crossed with four rungs.
+ *
+ * Two colour channels, kept strictly apart so they never fight:
+ *
+ *   ELEMENT is the left rail and the swatch, and it comes from `--spell-core` / `--spell-edge`,
+ *   which `spellbookPanel.ts` writes inline from `ELEMENT_COLOURS` in render/spellVfx.ts. So the
+ *   dot beside "Fire" is literally the orange the impact draws. Nothing in here hard-codes an
+ *   element colour; a swatch with no custom property falls back to plain ink rather than lying.
+ *
+ *   STATE is brass, and brass alone: the chosen row, the row that will actually fire, the focus
+ *   ring. That is the same rule the rest of the UI runs on — brass means "actionable / live" —
+ *   and it survives four saturated element hues sitting next to it because none of them is gold.
+ *
+ * Everything is scoped to `.spellbook` (the body wrapper) or `#panel-spellbook` (the frame itself,
+ * which the panel owns but cannot style from inside), matching controls.css and map.css.
+ */
+
+/* Centre slot: `left: 50%` places the left edge, this pulls the box back over the centre line. */
+#panel-spellbook { transform: translateX(-50%); }
+
+.spellbook {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* The grid columns are minmax(0, 1fr); without this a long spell name would push the panel
+   * wider than the width its placement asked for. */
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------------- the banner */
+
+/*
+ * What is being cast, and whose decision that was. It carries the brass left edge the controls
+ * panel uses for "this is the live one", because a player who never opens this panel still has a
+ * spell being picked for them and this sentence is the only place the game admits it.
+ */
+.spellbook__status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(212, 175, 78, 0.07);
+  border: var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.spellbook__status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.spellbook__casting {
+  font-family: var(--font-display);
+  font-size: var(--size-lg);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--highlight);
+  text-shadow: var(--shadow-text);
+}
+
+.spellbook__note {
+  margin: 0;
+  font-size: var(--size-xs);
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.spellbook__auto { flex: 0 0 auto; }
+
+/* The escape hatch out of a standing choice, and the only one a player can find by reading rather
+ * than by guessing that clicking the lit cell again undoes it. Brass while it has something to
+ * undo; `.btn[disabled]` takes it back down to 45% when the game is already choosing. */
+.spellbook__auto:not(:disabled) { color: var(--accent); }
+
+/* ----------------------------------------------------------------- the swatches */
+
+/*
+ * A lit orb rather than a flat chip: hot centre, cooler rim, and a bloom in the rim colour. That
+ * is the same two-colour recipe the VFX layer uses for a projectile (core inside, edge particles
+ * outside), so the legend and the effect read as the same object at a glance.
+ */
+.spellbook__swatch {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 34% 30%,
+    var(--spell-core, var(--ink-dim)) 0%,
+    var(--spell-edge, var(--ink-faint)) 74%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+  box-shadow:
+    0 0 10px -2px var(--spell-edge, transparent),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+.spellbook__swatch--small {
+  width: 11px;
+  height: 11px;
+  box-shadow:
+    0 0 6px -1px var(--spell-edge, transparent),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+/* Nothing is castable, so the orb is out. Desaturated rather than hidden: the slot stays, which
+ * keeps the banner from reflowing every time the last shard is spent. */
+.spellbook__swatch.is-dead {
+  background: radial-gradient(circle at 34% 30%, #3a352c 0%, #1a1712 78%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* ------------------------------------------------------------------ cost strip */
+
+.spellbook__cost {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  background: rgba(0, 0, 0, 0.22);
+  border: var(--border);
+  border-left: 2px solid var(--panel-edge);
+  border-radius: var(--radius);
+  font-size: var(--size-xs);
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+/*
+ * Zero shards. The API still lets every row be chosen and the panel still shows every number, so
+ * this is a warning and not a lock — a caster restocking at a general store needs to be able to
+ * set the spell they are coming back for. Danger tone only on the rail and the ink; a red fill
+ * across the strip reads as an error the player caused.
+ */
+.spellbook__cost.is-empty {
+  border-left-color: var(--danger);
+  background: rgba(126, 53, 39, 0.16);
+  color: #f3c3b8;
+}
+
+/*
+ * `createItemIcon` returns a wrapper whose sizing rules in styles.css are all scoped to
+ * `.slot__glyph`, so outside an inventory slot it has none and the raster inside it is 48 px.
+ * These four rules are the whole of dressing it for a text line.
+ */
+.spellbook__cost-icon {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.spellbook__cost-icon .icon,
+.spellbook__cost-icon .item-icon__raster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.spellbook__cost-icon .icon { fill: #e8dfcb; }
+
+.spellbook__cost-icon.is-raster-ready .icon { visibility: hidden; }
+
+/* -------------------------------------------------------------------- the grid */
+
+/*
+ * One grid, not four columns of lists. The DOM is row-major — rung label, then the four elements
+ * at that rung — which is what lets `installRovingGrid(grid, 4)` map ArrowRight to "next element"
+ * and ArrowDown to "next rung up the ladder". The rung labels and the corner carry no
+ * `data-slot-index`, so the roving grid steps straight over them.
+ */
+.spellbook__grid {
+  display: grid;
+  grid-template-columns: 54px repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+  align-items: stretch;
+}
+
+.spellbook__corner,
+.spellbook__head {
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid rgba(212, 175, 88, 0.22);
+}
+
+.spellbook__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.spellbook__head-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.spellbook__head-name {
+  font-family: var(--font-display);
+  font-size: var(--size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+}
+
+.spellbook__head-blurb {
+  font-size: var(--size-xs);
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* The ladder's own axis, right-aligned into the cells so the eye reads label-then-row. */
+.spellbook__rung {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+}
+
+/* --------------------------------------------------------------------- a spell */
+
+/* A SQUARE ICON TILE, not a name plate.
+ *
+ * The grid's two axes already carry the taxonomy — element across, rung down — so a cell only has
+ * to be findable, not readable: colour says which element, glyph says which rung, and the corner
+ * number says whether it is reachable. Everything else is one hover away in the tooltip.
+ *
+ * `aspect-ratio` rather than a fixed height so the tile stays square as the four fluid columns
+ * resize with the window, and `place-items: center` so the glyph is optically centred whether or
+ * not the padlock is showing. */
+.spellbook__cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--spell-edge) 26%, transparent), transparent 68%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.24));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition),
+    transform var(--transition);
+}
+
+.spellbook__cell:hover {
+  border-color: var(--panel-edge-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--spell-core) 45%, transparent) inset;
+}
+
+.spellbook__cell-glyph {
+  display: block;
+  line-height: 0;
+  /* The glyph is the only lit thing in the tile, so it carries the element's own glow rather than
+   * a generic one. Kept subtle: sixteen tiles all blooming at once would read as noise. */
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--spell-core) 55%, transparent));
+}
+
+/* Bottom-right, over the tile rather than beside it: the number is a qualifier on the icon, and
+ * giving it its own row would put the tile back to being a two-line plate. */
+.spellbook__cell-req {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-size: var(--size-xs);
+  line-height: 1;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.spellbook__cell-lock {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  line-height: 0;
+  color: #d9a294;
+}
+
+.spellbook__cell-lock[hidden] { display: none; }
+
+.spellbook__cell.is-preferred {
+  background: linear-gradient(180deg, rgba(212, 175, 78, 0.22), rgba(212, 175, 78, 0.07));
+  border-color: var(--accent-dim);
+  border-left-color: var(--spell-core, var(--accent));
+}
+
+/*
+ * What "Cast at" will actually throw. This is the one thing on the panel that must be unmistakable
+ * from across the window, because it is true whether or not the player ever made a choice — so it
+ * gets a full brass ring plus a bloom in the element's own colour, which is more than any other
+ * state here spends.
+ */
+.spellbook__cell.is-active {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 14px -5px var(--spell-edge, var(--accent));
+}
+
+/* The chosen-but-not-yet-castable pip. `is-preferred` alone means the player pointed at this
+ * spell; the ring below means the game is actually throwing it. */
+.spellbook__cell.is-preferred::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 4px var(--accent);
+}
+
+/*
+ * Above the player's Magic level. Still clickable on purpose: `setPreferredSpell` deliberately does
+ * not gate on level, so a caster gets to point at what they are training toward and the combat
+ * system falls back until they reach it. The tile carries a padlock AND keeps its level number —
+ * the padlock says "not yet" at a glance, the number says how far.
+ *
+ * Locked is DIMMED, not hidden. The first pass took opacity to 0.62 and saturation to 0.5 on top of
+ * a tile that is already dark glass, and the surge row — all four of them locked until Magic 62 —
+ * came out as four empty squares: the player could not see that the top of the ladder exists, which
+ * is most of what a spellbook is for. The glyph now keeps its shape and loses its glow, which is the
+ * honest reading: it is a real spell, you cannot cast it yet. */
+.spellbook__cell.is-locked {
+  background: rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.07);
+  opacity: 0.82;
+  filter: saturate(0.35);
+}
+
+.spellbook__cell.is-locked .spellbook__cell-glyph { filter: none; }
+
+.spellbook__cell.is-locked .spellbook__cell-req { color: #d9a294; }
+.spellbook__cell.is-locked:hover { opacity: 1; filter: none; }
+
+/* Only reachable if content ever stops being a full 4x4; see buildCell's note. */
+.spellbook__cell.is-absent {
+  cursor: default;
+  opacity: 0.28;
+  border-left-color: var(--panel-edge);
+}
+
+/* ================================================================== compact density */
+
+/*
+ * The tokens in title.css do most of this on their own — type and spacing shrink under
+ * `#ui-root.is-compact` and every rule above reads them through var(). What is left is the fixed
+ * geometry: the rung gutter, the orbs, and the panel width itself. `max-width` is used rather than
+ * `width` because the width is an inline style from `PanelPlacement` and only `max-width` outranks
+ * it without `!important`; the panel is centred by transform, so clamping it keeps it centred.
+ */
+/* 380, not the old 600: a 600 px cap never bound once the panel went from 700 px name plates to a
+ * 460 px icon grid, so compact density silently stopped narrowing this panel at all. */
+#ui-root.is-compact #panel-spellbook { max-width: 380px; }
+#ui-root.is-compact .spellbook__grid { grid-template-columns: 44px repeat(4, minmax(0, 1fr)); gap: 2px; }
+#ui-root.is-compact .spellbook__status { padding: var(--space-1) var(--space-2); }
+#ui-root.is-compact .spellbook__swatch { width: 18px; height: 18px; }
+#ui-root.is-compact .spellbook__head-blurb { display: none; }
+
+/* =================================================================== smaller screens */
+
+/* 1280x720 is the floor. Squeeze the gaps, never the tiles: the sixteen glyphs are what the panel
+ * is read by, and a shrunken glyph stops being distinguishable from the rung above it. */
+@media (max-height: 800px) {
+  .spellbook { gap: var(--space-1); }
+  .spellbook__grid { gap: 2px; }
+  .spellbook__head-blurb { display: none; }
+  .spellbook__note { line-height: 1.35; }
+}
+
+/*
+ * Below the floor the rung gutter goes first. `display: none` takes those cells out of grid flow
+ * entirely, so the header row and each rung row still line up four across without renumbering
+ * anything — and the ladder is still legible without its labels, because the glyph in each tile IS
+ * the rung and it escalates down the grid. The four element columns are the one thing that must
+ * survive, so they never collapse.
+ */
+@media (max-width: 780px) {
+  /* `max-width`, not `width`. The old rule forced the panel to the full viewport, which was right
+   * for a 700 px grid of name plates and wrong for a 460 px grid of square tiles: measured at a
+   * 760x720 viewport it inflated the panel to 736 px and, with the tiles on `aspect-ratio: 1`,
+   * pushed the grid taller than the window and made it scroll. Clamping instead of forcing leaves
+   * the panel at its natural 460 px until the viewport is actually narrower than that. */
+  #panel-spellbook { max-width: calc(100vw - 24px); }
+  .spellbook__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .spellbook__rung,
+  .spellbook__corner { display: none; }
+  .spellbook__status { grid-template-columns: auto minmax(0, 1fr); }
+  .spellbook__auto { grid-column: 2; justify-self: start; }
+}

@@ -102,7 +102,12 @@ export function buildDocs(): DocEntry[] {
       + "is (defenceLevel + 9) scaled by the target's armour. Melee damage rolls between 1 and "
       + "floor(2 + (Melee level + gear power) / 4.2). Magic is 15% more accurate and rolls up to "
       + "floor(spell base + (Magic level + magic power) / spell divisor), but it is slower and each "
-      + "cast consumes an essence shard. Magic beats high-armour, low-magic-armour targets; melee "
+      + "cast consumes an essence shard. Attacking uses whatever is in your main hand: hold a staff "
+      + "and Attack casts at up to fifteen metres without closing, hold a blade and it swings at 1.6 m. "
+      + "A spell does not hurt anything until its bolt arrives, which takes about 0.3 to 1.3 seconds "
+      + "depending on the spell and the range, so the target's health moves after the cast rather "
+      + "than with it. "
+      + "Magic beats high-armour, low-magic-armour targets; melee "
       + "beats the reverse. You gain 4 experience per point of damage dealt, plus twice the target's "
       + "maximum health when it dies. Health is derived: 20 + 3 * floor((Melee + Magic) / 2) plus any "
       + "vitality from equipment. Out of combat you regain 1 health every 6 seconds.",
@@ -214,12 +219,17 @@ export function buildDocs(): DocEntry[] {
       title: spell.name,
       section: "Combat",
       body:
-        `${spell.name} needs Magic ${spell.reqLevel}. ${spell.description} `
+        `${spell.name} is a ${spell.element} ${spell.rung} spell and needs Magic ${spell.reqLevel}. `
+        + `${spell.description} `
         + `Maximum damage is ${spell.baseMax} plus (Magic level + magic power) / ${spell.divisor}. `
         + `Each cast takes ${(spell.castMs / 1000).toFixed(1)} seconds, gives ${spell.baseXp} Magic `
         + `experience hit or miss, and consumes ${spell.cost.quantity}x `
-        + `${content.item(spell.cost.itemId)?.name ?? spell.cost.itemId}.`,
-      keywords: [spell.id, "spell", "magic"],
+        + `${content.item(spell.cost.itemId)?.name ?? spell.cost.itemId}. `
+        + "All four elements deal the same kind of damage; they differ in when they unlock, so the "
+        + "strongest spell available rotates between them as Magic levels.",
+      // Element and rung are keywords because "what wind spells do I have" is the question a player
+      // or an agent actually asks, and neither word appears in a spell's own name.
+      keywords: [spell.id, spell.element, spell.rung, "spell", "magic"],
     });
   }
 

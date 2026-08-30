@@ -89,8 +89,63 @@ export const EQUIP_SLOTS: readonly EquipSlot[] = [
 export type EntityId = string;
 export type ItemId = string;
 export type RecipeId = string;
-export type SpellId = "emberlash" | "stonebrand" | "voltrend";
 export type QuestId = string;
+
+// ------------------------------------------------------------------- spells
+
+/**
+ * The four attack elements.
+ *
+ * They are a LOOK and a SOUND, not four damage types. There is no elemental weakness table and no
+ * resistance stat: `EquipmentBonuses` carries one `magicArmour`, every enemy row carries one
+ * `magicArmour`, and inventing a second axis would mean re-solving the whole PRD 2.4 magic balance
+ * against four columns instead of one. What separates them is WHEN they unlock — the ladder in
+ * `content/spells.ts` staggers the four elements inside each rung, so the strongest spell a caster
+ * owns rotates wind -> water -> earth -> fire as they level, and a player who prefers one element's
+ * look pays a small, temporary damage cost to stay on it.
+ *
+ * `wind` covers gale and charge, which is why Voltrend — a garnet cracked for the charge in it —
+ * is a wind spell rather than a fifth element. The tier-10 magic kit already calls its accessories
+ * `storm_ring` and `storm_charm`, so the equipment ladder made that association before this did.
+ */
+export type SpellElement = "wind" | "water" | "earth" | "fire";
+
+export const SPELL_ELEMENTS: readonly SpellElement[] = ["wind", "water", "earth", "fire"] as const;
+
+/**
+ * The four escalating shapes a spell can take, low to high.
+ *
+ * This is the axis the renderer reads. All four elements at one rung share a silhouette, a particle
+ * count and a timing envelope, and differ only in tint — one sprite atlas therefore covers sixteen
+ * spells (`render/spellVfx.ts`). Rung is also the difficulty read the player gets before the damage
+ * number lands: a `lash` is a single small dart, a `surge` is a wide front with a ground wave under
+ * it, and the two are not mistakable at gameplay distance.
+ */
+export type SpellRung = "lash" | "bolt" | "burst" | "surge";
+
+export const SPELL_RUNGS: readonly SpellRung[] = ["lash", "bolt", "burst", "surge"] as const;
+
+/**
+ * Every attack spell, in unlock order, Magic 1 to Magic 70.
+ *
+ * Four rungs of four. `emberlash`, `stonebrand` and `voltrend` keep the ids, levels and damage
+ * numbers PRD 2.4 fixes for them and now sit inside the ladder as the lash rung's fire, earth and
+ * wind entries; `rimewash` completes that rung with the water entry the PRD never authored.
+ *
+ * Widened from a three-way union together with its callers, per AGENTS.md rule 5: `content/spells.ts`,
+ * `systems/combat.ts`, `agent/tools.ts` and `ui/spellbookPanel.ts`. Kept as a literal union rather
+ * than relaxed to `string` so a typo in a quest reference or an agent call is a compile error
+ * rather than a `NOT_FOUND` at runtime.
+ */
+export type SpellId =
+  // lash — Magic 1 to 13
+  | "emberlash" | "stonebrand" | "voltrend" | "rimewash"
+  // bolt — Magic 17 to 35
+  | "skirlbolt" | "sleetbolt" | "shalebolt" | "cinderbolt"
+  // burst — Magic 41 to 59
+  | "galeburst" | "spateburst" | "cragburst" | "pyreburst"
+  // surge — Magic 62 to 70
+  | "squallsurge" | "tidesurge" | "scarpsurge" | "kilnsurge";
 
 export type Archetype =
   | "ore" | "tree" | "fishing_spot" | "farm_plot"
@@ -390,6 +445,19 @@ export type GameEventType =
    */
   | "item.equipped" | "item.unequipped"
   | "combat.started" | "combat.ended"
+  /**
+   * A cast has been rolled and paid for, and its bolt is in the air.
+   *
+   * Carries `flightMs`, the gap before the damage lands. This exists because a spell now HURTS on
+   * arrival rather than on release (`systems/combat.ts landSpellHits`), so the hit log entry is
+   * written at the far end of the flight — too late to be the renderer's cue to start drawing the
+   * bolt. `data` is `{ spellId, targetId, element, rung, flightMs, hit }`.
+   *
+   * `hit` is the resolved roll, published before the damage lands. That is deliberate rather than a
+   * leak: the effect layer has to know at launch whether to draw a bolt that connects or one that
+   * fizzles short, and this is a single-player simulation where the client already owns the world.
+   */
+  | "spell.launched"
   | "health.low" | "player.died"
   | "level.gained" | "production.completed"
   | "quest.updated" | "dialogue.opened" | "dialogue.closed"
@@ -509,6 +577,42 @@ export interface TimeView {
 
 export interface BankView { slots: ItemStack[]; usedSlots: number; capacity: number }
 
+/**
+ * One row of the spellbook, resolved for the player standing there right now.
+ *
+ * `maxHit` is computed WITH worn gear, not bare, because the question the panel answers is "what
+ * does this do if I cast it now" and the player is wearing what they are wearing. `castable`
+ * separates the two ways a spell can be unavailable — too low a level is permanent until you train,
+ * an empty shard pouch is a trip to a general store — so the UI can say which.
+ */
+export interface SpellRow {
+  id: SpellId;
+  name: string;
+  element: SpellElement;
+  rung: SpellRung;
+  reqLevel: number;
+  /** Highest damage this spell can roll at the player's current Magic level and worn gear. */
+  maxHit: number;
+  baseXp: number;
+  castMs: number;
+  costItemId: ItemId;
+  costQuantity: number;
+  unlocked: boolean;
+  castable: boolean;
+  description: string;
+}
+
+export interface SpellbookView {
+  spells: SpellRow[];
+  /** The player's standing choice, or null when the game is picking. */
+  preferredSpellId: SpellId | null;
+  /** What a "Cast at" would actually throw right now, or null if nothing is castable. */
+  activeSpellId: SpellId | null;
+  magicLevel: number;
+  /** Essence shards carried. Zero means every row is unaffordable, which the panel must explain. */
+  shards: number;
+}
+
 export interface ShopView {
   shopId: EntityId;
   stock: { itemId: ItemId; name: string; buyPrice: number; sellPrice: number; quantity: number }[];
@@ -573,6 +677,16 @@ export interface GameApi {
   // combat
   attack(entityId: EntityId): Result<{ targetId: EntityId; attackSpeedMs: number }>;
   cast(spellId: SpellId, entityId: EntityId): Result<{ targetId: EntityId; castMs: number }>;
+  getSpellbook(): SpellbookView;
+  /**
+   * Sets the standing spell choice, or clears it back to automatic with null.
+   *
+   * Deliberately NOT gated on the level or the shard count. A player one level short still gets to
+   * point at the spell they are working toward, and `systems/combat.ts` falls back to the automatic
+   * pick until it becomes castable. Refusing the click would need the UI to explain a rejection
+   * that the panel already shows as a lock icon.
+   */
+  setPreferredSpell(spellId: SpellId | null): Result<{ preferredSpellId: SpellId | null }>;
 
   // npc, bank, shop
   dialogue(op: "state" | "choose" | "end", optionId?: string): Result<DialogueView | null>;

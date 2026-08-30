@@ -129,12 +129,23 @@ const CAST_SPEED_MS = 3000;
  *
  * Tier 0 exists so the first minute of the game has a weapon in it and so the tier ladder starts
  * below the first thing you can buy, rather than at it. The numbers are deliberately under
- * `grithe_dagger`'s 6/6: this is a blade someone else wore out, and replacing it has to be worth
- * 90 marks. It is the only tier-0 equipment row, and it is not part of any `KITS` entry because
- * the PRD's derived-health and damage tables are written against tiers 1, 5 and 10.
+ * `grithe_dagger`'s 6/6 and `palewood_staff`'s 6/4/1: these are things someone else wore out, and
+ * replacing them has to be worth 90 and 140 marks. Neither row is part of any `KITS` entry, because
+ * the PRD's derived-health and damage tables are written against tiers 1, 5 and 10 only.
  *
- * `requires` is empty on purpose. A starting item that the starting character cannot equip would
- * be a bug the player meets before they meet anything else.
+ * Tier 0 now carries ONE WEAPON PER COMBAT LINE, which it did not before `worn_staff` existed. The
+ * melee line opened at Melee 1 with a blade already in hand; the magic line opened with nothing, so
+ * a player who read "Magic" on the character sheet and wanted to train it from level 1 had to earn
+ * the 140 marks `palewood_staff` costs with a sword first — buy your way into the skill, before the
+ * skill has shown you anything. Both lines now start in the first minute.
+ *
+ * The staff is only half of that, and the other half is in `items.ts`: a cast also spends an Essence
+ * Shard, and a new character has `currency: 0` and nothing to sell, so `STARTING_INVENTORY` carries
+ * twenty shards alongside the staff. Without them this row would be a weapon that cannot be fired
+ * once. The two must move together.
+ *
+ * `requires` is empty on both rows on purpose. A starting item that the starting character cannot
+ * equip would be a bug the player meets before they meet anything else.
  */
 const STARTER_EQUIPMENT: readonly ItemDef[] = [
   gear({
@@ -142,6 +153,20 @@ const STARTER_EQUIPMENT: readonly ItemDef[] = [
     description: "Notched, re-hafted twice, and lighter than it looks. It was somebody else's first.",
     requires: {}, attackSpeedMs: MELEE_SPEED_MS,
     bonuses: { accuracy: 3, power: 3 },
+  }),
+  gear({
+    id: "worn_staff", name: "Worn Staff", tier: 0, slot: "mainHand", value: 15,
+    description: "A split shaft with a quartz chip wound into the crack. It holds a cast, barely.",
+    requires: {}, attackSpeedMs: CAST_SPEED_MS,
+    // 3/2 against `palewood_staff`'s 6/4/1. Worked through, because "slightly worse" is easy to
+    // write and easy to get wrong: Emberlash at Magic 1 is floor(3 + (1 + 2)/8) = 3 on this staff
+    // and floor(3 + (1 + 4)/8) = 3 on the palewood one, so at the level a player meets both, the
+    // upgrade buys ACCURACY and not damage — attack roll 1.03 against 1.06. Max hit first splits at
+    // Magic 4: floor(3 + 6/8) = 3 here against floor(3 + 8/8) = 4 there. That is the intended
+    // shape. Any higher and the first staff a player can buy would be a sidegrade at the moment
+    // they can afford it, which is the trap the tier-0 tools in `items.ts` sidestep for the same
+    // reason.
+    bonuses: { magicAccuracy: 3, magicPower: 2 },
   }),
 ];
 
@@ -347,6 +372,22 @@ const MELEE_TIER_10: readonly ItemDef[] = [
   }),
 ];
 
+// ------------------------------------------------------------------------- the staff ladder
+// THE STAFF LADDER IS A WOODCUTTING LADDER. The three rows below already are the "wood from better
+// trees" progression the design asks for; there is no fourth staff to add, and the real gate on
+// each one is the WOOD, not the `requires` field printed on the row. Written out here because the
+// chain is otherwise only discoverable by cross-reading three files:
+//
+//   palewood_staff   Magic 1  <- 3 palewood_shaft  + 1 pale_quartz  <- palewood_log,  Woodcutting 1
+//   duskoak_staff    Magic 5  <- 3 duskoak_shaft   + 1 vell_amber   <- duskoak_log,   Woodcutting 5
+//   cairnpine_staff  Magic 10 <- 3 cairnpine_shaft + 1 cairn_garnet <- cairnpine_log, Woodcutting 10
+//
+// `content/recipes.ts` fletches each staff at the fletching bench out of its OWN wood's shafts
+// (1 log -> 4 shafts, then 3 shafts + 1 tier gem -> 1 staff), and `content/regions.ts` puts the
+// duskoak node at reqLevel 5 and the cairnpine node at reqLevel 10. So the Woodcutting gate is real
+// and already enforced upstream, by the only source of the material. Copying it into `requires`
+// would double-gate the player who buys logs instead of cutting them, which is a legal route.
+
 // ------------------------------------------------------------------ magic, tier 1 (Marchhide)
 // Kit totals: magicAccuracy 12, magicPower 6, armour 3, magicArmour 13, vitality 4.
 // Emberlash at Magic 1 with the full kit: floor(3 + (1 + 6)/8) = 3, matching PRD 2.4's
@@ -531,7 +572,11 @@ const MAGIC_TIER_10: readonly ItemDef[] = [
   }),
 ];
 
-/** Every equippable item, tiers 1 / 5 / 10, melee line then magic line. 57 rows. */
+/**
+ * Every equippable item: the tier-0 starter pair, then the melee line and the magic line at tiers
+ * 1 / 5 / 10. 59 rows. The count was written as 57 while the table already held 58, so treat
+ * `tests/equipment.test.ts` as the authority on it, not this line.
+ */
 export const EQUIPMENT: readonly ItemDef[] = [
   ...STARTER_EQUIPMENT,
   ...MELEE_TIER_1, ...MELEE_TIER_5, ...MELEE_TIER_10,

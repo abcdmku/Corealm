@@ -47,32 +47,35 @@ export function reportResult<T>(result: Result<T>): result is { ok: true; value:
   return result.ok;
 }
 
-const TOAST_LIMIT = 4;
-const TOAST_DECAY_MS = 6_000;
+const MESSAGE_LIMIT = 8;
 
+/**
+ * The pre-HUD fallback for the message log.
+ *
+ * Only reachable before `createUi` has wired `Hud.pushNotice` as the sink — a boot failure, or a
+ * test that stands this file up alone. It writes into the SAME `.msglog` element the HUD owns, with
+ * the same classes, so the two cannot disagree about where the game talks to the player, and the
+ * HUD taking over mid-session leaves the existing lines in place rather than orphaning them.
+ */
 function defaultToast(message: string, tone: NoticeTone): void {
   const root = uiRoot();
   if (!root) return;
-  let strip = root.querySelector<HTMLElement>(".toast-strip");
+  let strip = root.querySelector<HTMLElement>(".msglog");
   if (!strip) {
     strip = document.createElement("div");
-    strip.className = "toast-strip";
+    strip.className = "msglog";
     // Announced politely so a screen reader hears the failure without stealing focus mid-action.
-    strip.setAttribute("role", "status");
+    strip.setAttribute("role", "log");
     strip.setAttribute("aria-live", "polite");
     root.appendChild(strip);
   }
 
   const line = document.createElement("div");
-  line.className = `toast toast--${tone}`;
+  line.className = `msglog__line msglog__line--${tone}`;
+  line.dataset["message"] = message;
   line.textContent = message;
   strip.appendChild(line);
-  while (strip.childElementCount > TOAST_LIMIT) strip.firstElementChild?.remove();
-
-  window.setTimeout(() => {
-    line.classList.add("toast--leaving");
-    window.setTimeout(() => line.remove(), 400);
-  }, TOAST_DECAY_MS);
+  while (strip.childElementCount > MESSAGE_LIMIT) strip.firstElementChild?.remove();
 }
 
 function uiRoot(): HTMLElement | null {
@@ -86,7 +89,10 @@ function uiRoot(): HTMLElement | null {
  * these, so this mostly decides sensible things like talk-before-trade on a shopkeeper.
  */
 export const INTERACTION_PRIORITY: readonly InteractionId[] = [
-  "attack", "cast",
+  // No "cast": enemies advertise "attack" alone now, and it means "hit that with what I am holding"
+  // (`world/regionBuilder.ts`). The verb still exists in the contract for `GameApi.cast`, which
+  // names a specific spell, so it keeps a label below — nothing routes it into a menu.
+  "attack",
   "talk", "trade", "bank", "produce",
   "mine", "chop", "fish", "harvest", "plant", "rake",
   "loot", "take",
@@ -104,7 +110,7 @@ export const INTERACTION_LABELS: Record<InteractionId, string> = {
   plant: "Plant",
   harvest: "Harvest",
   attack: "Attack",
-  cast: "Cast at",
+  cast: "Cast at",  // unreachable from a menu; see INTERACTION_PRIORITY
   talk: "Talk to",
   open: "Open",
   enter: "Enter",
@@ -265,7 +271,7 @@ export class ContextMenu {
         id: interaction,
         label: `${INTERACTION_LABELS[interaction]} ${entity.name}`,
         enabled: availability.enabled,
-        danger: interaction === "attack" || interaction === "cast",
+        danger: COMBAT_VERBS.includes(interaction),
         onSelect: () => this.runInteraction(entity, interaction),
       };
       if (availability.reason !== undefined) item.reason = availability.reason;

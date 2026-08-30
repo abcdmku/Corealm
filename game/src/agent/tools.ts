@@ -6,10 +6,15 @@
  * code path, which is what makes agent parity a property of the architecture rather than a claim:
  * every tool below calls `GameApi`, the same object the human UI calls.
  *
- * Sixteen tools, consolidated from the brief's ~30 capability bullets. The consolidations that did
- * the work: `observe` absorbs known-location recall through a `scope` parameter, `interact` absorbs
- * gather/agility/loot/talk/door through the `InteractionId` it is given, and `events` absorbs both
- * draining and long-poll waiting through an optional timeout.
+ * Seventeen tools, consolidated from the brief's ~30 capability bullets. The consolidations that
+ * did the work: `observe` absorbs known-location recall through a `scope` parameter, `interact`
+ * absorbs gather/agility/loot/talk/door through the `InteractionId` it is given, and `events`
+ * absorbs both draining and long-poll waiting through an optional timeout.
+ *
+ * The seventeenth is `corealm_spellbook`, added with the Magic 1-70 ladder. It is not a
+ * consolidation failure: `corealm_attack` can already name any spell per cast, but with sixteen
+ * spells an agent needs to be able to READ which ones it has and which one a bare "cast" resolves
+ * to, and that read has no other home.
  *
  * FROZEN. Only the root edits this file.
  */
@@ -17,6 +22,7 @@ import type {
   EntityId, GameApi, GameEventType, InteractionId, ItemId, RecipeId, SpellId, Vec3,
   EquipSlot, OverlaySpec, Result,
 } from "../contracts.js";
+import { SPELLS } from "../content/spells.js";
 
 /** JSON Schema fragment. Kept loose on purpose: WebMCP passes these through untouched. */
 export type JsonSchema = Record<string, unknown>;
@@ -224,17 +230,71 @@ export function createTools(api: GameApi): ToolDef[] {
     {
       name: "corealm_attack",
       description:
-        "Attack an enemy with the equipped weapon, or cast a spell at it. Attacking continues "
-        + "automatically on the weapon's cadence until the target dies, the character leaves range, "
-        + "you issue another command, or the character dies. Casting consumes essence shards.",
+        "Attack an enemy with whatever is in the main hand. A staff CASTS — the standing spell "
+        + "choice, or the strongest castable one — and reaches fifteen metres, so a caster opens fire "
+        + "from where they stand rather than closing; a blade or bare hands swing at 1.6 m and the "
+        + "character walks in first. A CAST DOES NOT DAMAGE ANYTHING UNTIL ITS BOLT ARRIVES: this "
+        + "returns as soon as the spell leaves, and the target's health moves 0.3 to 1.3 seconds "
+        + "later depending on the spell and the range. Do not read health straight after the call; "
+        + "the spell.launched event carries the exact flightMs. "
+        + "Pass spellId to force a specific spell instead of the standing "
+        + "choice. Attacking continues automatically on the weapon's cadence until the target dies, "
+        + "the character leaves range, you issue another command, or the character dies. Every cast "
+        + "consumes one essence shard.",
       inputSchema: obj({
         entityId: STR("Enemy entity id"),
-        spellId: STR("Optional: emberlash, stonebrand, or voltrend. Omit for a melee attack."),
+        // Enumerated from the content table rather than typed out, because the ladder went from
+        // three spells to sixteen and a hand-written list is the thing that goes stale first. The
+        // enum also makes a bad id a schema rejection at the tool boundary instead of a NOT_FOUND
+        // three calls later.
+        spellId: {
+          type: "string",
+          enum: SPELLS.map((spell) => spell.id),
+          description:
+            "Optional. Which spell to cast; omit for a melee attack. Each is one of four elements "
+            + "(wind, water, earth, fire) and needs the Magic level listed here: "
+            + SPELLS.map((spell) => `${spell.id} (${spell.element}, Magic ${spell.reqLevel})`).join(", ")
+            + ". Every cast costs one essence shard.",
+        },
       }, ["entityId"]),
       execute: (args) => {
         const entityId = asString(args.entityId);
-        if (typeof args.spellId === "string") return unwrap(api.cast(args.spellId as SpellId, entityId));
-        return unwrap(api.attack(entityId));
+        if (typeof args.spellId !== "string") return unwrap(api.attack(entityId));
+        // ONE result shape for one tool. `GameApi.cast` reports its cadence as `castMs` and
+        // `GameApi.attack` as `attackSpeedMs` — the frozen contract's two names for the same
+        // quantity, the interval until the next swing. Passed straight through, an agent that read
+        // `attackSpeedMs` to pace itself got `undefined` the moment it named a spell, and paced
+        // itself off nothing. Both names are emitted rather than renaming either, because the
+        // contract owns both and an agent may already be reading either one.
+        const cast = api.cast(args.spellId as SpellId, entityId);
+        if (!cast.ok) return unwrap(cast);
+        return { targetId: cast.value.targetId, castMs: cast.value.castMs, attackSpeedMs: cast.value.castMs };
+      },
+    },
+
+    {
+      name: "corealm_spellbook",
+      description:
+        "Read the sixteen attack spells and which one a plain \"cast\" would throw, or set a "
+        + "standing choice. The four elements — wind, water, earth, fire — deal the same kind of "
+        + "damage and differ in when they unlock, so the strongest spell available rotates between "
+        + "them as Magic levels. Setting a spell above the current Magic level is allowed; the "
+        + "automatic pick stands in until it is reachable. Pass spellId null to go back to automatic.",
+      inputSchema: obj({
+        op: { type: "string", enum: ["read", "select"] },
+        spellId: {
+          type: ["string", "null"],
+          enum: [...SPELLS.map((spell) => spell.id), null],
+          description: "Required when op is select. Null clears the choice back to automatic.",
+        },
+      }, ["op"]),
+      execute: (args) => {
+        if (asString(args.op) === "select") {
+          const raw = args.spellId;
+          const spellId = typeof raw === "string" ? (raw as SpellId) : null;
+          return unwrap(api.setPreferredSpell(spellId));
+        }
+        return api.getSpellbook();
       },
     },
 

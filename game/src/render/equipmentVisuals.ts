@@ -1,14 +1,15 @@
 /**
- * What worn gear looks like: the 57 equippable ids in `content/equipment.ts` mapped onto the
- * assets that actually exist, plus the hand sockets and the tier tints.
+ * What worn gear looks like: the 59 equippable ids in `content/equipment.ts` mapped onto the assets
+ * that actually exist — and, for the staff line alone, onto one that had to be built — plus the
+ * hand sockets and the tier tints.
  *
  * This file exists because the render half of equipment was never written. Measured before this
  * landed: `getSceneStats().totalObjects` read 1077 naked, 1077 in a full tier-10 Kaldite kit and
  * 1077 in a full Wightshroud kit — the player's rig children never changed
  * (runs/corealm/diagnosis/equipment.md, finding 1).
  *
- * THE LIBRARY IS SMALLER THAN THE LADDER, so the mapping is 57 ids onto 2 outfit sets x 6 tints
- * rather than 57 meshes. Measured from game/public/assets/manifest.json: the outfit category holds
+ * THE LIBRARY IS SMALLER THAN THE LADDER, so the mapping is 59 ids onto 2 outfit sets x 6 tints
+ * rather than 59 meshes. Measured from game/public/assets/manifest.json: the outfit category holds
  * 20 modular parts in exactly four sets (male/female x peasant/ranger) and the weapon category
  * holds exactly four GLBs — axe, pickaxe, shield, sword. There is no staff, dagger, bow, helm,
  * ring or pendant mesh anywhere in the 213 assets.
@@ -17,12 +18,28 @@
  *
  *   - Daggers are `weapon/sword` at 0.62 and foci are `weapon/shield` at 0.40. Both read as what
  *     they are at the default camera pitch, and both are the diagnosis's own recommendation.
- *   - The three STAFFS (palewood_staff, duskoak_staff, cairnpine_staff) render NOTHING. There is
- *     no honest proxy: a sword in a mage's hand is a lie about what the player is holding, and the
- *     nearest pole-shaped props (`torch` 0.65 m, `candle_stand` 1.31 m with a floor base) read as
- *     what they are, not as a staff. They are listed in `GEAR_ASSET_GAPS` so the gap is a value in
- *     the program rather than a note in a file nobody reads. (The diagnosis says "6 staffs"; the
- *     content table has 3 — 9 mainHand rows are 3 daggers, 3 swords, 3 staffs.)
+ *   - The four STAFFS (worn_staff, palewood_staff, duskoak_staff, cairnpine_staff) are the one
+ *     place this file stops mapping and starts BUILDING. They rendered nothing for the whole of
+ *     Phase 1, and at the time that was the honest answer rather than an oversight: there is no
+ *     staff mesh in the library, a sword in a mage's hand is a lie about what the player is
+ *     holding, and the nearest pole-shaped props (`torch` 0.65 m, `candle_stand` 1.31 m with a
+ *     floor base) read as what they are. What changed is that the magic ladder added `worn_staff`
+ *     to the starting inventory, so the gap stopped being a missing nice-to-have at tier 1 and
+ *     became the FIRST weapon a caster is ever handed — "the basic staff" would have been an
+ *     invisible one on the very character it is given to.
+ *
+ *     So the mesh is generated instead of loaded. `render/proceduralGear.ts` builds each staff from
+ *     a tapered shaft, two grip rings, a butt ferrule and a faceted gem, merges it down to two draw
+ *     calls, and `AssetRegistry.registerBuilt` publishes it under a `proc_staff_*` id in the same
+ *     cache `load()` reads first. Nothing downstream changed: `characterRig.attachBoneSlot`, the
+ *     socket table below and the appearance rows all treat it as any other bone attachment and none
+ *     of them knows the difference. Building won on the alternatives' own terms — 7 to 9 primitives
+ *     and 212-344 triangles is no download, no pack licence and no draw-call budget worth arguing
+ *     about, and unlike a proxy it reports what is actually held. Staff rows deliberately carry no
+ *     `tint` and no `accent`: the colour is already in the built material, and
+ *     `applyGearAppearance` would flatten the gem to the shaft's colour. (The diagnosis says "6
+ *     staffs"; the content table has 4 — 11 mainHand rows are 2 worn, 3 daggers, 3 swords, 3
+ *     tiered staffs.)
  *   - Helms borrow the ranger HOOD, the library's only skinned head part (the peasant set has
  *     four parts and no head at all). Rings and pendants stay invisible: accessory1 and
  *     accessory2 are not in `VISIBLE_EQUIP_SLOTS`, because a ring is about a pixel at gameplay
@@ -40,6 +57,12 @@
 import * as THREE from "three";
 import type { EquipSlot, ItemId } from "../contracts.js";
 import { tierSilhouetteScale } from "./materials.js";
+// One direction only: this file imports proceduralGear.ts and never the reverse. Both build their
+// tables at module scope, so a cycle would leave one of them reading the other's constants in the
+// temporal dead zone, and which one would depend on load order. `registerProceduralGear` and
+// `isProceduralGearAsset` are therefore imported from there by boot and by the test, not re-exported
+// through here.
+import { PROCEDURAL_GEAR_ASSETS, staffAssetId } from "./proceduralGear.js";
 
 /** Which base body the parts are resolved against. `boot.ts` builds the player as `base_male`. */
 export type CharacterBody = "male" | "female";
@@ -125,10 +148,16 @@ type OutfitKit = "ranger" | "peasant";
 type OutfitPart = "hood" | "chest" | "legs" | "boots" | "gloves" | "pauldron";
 type WeaponAsset = "sword" | "shield";
 
-/** A resolved part before the body variant is chosen. One item can be more than one part. */
+/**
+ * A resolved part before the body variant is chosen. One item can be more than one part.
+ *
+ * `built` carries no tint: a generated mesh already has its colours, and `applyGearAppearance`
+ * paints every material in the graph with the same one, which would turn the gem into wood.
+ */
 type PartSpec =
   | { kind: "outfit"; kit: OutfitKit; part: OutfitPart; tint: number; accent?: number }
-  | { kind: "weapon"; assetId: WeaponAsset; tint: number; accent?: number; scale: number };
+  | { kind: "weapon"; assetId: WeaponAsset; tint: number; accent?: number; scale: number }
+  | { kind: "built"; assetId: string };
 
 interface GearVisual {
   slot: EquipSlot;
@@ -147,8 +176,12 @@ interface LadderTier {
   weaponAccent?: number;
   /** Tint for the off-hand shield or focus. */
   offHandTint: number;
-  /** `null` where the archetype has no mesh; `sword` covers both dagger and sword geometry. */
-  mainHand: readonly { id: ItemId; asset: WeaponAsset | null; scale: number }[];
+  /**
+   * `sword` covers both dagger and sword geometry; `built` means `render/proceduralGear.ts` makes
+   * the mesh. `scale` is only meaningful for a library GLB — a built staff is authored at its true
+   * length, so there is nothing to fit.
+   */
+  mainHand: readonly { id: ItemId; asset: WeaponAsset | "built"; scale?: number }[];
   offHand: { id: ItemId; scale: number };
   head: ItemId;
   body: ItemId;
@@ -200,7 +233,7 @@ const LADDER: readonly LadderTier[] = [
   },
   {
     tier: 1, kit: "peasant", cloth: MARCHHIDE, weapon: MARCHHIDE, offHandTint: QUARTZ,
-    mainHand: [{ id: "palewood_staff", asset: null, scale: 1 }],
+    mainHand: [{ id: "palewood_staff", asset: "built" }],
     offHand: { id: "quartz_focus", scale: 0.4 },
     head: "marchhide_hood", body: "marchhide_robe", legs: "marchhide_leggings",
     feet: "marchhide_boots", hands: "marchhide_wraps",
@@ -208,7 +241,7 @@ const LADDER: readonly LadderTier[] = [
   },
   {
     tier: 5, kit: "peasant", cloth: BRAMBLEHIDE, weapon: BRAMBLEHIDE, offHandTint: AMBER,
-    mainHand: [{ id: "duskoak_staff", asset: null, scale: 1 }],
+    mainHand: [{ id: "duskoak_staff", asset: "built" }],
     offHand: { id: "amber_focus", scale: 0.4 },
     head: "bramblehide_hood", body: "bramblehide_robe", legs: "bramblehide_leggings",
     feet: "bramblehide_boots", hands: "bramblehide_wraps",
@@ -216,7 +249,7 @@ const LADDER: readonly LadderTier[] = [
   },
   {
     tier: 10, kit: "peasant", cloth: WIGHTSHROUD, weapon: WIGHTSHROUD, offHandTint: GARNET,
-    mainHand: [{ id: "cairnpine_staff", asset: null, scale: 1 }],
+    mainHand: [{ id: "cairnpine_staff", asset: "built" }],
     offHand: { id: "garnet_focus", scale: 0.4 },
     head: "wightshroud_hood", body: "wightshroud_robe", legs: "wightshroud_leggings",
     feet: "wightshroud_boots", hands: "wightshroud_wraps",
@@ -225,15 +258,21 @@ const LADDER: readonly LadderTier[] = [
 ];
 
 /**
- * Ids that are covered but have no mesh, and why. Exported so the gap is checkable: a test asserts
- * that these are the ONLY visible-slot ids resolving to nothing, which is what stops a fourth staff
- * being added later and silently rendering as an empty hand.
+ * Ids that are covered but have no mesh, and why.
+ *
+ * EMPTY, and the empty table is the point rather than dead code. It held the three staffs from the
+ * day this file was written until the magic ladder landed, and it did the job it was there for: the
+ * gap was a value in the program instead of a note in a file nobody reads, so when a fourth staff
+ * arrived the cost of leaving it open was visible. `render/proceduralGear.ts` then closed it by
+ * building the mesh, and nothing else in the 59 rows resolves to an empty visible slot.
+ *
+ * It stays exported because the test that reads it is the tripwire: it asserts these are the ONLY
+ * visible-slot ids resolving to nothing, so a future item that would render as an empty hand fails
+ * CI instead of shipping, and whoever adds it has to either give it a mesh or write down here why
+ * it has none. Rings and pendants are not in it and never were — they are excluded one level up, by
+ * `VISIBLE_EQUIP_SLOTS`.
  */
-export const GEAR_ASSET_GAPS: Readonly<Record<ItemId, string>> = {
-  palewood_staff: "no staff mesh in the 213-asset library; a sword would misreport what is held",
-  duskoak_staff: "no staff mesh in the 213-asset library; a sword would misreport what is held",
-  cairnpine_staff: "no staff mesh in the 213-asset library; a sword would misreport what is held",
-};
+export const GEAR_ASSET_GAPS: Readonly<Record<ItemId, string>> = {};
 
 function outfitPart(kit: OutfitKit, part: OutfitPart, tint: number, accent?: number): PartSpec {
   return accent === undefined
@@ -245,6 +284,10 @@ function weaponPart(assetId: WeaponAsset, tint: number, scale: number, accent?: 
   return accent === undefined
     ? { kind: "weapon", assetId, tint, scale }
     : { kind: "weapon", assetId, tint, scale, accent };
+}
+
+function builtPart(assetId: string): PartSpec {
+  return { kind: "built", assetId };
 }
 
 function buildTable(): Map<ItemId, GearVisual> {
@@ -260,14 +303,21 @@ function buildTable(): Map<ItemId, GearVisual> {
     parts: [weaponPart("sword", WORN, round3(tierSilhouetteScale(1) * 0.86))],
   });
 
+  // The starting staff, tier 0 and outside the LADDER for the same reason worn_sword is. It needs
+  // none of the tier-0 scale fudge above: that one exists because `tierSilhouetteScale(0)` clamps to
+  // tier 1, so the only way to make the worn blade smaller than a Grithe one is to multiply the
+  // shared GLB. A built staff carries its own length — `STAFF_LOOKS.worn_staff` is 1.32 m against
+  // palewood's 1.48 — so the tier reads out of the geometry with nothing to cancel.
+  table.set("worn_staff", { slot: "mainHand", parts: [builtPart(staffAssetId("worn_staff"))] });
+
   for (const row of LADDER) {
     const silhouette = tierSilhouetteScale(row.tier);
     for (const hand of row.mainHand) {
       table.set(hand.id, {
         slot: "mainHand",
-        parts: hand.asset === null
-          ? []
-          : [weaponPart(hand.asset, row.weapon, hand.scale * silhouette, row.weaponAccent)],
+        parts: [hand.asset === "built"
+          ? builtPart(staffAssetId(hand.id))
+          : weaponPart(hand.asset, row.weapon, (hand.scale ?? 1) * silhouette, row.weaponAccent)],
       });
     }
     table.set(row.offHand.id, {
@@ -299,11 +349,12 @@ function buildTable(): Map<ItemId, GearVisual> {
 
 const GEAR_VISUALS = buildTable();
 
-/** Every id this file covers. 58 today, and the test asserts it equals the content table exactly. */
+/** Every id this file covers. 59 today, and the test asserts it equals the content table exactly. */
 export const GEAR_APPEARANCE_IDS: readonly ItemId[] = [...GEAR_VISUALS.keys()];
 
 /**
- * Every distinct asset the 57 rows can ask for, so a rig can warm them before the player equips.
+ * Every distinct FILE-BACKED asset the 59 rows can ask for, so a rig can warm them before the
+ * player equips.
  *
  * This exists because of a measured stall, not a hunch. Instrumenting `CharacterRig.attachBoneSlot`
  * with `performance.now()` in a headless run: `applyEquipment` fired 1 ms after the equip landed in
@@ -313,16 +364,29 @@ export const GEAR_APPEARANCE_IDS: readonly ItemId[] = [...GEAR_VISUALS.keys()];
  *
  * Eight ids for a male character, of which six (the ranger set) are already loaded for the NPCs and
  * two (sword, shield) are not — 269 KB combined.
+ *
+ * The four built staves are NOT in here, and that is not an omission. Warming means "fetch and
+ * parse the GLB before the player needs it"; a built staff has no fetch and no parse, it is already
+ * in the cache from `registerProceduralGear`, and asking for one before boot registers it would
+ * throw an "Unknown asset id" that `preloadGear` would then swallow. Every id this returns has a
+ * file behind it, which is the only useful promise the function can make.
  */
 export function gearAssetIds(body: CharacterBody = "male"): readonly string[] {
   const ids = new Set<string>();
   for (const visual of GEAR_VISUALS.values()) {
-    for (const spec of visual.parts) ids.add(resolve(spec, visual.slot, body).assetId);
+    for (const spec of visual.parts) {
+      if (spec.kind === "built") continue;
+      ids.add(resolve(spec, visual.slot, body).assetId);
+    }
   }
   return [...ids];
 }
 
 function resolve(spec: PartSpec, slot: EquipSlot, body: CharacterBody): GearAppearance {
+  // Scale 1, not `tierSilhouetteScale`: the staff line's tier growth is BUILT IN (1.32 m worn to
+  // 1.74 m cairnpine), so scaling on top would double-count it and thicken the shaft and the gem
+  // along with it. A Cairnpine staff is a longer staff, not a fatter one.
+  if (spec.kind === "built") return { assetId: spec.assetId, slot, attach: "bone", scale: 1 };
   if (spec.kind === "weapon") {
     const appearance: GearAppearance = {
       assetId: spec.assetId, slot, attach: "bone", tint: spec.tint, scale: round3(spec.scale),
@@ -386,6 +450,13 @@ export function gearAppearanceParts(itemId: ItemId, body: CharacterBody = "male"
  *   shield   face in XY, boss toward +Z, grip bar at z [-0.001, +0.044], centre z = +0.022
  * The offset is `fistCentre - R * gripCentre`, which is where each Z component below comes from.
  *
+ * The built staves are the one entry with a ZERO grip offset, and that is the whole reason
+ * `render/proceduralGear.ts` puts its origin at the grip instead of at the butt: a generated mesh
+ * gets to choose where its origin is, so it chooses the one point that makes the correction below
+ * unnecessary. They take the sword's rotation because a staff and a sword are gripped the same way
+ * — asset +Y along local +Z — which also means every pose the rig already animates a sword through
+ * applies unchanged.
+ *
  * The previous shared constant (characterRig.ts: rotation (PI/2,0,0), position (0, 0.03, 0.04))
  * put the sword's entire 21 cm grip and pommel outside the fist with only the guard touching it.
  *
@@ -407,17 +478,39 @@ interface WeaponSocket {
 const FIST_RIGHT: readonly [number, number, number] = [-0.010, 0.085, 0.000];
 const FIST_LEFT: readonly [number, number, number] = [0.010, 0.085, 0.000];
 
-/** Where the grip centre lands relative to the asset origin AFTER `rotation`, at scale 1. */
-const SOCKET_PARTS: Readonly<Record<string, {
+interface SocketParts {
   bone: string;
   fist: readonly [number, number, number];
   grip: readonly [number, number, number];
   rotation: readonly [number, number, number];
-}>> = {
+}
+
+/**
+ * Every built staff shares one socket: the MAIN hand, same grip axis as the sword, no grip offset.
+ *
+ * A staff is a `mainHand` item and is held in the right hand like every other weapon. The animation
+ * was the thing that had to move, not the weapon: the library's only cast raises the LEFT hand, so
+ * `render/assets.ts` registers a mirrored copy and `characterRig.ts` plays that. Measured on the
+ * mirrored clip with the staff attached here, the crown reaches 0.377 m ABOVE the head with 0.684 m
+ * of reach — identical to the original clip's left-hand figures, because the rig's bind pose is
+ * symmetric.
+ *
+ * An earlier pass socketed staves LEFT to match the unmirrored clip. That worked visually and was
+ * wrong: it put a main-hand weapon in the off hand and collided with the off-hand focus.
+ */
+const STAFF_SOCKET: SocketParts = {
+  bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0], rotation: [Math.PI / 2, 0, 0],
+};
+
+/** Where the grip centre lands relative to the asset origin AFTER `rotation`, at scale 1. */
+const SOCKET_PARTS: Readonly<Record<string, SocketParts>> = {
   sword: { bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.100], rotation: [Math.PI / 2, 0, 0] },
   axe: { bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.250], rotation: [Math.PI / 2, 0, 0] },
   pickaxe: { bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.150], rotation: [Math.PI / 2, Math.PI / 2, 0] },
   shield: { bone: "hand_l", fist: FIST_LEFT, grip: [0.022, 0, 0], rotation: [Math.PI / 2, -Math.PI / 2, 0] },
+  // Spread rather than four literal `proc_staff_*` keys, so the ids stay derived from
+  // `staffAssetId` in exactly one place and a fifth staff cannot arrive with no socket.
+  ...Object.fromEntries(PROCEDURAL_GEAR_ASSETS.map((asset) => [asset.assetId, STAFF_SOCKET])),
 };
 
 function socketAt(assetId: string, scale: number): WeaponSocket | null {

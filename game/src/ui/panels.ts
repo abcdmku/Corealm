@@ -40,6 +40,7 @@ import { QuestPanel } from "./questPanel.js";
 import { DialoguePanel } from "./dialoguePanel.js";
 import { ControlsPanel } from "./controlsPanel.js";
 import { MapPanel } from "./mapPanel.js";
+import { SpellbookPanel } from "./spellbookPanel.js";
 import { DeathScreen, type DeathDetail } from "./deathScreen.js";
 import { TitleScreen } from "./titleScreen.js";
 import { SettingsPanel } from "./settingsPanel.js";
@@ -693,6 +694,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   const dialogue = new DialoguePanel(context);
   const controls = new ControlsPanel(context);
   const map = new MapPanel(context);
+  const spellbook = new SpellbookPanel(context);
   let titleCoveredBySettings = false;
   const settingsPanel = new SettingsPanel(context, settings, () => {
     if (!titleCoveredBySettings) return;
@@ -702,7 +704,8 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   bank = new BankPanel(context);
   shop = new ShopPanel(context);
   const panels: ManagedPanel[] = [
-    inventory, skills, skillGuide, equipment, quests, map, controls, dialogue, settingsPanel, bank, shop,
+    inventory, skills, skillGuide, equipment, quests, map, controls, dialogue, settingsPanel,
+    bank, shop, spellbook,
   ];
 
   const death = new DeathScreen(context);
@@ -748,8 +751,20 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
         const active = api.getQuests().filter((quest) => quest.status === "active").length;
         return active > 0 ? String(active) : "";
       } },
-    { id: "map", label: "Map", key: "m", glyph: "◎",
-      toggle: () => map.frame.toggle(), isOpen: () => map.frame.isOpen() },
+    // The spellbook stands where the map button used to. The map is one click away on the minimap's
+    // own corner button (`ui/minimap.ts`, "Full map (M)") and keeps its "m" binding, so a second
+    // dock entry for it was the least useful button on the bar; the spellbook, with sixteen spells
+    // behind it, is the most. The map panel itself is unchanged and still registered below.
+    { id: "spellbook", label: "Spells", key: "b", glyph: "✦",
+      toggle: () => spellbook.frame.toggle(), isOpen: () => spellbook.frame.isOpen(),
+      // The badge is the element the player has chosen, or nothing while the game is choosing for
+      // them. A caster who set fire and then out-levelled it needs to see that from the dock,
+      // without opening the book to find out why their damage stopped climbing.
+      badge: () => {
+        const book = api.getSpellbook();
+        if (!book.preferredSpellId) return "";
+        return book.spells.find((row) => row.id === book.preferredSpellId)?.element.slice(0, 1).toUpperCase() ?? "";
+      } },
     { id: "controls", label: "Keys", key: "h", glyph: "⌨",
       toggle: () => controls.frame.toggle(), isOpen: () => controls.frame.isOpen() },
   ]);

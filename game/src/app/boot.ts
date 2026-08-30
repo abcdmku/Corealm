@@ -17,6 +17,7 @@ import { RngStreams } from "../core/rng.js";
 import { Renderer } from "../render/renderer.js";
 import { OrbitCamera } from "../render/camera.js";
 import { AssetRegistry } from "../render/assets.js";
+import { registerProceduralGear } from "../render/proceduralGear.js";
 import { WorldScene } from "../render/scene.js";
 import { EntityViews } from "../render/entityViews.js";
 import { Physics } from "../systems/physics.js";
@@ -72,6 +73,7 @@ import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
 import { addChamberLights, buildDungeon, type DungeonSpec } from "../render/dungeon.js";
 import { Ambience, Vfx, type AmbienceEmitter, type AmbienceKind } from "../render/vfx.js";
+import { SpellVfx } from "../render/spellVfx.js";
 import { DocSearch, buildDocs } from "../api/docs.js";
 import {
   AudioDirector, AudioEngine, COREALM_AUDIO_CATALOG, CorealmAudioBridge,
@@ -159,6 +161,12 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // 6. Assets. Animation libraries load once as a shared clip library; every rig plays from it.
   setStatus("loading assets…");
   const assets = new AssetRegistry();
+  // The staff meshes, built rather than loaded. There is no staff anywhere in the 213-asset library,
+  // so without this line all four staffs resolve to an asset id that `AssetRegistry.load` rejects,
+  // `characterRig.attachBoneSlot` swallows the rejection, and a mage holds empty air — which is
+  // exactly the state this wave set out to fix. Registered BEFORE the manifest loads and before the
+  // player rig is built, because `CharacterRig` warms gear through the same `load()` path.
+  registerProceduralGear(assets);
   try {
     await assets.loadManifest();
     await assets.loadAnimationLibraries();
@@ -729,6 +737,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
       gameAudio.handleInteraction(interaction, result);
       return result;
     },
+    // Lets `GameApi.interact` walk to the VERB's reach instead of one constant for all of them,
+    // which is what makes a staff attack open fire at nine metres instead of closing to 2.4 first.
+    rangeFor: (interaction) => interactions.rangeFor(interaction),
   });
 
   // Assistance overlays. Presentation only: drawing one never changes canonical state, which is
@@ -756,7 +767,24 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     playerPosition: () => store.get().player.position,
   });
   events.subscribe((event) => vfx.handle(event, clock.elapsedMs));
+  // The bolt starts when the cast is rolled, not when it lands. `systems/combat.ts` now holds the
+  // damage back for the flight, so the hit log entry arrives at the far end and cannot be the cue.
+  events.subscribe((event) => loop.handleSpellLaunch(event, performance.now()));
   events.subscribe((event) => gameAudio.handleEvent(event));
+
+  // Spell cast, flight and impact. A separate layer from `Vfx` and from `Ambience` because it is the
+  // only one that is off entirely most of the time: one InstancedMesh drawing zero instances, which
+  // costs no draw call until the player actually casts. `heightAt` is passed so an impact ring lies
+  // on the ground the player is standing on rather than on a plane through the target's origin.
+  const spellVfx = new SpellVfx({
+    parent: scene.overlayGroup,
+    camera: renderer.camera,
+    // `meshHeightAt`, not `heightAt`: the latter needs a region id, and the only one to hand here is
+    // the PLAYER's — which is the wrong answer for a target standing over a region boundary, and the
+    // impact ring would sink into or float over the ground exactly where a region seam runs.
+    // `meshHeightAt` samples the drawn lattice and needs no region at all.
+    groundHeightAt: (x, z) => scene.meshHeightAt(x, z),
+  });
 
   // Standing atmosphere, as opposed to the event-driven feedback above. Both are polled from Vfx's
   // own update, so the loop needs no change. One InstancedMesh for the whole world.
@@ -1002,6 +1030,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   loop.setArchetypeLookup((id) => entityStore.get(id)?.archetype ?? null);
   loop.setOverlays(overlays);
   loop.setVfx(vfx);
+  loop.setSpellVfx(spellVfx);
   loop.setCombatHits(() => combatSystem.consumeHits());
   loop.setCombatPresentationHandler((hit, phase) => gameAudio.handlePlayerCombatMotion(hit, phase));
   loop.setPlayerMotionHandler((event) => {
@@ -1035,6 +1064,10 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     camera.update(spawn[0], spawn[1], spawn[2], true);
     scene.syncPlayer(spawn, spawnFacing, true);
     loop.resetPresentation();
+    // Combat holds two things outside `GameState` - the hit log and any spell still in the air -
+    // and a world swap has to drop both. Without this a bolt rolled against the old world lands in
+    // the new one, on an entity id that now belongs to something else.
+    combatSystem.resetForNewWorld();
     gameAudio.reset();
 
     // Node yields and enemy health are seeded world state, so a reset rebuilds them rather than
@@ -1050,6 +1083,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   installGameDebug({
     store, events, clock, nav, movement, api, renderer, camera, assets, errors,
     version,
+    // Direct evidence that a cast drew something, for `tools/verify-magic.ts`. Reading `drawCalls`
+    // instead conflates a spell with anything else that streamed in that frame.
+    spellParticles: () => spellVfx.liveParticles(),
     audioState: () => ({
       ...audioEngine.snapshot(),
       regionId: store.get().player.regionId,

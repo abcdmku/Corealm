@@ -552,7 +552,12 @@ function playthroughSource(): string {
     dbg.setSkillLevel("magic", 10);
     dbg.giveItem("essence_shard", 20);
     dbg.setHealth(999);
-    const enemy = await findNear(["enemy"], "cast", "march|camp|pit|skitter");
+    // Filtered on "attack", not "cast". Enemies no longer advertise a separate cast verb - one
+    // combat verb now means "hit that with what I am holding" - so a "cast" filter matches nothing
+    // and this step would quietly report "no enemy found" instead of testing magic at all. The cast
+    // below still names its spell explicitly through corealm_attack, which is unchanged.
+    // (No backticks in here: this whole block is inside the playthroughSource template literal.)
+    const enemy = await findNear(["enemy"], "attack", "march|camp|pit|skitter");
     let evidence = "no enemy found";
     if (enemy) {
       await agent.call("corealm_move_to", { entityId: enemy.id });

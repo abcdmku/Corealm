@@ -103,6 +103,11 @@ const CLIP_MOTION_MARKERS: Readonly<Record<string, readonly ClipMotionMarker[]>>
     { phase: 0.32, kind: "swing" },
     { phase: 0.42, kind: "impact" },
   ],
+  // The mirror is a reflection in space, not in time, so its contact frames are the original's.
+  Spell_Simple_Shoot_Mirror: [
+    { phase: 0.32, kind: "swing" },
+    { phase: 0.42, kind: "impact" },
+  ],
 };
 
 const GATHER_IMPACT_PHASE = 0.22;
@@ -129,7 +134,11 @@ const POSE_CLIPS: Record<CharacterPose, readonly string[]> = {
   fish: ["Idle_Rail_Loop", "Idle_Loop"],
   farm: ["Farm_Harvest", "Farm_PlantSeed"],
   attack_melee: ["Sword_Attack", "Sword_Regular_A", "Punch_Jab"],
-  cast: ["Spell_Simple_Shoot", "Spell_Simple_Idle_Loop"],
+  // MIRRORED. The library's only cast raises the LEFT hand and a staff is a main-hand item held in
+  // the right, so played as authored the caster raised an empty hand while the staff hung at their
+  // side. `render/assets.ts` registers a reflected copy of each; the fallbacks are the originals, so
+  // a build whose mirror registration failed still animates rather than freezing on idle.
+  cast: ["Spell_Simple_Shoot_Mirror", "Spell_Simple_Shoot", "Spell_Simple_Idle_Loop"],
   hit: ["Hit_Chest", "Hit_Knockback"],
   death: ["Death01"],
   eat: ["Consume"],
@@ -613,7 +622,7 @@ export class CharacterRig {
    * progress, and the very next frame crossfades `Sword_Attack` (1.533 s) back to idle. Death is
    * the one thing allowed to interrupt, because being dead is not a pose you recover from.
    */
-  play(pose: CharacterPose, force = false): void {
+  play(pose: CharacterPose, force = false, timeScale?: number): void {
     if (!this.mixer) return;
     if (pose === this.current && !force) return;
     if (!force && pose !== "death" && ONE_SHOT.has(this.current) && this.currentAction?.isRunning()) return;
@@ -643,7 +652,17 @@ export class CharacterRig {
     }
     action.paused = false;
     action.enabled = true;
-    action.setEffectiveTimeScale(POSE_TIME_SCALE[pose] ?? 1);
+    // A caller-supplied scale outranks the per-pose table. Only the cast uses it, and only to make
+    // rung read in the BODY: `Spell_Simple_Shoot` is the single casting clip the 86-clip library
+    // ships (the others are Enter, Exit and an Idle_Loop, none of them a throw), so a Kilnsurge and
+    // an Emberlash are the same 1.0 s motion. Slowing the heavy rungs gives them visible weight
+    // without a second clip and without a wind-up that would fight the already-resolved cast.
+    //
+    // Marker phases are NORMALISED, so `recordMotionMarkers` still fires swing at 0.32 and contact
+    // at 0.42 of whatever duration this produces — the release just arrives later in wall time,
+    // which is what "heavier" means here. `app/loop.ts` sets the projectile's flight deadline from
+    // the swing marker, so the effect follows the body rather than drifting off it.
+    action.setEffectiveTimeScale(timeScale ?? POSE_TIME_SCALE[pose] ?? 1);
     action.setEffectiveWeight(1);
 
     if (ONE_SHOT.has(pose)) {

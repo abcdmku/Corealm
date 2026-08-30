@@ -32,6 +32,9 @@ import type { EntityViews } from "../render/entityViews.js";
 import type { Overlays } from "../render/overlays.js";
 import type { CharacterMotionEvent, CharacterRig, CharacterPose } from "../render/characterRig.js";
 import type { Vfx } from "../render/vfx.js";
+import type { SpellVfx } from "../render/spellVfx.js";
+import { content } from "../content/index.js";
+import type { GameEvent, SpellElement, SpellRung } from "../contracts.js";
 import type { Ui } from "../ui/panels.js";
 import type { EntityId, SemanticEntity, Vec3 } from "../contracts.js";
 import { GATHER_TICK_MS, SIM_TICK_MS } from "../core/time.js";
@@ -101,6 +104,44 @@ const TELEPORT_SNAP_SQUARED = TELEPORT_SNAP_METRES * TELEPORT_SNAP_METRES;
 
 const TWO_PI = Math.PI * 2;
 
+
+/**
+ * One player hit held between the roll that produced it and the frame that should appear to cause
+ * it. `flightUntilMs` is null for melee and for any cast the effect layer could not fly; see the
+ * field comment on `pendingPlayerHits`.
+ */
+/**
+ * How fast the single casting clip plays, by rung.
+ *
+ * `Spell_Simple_Shoot` is 1.0 s of the same gesture whatever is being thrown. A lash runs slightly
+ * hot so a cheap dart looks flicked; a surge runs at two-thirds speed so the biggest spell in the
+ * game looks like it costs something. The band is deliberately narrow — below about 0.6 the clip
+ * stops reading as one motion and starts reading as a stutter, and the cast still has to finish
+ * inside the 3000 ms it is given.
+ */
+/**
+ * Height above the player's feet that a spell is emitted from.
+ *
+ * Chest height on the 1.8 m rigs this game uses, so the bolt leaves the middle of the character
+ * rather than their head or their shins.
+ */
+const CAST_ORIGIN_HEIGHT = 1.1;
+
+function castTimeScale(rung: SpellRung | null): number | null {
+  switch (rung) {
+    case "lash": return 1.15;
+    case "bolt": return 1.0;
+    case "burst": return 0.85;
+    case "surge": return 0.7;
+    default: return null;
+  }
+}
+
+interface PendingPlayerHit {
+  hit: CombatHit;
+  swingPresented: boolean;
+}
+
 export class GameLoop {
   private running = false;
   private frameHandle = 0;
@@ -116,7 +157,19 @@ export class GameLoop {
   private drainHits: (() => readonly CombatHit[]) | null = null;
   private playerMotionHandler: ((event: CharacterMotionEvent) => void) | null = null;
   private combatPresentationHandler: ((hit: CombatHit, phase: "swing" | "impact" | "combined") => void) | null = null;
-  private readonly pendingPlayerHits: { hit: CombatHit; swingPresented: boolean }[] = [];
+  /**
+   * MELEE hits waiting for the animation frame that should appear to cause them.
+   *
+   * Melee only, now. A sword's contact marker IS the moment it connects, so a swing pays out on
+   * `impact` and is done. Magic used to queue here too, with a flight deadline layered on top,
+   * because the damage was canonical the instant the cast resolved and only the number could be
+   * held back. `systems/combat.ts` now holds the DAMAGE back for the length of the flight, so a
+   * magic hit reaches this class already on time and is presented immediately.
+   */
+  private readonly pendingPlayerHits: PendingPlayerHit[] = [];
+  private spellVfx: SpellVfx | null = null;
+  /** Scratch for the cast origin, so a cast allocates nothing. */
+  private readonly spellOriginTuple: [number, number, number] = [0, 0, 0];
   private gatheringRigKey: string | null = null;
   private ui: Ui | null = null;
   private interiors: { group: { visible: boolean }; visible: () => boolean }[] = [];
@@ -149,6 +202,15 @@ export class GameLoop {
   private archetypeOf: ((entityId: EntityId) => string | null) | null = null;
   /** Set by the event subscription, drained by the next render frame. */
   private pendingRigPose: CharacterPose | null = null;
+  /**
+   * Playback rate for the pose in `pendingRigPose`, when it should not run at its authored tempo.
+   *
+   * Set only for casts, and only from the spell's rung. The 86-clip animation library ships exactly
+   * one casting motion (`Spell_Simple_Shoot`; the other three Spell_Simple_* clips are Enter, Exit
+   * and an idle loop), so without this every spell from Emberlash to Kilnsurge is the same 1.0 s
+   * gesture and the rung the player picked reads nowhere on the body.
+   */
+  private pendingRigPoseTimeScale: number | null = null;
 
   constructor(private readonly deps: LoopDeps) {
     // A bank interaction has no event of its own; it arrives as `activity.started` on an entity
@@ -209,6 +271,14 @@ export class GameLoop {
   /** Floating combat and XP feedback. Ticked on real time so it reads the same at any time scale. */
   setVfx(vfx: Vfx): void {
     this.vfx = vfx;
+  }
+
+  /**
+   * The spell effect layer. Optional: unwired, casts still resolve, still award XP and still play
+   * their cue — they simply pay out on the rig's contact marker like a sword does.
+   */
+  setSpellVfx(spellVfx: SpellVfx): void {
+    this.spellVfx = spellVfx;
   }
 
   /**
@@ -280,6 +350,7 @@ export class GameLoop {
   /** Clears render-only work when debug or save loading replaces the canonical world. */
   resetPresentation(): void {
     this.pendingRigPose = null;
+    this.pendingRigPoseTimeScale = null;
     this.pendingPlayerHits.length = 0;
     this.gatheringRigKey = null;
     this.playerRig?.drainMotionEvents();
@@ -411,6 +482,8 @@ export class GameLoop {
     this.overlays?.update(this.deps.clock.elapsedMs);
     this.paintCombatHits(nowMs);
     this.vfx?.update(nowMs);
+    // After `vfx`, so a spell burst draws over the floating numbers rather than under them.
+    this.spellVfx?.update(nowMs);
     this.ui?.update();
     this.syncPlayerEquipment();
     this.syncPlayerRig(position, facingRad, realDeltaMs, nowMs);
@@ -444,9 +517,11 @@ export class GameLoop {
     // A one-shot claimed by an interaction or a swing outranks the steady-state pose for this
     // frame; `update()` drops back to idle when the clip finishes.
     const forced = this.pendingRigPose;
+    const forcedTimeScale = this.pendingRigPoseTimeScale;
     this.pendingRigPose = null;
+    this.pendingRigPoseTimeScale = null;
     if (forced && state.player.health > 0) {
-      rig.play(forced, true);
+      rig.play(forced, true, forcedTimeScale ?? undefined);
     } else {
       rig.play(rig.poseFor({
         moving,
@@ -539,19 +614,34 @@ export class GameLoop {
         // The enemy that threw it swings; the player takes it. Without this the boss fight is a
         // frozen statue exchanging damage numbers with a moving player.
         this.entityViews?.playAction(swing.sourceId, "attack");
+      } else if (swing.kind === "magic") {
+        // A magic hit arrives ALREADY on time: `systems/combat.ts` held the damage back for the
+        // whole flight, so this IS the frame the bolt reached the target. Waiting for the rig's
+        // contact marker the way melee does would delay it a second time — and the cast animation
+        // that owns those markers finished while the bolt was still travelling, so the next marker
+        // is a whole cast interval away. No pose either: the caster threw this a second ago and is
+        // standing still now. `handleSpellLaunch` played the cast when it was actually cast.
+        // "impact", not "combined": the cast half already sounded when the spell launched, and
+        // "combined" replays both.
+        this.combatPresentationHandler?.(swing, "impact");
+        this.vfx?.damage(swing.targetId, swing.damage, "magic", nowMs);
+        if (swing.hit) this.entityViews?.playAction(swing.targetId, "hit");
       } else {
         // Damage is already canonical. Its sound and number wait for the attack clip's measured
-        // contact frame, so the player's sword or spell is what appears to cause it.
+        // contact frame, so the player's sword is what appears to cause it.
         if (this.pendingPlayerHits.length > 0) this.flushPendingPlayerHits(nowMs);
         this.pendingPlayerHits.push({ hit: swing, swingPresented: false });
-        if (swingPose !== "hit") swingPose = swing.kind === "magic" ? "cast" : "attack_melee";
+        if (swingPose !== "hit") swingPose = "attack_melee";
       }
     }
     // A flinch outranks the attack pose. If both land in one render frame there will be no player
     // contact marker to consume the queued hit, so present it now instead of losing the feedback.
     if (swingPose === "hit" && this.pendingPlayerHits.length > 0) this.flushPendingPlayerHits(nowMs);
     if (!this.playerRig && this.pendingPlayerHits.length > 0) this.flushPendingPlayerHits(nowMs);
-    if (swingPose) this.pendingRigPose = swingPose;
+    if (swingPose) {
+      this.pendingRigPose = swingPose;
+      this.pendingRigPoseTimeScale = null;
+    }
   }
 
   private presentPlayerCombatEvent(event: CharacterMotionEvent, nowMs: number): void {
@@ -568,6 +658,85 @@ export class GameLoop {
     }
 
     if (!pending.swingPresented) this.combatPresentationHandler?.(pending.hit, "swing");
+    this.payOutPlayerHit(pending, nowMs);
+  }
+
+  /**
+   * Starts the bolt for a cast that has just been rolled.
+   *
+   * Driven by the `spell.launched` event rather than by the hit log, because the hit log entry for a
+   * spell is now written when it LANDS — `systems/combat.ts` defers the damage for the length of the
+   * flight, so by the time a magic `CombatHit` exists the projectile should already have arrived.
+   *
+   * Nothing here decides timing. The event carries `flightMs`, the sim scheduled the damage against
+   * it, and `render/spellVfx.ts` draws against the same shared `spellFlightMs`; this only has to
+   * point the effect at the right places.
+   */
+  handleSpellLaunch(event: GameEvent, nowMs: number): void {
+    if (event.type !== "spell.launched" || !this.spellVfx) return;
+    const data = event.data;
+    const targetId = typeof data["targetId"] === "string" ? data["targetId"] : null;
+    const element = data["element"] as SpellElement | undefined;
+    const rung = data["rung"] as SpellRung | undefined;
+    if (!targetId || !element || !rung) return;
+    const to = this.entityPositionFor(targetId);
+    if (!to) return;
+
+    this.spellVfx.cast({
+      // Seeded off the sim stamp and the target, so two casts thrown in one frame at two enemies
+      // scatter differently, and the same cast replayed from a seed scatters identically.
+      id: `${event.atMs}:${targetId}`,
+      element,
+      rung,
+      from: this.castOrigin(),
+      to,
+      hit: data["hit"] === true,
+      // The event carries the flight in SIM milliseconds, which is what the damage was scheduled
+      // against. This layer runs on the render clock, so the sim's time scale is divided out or the
+      // bolt and the hit come apart the moment anything scales time — the acceptance harness runs
+      // at 20.
+      flightMsOverride: typeof data["flightMs"] === "number"
+        ? data["flightMs"] / (this.deps.clock.timeScale || 1)
+        : undefined,
+    }, nowMs);
+
+    // The cast animation belongs here too, for the same reason the bolt does: this is the moment
+    // the spell leaves. Driving it off the hit log would play the throw at the instant the spell
+    // arrived, a whole flight late.
+    this.pendingRigPose = "cast";
+    this.pendingRigPoseTimeScale = castTimeScale(rung);
+  }
+
+  /**
+   * Where a spell leaves the caster: the centre of the player, slightly in front.
+   *
+   * An earlier pass read the crown of the staff through the hand bone, which was more literal and
+   * read worse — the crown swings through a wide arc during the cast, so the bolt appeared to be
+   * flung from wherever the arm happened to be rather than aimed, and at some phases it started
+   * behind the player's shoulder. A fixed point at chest height is steady, reads as "from the
+   * caster", and is what the effect layer's forward nudge was designed around.
+   *
+   * The nudge itself lives in `render/spellVfx.ts` (`HAND_REACH`), which knows the direction to the
+   * target; this only has to supply the height.
+   */
+  private castOrigin(): Vec3 {
+    const at = this.deps.store.get().player.position;
+    this.spellOriginTuple[0] = at[0];
+    this.spellOriginTuple[1] = at[1] + CAST_ORIGIN_HEIGHT;
+    this.spellOriginTuple[2] = at[2];
+    return this.spellOriginTuple;
+  }
+
+  /** Where a target stands right now. Null rather than the origin when it has gone. */
+  private entityPositionFor(entityId: EntityId): Vec3 | null {
+    if (!this.entitySource) return null;
+    for (const entity of this.entitySource()) {
+      if (entity.id === entityId) return entity.position;
+    }
+    return null;
+  }
+
+  private payOutPlayerHit(pending: PendingPlayerHit, nowMs: number): void {
     this.combatPresentationHandler?.(pending.hit, "impact");
     const kind = pending.hit.kind === "magic" ? "magic" : "melee";
     this.vfx?.damage(pending.hit.targetId, pending.hit.damage, kind, nowMs);
@@ -576,6 +745,23 @@ export class GameLoop {
     if (index >= 0) this.pendingPlayerHits.splice(index, 1);
   }
 
+  /**
+   * Pays out every queued hit at once, without waiting for a contact marker.
+   *
+   * Reached when a flinch outranks the attack pose in the same frame, when a second hit lands before
+   * the first was presented, and when there is no player rig at all. All three are cases where the
+   * marker that would normally trigger the payout is never going to arrive.
+   *
+   * IT MUST STILL FIRE THE SPELL EFFECT, and the first version of this did not. `launchSpell` was
+   * only called from the rig's swing marker, so a cast that flushed drew a damage number out of
+   * thin air with nothing leaving the staff. That is not a rare path: a caster fighting anything
+   * that fights back gets flinched constantly, and `tools/verify-magic.ts` found it by casting four
+   * times at an aggressive target and seeing zero particles every time — while the same cast against
+   * a target that had not yet retaliated drew fine.
+   *
+   * Melee only. A magic hit never reaches this queue: it is presented the moment it arrives, which
+   * is already the right moment.
+   */
   private flushPendingPlayerHits(nowMs: number): void {
     for (const pending of this.pendingPlayerHits.splice(0, this.pendingPlayerHits.length)) {
       this.combatPresentationHandler?.(pending.hit, "combined");

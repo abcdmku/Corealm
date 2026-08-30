@@ -44,7 +44,7 @@ import type { GameState } from "../state/store.js";
 import type { Navigation, RouteLeg } from "./navigation.js";
 import type { EventBus } from "../core/events.js";
 import { INTERACT_RANGE, MOVEMENT, PLAYER_RADIUS, PLAYER_SPEED } from "../app/config.js";
-import { distanceXZ, pathLength } from "../core/math.js";
+import { distanceXZ, pathLength, turnToward } from "../core/math.js";
 
 /** How close counts as arrived, in metres. */
 const ARRIVE_EPSILON = 0.35;
@@ -1029,15 +1029,6 @@ export class Movement {
 }
 
 // ------------------------------------------------------------- geometry
-
-function turnToward(current: number, desired: number, rateRadPerSecond: number, deltaMs: number): number {
-  let delta = desired - current;
-  while (delta > Math.PI) delta -= Math.PI * 2;
-  while (delta < -Math.PI) delta += Math.PI * 2;
-  const maxStep = rateRadPerSecond * (deltaMs / 1000);
-  if (Math.abs(delta) <= maxStep) return desired;
-  return current + Math.sign(delta) * maxStep;
-}
 
 /** The point `distance` metres further along the path from `position`. */
 function lookAheadPoint(path: readonly Vec3[], index: number, position: Vec3, distance: number): Vec3 | null {

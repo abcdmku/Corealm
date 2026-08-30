@@ -1,4 +1,5 @@
 /** Tunables the root owns. Numbers come from runs/corealm/PRD.md. */
+import type { SpellRung } from "../contracts.js";
 
 export const PLAYER_SPEED = 4.2;          // m/s over the navmesh
 export const PLAYER_RADIUS = 0.35;        // m, capsule radius for collision and navmesh inset
@@ -49,7 +50,51 @@ export const MOVEMENT = {
 
 export const INTERACT_RANGE = 2.4;        // m, walk-into-range threshold for gathering and talking
 export const MELEE_RANGE = 1.6;           // m
-export const SPELL_RANGE = 9.0;           // m
+/**
+ * How far a spell reaches, in metres.
+ *
+ * 15, up from the PRD's 9. Nine metres is inside the distance a Marchwolf closes in two seconds, so
+ * a caster who opened at maximum range was in melee before the second cast landed and magic played
+ * as a slower sword. Fifteen is far enough that the first two casts are free, which is the trade the
+ * 3.0 s cast time is priced against.
+ *
+ * Read by `world/interactions.ts` (how close a click walks you), `systems/combat.ts` (where a cast
+ * is allowed to resolve from, and how close `pursue` re-closes to), and `content/spells.ts`'s
+ * `SPELL_RANGE_M`, which mirrors it for the generated docs.
+ */
+export const SPELL_RANGE = 15.0;          // m
+
+/**
+ * How fast a cast spell crosses ground, in metres per second, and the wind-up before it leaves.
+ *
+ * THIS IS SIMULATION TIMING, not decoration, which is why it lives here rather than in the effect
+ * layer that used to own it. A spell does not hurt anything until it arrives, so these numbers
+ * decide when damage lands, when the target dies, and when the XP is paid — `systems/combat.ts`
+ * schedules the impact from them, and `render/spellVfx.ts` draws the bolt against the SAME numbers
+ * so the picture and the damage cannot disagree. Two copies of this table is a spell whose bolt
+ * lands visibly before or after the health bar moves.
+ *
+ * Heavier rungs fly slower. A surge crossing the full 15 m takes 1.3 s, which is the longest gap
+ * between a cast resolving and its damage landing that the game can produce.
+ */
+export const SPELL_FLIGHT = {
+  lash: { speed: 22, chargeMs: 150, minMs: 300 },
+  bolt: { speed: 19, chargeMs: 170, minMs: 330 },
+  burst: { speed: 16, chargeMs: 200, minMs: 380 },
+  surge: { speed: 14, chargeMs: 230, minMs: 430 },
+} as const satisfies Record<SpellRung, { speed: number; chargeMs: number; minMs: number }>;
+
+/**
+ * Milliseconds from a cast resolving to the bolt reaching the target.
+ *
+ * Distance-driven rather than fixed: a flat duration made a 2 m shot and a 15 m shot take the same
+ * time, which at 15 m read as the bolt teleporting.
+ */
+export function spellFlightMs(rung: SpellRung, distanceM: number): number {
+  const profile = SPELL_FLIGHT[rung];
+  const travel = Math.max(0, distanceM) / profile.speed;
+  return Math.round(Math.max(profile.minMs, profile.chargeMs + travel * 1000));
+}
 
 export const HEALTH_REGEN_INTERVAL_MS = 6_000;
 export const HEALTH_REGEN_BLOCKED_MS = 8_000;

@@ -16,7 +16,9 @@ import {
 
 describe("3D item icon catalog", () => {
   it("covers every item explicitly", () => {
-    expect(ALL_ITEMS).toHaveLength(106);
+    // 106 before the magic ladder, plus `worn_staff`. The `/_staff$/` rule in
+    // `itemIconAppearances.ts` already covers it, so the count is the only thing that moved.
+    expect(ALL_ITEMS).toHaveLength(107);
     expect([...ITEM_ICON_APPEARANCE_IDS].sort()).toEqual(ALL_ITEMS.map((item) => item.id).sort());
     for (const item of ALL_ITEMS) expect(itemIconAppearance(item.id).parts.length, item.id).toBeGreaterThan(0);
   });

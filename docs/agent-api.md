@@ -73,10 +73,16 @@ The event types are:
 navigation.started  navigation.completed  navigation.failed
 activity.started    activity.stopped      resource.depleted   inventory.full
 item.received       item.lost             item.equipped       item.unequipped
-combat.started      combat.ended          health.low          player.died
-level.gained        production.completed  quest.updated       dialogue.opened
-dialogue.closed     entity.discovered
+combat.started      combat.ended          spell.launched      health.low
+player.died         level.gained          production.completed
+quest.updated       dialogue.opened       dialogue.closed     entity.discovered
 ```
+
+`spell.launched` fires when a cast is rolled and its bolt leaves, carrying
+`{ spellId, targetId, element, rung, flightMs, hit }`. It matters to an agent because a spell does
+NOT damage anything until it arrives: `flightMs` later, the target's health moves and the kill (if
+any) resolves. So a cast that has been accepted is not yet a hit, and an agent that reads health
+immediately after `corealm_attack` will read the old value.
 
 You can reconstruct your inventory from `item.received` and `item.lost` alone. Gear moving onto or
 off the body is **not** a loss or a gain: it emits `item.equipped` or `item.unequipped` instead, and
@@ -141,7 +147,10 @@ with the id of the piece that went back into the pack.
 - `corealm_use_item` — eat food, apply a seed, combine two items
 - `corealm_equip` — equip an item or clear a slot
 - `corealm_produce` — smelt, smith, cook, craft, fletch
-- `corealm_attack` — melee, or cast a spell with `spellId`
+- `corealm_attack` — attack with whatever is in the main hand. A staff CASTS (reaching 15 m, so the
+  character opens fire without closing); a blade or bare hands swing at 1.6 m and walk in first.
+  Pass `spellId` to force a specific spell. Damage lands when the bolt arrives, not when the call
+  returns — see `spell.launched`
 - `corealm_dialogue` — read, choose an option, end
 - `corealm_bank` — list, deposit, withdraw, depositAll
 - `corealm_shop` — list, buy, sell

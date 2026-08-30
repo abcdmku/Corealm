@@ -26,6 +26,36 @@ export function distanceXZ(a: Vec3, b: Vec3): number {
   return Math.sqrt(dx * dx + dz * dz);
 }
 
+/**
+ * Rotates `current` toward `desired` by at most `rateRadPerSecond`, taking the short way round.
+ *
+ * Lives here rather than in `systems/movement.ts`, where it started, because combat needs it too:
+ * the player has to turn to face whatever they are swinging at or casting at, and that is the same
+ * capped, shortest-arc turn walking uses. Duplicating it would have let the two drift, and a
+ * character who turns at one rate to walk and another to fight reads as two different characters.
+ *
+ * The wrap is a loop rather than a modulo because the inputs are already near the principal range
+ * and a `%` on a negative angle needs a correction term that is easy to get wrong.
+ */
+export function turnToward(
+  current: number,
+  desired: number,
+  rateRadPerSecond: number,
+  deltaMs: number,
+): number {
+  let delta = desired - current;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  const maxStep = rateRadPerSecond * (deltaMs / 1000);
+  if (Math.abs(delta) <= maxStep) return desired;
+  return current + Math.sign(delta) * maxStep;
+}
+
+/** Facing, in radians, from `from` to `to` in the XZ plane. Matches the rig's yaw convention. */
+export function bearingXZ(from: Vec3, to: Vec3): number {
+  return Math.atan2(to[0] - from[0], to[2] - from[2]);
+}
+
 export function pathLength(points: readonly Vec3[]): number {
   let total = 0;
   for (let i = 1; i < points.length; i += 1) total += distance(points[i - 1]!, points[i]!);

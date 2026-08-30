@@ -454,6 +454,15 @@ export class Renderer {
    * added to the scene afterwards is not covered.
    *
    * Cheap to call twice; three returns the cached program for anything already compiled.
+   *
+   * THIS METHOD CANNOT WARM EVERY LAYER, and `render/spellVfx.ts` is the counter-example worth
+   * recording. Its one InstancedMesh sits hidden with `count = 0` until the player casts, and three
+   * gathers materials with a plain `scene.traverse` (three.module.js:17426), so it looks like it
+   * should be covered here — but measured, `getMetrics().programs` still climbed 106 -> 107 on the
+   * first cast of a session, and routing the material through a one-instance proxy in this method
+   * did not stop it either. That layer now compiles its own program by drawing one degenerate
+   * instance on its first idle frame; see `SpellVfx.primeShader`. Prefer that shape for any future
+   * layer whose real draw is unusual enough that a proxy is a guess.
    */
   warmup(options?: WarmupOptions): void {
     const holder = new THREE.Group();

@@ -17,7 +17,7 @@ import { STARTING_EQUIPMENT, STARTING_INVENTORY } from "../content/items.js";
 
 export const INVENTORY_SLOTS = 28;
 export const BANK_CAPACITY = 400;
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export type ActivityState =
   | {
@@ -78,7 +78,17 @@ export interface GameState {
     targetId: EntityId | null;
     inCombatUntilMs: number;
     nextAttackAtMs: number;
+    /** The spell the CURRENT engagement is throwing. Cleared on disengage. */
     activeSpellId: SpellId | null;
+    /**
+     * The spell the player chose in the spellbook, or null for "pick the best one for me".
+     *
+     * Distinct from `activeSpellId` on purpose: that one is the live engagement and dies with it,
+     * this one outlives every fight and is the whole reason a sixteen-spell ladder is playable —
+     * without it, "Cast at" silently throws whatever is strongest and the three elements a player
+     * did not pick are decoration. See `systems/combat.ts setPreferredSpell`.
+     */
+    preferredSpellId: SpellId | null;
     engagedBy: EntityId[];
   };
   quests: Record<string, {
@@ -165,7 +175,10 @@ export function createInitialState(seed = 1337, nowMs = 0): GameState {
     bank: { slots: [], filter: "" },
     currency: 0,
     activity: null,
-    combat: { targetId: null, inCombatUntilMs: 0, nextAttackAtMs: 0, activeSpellId: null, engagedBy: [] },
+    combat: {
+      targetId: null, inCombatUntilMs: 0, nextAttackAtMs: 0,
+      activeSpellId: null, preferredSpellId: null, engagedBy: [],
+    },
     quests: {},
     dialogue: null,
     farming: {},
