@@ -14,6 +14,7 @@
 import type { RegionId } from "../contracts.js";
 import { REGIONS, type RegionDef, type SettlementDef } from "../content/regions.js";
 import type { FlatSpot, RegionTerrainSpec, WorldTerrainSpec, Rect } from "../render/scene.js";
+import { seedFromText, type OrganicBiomeSpec } from "../world/organicFields.js";
 import { WATER_BASIN_DEPTH, waterBasinForCluster } from "../world/waterBodies.js";
 
 // Kept here as a re-export because boot and its existing callers already own this import path.
@@ -137,6 +138,111 @@ function settlementRadius(settlement: SettlementDef): number {
   return Math.max(24, Math.ceil(furthest + SETTLEMENT_PAD_MARGIN));
 }
 
+/**
+ * Visual biomes follow climate and authored places, never the semantic region rectangles. Round
+ * intents protect important hubs. Corridors loosely connect related places. The two broad climate
+ * channels decide the unclaimed land, so borders can fork, double back, and reach the coast.
+ */
+const COREALM_BIOMES: OrganicBiomeSpec<RegionId> = {
+  warp: {
+    seed: seedFromText("corealm:biome-warp"),
+    scale: 180,
+    strength: 52,
+  },
+  climate: {
+    seed: seedFromText("corealm:biome-climate"),
+    scales: [310, 112],
+    strength: 0.72,
+  },
+  edgeScale: 76,
+  edgeStrength: 0.5,
+  temperature: 0.5,
+  fields: [
+    {
+      id: "fallowmarch",
+      seed: seedFromText("corealm:biome:fallowmarch"),
+      climateTarget: [-0.12, -0.4],
+      climateTolerance: [0.68, 0.62],
+      bias: 0.07,
+      anchors: [
+        { id: "coldbrace", centre: [-160, -80], radius: 48, strength: 1.65 },
+        { id: "bracken-pit", centre: [-160, 80], radius: 38, strength: 1.25 },
+        { id: "palewood-copse", centre: [-334, -64], radius: 34, strength: 1.4 },
+        { id: "marchfield", centre: [-96, -22], radius: 36, strength: 1.3 },
+        { id: "redsill-shallows", centre: [-40, -60], radius: 34, strength: 1.15 },
+        { id: "open-march", centre: [-250, 30], radius: 44, strength: 1.1 },
+        { id: "corven-ford", centre: [-72, -146], radius: 32, strength: 1.05 },
+        { id: "south-march", centre: [-250, -150], radius: 40, strength: 1.0 },
+        { id: "west-bluff", centre: [-395, -20], radius: 26, strength: 1.0 },
+        { id: "west-headland", centre: [-430, 35], radius: 26, strength: 1.0 },
+        { id: "western-rise", centre: [-345, 45], radius: 34, strength: 1.0 },
+        { id: "corven-lowland", centre: [-130, -165], radius: 34, strength: 1.0 },
+      ],
+      corridors: [
+        { from: [-160, -80], to: [-250, 30], halfWidth: 30, strength: 0.64 },
+        { from: [-250, 30], to: [-160, 80], halfWidth: 28, strength: 0.58 },
+        { from: [-160, -80], to: [-96, -22], halfWidth: 24, strength: 0.56 },
+        { from: [-395, -20], to: [-430, 35], halfWidth: 16, strength: 0.5 },
+        { from: [-250, -150], to: [-330, -230], halfWidth: 20, strength: 0.55 },
+      ],
+    },
+    {
+      id: "vellenwood",
+      seed: seedFromText("corealm:biome:vellenwood"),
+      climateTarget: [0.36, -0.2],
+      climateTolerance: [0.64, 0.64],
+      bias: 0.03,
+      anchors: [
+        { id: "marchgate-fold", centre: [-26, 118], radius: 30, strength: 1.45 },
+        { id: "rootfall", centre: [60, 120], radius: 46, strength: 1.6 },
+        { id: "duskoak-stand", centre: [14, 166], radius: 36, strength: 1.4 },
+        { id: "blackwater-pools", centre: [128, 84], radius: 40, strength: 1.45 },
+        { id: "gorge-ford", centre: [230, 44], radius: 34, strength: 1.35 },
+        { id: "thornline", centre: [196, 152], radius: 40, strength: 1.3 },
+        { id: "cairn-gate", centre: [250, 24], radius: 28, holdRadius: 5, strength: 1.45 },
+        { id: "gorge-head", centre: [104, 192], radius: 32, strength: 1.2 },
+        { id: "rainfold", centre: [-45, 245], radius: 26, strength: 1.05 },
+        { id: "north-hollow", centre: [20, 270], radius: 24, strength: 1.0 },
+      ],
+      corridors: [
+        { from: [-26, 118], to: [60, 120], halfWidth: 25, strength: 0.68 },
+        { from: [60, 120], to: [128, 84], halfWidth: 28, strength: 0.64 },
+        { from: [128, 84], to: [230, 44], halfWidth: 25, strength: 0.56 },
+        { from: [230, 44], to: [196, 152], halfWidth: 24, strength: 0.52 },
+        { from: [-45, 245], to: [20, 270], halfWidth: 16, strength: 0.5 },
+      ],
+    },
+    {
+      id: "karrowmoor",
+      seed: seedFromText("corealm:biome:karrowmoor"),
+      climateTarget: [-0.5, 0.08],
+      climateTolerance: [0.58, 0.7],
+      bias: 0.1,
+      anchors: [
+        { id: "moorgate", centre: [256, 4], radius: 28, holdRadius: 5, strength: 1.55 },
+        { id: "lower-quarry", centre: [60, -16], radius: 40, strength: 1.4 },
+        { id: "highcairn", centre: [144, -66], radius: 46, strength: 1.65 },
+        { id: "upper-seam", centre: [194, -132], radius: 40, strength: 1.35 },
+        { id: "great-cairn", centre: [140, -176], radius: 32, strength: 1.2 },
+        { id: "cairn-tarns", centre: [206, -88], radius: 34, strength: 1.25 },
+        { id: "ridge-pines", centre: [250, -96], radius: 36, strength: 1.25 },
+        { id: "far-tarn", centre: [284, -110], radius: 34, strength: 1.2 },
+        { id: "south-ridge", centre: [170, -214], radius: 38, strength: 1.0 },
+        { id: "far-uplift", centre: [310, -180], radius: 40, strength: 1.0 },
+        { id: "southwest-foot", centre: [0, -245], radius: 26, strength: 1.0 },
+        { id: "south-spur", centre: [45, -290], radius: 26, strength: 1.0 },
+      ],
+      corridors: [
+        { from: [60, -16], to: [144, -66], halfWidth: 28, strength: 0.64 },
+        { from: [144, -66], to: [194, -132], halfWidth: 30, strength: 0.66 },
+        { from: [194, -132], to: [140, -176], halfWidth: 24, strength: 0.52 },
+        { from: [206, -88], to: [284, -110], halfWidth: 26, strength: 0.58 },
+        { from: [0, -245], to: [45, -290], halfWidth: 16, strength: 0.5 },
+      ],
+    },
+  ],
+};
+
 export function buildWorldTerrainSpec(): WorldTerrainSpec {
   const regions: RegionTerrainSpec[] = REGIONS.map((region) => {
     const spec: RegionTerrainSpec = {
@@ -175,6 +281,18 @@ export function buildWorldTerrainSpec(): WorldTerrainSpec {
     regions,
     flats,
     basins,
+    biomes: COREALM_BIOMES,
+    // The gameplay bounds above stay put. This only describes the rendered land edge and ocean.
+    coast: {
+      seed: seedFromText("corealm:coast"),
+      collar: 210,
+      shoreline: [18, 190] as const,
+      seaLevel: -5.25,
+      floorDepth: 3,
+      // Match the terrain lattice at the inner seam so the render-only collar cannot form cracks.
+      gridStep: 2,
+      oceanSize: 2400,
+    },
   };
 }
 

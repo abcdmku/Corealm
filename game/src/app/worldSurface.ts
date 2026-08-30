@@ -10,7 +10,7 @@ import {
   WorldScene, pavingStampFromRect,
   type PavingStamp, type RoadStamp, type WaterStamp,
 } from "../render/scene.js";
-import { WATER_FILL_DEPTH } from "../world/waterBodies.js";
+import { WATER_FILL_DEPTH, waterBasinForCluster } from "../world/waterBodies.js";
 
 export const DEFAULT_WORLD_SEED = 1337;
 
@@ -33,7 +33,10 @@ export function prepareWorldSurface(
   return { roadCount: roads.length, pavingCount: paving.length, waterCount };
 }
 
-/** Resolves authored links through actual gates and samples their controls on the terrain. */
+/**
+ * Resolves authored links through actual gates. The scene's visual curve is also the line consumed
+ * by foliage exclusions and the map; semantic navigation keeps the authored link unchanged.
+ */
 export function collectRoadStamps(scene: WorldScene): RoadStamp[] {
   const stamps: RoadStamp[] = [];
   for (const region of REGIONS) {
@@ -59,25 +62,40 @@ export function collectRoadStamps(scene: WorldScene): RoadStamp[] {
               Math.hypot(to.position[0] - entry.position[0], to.position[1] - entry.position[1]);
             return routeLength(candidate) < routeLength(best) ? candidate : best;
           });
-          waypoints.push(gate.position);
+          // Hold the centreline on the gate's opening axis for a few metres on either side. The
+          // curve pass returns to every one of these controls, so its meander cannot graze a pier.
+          let outwardX = Math.sin(gate.rotationY);
+          let outwardZ = Math.cos(gate.rotationY);
+          const gateFromCentreX = gate.position[0] - settlement.centre[0];
+          const gateFromCentreZ = gate.position[1] - settlement.centre[1];
+          if (outwardX * gateFromCentreX + outwardZ * gateFromCentreZ < 0) {
+            outwardX *= -1;
+            outwardZ *= -1;
+          }
+          const travelSign = fromInside ? 1 : -1;
+          const travelX = outwardX * travelSign;
+          const travelZ = outwardZ * travelSign;
+          const approach = Math.min(
+            5,
+            Math.hypot(gate.position[0] - from.position[0], gate.position[1] - from.position[1]) * 0.35,
+            Math.hypot(to.position[0] - gate.position[0], to.position[1] - gate.position[1]) * 0.35,
+          );
+          if (approach > 0.5) {
+            waypoints.push(
+              [gate.position[0] - travelX * approach, gate.position[1] - travelZ * approach],
+              gate.position,
+              [gate.position[0] + travelX * approach, gate.position[1] + travelZ * approach],
+            );
+          } else {
+            waypoints.push(gate.position);
+          }
         }
       }
       waypoints.push(to.position);
 
-      const points: Vec3[] = [];
-      for (let segment = 0; segment < waypoints.length - 1; segment += 1) {
-        const a = waypoints[segment]!;
-        const b = waypoints[segment + 1]!;
-        const steps = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6));
-        for (let step = 0; step < steps; step += 1) {
-          const t = step / steps;
-          const x = a[0] + (b[0] - a[0]) * t;
-          const z = a[1] + (b[1] - a[1]) * t;
-          points.push([x, scene.heightAt(region.id, x, z), z]);
-        }
-      }
-      const final = waypoints[waypoints.length - 1]!;
-      points.push([final[0], scene.heightAt(region.id, final[0], final[1]), final[1]]);
+      // Do not fill the link with straight six-metre samples here. Each sample becomes a hard
+      // control in `curveRoadPolyline`, which used to suppress the meander entirely.
+      const points: Vec3[] = waypoints.map(([x, z]) => [x, scene.heightAt(region.id, x, z), z]);
       stamps.push({ points, width: 3.2 });
     }
   }
@@ -100,10 +118,12 @@ export function collectWaterStamps(scene: WorldScene): WaterStamp[] {
     for (const cluster of region.clusters) {
       if (cluster.archetype !== "fishing_spot") continue;
       const [x, z] = cluster.centre;
+      const basin = waterBasinForCluster(cluster);
       stamps.push({
         centre: [x, z],
-        radius: cluster.radius + 14,
+        radius: basin.crestRadius,
         level: scene.heightAt(region.id, x, z) + WATER_FILL_DEPTH,
+        shape: basin.shape,
       });
     }
   }
@@ -116,7 +136,7 @@ export function buildWaterBodies(scene: WorldScene): number {
     for (const cluster of region.clusters) {
       if (cluster.archetype !== "fishing_spot") continue;
       const [x, z] = cluster.centre;
-      const half = cluster.radius + 14;
+      const half = waterBasinForCluster(cluster).crestRadius;
       const floor = scene.heightAt(region.id, x, z);
       scene.buildWater(
         { minX: x - half, maxX: x + half, minZ: z - half, maxZ: z + half },

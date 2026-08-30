@@ -17,6 +17,8 @@
     "perf": "tsx tools/perf-test.ts",
     "fetch-assets": "tsx tools/fetch-assets.ts",
     "build-assets": "tsx tools/build-assets.ts",
+    "world-preview": "tsx tools/preview-worldgen.ts",
+    "world-map": "tsx tools/generate-world-map.ts",
     "agent-proof": "tsx tools/agent-proof.ts",
     "gen-docs": "tsx tools/gen-docs.ts",
     "icons": "tsx tools/generate-item-icons.ts",

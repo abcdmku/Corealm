@@ -553,6 +553,15 @@ export class Renderer {
     const previousFog = this.scene.fog;
     const previousSun = this.sun.position.clone();
     const previousTarget = this.sun.target.position.clone();
+    const shadowCamera = this.sun.shadow.camera;
+    const previousShadowBounds = {
+      left: shadowCamera.left,
+      right: shadowCamera.right,
+      top: shadowCamera.top,
+      bottom: shadowCamera.bottom,
+    };
+    const previousShadowNeedsUpdate = this.sun.shadow.needsUpdate;
+    const previousShadowMapNeedsUpdate = this.renderer.shadowMap.needsUpdate;
     const hidden = [this.scene.getObjectByName("player"), this.scene.getObjectByName("overlays")]
       .filter((object): object is THREE.Object3D => object !== undefined)
       .map((object) => ({ object, visible: object.visible }));
@@ -563,13 +572,38 @@ export class Renderer {
       // whole tile to the horizon colour, so map capture uses the same geometry, materials and
       // lights without that view-distance effect.
       this.scene.fog = null;
+      // The gameplay shadow camera covers only 96 m. Project the complete capture square onto the
+      // light camera's axes, then leave room for terrain, tree crowns and a small edge pad. This
+      // keeps the bleed area in the same shadow projection as the 50 m core that survives cropping.
+      const lightOffset = new THREE.Vector3().subVectors(this.sun.position, this.sun.target.position);
+      const lightForward = lightOffset.clone().normalize();
+      const lightRight = new THREE.Vector3(0, 1, 0).cross(lightForward);
+      if (lightRight.lengthSq() < 1e-8) lightRight.set(1, 0, 0);
+      else lightRight.normalize();
+      const lightUp = lightForward.clone().cross(lightRight).normalize();
+      const halfSpan = span / 2;
+      const casterHeightMargin = 32;
+      const edgePadding = 4;
+      const projectedHalfExtent = (axis: THREE.Vector3): number =>
+        halfSpan * (Math.abs(axis.x) + Math.abs(axis.z))
+        + casterHeightMargin * Math.abs(axis.y)
+        + edgePadding;
+      const shadowHalfWidth = projectedHalfExtent(lightRight);
+      const shadowHalfHeight = projectedHalfExtent(lightUp);
+      shadowCamera.left = -shadowHalfWidth;
+      shadowCamera.right = shadowHalfWidth;
+      shadowCamera.top = shadowHalfHeight;
+      shadowCamera.bottom = -shadowHalfHeight;
+      shadowCamera.updateProjectionMatrix();
+      this.sun.shadow.needsUpdate = true;
+      this.renderer.shadowMap.needsUpdate = true;
       // Anchor the shadow texel grid in the light camera's own right/up plane. World-X/Z snapping
       // only happened to work while the sun was high: under a grazing key, both light-space axes
       // contain world Y and Z, so neighbouring captures could land at a fractional texel there.
       const shadowTarget = snapShadowTargetToTexels(
         new THREE.Vector3(options.centreX, options.centreY, options.centreZ),
-        new THREE.Vector3().subVectors(this.sun.position, this.sun.target.position),
-        this.sun.shadow.camera,
+        lightOffset,
+        shadowCamera,
         this.sun.shadow.mapSize,
       );
       this.followShadow(shadowTarget);
@@ -583,6 +617,13 @@ export class Renderer {
       this.sun.position.copy(previousSun);
       this.sun.target.position.copy(previousTarget);
       this.sun.target.updateMatrixWorld(true);
+      shadowCamera.left = previousShadowBounds.left;
+      shadowCamera.right = previousShadowBounds.right;
+      shadowCamera.top = previousShadowBounds.top;
+      shadowCamera.bottom = previousShadowBounds.bottom;
+      shadowCamera.updateProjectionMatrix();
+      this.sun.shadow.needsUpdate = previousShadowNeedsUpdate;
+      this.renderer.shadowMap.needsUpdate = previousShadowMapNeedsUpdate;
       this.renderer.setPixelRatio(previousRatio);
       this.renderer.setSize(previousSize.x, previousSize.y, false);
     }

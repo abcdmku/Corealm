@@ -9,9 +9,9 @@
  *
  *   h(x,z) = SUM_i w_i(x,z) * h_i(x,z) / SUM_i w_i(x,z)
  *
- * `w_i` is a smoothstep of the signed distance into region i's rect, so two neighbouring regions
- * cross over at exactly 0.5 each on their shared border. Ground colour blends with the same
- * weights, which is why one vertex-coloured material covers all three region palettes.
+ * When organic biome data exists, the same normalized hub-and-band weights blend relief, palette,
+ * and scatter. Authored rectangles still own semantic regions and world bounds. Older specs keep
+ * the signed-distance rectangle blend as a fallback.
  *
  * The second structural decision, added later: THE GROUND ABSORBS THE THINGS DRAWN ON IT. Roads,
  * paved squares and waterlogged banks are per-vertex surface weights and colours on the terrain
@@ -33,6 +33,14 @@ import { PLAYER_HEIGHT, PLAYER_RADIUS } from "../app/config.js";
 import { Rng } from "../core/rng.js";
 import { clamp } from "../core/math.js";
 import type { WaterBasinSpec } from "../world/waterBodies.js";
+import {
+  organicDistance,
+  sampleOrganicBiomeWeights,
+  sampleOrganicCoast,
+  type OrganicBiomeSpec,
+  type OrganicCoastShapeSpec,
+  type OrganicShapeSpec,
+} from "../world/organicFields.js";
 
 // ----------------------------------------------------------------- specs
 
@@ -63,7 +71,7 @@ export type RegionCharacter = "plains" | "woodland" | "highlands" | "cavern";
 
 export interface RegionTerrainSpec {
   regionId: RegionId;
-  /** Region rects must tile the world with no gaps; blending happens across shared borders. */
+  /** Region rects tile semantic ownership with no gaps and define the legacy relief blend. */
   rect: Rect;
   seed: number;
   character: RegionCharacter;
@@ -114,12 +122,28 @@ export interface WorldTerrainSpec {
   chunkSize: number;
   /** Terrain grid resolution. 2 m keeps the whole world under 150k triangles. */
   metresPerQuad: number;
-  /** Half-width of the cross-region blend band, in metres. */
+  /** Half-width of the legacy rectangular relief blend, in metres. */
   blendMetres: number;
   regions: RegionTerrainSpec[];
   flats?: FlatSpot[];
   /** Closed recessed profiles for authored water. Applied after flats and haul roads. */
   basins?: WaterBasinSpec[];
+  /** Normalized hub-and-band fields shared by terrain relief, palette, and scatter. */
+  biomes?: OrganicBiomeSpec<RegionId>;
+  /** Render-only land edge and ocean. It never expands physics, navigation, or map bounds. */
+  coast?: CoastSpec;
+}
+
+export interface CoastSpec extends OrganicCoastShapeSpec {
+  /** Rendered land outside the playable bounds, in metres. */
+  collar: number;
+  seaLevel: number;
+  /** Seabed depth below sea level at the outside of the collar. */
+  floorDepth: number;
+  /** Coast mesh spacing. Match `metresPerQuad` so the inner edge shares the terrain lattice. */
+  gridStep: number;
+  /** Ocean plane size. Keep this comfortably beyond the camera far plane and fog. */
+  oceanSize: number;
 }
 
 interface ResolvedWaterBasin extends WaterBasinSpec {
@@ -221,6 +245,7 @@ export function createValueNoise(seed: number): (x: number, z: number) => number
 }
 
 type Noise2D = (x: number, z: number) => number;
+type HeightSampler = (x: number, z: number) => number;
 
 /** Fractal sum. Returns roughly -1..1. */
 function fbm(noise: Noise2D, x: number, z: number, octaves: number, featureSize: number): number {
@@ -257,6 +282,19 @@ function signedDepth(rect: Rect, x: number, z: number): number {
   return -(outside + inside);
 }
 
+function pointInContour(x: number, z: number, contour: readonly (readonly [number, number])[]): boolean {
+  let inside = false;
+  for (let index = 0, previous = contour.length - 1; index < contour.length; previous = index, index += 1) {
+    const a = contour[index];
+    const b = contour[previous];
+    if (!a || !b) continue;
+    const crosses = (a[1] > z) !== (b[1] > z)
+      && x < ((b[0] - a[0]) * (z - a[1])) / (b[1] - a[1]) + a[0];
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
 /**
  * Soft terrace. `riserFraction` of each band is the climb, the rest is flat. Keeping the riser
  * wide is what makes Karrowmoor's verticality survive navmesh generation: a hard step would be a
@@ -277,14 +315,11 @@ interface RegionField {
   height: (x: number, z: number) => number;
   palette: (typeof REGION_PALETTES)[RegionId];
   /**
-   * The height range the region's field ACTUALLY produces over its own rect, swept at 4 m.
+   * The height range the region's field ACTUALLY produces over the rendered land, swept at 4 m.
    *
-   * The altitude ramp used to normalise against `baseHeight` and `amplitude`, which assumes the
-   * field spans exactly 0..amplitude. It does not. Measured over each rect: Fallowmarch used
-   * -0.35..2.34 of that ramp, so 46.9% of it clamped to `groundLow` and 0.8% clamped to
-   * `groundHigh`; Vellenwood used 0.00..0.33, so #576b3f was never drawn anywhere in the game;
-   * Karrowmoor used -0.13..1.08. Normalising against the measured range instead restores the full
-   * eight-swatch palette that materials.ts had already authored.
+   * Normalising against the measured range keeps the full authored palette available. `buildWorld`
+   * measures the coast-expanded visual rectangle so the palette does not reset at a semantic edge.
+   * Legacy `buildTerrain` still measures only its single terrain rectangle.
    */
   hMin: number;
   hMax: number;
@@ -302,7 +337,7 @@ interface RegionField {
 export interface RoadStamp {
   /** World-space polyline. Only x and z are read; the ground supplies y. */
   points: readonly Vec3[];
-  /** Worn width in metres. Defaults to `ROAD_WORN_HALF * 2`. */
+  /** Full worn width in metres. Defaults to 3.2 m. */
   width?: number;
 }
 
@@ -317,6 +352,8 @@ export interface WaterStamp {
   radius: number;
   /** Surface height in metres. The mud and wet bands are placed against this. */
   level: number;
+  /** Same deformation as the carved basin, so its wet-bank stamp follows the real shore. */
+  shape?: OrganicShapeSpec;
 }
 
 /** Read-only proof of the basin and shoreline the renderer actually built. */
@@ -342,7 +379,7 @@ export interface GroundStamps {
   roads?: readonly RoadStamp[];
   paving?: readonly PavingStamp[];
   water?: readonly WaterStamp[];
-  /** Seeds the road meander. Fixed derivation per road index, so it is reproducible. */
+  /** Seeds road meander; each road derives a stable child seed from its controls and width. */
   seed?: number;
 }
 
@@ -398,6 +435,10 @@ function createGrassSpriteGeometry(): THREE.BufferGeometry {
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+function materialMovesInWind(material: THREE.Material): boolean {
+  return /^(?:Leaves(?:_|$)|Flowers(?:_|$)|MI_Vine(?:_|$))/i.test(material.name);
 }
 
 /** One contact patch. `radius` is the half-width of the darkening, in metres. */
@@ -457,6 +498,8 @@ export class WorldScene {
    * 1.75M analytic field evaluations into 1.75M array reads.
    */
   private lattice: HeightLattice | null = null;
+  /** The drawn render-only coast grid. It never enters physics, navigation, or terrain raycasts. */
+  private coastGrid: CoastHeightGrid | null = null;
   private chunks: ChunkRecord[] = [];
   private roads: RoadSegment[] = [];
   private roadPolylines: Vec3[][] = [];
@@ -534,15 +577,25 @@ export class WorldScene {
    */
   buildWorld(spec: WorldTerrainSpec = COREALM_WORLD): THREE.Mesh[] {
     this.world = spec;
+    this.coastGrid = null;
     // Flats registered through `addFlatSpot` before the build are kept: settlement pads are
     // registered by whoever knows where the settlement is, which is not this file.
     this.flats = [...this.flats, ...(spec.flats ?? [])].map((flat) => ({ ...flat }));
     this.basinSpecs = (spec.basins ?? []).map((basin) => ({ ...basin }));
     this.basins = [];
     this.builtWaterBodies = [];
+    const coastPadding = Number.isFinite(spec.coast?.collar)
+      ? Math.max(0, spec.coast?.collar ?? 0)
+      : 0;
+    const visualLandBounds: Rect = {
+      minX: spec.bounds.minX - coastPadding,
+      maxX: spec.bounds.maxX + coastPadding,
+      minZ: spec.bounds.minZ - coastPadding,
+      maxZ: spec.bounds.maxZ + coastPadding,
+    };
     this.fields = spec.regions.map((region) => {
       const height = makeRegionField(region);
-      const range = sweepFieldRange(region.rect, height);
+      const range = sweepFieldRange(visualLandBounds, height);
       return {
         spec: region,
         height,
@@ -587,6 +640,7 @@ export class WorldScene {
         created.push(mesh);
       }
     }
+    if (spec.coast) this.buildCoast(spec.coast);
     return created;
   }
 
@@ -657,6 +711,7 @@ export class WorldScene {
 
     const position = geometry.getAttribute("position") as THREE.BufferAttribute;
     const colours = new Float32Array(position.count * 3);
+    const normals = new Float32Array(position.count * 3);
     // Eight surface weights as two normalised Uint8 vec4s, plus the road frame. 12 bytes/vertex,
     // about 876 KB over the world's ~73k terrain vertices. See the splat block in materials.ts.
     const splatA = new Uint8Array(position.count * 4);
@@ -674,6 +729,10 @@ export class WorldScene {
       // makes the drawn surface and `meshHeightAt` identical by construction.
       const height = this.sampleLattice(worldX, worldZ);
       position.setY(i, height);
+      const normal = this.normalAt(worldX, worldZ);
+      normals[i * 3] = normal[0];
+      normals[i * 3 + 1] = normal[1];
+      normals[i * 3 + 2] = normal[2];
 
       this.sampleSurface(worldX, worldZ, height, surface);
       colours[i * 3] = surface.colour.r;
@@ -682,11 +741,11 @@ export class WorldScene {
       writeSplat(splatA, splatB, extra, i, surface);
     }
     position.needsUpdate = true;
+    geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
     geometry.setAttribute("aSplatA", new THREE.BufferAttribute(splatA, 4, true));
     geometry.setAttribute("aSplatB", new THREE.BufferAttribute(splatB, 4, true));
     geometry.setAttribute("aGround", new THREE.BufferAttribute(extra, 4, true));
-    geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -697,6 +756,190 @@ export class WorldScene {
     mesh.castShadow = false;
     this.chunks.push({ mesh, centreX, centreZ, sizeX, sizeZ });
     return mesh;
+  }
+
+  /**
+   * Builds a visual collar around the fixed gameplay rectangle, then puts one ocean plane under it.
+   * Neither mesh is walkable or raycast as terrain: content, nav, physics, and the map keep their
+   * existing bounds while the camera sees a shoreline instead of the end of a rectangular slab.
+   */
+  private buildCoast(spec: CoastSpec): void {
+    const bounds = this.world?.bounds;
+    if (!bounds || spec.gridStep <= 0 || spec.oceanSize <= 0) return;
+
+    const minimumReach = Math.max(0.001, Math.min(spec.shoreline[0], spec.shoreline[1]));
+    const maximumReach = Math.max(minimumReach, Math.max(spec.shoreline[0], spec.shoreline[1]));
+    if (!Number.isFinite(spec.collar) || spec.collar + COAST_GRID_EPSILON < maximumReach) {
+      throw new Error(
+        `Coast collar ${spec.collar} m is shorter than its ${maximumReach} m shoreline reach.`,
+      );
+    }
+
+    const terrainStep = this.world?.metresPerQuad ?? spec.gridStep;
+    if (Math.abs(terrainStep - spec.gridStep) > COAST_GRID_EPSILON) {
+      throw new Error(
+        `Coast gridStep ${spec.gridStep} m must match terrain metresPerQuad ${terrainStep} m.`,
+      );
+    }
+    const gridUnits = (distance: number, label: string): number => {
+      if (!Number.isFinite(distance)) throw new Error(`${label} must be finite.`);
+      const units = Math.round(distance / spec.gridStep);
+      if (Math.abs(units * spec.gridStep - distance) > COAST_GRID_EPSILON) {
+        throw new Error(`${label} ${distance} m does not land on the ${spec.gridStep} m coast grid.`);
+      }
+      return units;
+    };
+    const collarUnits = gridUnits(spec.collar, "Coast collar");
+    const playableCols = gridUnits(bounds.maxX - bounds.minX, "World X span");
+    const playableRows = gridUnits(bounds.maxZ - bounds.minZ, "World Z span");
+
+    const minX = bounds.minX - spec.collar;
+    const minZ = bounds.minZ - spec.collar;
+    const cols = playableCols + collarUnits * 2;
+    const rows = playableRows + collarUnits * 2;
+    const stepX = spec.gridStep;
+    const stepZ = spec.gridStep;
+    const vertexCols = cols + 1;
+    const vertexRows = rows + 1;
+    const vertexCount = vertexCols * vertexRows;
+    const positions = new Float32Array(vertexCount * 3);
+    const heights = new Float32Array(vertexCount);
+    const descents = new Float32Array(vertexCount);
+    const colours = new Float32Array(vertexCount * 3);
+    const splatA = new Uint8Array(vertexCount * 4);
+    const splatB = new Uint8Array(vertexCount * 4);
+    const ground = new Uint8Array(vertexCount * 4);
+    const referenced = new Uint8Array(vertexCount);
+    const indices: number[] = [];
+
+    // Height first. The material pass below needs the complete drawn coast for its slope,
+    // curvature, and horizon samples; using the playable lattice there would clamp all three to
+    // the old rectangular edge.
+    for (let row = 0; row <= rows; row += 1) {
+      const z = minZ + row * stepZ;
+      for (let col = 0; col <= cols; col += 1) {
+        const x = minX + col * stepX;
+        const vertex = row * vertexCols + col;
+        const strictInterior = x > bounds.minX && x < bounds.maxX
+          && z > bounds.minZ && z < bounds.maxZ;
+        if (strictInterior) {
+          heights[vertex] = this.sampleLattice(x, z);
+          descents[vertex] = 0;
+        } else {
+          const profile = this.coastProfileAt(x, z, spec);
+          heights[vertex] = profile.landHeight;
+          descents[vertex] = profile.descent;
+        }
+        positions[vertex * 3] = x;
+        positions[vertex * 3 + 1] = heights[vertex]!;
+        positions[vertex * 3 + 2] = z;
+      }
+    }
+    this.coastGrid = {
+      heights,
+      cols: vertexCols,
+      rows: vertexRows,
+      minX,
+      minZ,
+      stepX,
+      stepZ,
+    };
+
+    for (let row = 0; row < rows; row += 1) {
+      const centreZ = minZ + (row + 0.5) * stepZ;
+      for (let col = 0; col < cols; col += 1) {
+        const centreX = minX + (col + 0.5) * stepX;
+        const inside = centreX >= bounds.minX && centreX <= bounds.maxX
+          && centreZ >= bounds.minZ && centreZ <= bounds.maxZ;
+        if (inside) continue;
+        const a = row * vertexCols + col;
+        const b = a + 1;
+        const c = a + vertexCols;
+        const d = c + 1;
+        indices.push(a, c, b, b, c, d);
+        referenced[a] = 1;
+        referenced[b] = 1;
+        referenced[c] = 1;
+        referenced[d] = 1;
+      }
+    }
+
+    const coastHeightAt = (x: number, z: number): number => (
+      this.sampleCoastGrid(x, z) ?? spec.seaLevel - Math.max(0, spec.floorDepth)
+    );
+    const surface = emptySurface();
+    const seabed = new THREE.Color(0x31473f);
+    const colour = new THREE.Color();
+    for (let row = 0; row <= rows; row += 1) {
+      const z = minZ + row * stepZ;
+      for (let col = 0; col <= cols; col += 1) {
+        const vertex = row * vertexCols + col;
+        if (referenced[vertex] === 0) continue;
+        const x = minX + col * stepX;
+        const playable = x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
+        this.sampleSurface(x, z, heights[vertex]!, surface, true, playable ? undefined : coastHeightAt);
+        writeSplat(splatA, splatB, ground, vertex, surface);
+        colour.copy(surface.colour).lerp(seabed, descents[vertex]!);
+        colours[vertex * 3] = colour.r;
+        colours[vertex * 3 + 1] = colour.g;
+        colours[vertex * 3 + 2] = colour.b;
+      }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+    geometry.setAttribute("aSplatA", new THREE.BufferAttribute(splatA, 4, true));
+    geometry.setAttribute("aSplatB", new THREE.BufferAttribute(splatB, 4, true));
+    geometry.setAttribute("aGround", new THREE.BufferAttribute(ground, 4, true));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const normalAttribute = geometry.getAttribute("normal") as THREE.BufferAttribute;
+    for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+      if (referenced[vertex] === 0) continue;
+      const x = positions[vertex * 3]!;
+      const z = positions[vertex * 3 + 2]!;
+      const coastSample = sampleOrganicCoast(x, z, bounds, spec);
+      const seamWidth = Math.min(COAST_EDGE_PIN_METRES, coastSample.shelfWidth);
+      if (coastSample.outsideDistance > seamWidth) continue;
+      const terrainNormal = this.normalAt(coastSample.boundaryX, coastSample.boundaryZ);
+      const skirtWeight = smoothstep01(
+        coastSample.outsideDistance / Math.max(0.000_001, seamWidth),
+      );
+      const normalX = terrainNormal[0]
+        + (normalAttribute.getX(vertex) - terrainNormal[0]) * skirtWeight;
+      const normalY = terrainNormal[1]
+        + (normalAttribute.getY(vertex) - terrainNormal[1]) * skirtWeight;
+      const normalZ = terrainNormal[2]
+        + (normalAttribute.getZ(vertex) - terrainNormal[2]) * skirtWeight;
+      const normalLength = Math.hypot(normalX, normalY, normalZ) || 1;
+      normalAttribute.setXYZ(
+        vertex,
+        normalX / normalLength,
+        normalY / normalLength,
+        normalZ / normalLength,
+      );
+    }
+    normalAttribute.needsUpdate = true;
+    geometry.computeBoundingSphere();
+    const coast = new THREE.Mesh(geometry, this.materials.ground());
+    coast.name = "coastal-skirt";
+    coast.castShadow = false;
+    coast.receiveShadow = true;
+    this.scatterGroup.add(coast);
+
+    const oceanGeometry = new THREE.PlaneGeometry(spec.oceanSize, spec.oceanSize);
+    oceanGeometry.rotateX(-Math.PI / 2);
+    const oceanDepth = new Float32Array(oceanGeometry.getAttribute("position").count);
+    oceanDepth.fill(Math.max(1.2, spec.floorDepth));
+    oceanGeometry.setAttribute("aWaterDepth", new THREE.BufferAttribute(oceanDepth, 1));
+    const ocean = new THREE.Mesh(oceanGeometry, this.materials.water("fallowmarch"));
+    ocean.name = "infinite-ocean";
+    ocean.position.set((bounds.minX + bounds.maxX) / 2, spec.seaLevel, (bounds.minZ + bounds.maxZ) / 2);
+    ocean.renderOrder = 0;
+    ocean.castShadow = false;
+    ocean.receiveShadow = false;
+    this.scatterGroup.add(ocean);
   }
 
   /**
@@ -1215,7 +1458,7 @@ export class WorldScene {
    */
   private applyBasins(x: number, z: number, height: number): number {
     for (const basin of this.basins) {
-      const radius = Math.hypot(x - basin.x, z - basin.z);
+      const radius = organicDistance(x - basin.x, z - basin.z, basin.shape);
       if (radius >= basin.outerRadius) continue;
       if (radius <= basin.floorRadius) return basin.floorY;
 
@@ -1253,8 +1496,98 @@ export class WorldScene {
     return height;
   }
 
+  /** One normalized field shared by terrain relief, surface palette, scatter masks, and diagnostics. */
+  private biomeWeightsAt(x: number, z: number): readonly { id: RegionId; weight: number }[] {
+    const spec = this.world?.biomes;
+    if (spec) return sampleOrganicBiomeWeights(x, z, spec);
+    if (this.fields.length === 0) return [];
+    if (this.fields.length === 1) return [{ id: this.fields[0]!.spec.regionId, weight: 1 }];
+
+    const blend = this.world?.blendMetres ?? 45;
+    const raw = this.fields.map((field) => ({
+      id: field.spec.regionId,
+      weight: smoothstep01((signedDepth(field.spec.rect, x, z) + blend) / (2 * blend)),
+    }));
+    const sum = raw.reduce((total, sample) => total + sample.weight, 0);
+    if (sum > 0) return raw.map((sample) => ({ ...sample, weight: sample.weight / sum }));
+    const nearest = this.fields.reduce((best, field) => (
+      signedDepth(field.spec.rect, x, z) > signedDepth(best.spec.rect, x, z) ? field : best
+    ), this.fields[0]!);
+    return raw.map((sample) => ({
+      id: sample.id,
+      weight: sample.id === nearest.spec.regionId ? 1 : 0,
+    }));
+  }
+
+  private coastProfileAt(x: number, z: number, spec: CoastSpec): {
+    boundaryX: number;
+    boundaryZ: number;
+    boundaryHeight: number;
+    outsideDistance: number;
+    shorelineWidth: number;
+    shelfWidth: number;
+    descent: number;
+    land: boolean;
+    landHeight: number;
+  } {
+    const bounds = this.world?.bounds ?? { minX: x, maxX: x, minZ: z, maxZ: z };
+    const coast = sampleOrganicCoast(x, z, bounds, spec);
+    const boundaryHeight = this.meshHeightAt(coast.boundaryX, coast.boundaryZ);
+    const edgeStep = Math.max(0.25, this.lattice?.step ?? spec.gridStep);
+    let gradientX = 0;
+    let gradientZ = 0;
+    if (x < bounds.minX) {
+      const innerX = Math.min(bounds.maxX, coast.boundaryX + edgeStep);
+      gradientX = (this.meshHeightAt(innerX, coast.boundaryZ) - boundaryHeight)
+        / Math.max(0.000_001, innerX - coast.boundaryX);
+    } else if (x > bounds.maxX) {
+      const innerX = Math.max(bounds.minX, coast.boundaryX - edgeStep);
+      gradientX = (boundaryHeight - this.meshHeightAt(innerX, coast.boundaryZ))
+        / Math.max(0.000_001, coast.boundaryX - innerX);
+    }
+    if (z < bounds.minZ) {
+      const innerZ = Math.min(bounds.maxZ, coast.boundaryZ + edgeStep);
+      gradientZ = (this.meshHeightAt(coast.boundaryX, innerZ) - boundaryHeight)
+        / Math.max(0.000_001, innerZ - coast.boundaryZ);
+    } else if (z > bounds.maxZ) {
+      const innerZ = Math.max(bounds.minZ, coast.boundaryZ - edgeStep);
+      gradientZ = (boundaryHeight - this.meshHeightAt(coast.boundaryX, innerZ))
+        / Math.max(0.000_001, coast.boundaryZ - innerZ);
+    }
+    const edgePlaneHeight = boundaryHeight
+      + gradientX * (x - coast.boundaryX)
+      + gradientZ * (z - coast.boundaryZ);
+    const naturalHeight = coast.land ? this.heightAtXZ(x, z) : edgePlaneHeight;
+    // The playable lattice supplies both the seam value and its inward one-sided gradient. Four
+    // coast quads later, the unchanged analytic field owns the headland; smoothstep leaves the
+    // derivative of each source intact at its end of the blend.
+    const edgeBlend = smoothstep01(coast.outsideDistance / COAST_EDGE_PIN_METRES);
+    const plateauHeight = edgePlaneHeight + (naturalHeight - edgePlaneHeight) * edgeBlend;
+    const floorY = spec.seaLevel - Math.max(0, spec.floorDepth);
+    return {
+      boundaryX: coast.boundaryX,
+      boundaryZ: coast.boundaryZ,
+      boundaryHeight,
+      outsideDistance: coast.outsideDistance,
+      shorelineWidth: coast.shorelineWidth,
+      shelfWidth: coast.shelfWidth,
+      descent: coast.descent,
+      land: coast.land,
+      landHeight: plateauHeight + (floorY - plateauHeight) * coast.descent,
+    };
+  }
+
   private naturalHeight(x: number, z: number): number {
     if (this.fields.length === 0) return 0;
+    if (this.world?.biomes) {
+      const weights = this.biomeWeightsAt(x, z);
+      let height = 0;
+      for (const field of this.fields) {
+        const weight = weights.find((sample) => sample.id === field.spec.regionId)?.weight ?? 0;
+        height += field.height(x, z) * weight;
+      }
+      return height;
+    }
     if (this.fields.length === 1) return this.fields[0]!.height(x, z);
 
     const blend = this.world?.blendMetres ?? 45;
@@ -1365,12 +1698,9 @@ export class WorldScene {
     return best.spec.regionId;
   }
 
-  /** Blend weight of a region at a point, 0..1. Scatter uses it to fade species across seams. */
+  /** Blend weight of a region at a point, 0..1. Scatter uses it to fade species between biomes. */
   regionWeightAt(regionId: RegionId, x: number, z: number): number {
-    const field = this.fields.find((candidate) => candidate.spec.regionId === regionId);
-    if (!field) return 0;
-    const blend = this.world?.blendMetres ?? 45;
-    return smoothstep01((signedDepth(field.spec.rect, x, z) + blend) / (2 * blend));
+    return this.biomeWeightsAt(x, z).find((sample) => sample.id === regionId)?.weight ?? 0;
   }
 
   /** Terrain steepness at a point, as rise over run. 0 is flat, 1 is 45 degrees. */
@@ -1386,6 +1716,129 @@ export class WorldScene {
 
   getWorldBounds(): Rect {
     return this.world?.bounds ?? { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+  }
+
+  /**
+   * Candidate bounds for visual scatter. Gameplay bounds stay canonical; a requested bleed may
+   * reach the coast mesh but never past its declared rectangular collar.
+   */
+  getScatterBounds(bleed: number): Rect {
+    const bounds = this.getWorldBounds();
+    const collar = Math.max(0, this.world?.coast?.collar ?? 0);
+    const requested = Number.isNaN(bleed) ? 0 : Math.max(0, bleed);
+    const padding = Math.min(collar, requested);
+    return {
+      minX: bounds.minX - padding,
+      maxX: bounds.maxX + padding,
+      minZ: bounds.minZ - padding,
+      maxZ: bounds.maxZ + padding,
+    };
+  }
+
+  /**
+   * The drawn ground visual scatter may sit on. Outside gameplay this reads only the render coast
+   * grid, fades through its final shore band, and disappears before the ocean surface. It is never
+   * used by physics, navigation, entity placement, or click raycasts.
+   */
+  scatterSurfaceAt(x: number, z: number): {
+    height: number;
+    normal: Vec3;
+    slope: number;
+    density: number;
+    coast: boolean;
+  } | null {
+    const bounds = this.getWorldBounds();
+    const playable = x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
+    if (playable) {
+      const height = this.meshHeightAt(x, z);
+      const normal = this.normalAt(x, z);
+      const slope = normal[1] > 0.000_001
+        ? Math.hypot(normal[0], normal[2]) / normal[1]
+        : Number.POSITIVE_INFINITY;
+      return { height, normal, slope, density: 1, coast: false };
+    }
+
+    const spec = this.world?.coast;
+    const grid = this.coastGrid;
+    if (!spec || !grid) return null;
+    const scatterBounds = this.getScatterBounds(spec.collar);
+    if (x < scatterBounds.minX || x > scatterBounds.maxX
+      || z < scatterBounds.minZ || z > scatterBounds.maxZ) return null;
+
+    const profile = this.coastProfileAt(x, z, spec);
+    if (!profile.land) return null;
+    const height = this.sampleCoastGrid(x, z);
+    if (height === null || height <= spec.seaLevel + COAST_SCATTER_WATER_CLEARANCE) return null;
+
+    const shoreWidth = Math.max(0.000_001, profile.shorelineWidth - profile.shelfWidth);
+    const shoreProgress = smoothstep01((profile.outsideDistance - profile.shelfWidth) / shoreWidth);
+    const density = 1 - shoreProgress;
+    if (density <= 0.000_001) return null;
+
+    const sampleX = Math.max(0.25, grid.stepX);
+    const sampleZ = Math.max(0.25, grid.stepZ);
+    const dx = (this.sampleCoastGrid(x + sampleX, z)! - this.sampleCoastGrid(x - sampleX, z)!)
+      / (2 * sampleX);
+    const dz = (this.sampleCoastGrid(x, z + sampleZ)! - this.sampleCoastGrid(x, z - sampleZ)!)
+      / (2 * sampleZ);
+    const length = Math.hypot(dx, 1, dz);
+    const normal: Vec3 = [-dx / length, 1 / length, -dz / length];
+    return { height, normal, slope: Math.hypot(dx, dz), density, coast: true };
+  }
+
+  /** One compact, JSON-safe probe for biome/coast authoring and browser diagnostics. */
+  sampleWorld(x: number, z: number): {
+    x: number;
+    z: number;
+    playable: boolean;
+    height: number;
+    slope: number | null;
+    semanticRegion: RegionId;
+    visualBiome: RegionId;
+    biomeWeights: Partial<Record<RegionId, number>>;
+    waterBodyId: string | null;
+    coast: { outsideDistance: number; shorelineWidth: number; seaLevel: number } | null;
+  } {
+    const bounds = this.getWorldBounds();
+    const boundaryX = clamp(x, bounds.minX, bounds.maxX);
+    const boundaryZ = clamp(z, bounds.minZ, bounds.maxZ);
+    const outsideDistance = Math.hypot(x - boundaryX, z - boundaryZ);
+    const playable = outsideDistance <= 0.000_001;
+    const raw = this.biomeWeightsAt(x, z);
+    const biomeWeights: Partial<Record<RegionId, number>> = {};
+    for (const entry of raw) biomeWeights[entry.id] = entry.weight;
+    const visualBiome = raw.reduce(
+      (best, entry) => entry.weight > best.weight ? entry : best,
+      raw[0] ?? { id: this.regionAt(x, z), weight: 1 },
+    ).id;
+
+    const coastSpec = this.world?.coast;
+    const profile = coastSpec ? this.coastProfileAt(x, z, coastSpec) : null;
+    const height = playable
+      ? this.meshHeightAt(x, z)
+      : profile
+        ? Math.max(this.sampleCoastGrid(x, z) ?? profile.landHeight, coastSpec!.seaLevel)
+        : this.meshHeightAt(boundaryX, boundaryZ);
+    const waterBody = this.builtWaterBodies.find((body) => body.closed && pointInContour(x, z, body.contour));
+
+    return {
+      x,
+      z,
+      playable,
+      height,
+      slope: playable ? this.slopeAt(x, z) : null,
+      semanticRegion: this.regionAt(x, z),
+      visualBiome,
+      biomeWeights,
+      waterBodyId: waterBody?.id ?? null,
+      coast: coastSpec && profile
+        ? {
+            outsideDistance: profile.outsideDistance,
+            shorelineWidth: profile.shorelineWidth,
+            seaLevel: coastSpec.seaLevel,
+          }
+        : null,
+    };
   }
 
   /** JSON-safe layout description, so the debug surface and the world builder can reconcile. */
@@ -1508,6 +1961,27 @@ export class WorldScene {
     return top + (bottom - top) * tz;
   }
 
+  /** Bilinear read of the render-only coast grid. Coordinates outside its rectangle clamp to it. */
+  private sampleCoastGrid(x: number, z: number): number | null {
+    const grid = this.coastGrid;
+    if (!grid) return null;
+    const fx = clamp((x - grid.minX) / grid.stepX, 0, grid.cols - 1);
+    const fz = clamp((z - grid.minZ) / grid.stepZ, 0, grid.rows - 1);
+    const x0 = Math.floor(fx);
+    const z0 = Math.floor(fz);
+    const x1 = Math.min(x0 + 1, grid.cols - 1);
+    const z1 = Math.min(z0 + 1, grid.rows - 1);
+    const tx = fx - x0;
+    const tz = fz - z0;
+    const h00 = grid.heights[z0 * grid.cols + x0]!;
+    const h10 = grid.heights[z0 * grid.cols + x1]!;
+    const h01 = grid.heights[z1 * grid.cols + x0]!;
+    const h11 = grid.heights[z1 * grid.cols + x1]!;
+    const top = h00 + (h10 - h00) * tx;
+    const bottom = h01 + (h11 - h01) * tx;
+    return top + (bottom - top) * tz;
+  }
+
   /**
    * The height of the DRAWN ground, bilinear on the same 2 m lattice the mesh is built from.
    *
@@ -1563,10 +2037,17 @@ export class WorldScene {
     this.roadPolylines = [];
     this.roads = [];
     const seed = stamps.seed ?? 0x0a0d;
-    for (const [index, road] of (stamps.roads ?? []).entries()) {
-      const curved = curveRoadPolyline(road.points, (seed ^ (index * 0x9e37)) >>> 0);
+    for (const road of stamps.roads ?? []) {
+      const roadSeed = roadSeedFromStamp(seed, road);
+      const curved = curveRoadPolyline(road.points, roadSeed);
       this.roadPolylines.push(curved);
-      appendRoadSegments(this.roads, curved);
+      appendRoadSegments(
+        this.roads,
+        curved,
+        road.width ?? ROAD_DEFAULT_WORN_WIDTH,
+        roadSeed,
+        road.points,
+      );
     }
     this.rebuildRoadGrid();
     if (this.chunks.length > 0) this.restampArea(-Infinity, -Infinity, Infinity, Infinity);
@@ -1575,8 +2056,8 @@ export class WorldScene {
   /**
    * The road centrelines as they were actually stamped, after the meander.
    *
-   * Kerbs, path rocks and anything else that follows a route needs the CURVED line, not the
-   * authored endpoints, or the edge dressing runs beside the road rather than along it.
+   * Kerbs, foliage exclusions, the world map and anything else that follows a route need this
+   * resolved line. Terrain height and route costs stay unchanged; only the stamped centreline bows.
    */
   getRoadPolylines(): Vec3[][] {
     return this.roadPolylines.map((line) => line.map((point) => [point[0], point[1], point[2]] as Vec3));
@@ -1601,10 +2082,11 @@ export class WorldScene {
   private rebuildRoadGrid(): void {
     this.roadGrid.clear();
     for (const [index, segment] of this.roads.entries()) {
-      const minX = Math.min(segment.ax, segment.bx) - ROAD_FADE_HALF;
-      const maxX = Math.max(segment.ax, segment.bx) + ROAD_FADE_HALF;
-      const minZ = Math.min(segment.az, segment.bz) - ROAD_FADE_HALF;
-      const maxZ = Math.max(segment.az, segment.bz) + ROAD_FADE_HALF;
+      const reach = roadOuterHalf(Math.max(segment.aWidth, segment.bWidth));
+      const minX = Math.min(segment.ax, segment.bx) - reach;
+      const maxX = Math.max(segment.ax, segment.bx) + reach;
+      const minZ = Math.min(segment.az, segment.bz) - reach;
+      const maxZ = Math.max(segment.az, segment.bz) + reach;
       for (let cz = Math.floor(minZ / ROAD_CELL); cz <= Math.floor(maxZ / ROAD_CELL); cz += 1) {
         for (let cx = Math.floor(minX / ROAD_CELL); cx <= Math.floor(maxX / ROAD_CELL); cx += 1) {
           const key = cellKey(cx, cz);
@@ -1620,12 +2102,21 @@ export class WorldScene {
    * Distance from a point to the nearest road centreline, with the sign of which side it is on.
    *
    * Bucketed on an 8 m grid, so a terrain vertex tests a handful of segments rather than all ~700.
-   * Returns `null` past `ROAD_FADE_HALF`, which is most of the world.
+   * Returns `null` past the local verge. Width is interpolated along the winning segment.
    */
-  private roadAt(x: number, z: number): { distance: number; perpendicular: number } | null {
+  private roadAt(x: number, z: number): {
+    distance: number;
+    perpendicular: number;
+    wornHalf: number;
+    fadeHalf: number;
+    vergeMetres: number;
+  } | null {
     if (this.roads.length === 0) return null;
     let best = Infinity;
     let bestPerpendicular = 0;
+    let bestWornHalf = 0;
+    let bestFadeHalf = 0;
+    let bestVerge = 0;
     const cx = Math.floor(x / ROAD_CELL);
     const cz = Math.floor(z / ROAD_CELL);
     const bucket = this.roadGrid.get(cellKey(cx, cz));
@@ -1641,13 +2132,28 @@ export class WorldScene {
       const px = segment.ax + ex * t;
       const pz = segment.az + ez * t;
       const distance = Math.hypot(x - px, z - pz);
+      const wornWidth = segment.aWidth + (segment.bWidth - segment.aWidth) * t;
+      const widthScale = wornWidth / ROAD_DEFAULT_WORN_WIDTH;
+      const wornHalf = wornWidth / 2;
+      const fadeHalf = wornHalf + ROAD_FADE_METRES * widthScale;
+      const vergeMetres = ROAD_VERGE_METRES * widthScale;
+      if (distance > fadeHalf + vergeMetres) continue;
       if (distance >= best) continue;
       best = distance;
       const length = Math.sqrt(lengthSquared) || 1;
       bestPerpendicular = ((x - px) * (ez / length) - (z - pz) * (ex / length));
+      bestWornHalf = wornHalf;
+      bestFadeHalf = fadeHalf;
+      bestVerge = vergeMetres;
     }
-    if (best > ROAD_FADE_HALF) return null;
-    return { distance: best, perpendicular: bestPerpendicular };
+    if (!Number.isFinite(best)) return null;
+    return {
+      distance: best,
+      perpendicular: bestPerpendicular,
+      wornHalf: bestWornHalf,
+      fadeHalf: bestFadeHalf,
+      vergeMetres: bestVerge,
+    };
   }
 
   /**
@@ -1667,8 +2173,8 @@ export class WorldScene {
     height: number,
     out: SurfaceSample,
     shadeColour = true,
+    heightAt?: HeightSampler,
   ): void {
-    const blend = this.world?.blendMetres ?? 45;
     let weightSum = 0;
     let local = 0;
     let lowR = 0; let lowG = 0; let lowB = 0;
@@ -1680,10 +2186,9 @@ export class WorldScene {
     let cobbleR = 0; let cobbleG = 0; let cobbleB = 0;
     let wetR = 0; let wetG = 0; let wetB = 0;
 
+    const biomeWeights = this.biomeWeightsAt(x, z);
     for (const field of this.fields) {
-      const weight = this.fields.length === 1
-        ? 1
-        : smoothstep01((signedDepth(field.spec.rect, x, z) + blend) / (2 * blend));
+      const weight = biomeWeights.find((sample) => sample.id === field.spec.regionId)?.weight ?? 0;
       if (weight <= 0) continue;
       const swatches = swatchesFor(field.spec.regionId);
       // Altitude within the height range the region's field ACTUALLY produces. See RegionField.
@@ -1715,10 +2220,10 @@ export class WorldScene {
     local *= inverse;
 
     const step = this.lattice?.step ?? 2;
-    const hxp = this.sampleLattice(x + step, z);
-    const hxm = this.sampleLattice(x - step, z);
-    const hzp = this.sampleLattice(x, z + step);
-    const hzm = this.sampleLattice(x, z - step);
+    const hxp = heightAt ? heightAt(x + step, z) : this.sampleLattice(x + step, z);
+    const hxm = heightAt ? heightAt(x - step, z) : this.sampleLattice(x - step, z);
+    const hzp = heightAt ? heightAt(x, z + step) : this.sampleLattice(x, z + step);
+    const hzm = heightAt ? heightAt(x, z - step) : this.sampleLattice(x, z - step);
     const slope = Math.hypot((hxp - hxm) / (2 * step), (hzp - hzm) / (2 * step));
     // Laplacian on the same stencil. Positive is a hollow, negative is a crest. Measured over the
     // world this lands in roughly -0.35..0.35 m, so 0.10 is a pronounced hollow, not a wobble.
@@ -1748,12 +2253,8 @@ export class WorldScene {
 
     // Stamps, in priority order: paving beats a road, a road beats a waterlogged bank.
     //
-    // The corridor is deliberately narrow and hard-edged. The first stamped version feathered from
-    // a 1.9 m worn half-width out to 3.4 m, and 1.5 m of gradient either side of a 3.8 m track is
-    // most of what a player sees, so the road read as an airbrush smear rather than as a track
-    // with a verge. 1.5 m of full wear out to 2.5 m is a 3 m rut band with a 1 m shoulder, and the
-    // shoulder now carries GRAVEL rather than more dirt, so the edge is a material change instead
-    // of a fade to nothing.
+    // The stamp owns the local width. Its low-frequency drift moves the worn edge, fade and gravel
+    // verge together, while the default 3.2 m worn band stays narrow enough to read as a track.
     const road = this.roadAt(x, z);
     let dirt = 0;
     let verge = 0;
@@ -1761,10 +2262,10 @@ export class WorldScene {
     let roadPresence = 0;
     let roadWear = 0;
     if (road) {
-      dirt = 1 - smoothstep01((road.distance - ROAD_WORN_HALF) / (ROAD_FADE_HALF - ROAD_WORN_HALF));
+      dirt = 1 - smoothstep01((road.distance - road.wornHalf) / (road.fadeHalf - road.wornHalf));
       // A gravel shoulder peaking exactly where the dirt gives out, and gone by the time the
       // untouched ground starts.
-      verge = (1 - dirt) * (1 - smoothstep01((road.distance - ROAD_FADE_HALF) / ROAD_VERGE_METRES));
+      verge = (1 - dirt) * (1 - smoothstep01((road.distance - road.fadeHalf) / road.vergeMetres));
       roadPerpendicular = clamp(road.perpendicular / (ROAD_PERP_RANGE * 2) + 0.5, 0, 1);
       roadPresence = dirt > 0.02 ? 1 : 0;
       roadWear = dirt;
@@ -1779,7 +2280,11 @@ export class WorldScene {
     let wet = 0;
     let mud = 0;
     for (const body of this.waters) {
-      const distance = Math.hypot(x - body.centre[0], z - body.centre[1]);
+      const localX = x - body.centre[0];
+      const localZ = z - body.centre[1];
+      const distance = body.shape
+        ? organicDistance(localX, localZ, body.shape)
+        : Math.hypot(localX, localZ);
       if (distance > body.radius + WATER_BANK_METRES) continue;
       const above = height - body.level;
       // Waterlogged right at and below the line, churned mud for the next 0.9 m up the bank.
@@ -1819,7 +2324,7 @@ export class WorldScene {
     );
 
     if (shadeColour) {
-      const ao = this.horizonAo(x, z, height);
+      const ao = this.horizonAo(x, z, height, heightAt);
       out.colour.multiplyScalar(ao);
     }
   }
@@ -1833,15 +2338,18 @@ export class WorldScene {
    * ~73k vertices is about 40 ms at build time and exactly zero at runtime, and it is the single
    * change that makes relief legible.
    */
-  private horizonAo(x: number, z: number, height: number): number {
-    if (!this.lattice) return 1;
+  private horizonAo(x: number, z: number, height: number, heightAt?: HeightSampler): number {
+    if (!heightAt && !this.lattice) return 1;
     let maxAngle = 0;
     for (let step = 0; step < AO_AZIMUTHS; step += 1) {
       const angle = (step / AO_AZIMUTHS) * Math.PI * 2;
       const dx = Math.cos(angle);
       const dz = Math.sin(angle);
       for (const range of AO_RANGES) {
-        const rise = this.sampleLattice(x + dx * range, z + dz * range) - height;
+        const sampled = heightAt
+          ? heightAt(x + dx * range, z + dz * range)
+          : this.sampleLattice(x + dx * range, z + dz * range);
+        const rise = sampled - height;
         if (rise <= 0) continue;
         const angleTo = Math.atan2(rise, range);
         if (angleTo > maxAngle) maxAngle = angleTo;
@@ -1867,7 +2375,7 @@ export class WorldScene {
    * shadow-correct, z-fight-free, and a junction is just ground that two corridors both cover.
    *
    * Returns null and draws nothing. The signature is kept because boot calls it, and the
-   * `width` and `regionId` arguments still do their jobs — width sets the worn half-width, and
+   * `width` and `regionId` arguments still do their jobs — width sets the full worn width, and
    * the region decides which soil the track exposes.
    */
   buildRoad(points: readonly Vec3[], width = 4.5, regionId: RegionId = "fallowmarch"): THREE.Mesh | null {
@@ -1877,10 +2385,11 @@ export class WorldScene {
     // the corridor at every vertex the two descriptions share.
     if (this.stampsProvided) return null;
 
-    const curved = curveRoadPolyline(points, (0x0a0d ^ (this.roadPolylines.length * 0x9e37)) >>> 0);
+    const roadSeed = roadSeedFromStamp(0x0a0d, { points, width });
+    const curved = curveRoadPolyline(points, roadSeed);
     this.roadPolylines.push(curved);
     const before = this.roads.length;
-    appendRoadSegments(this.roads, curved);
+    appendRoadSegments(this.roads, curved, width, roadSeed, points);
     this.rebuildRoadGrid();
 
     let minX = Infinity;
@@ -1894,7 +2403,7 @@ export class WorldScene {
       minZ = Math.min(minZ, segment.az, segment.bz);
       maxZ = Math.max(maxZ, segment.az, segment.bz);
     }
-    const reach = Math.max(ROAD_FADE_HALF, width) + 1;
+    const reach = roadOuterHalf(width * (1 + ROAD_WIDTH_DRIFT)) + 1;
     this.restampArea(minX - reach, minZ - reach, maxX + reach, maxZ + reach);
     return null;
   }
@@ -2071,7 +2580,7 @@ export class WorldScene {
     // Registering the guess put the mud and wet bands metres inside or outside the drawn edge.
     let reached = 0;
     for (let step = 0; step < segments; step += 1) reached = Math.max(reached, shoreline[step]!);
-    this.waters.push({ centre: [centreX, centreZ], radius: reached, level });
+    this.waters.push({ centre: [centreX, centreZ], radius: reached, level, shape: basin.shape });
     this.rememberWaterBody({
       id: bodyId,
       centre: [centreX, centreZ],
@@ -2105,7 +2614,7 @@ export class WorldScene {
     source: THREE.Object3D,
     placements: ScatterPlacement[],
     name: string,
-    options: { regionId?: RegionId; castShadow?: boolean } = {},
+    options: { regionId?: RegionId; castShadow?: boolean; windStrength?: number } = {},
   ): THREE.InstancedMesh[] {
     if (placements.length === 0) return [];
 
@@ -2116,11 +2625,15 @@ export class WorldScene {
       if (!mesh.isMesh || !mesh.geometry) return;
       const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
       if (!material) return;
+      let resolvedMaterial = needsStoneDetail(mesh.geometry, material) ? stoneDetail(material) : material;
+      if ((options.windStrength ?? 0) > 0 && materialMovesInWind(material)) {
+        resolvedMaterial = this.materials.wind(resolvedMaterial, options.windStrength!);
+      }
       parts.push({
         geometry: mesh.geometry,
         // The six platformer rocks ship with no UVs and no texture, so a scattered crag drew as a
         // smooth flat cone. See `stoneDetail`.
-        material: needsStoneDetail(mesh.geometry, material) ? stoneDetail(material) : material,
+        material: resolvedMaterial,
         matrix: mesh.matrixWorld.clone(),
       });
     });
@@ -2287,7 +2800,7 @@ export class WorldScene {
     this.materials.setTime(seconds);
   }
 
-  /** Ties an object to a region so distance streaming can hide it. */
+  /** Registers legacy region scatter and organic biome recipe shards under their recipe id. */
   registerScatter(regionId: RegionId, object: THREE.Object3D): void {
     const list = this.scatterByRegion.get(regionId) ?? [];
     list.push(object);
@@ -2295,15 +2808,15 @@ export class WorldScene {
   }
 
   /**
-   * Region-level distance streaming. Whole regions of scatter switch off once the viewer is more
-   * than `radius` metres outside their rect. With 700 m of world and 260 m of fog that removes
-   * roughly two thirds of scatter draw calls and triangles from any given frame, and it never
-   * pops, because the cut-off is well past the fog wall.
+   * Legacy region scatter switches off beyond its semantic rectangle. Organic biome recipe shards
+   * can occur anywhere on the island, so their 128 m bounding spheres and Three.js frustum culling
+   * own visibility instead.
    */
   updateStreaming(x: number, z: number, radius = 240): void {
+    const organicBiomes = this.world?.biomes !== undefined;
     for (const [regionId, objects] of this.scatterByRegion) {
-      const rect = this.getRegionRect(regionId);
-      const visible = rect === null ? true : signedDepth(rect, x, z) > -radius;
+      const rect = organicBiomes ? null : this.getRegionRect(regionId);
+      const visible = organicBiomes || rect === null || signedDepth(rect, x, z) > -radius;
       for (const object of objects) object.visible = visible;
     }
   }
@@ -2402,6 +2915,7 @@ export class WorldScene {
     this.playerMesh = null;
     this.lastSyncMs = 0;
     this.lattice = null;
+    this.coastGrid = null;
     this.chunks = [];
     this.roads = [];
     this.roadPolylines = [];
@@ -2580,22 +3094,79 @@ function characterFor(regionId: RegionId): RegionCharacter {
   }
 }
 
+/** Authored Vellenwood stream reach. Both ends sit beyond the old semantic region edges. */
+const WOODLAND_STREAM_START: readonly [number, number] = [-75, 250];
+const WOODLAND_STREAM_END: readonly [number, number] = [430, -55];
+const WOODLAND_STREAM_WIDTH = 16;
+
+interface TerraceFrame {
+  originX: number;
+  originZ: number;
+  uphillX: number;
+  uphillZ: number;
+  lateralX: number;
+  lateralZ: number;
+  metresPerStep: number;
+  steps: number;
+}
+
+/** Fixed world-space frame for one authored terrace climb. */
+function makeTerraceFrame(spec: RegionTerrainSpec, width: number, depth: number): TerraceFrame {
+  const steps = Math.max(1, spec.terraceSteps ?? 4);
+  const centreX = (spec.rect.minX + spec.rect.maxX) / 2;
+  const centreZ = (spec.rect.minZ + spec.rect.maxZ) / 2;
+  let originX = spec.rect.minX;
+  let originZ = centreZ;
+  let uphillX = 1;
+  let uphillZ = 0;
+  let climbMetres = width;
+
+  switch (spec.terraceAxis ?? "+x") {
+    case "-x":
+      originX = spec.rect.maxX;
+      uphillX = -1;
+      break;
+    case "+z":
+      originX = centreX;
+      originZ = spec.rect.minZ;
+      uphillX = 0;
+      uphillZ = 1;
+      climbMetres = depth;
+      break;
+    case "-z":
+      originX = centreX;
+      originZ = spec.rect.maxZ;
+      uphillX = 0;
+      uphillZ = -1;
+      climbMetres = depth;
+      break;
+  }
+
+  return {
+    originX,
+    originZ,
+    uphillX,
+    uphillZ,
+    lateralX: -uphillZ,
+    lateralZ: uphillX,
+    metresPerStep: climbMetres / steps,
+    steps,
+  };
+}
+
 /**
  * Each region gets its own relief, and each relief is chosen for how it plays, not how it looks:
  *
  *  - plains    long sightlines, low gradient. You can see Coldbrace from anywhere on the march.
  *  - woodland  tighter, higher-frequency undulation plus a shallow stream cut. Feels enclosed
  *              without ever producing a slope the navmesh will not accept.
- *  - highlands soft terraces climbing east, with ridge spurs. Real verticality, ~36 m of it, but
- *              every riser is a walkable ramp so all four terraces stay on one connected navmesh.
+ *  - highlands soft terraces along the authored climb axis, with broad bends and ridge spurs.
  */
 function makeRegionField(spec: RegionTerrainSpec): (x: number, z: number) => number {
   const noise = createValueNoise(spec.seed);
   const detail = createValueNoise((spec.seed ^ 0x9e3779b9) >>> 0);
   const width = Math.max(1, spec.rect.maxX - spec.rect.minX);
   const depth = Math.max(1, spec.rect.maxZ - spec.rect.minZ);
-  const centreX = (spec.rect.minX + spec.rect.maxX) / 2;
-  const centreZ = (spec.rect.minZ + spec.rect.maxZ) / 2;
 
   switch (spec.character) {
     case "plains":
@@ -2605,51 +3176,56 @@ function makeRegionField(spec: RegionTerrainSpec): (x: number, z: number) => num
         return spec.baseHeight + (rolling + swell) * spec.amplitude * 0.62;
       };
 
-    case "woodland":
+    case "woodland": {
+      const streamDX = WOODLAND_STREAM_END[0] - WOODLAND_STREAM_START[0];
+      const streamDZ = WOODLAND_STREAM_END[1] - WOODLAND_STREAM_START[1];
+      const streamLength = Math.hypot(streamDX, streamDZ);
+      const streamX = streamDX / streamLength;
+      const streamZ = streamDZ / streamLength;
+      const streamNormalX = -streamZ;
+      const streamNormalZ = streamX;
       return (x, z) => {
         // Billowed noise (|n|) gives rounded mounds and narrow hollows: the "enclosed" read.
         const mounds = Math.abs(fbm(noise, x, z, 4, 74));
         const ripple = fbm(detail, x, z, 3, 21) * 0.22;
         let height = spec.baseHeight + (mounds * 1.15 + ripple) * spec.amplitude * 0.55;
 
-        // A shallow stream cut running north-west to south-east. Deliberately shallow (2.6 m) and
-        // wide (22 m) so it reads as a gorge floor from inside while staying fully walkable.
-        const along = ((x - centreX) / width) + ((z - centreZ) / depth) * 0.85;
-        const meander = fbm(detail, x * 0.35, z * 0.35, 2, 55) * 0.09;
-        const channel = Math.exp(-Math.pow((along + meander) / 0.085, 2));
+        // A shallow world-space corridor through Vellenwood. The segment outlives the semantic
+        // rectangle, while its broad lateral drift keeps the cut from reading as a ruler line.
+        const projected = (x - WOODLAND_STREAM_START[0]) * streamX
+          + (z - WOODLAND_STREAM_START[1]) * streamZ;
+        const along = clamp(projected, 0, streamLength);
+        const meander = Math.sin(along / 72 + 0.65) * 4.5
+          + fbm(detail, along, 0, 2, 130) * 3.5;
+        const centreX = WOODLAND_STREAM_START[0] + streamX * along + streamNormalX * meander;
+        const centreZ = WOODLAND_STREAM_START[1] + streamZ * along + streamNormalZ * meander;
+        const distance = Math.hypot(x - centreX, z - centreZ);
+        const channel = Math.exp(-Math.pow(distance / WOODLAND_STREAM_WIDTH, 2));
         height -= channel * 2.6;
         return height;
       };
+    }
 
-    case "highlands":
+    case "highlands": {
+      const frame = makeTerraceFrame(spec, width, depth);
       return (x, z) => {
-        // Terraces climb along the authored axis. The comment here used to claim every riser was a
-        // walkable ramp; measured against Karrowmoor's own numbers it was not, and that is why half
-        // the region was unreachable on foot. Karrowmoor is 210 m deep with four terraces, so a
-        // band is 52.5 m and a step is 62/4 = 15.5 m. At the old riser fraction of 0.55 the riser
-        // was 28.9 m wide, and `terrace`'s smoothstep peaks at 1.5x the mean, so the riser's own
-        // gradient was 0.80 (39 degrees) before anything else was added to it.
-        //
-        // Two terms were added to it, and both were larger than the riser they sat on:
-        //
-        //   `warp` at 0.18 shifts the terrace boundary by up to +/-38 m of ramp position, and its
-        //   own gradient (0.0019 per metre) is 43% of the ramp's 0.0045, so it inflated every riser
-        //   by nearly half again: 0.80 -> 1.14, past the 48-degree walkable limit on its own.
-        //
-        //   `rubble` was 3.7 m of relief at a 16 m feature size. Measured |grad| of that fbm is
-        //   0.16 per metre, so the rubble alone contributed 0.60 of gradient — 31 degrees of
-        //   noise stacked on top of a riser that had 0.31 of headroom left.
-        //
-        // The numbers below are chosen against that arithmetic: riser 0.62 (32.6 m wide, gradient
-        // 0.71), warp 0.10 (inflates it to 0.83), rubble 2.8 m at a 33 m feature (gradient 0.21).
-        // Measured world-wide the change took analytic samples steeper than 45 degrees from 901 to
-        // 720 and it is what lets the haul roads (see `buildHaulRoads`) start from ground that is
-        // already close to walkable. The terrace BENCHES are untouched: 38% of each band is still
-        // dead flat, which is what a quarry terrace is.
-        const ramp = clamp(terraceRamp(spec, x, z, width, depth), 0, 1);
-        const warp = fbm(noise, x, z, 2, 190) * 0.10;
-        const steps = spec.terraceSteps ?? 4;
-        const terraced = terrace(clamp(ramp * 0.94 + warp, 0, 0.999) * steps, 0.62) / steps;
+        // The frame starts at the authored low edge and advances in metres along the uphill axis.
+        // Karrowmoor keeps four 52.5 m bands, so its height and broad walkable risers stay familiar.
+        const offsetX = x - frame.originX;
+        const offsetZ = z - frame.originZ;
+        const uphillMetres = offsetX * frame.uphillX + offsetZ * frame.uphillZ;
+        const lateralMetres = offsetX * frame.lateralX + offsetZ * frame.lateralZ;
+
+        // A broad lateral bend and a smaller two-dimensional fold break the old straight z bands.
+        // Together they move a contour by at most one quarter of a step and retain the wide risers.
+        const bendMetres = fbm(noise, lateralMetres, 0, 3, 190) * frame.metresPerStep * 0.18;
+        const foldMetres = fbm(detail, x, z, 2, 155) * frame.metresPerStep * 0.07;
+        const terracePosition = clamp(
+          (uphillMetres * 0.94 + bendMetres + foldMetres) / frame.metresPerStep,
+          0,
+          frame.steps * 0.999,
+        );
+        const terraced = terrace(terracePosition, 0.62) / frame.steps;
 
         // Ridge spurs running across the slope. Ridged noise (1 - |n|) makes crests, not bumps.
         const spur = (1 - Math.abs(fbm(detail, x, z, 3, 105))) * 0.32;
@@ -2657,6 +3233,7 @@ function makeRegionField(spec: RegionTerrainSpec): (x: number, z: number) => num
 
         return spec.baseHeight + (terraced + spur * 0.22 + rubble) * spec.amplitude;
       };
+    }
 
     case "cavern":
     default:
@@ -2664,37 +3241,29 @@ function makeRegionField(spec: RegionTerrainSpec): (x: number, z: number) => num
   }
 }
 
-/** 0 at the low end of the authored terrace axis, 1 at the ridge. */
-function terraceRamp(spec: RegionTerrainSpec, x: number, z: number, width: number, depth: number): number {
-  switch (spec.terraceAxis ?? "+x") {
-    case "-x": return (spec.rect.maxX - x) / width;
-    case "+z": return (z - spec.rect.minZ) / depth;
-    case "-z": return (spec.rect.maxZ - z) / depth;
-    default: return (x - spec.rect.minX) / width;
-  }
-}
-
 /**
  * The road corridor, in metres either side of the centreline.
  *
- * `ROAD_WORN_HALF` is fully worn track; from there the dirt weight feathers out to
- * `ROAD_FADE_HALF` and a gravel shoulder carries it the last `ROAD_VERGE_METRES`.
+ * A stamp's width is the full worn track. Dirt then feathers over `ROAD_FADE_METRES`, and a gravel
+ * shoulder carries the edge the last `ROAD_VERGE_METRES`. Both bands scale with the local width.
  *
  * The first stamped version used 1.9 m and 3.4 m, which put 1.5 m of pure gradient either side of
  * a 3.8 m track, and a 6.8 m corridor that is more than half feather reads as an airbrush smear
- * rather than as a road. 1.5 m and 2.5 m is a 3 m rut band with a 1 m shoulder: the boundary lands
- * inside one 2 m lattice quad, which is as hard an edge as vertex weights on this lattice can
- * make, and the shoulder is a MATERIAL change (gravel) rather than less of the same dirt.
+ * rather than as a road. A 3.2 m rut band with a 1 m fade keeps the boundary inside one 2 m lattice
+ * quad. The shoulder is a MATERIAL change (gravel) rather than less of the same dirt.
  *
  * `ROAD_PERP_RANGE` is only the encoding range of the perpendicular distance in `aGround.x`; at
  * 2.6 m it gives the fragment shader 2.0 cm of resolution, finer than any rut band worth drawing.
  */
-const ROAD_WORN_HALF = 1.5;
-const ROAD_FADE_HALF = 2.5;
+const ROAD_DEFAULT_WORN_WIDTH = 3.2;
+const ROAD_FADE_METRES = 1;
 const ROAD_PERP_RANGE = 2.6;
 
 /** How far past the worn edge the gravel shoulder reaches, in metres. */
 const ROAD_VERGE_METRES = 1.1;
+
+/** Maximum local width drift. Its two broad waves sum to this fraction. */
+const ROAD_WIDTH_DRIFT = 0.13;
 
 /**
  * How far the macro field may bias the grass/dry split, as a fraction of the whole ramp.
@@ -2776,6 +3345,15 @@ const WATER_MARCH_METRES = 0.5;
 const AO_AZIMUTHS = 8;
 const AO_RANGES: readonly number[] = [12, 25, 50];
 const AO_FLOOR = 0.62;
+
+/** Coast quads used to join the canonical mesh before the unchanged organic relief takes over. */
+const COAST_EDGE_PIN_METRES = 8;
+
+/** Tolerance for authored coast dimensions that must share exact terrain-grid nodes. */
+const COAST_GRID_EPSILON = 1e-6;
+
+/** Keeps visual scatter roots clear of the ocean plane and its depth edge. */
+const COAST_SCATTER_WATER_CLEARANCE = 0.08;
 
 /**
  * How far a pad may carve BELOW the natural ground at its own centre, in metres.
@@ -2882,8 +3460,11 @@ const CONTACT_DECAL_LIFT = 0.03;
 /** Spacing at which a stamped road polyline is resampled into segments, in metres. */
 const ROAD_SEGMENT_SPACING = 4;
 
-/** How far one authored road leg may bow away from its centreline, in metres. */
-const ROAD_MAX_SWAY = 3;
+/** Maximum lateral displacement on a long open road leg, in metres. */
+const ROAD_MAX_SWAY = 9;
+
+/** Distance near an authored control over which its centreline straightens, in metres. */
+const ROAD_CONTROL_TAPER = 16;
 
 /** Reused in the scatter tilt slerp. Allocating one per instance showed up in the profile. */
 const IDENTITY_QUATERNION = new THREE.Quaternion();
@@ -2895,6 +3476,16 @@ interface HeightLattice {
   minX: number;
   minZ: number;
   step: number;
+}
+
+interface CoastHeightGrid {
+  heights: Float32Array;
+  cols: number;
+  rows: number;
+  minX: number;
+  minZ: number;
+  stepX: number;
+  stepZ: number;
 }
 
 interface ChunkRecord {
@@ -2910,6 +3501,8 @@ interface RoadSegment {
   az: number;
   bx: number;
   bz: number;
+  aWidth: number;
+  bWidth: number;
 }
 
 /** The eight surface weights at one point, plus the colour they blend to. */
@@ -3134,23 +3727,83 @@ export function pavingStampFromRect(rect: {
   };
 }
 
-/** Chops a polyline into short segments for the road distance grid. */
-function appendRoadSegments(into: RoadSegment[], points: readonly Vec3[]): void {
+function roadOuterHalf(wornWidth: number): number {
+  const width = Number.isFinite(wornWidth) ? Math.max(0.25, wornWidth) : ROAD_DEFAULT_WORN_WIDTH;
+  const scale = width / ROAD_DEFAULT_WORN_WIDTH;
+  return width / 2 + (ROAD_FADE_METRES + ROAD_VERGE_METRES) * scale;
+}
+
+/** Stable seed for one authored feature. Array insertion and reordering cannot move another road. */
+function roadSeedFromStamp(worldSeed: number, road: RoadStamp): number {
+  let hash = (worldSeed ^ 0x811c9dc5) >>> 0;
+  const mix = (value: number): void => {
+    hash ^= value >>> 0;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  };
+  mix(road.points.length);
+  for (const point of road.points) {
+    mix(Math.round(point[0] * 1000));
+    mix(Math.round(point[2] * 1000));
+  }
+  mix(Math.round((road.width ?? ROAD_DEFAULT_WORN_WIDTH) * 1000));
+  return hash;
+}
+
+/** Chops a polyline into short segments and gives each endpoint a deterministic local width. */
+function appendRoadSegments(
+  into: RoadSegment[],
+  points: readonly Vec3[],
+  wornWidth: number,
+  seed: number,
+  stableControls: readonly Vec3[],
+): void {
   const samples = resamplePolyline(points, ROAD_SEGMENT_SPACING);
+  if (samples.length < 2) return;
+  const baseWidth = Number.isFinite(wornWidth) ? Math.max(0.25, wornWidth) : ROAD_DEFAULT_WORN_WIDTH;
+  const rng = new Rng((seed ^ 0x51ed270b) >>> 0);
+  const period = rng.float(30, 44);
+  const longPeriod = period * rng.float(1.7, 2.2);
+  const phase = rng.float(0, Math.PI * 2);
+  const longPhase = rng.float(0, Math.PI * 2);
+  const distances = new Float64Array(samples.length);
+  const widths = new Float64Array(samples.length);
+
+  for (let i = 1; i < samples.length; i += 1) {
+    const previous = samples[i - 1]!;
+    const sample = samples[i]!;
+    distances[i] = distances[i - 1]! + Math.hypot(sample[0] - previous[0], sample[2] - previous[2]);
+  }
+  for (let i = 0; i < samples.length; i += 1) {
+    const sample = samples[i]!;
+    let controlDistance = Infinity;
+    for (const control of stableControls) {
+      controlDistance = Math.min(controlDistance, Math.hypot(sample[0] - control[0], sample[2] - control[2]));
+    }
+    const controlFade = smoothstep01(controlDistance / 10);
+    const distance = distances[i]!;
+    const drift = (
+      Math.sin(distance / period * Math.PI * 2 + phase) * 0.09
+      + Math.sin(distance / longPeriod * Math.PI * 2 + longPhase) * 0.04
+    ) * controlFade;
+    widths[i] = baseWidth * (1 + drift);
+  }
+
   for (let i = 0; i < samples.length - 1; i += 1) {
     const a = samples[i]!;
     const b = samples[i + 1]!;
-    into.push({ ax: a[0], az: a[2], bx: b[0], bz: b[2] });
+    into.push({
+      ax: a[0], az: a[2], bx: b[0], bz: b[2],
+      aWidth: widths[i]!, bWidth: widths[i + 1]!,
+    });
   }
 }
 
 /**
  * Bends each authored leg into a route while preserving every supplied waypoint.
  *
- * Roads used to discard every interior waypoint and bend only the first-to-last chord. That made
- * settlement routes ignore their gate controls and visibly run through walls. Each leg now gets
- * its own small Catmull-Rom bow. The shared endpoint is copied exactly before the next leg starts,
- * so a gate, bridge or other authored control remains on the stamped road.
+ * Each leg advances monotonically along its chord and moves only along the perpendicular. Seeded
+ * guides vary their spacing, side and depth, then a cubic ease joins them without overshoot. A
+ * smooth envelope removes the offset near both controls, so gate approaches stay centred.
  *
  * The route graph is unaffected. It works on node ids, and both endpoints here are untouched, so
  * the distance ledger the Agility route flip is measured against does not move.
@@ -3166,36 +3819,57 @@ export function curveRoadPolyline(points: readonly Vec3[], seed: number): Vec3[]
     const dx = end[0] - start[0];
     const dz = end[2] - start[2];
     const length = Math.hypot(dx, dz);
-    let legPoints: Vec3[];
+    const divisions = Math.max(1, Math.ceil(length / ROAD_SEGMENT_SPACING));
+    const legPoints: Vec3[] = [];
+    const nx = length > 1e-9 ? -dz / length : 0;
+    const nz = length > 1e-9 ? dx / length : 0;
+    const sway = Math.min(ROAD_MAX_SWAY, Math.max(0, length - 14) * 0.11);
+    const taperMetres = Math.min(ROAD_CONTROL_TAPER, length * 0.36);
+    const guideCount = Math.max(1, Math.min(4, Math.round(length / 27)));
+    const guideTs = [0];
+    const guideOffsets = [0];
+    const deepGuide = rng.int(0, guideCount - 1);
 
-    if (length < 12) {
-      legPoints = [
-        [start[0], start[1], start[2]],
-        [end[0], end[1], end[2]],
-      ];
-    } else {
-      const nx = -dz / length;
-      const nz = dx / length;
-      const sway = Math.min(ROAD_MAX_SWAY, length * 0.05);
-      const control: THREE.Vector3[] = [new THREE.Vector3(start[0], 0, start[2])];
-      for (let i = 1; i <= 2; i += 1) {
-        const t = i / 3;
-        const offset = rng.float(-sway, sway);
-        control.push(new THREE.Vector3(start[0] + dx * t + nx * offset, 0, start[2] + dz * t + nz * offset));
-      }
-      control.push(new THREE.Vector3(end[0], 0, end[2]));
-
-      const curve = new THREE.CatmullRomCurve3(control, false, "catmullrom", 0.5);
-      const divisions = Math.max(4, Math.round(length / ROAD_SEGMENT_SPACING));
-      legPoints = curve.getSpacedPoints(divisions).map((point) => [point.x, 0, point.z] as Vec3);
-      legPoints[0] = [start[0], start[1], start[2]];
-      legPoints[legPoints.length - 1] = [end[0], end[1], end[2]];
+    for (let guide = 0; guide < guideCount; guide += 1) {
+      const interval = 1 / (guideCount + 1);
+      guideTs.push((guide + 1) * interval + rng.float(-interval * 0.28, interval * 0.28));
+      const sign = rng.chance(0.5) ? -1 : 1;
+      const depth = guide === deepGuide ? rng.float(0.74, 1) : rng.float(0.18, 0.82);
+      guideOffsets.push(sign * sway * depth);
     }
+    guideTs.push(1);
+    guideOffsets.push(0);
+
+    for (let division = 0; division <= divisions; division += 1) {
+      const t = division / divisions;
+      const edgeDistance = Math.min(t * length, (1 - t) * length);
+      const envelope = taperMetres > 0 ? smoothstep01(edgeDistance / taperMetres) : 0;
+      const offset = envelope * sampleRoadGuideOffset(guideTs, guideOffsets, t);
+      legPoints.push([
+        start[0] + dx * t + nx * offset,
+        start[1] + (end[1] - start[1]) * t,
+        start[2] + dz * t + nz * offset,
+      ]);
+    }
+    legPoints[0] = [start[0], start[1], start[2]];
+    legPoints[legPoints.length - 1] = [end[0], end[1], end[2]];
 
     output.push(...(leg === 0 ? legPoints : legPoints.slice(1)));
   }
 
   return output;
+}
+
+/** Smooth interpolation between uneven lateral guides, bounded by their two offsets. */
+function sampleRoadGuideOffset(ts: readonly number[], offsets: readonly number[], t: number): number {
+  for (let guide = 0; guide < ts.length - 1; guide += 1) {
+    const endT = ts[guide + 1]!;
+    if (t > endT) continue;
+    const startT = ts[guide]!;
+    const localT = smoothstep01((t - startT) / Math.max(1e-6, endT - startT));
+    return offsets[guide]! + (offsets[guide + 1]! - offsets[guide]!) * localT;
+  }
+  return offsets[offsets.length - 1] ?? 0;
 }
 
 /** Even-ish resampling of a polyline, so road corridors do not stretch across long segments. */

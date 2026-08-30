@@ -1061,6 +1061,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     playerMotion: () => playerRig.motionSnapshot(),
     entityMotion: (entityId: EntityId) => entityViews.motionSnapshot(entityId),
     waterBodies: () => scene.getWaterBodies(),
+    worldSample: (x: number, z: number) => scene.sampleWorld(x, z),
     captureWorldMapTile: (options) => {
       const position = store.get().player.position;
       // All terrain, assets and entity batches are resident; only procedural scatter is hidden by

@@ -1,22 +1,29 @@
 {
-  "version": 2,
+  "version": 3,
   "source": "actual-game-scene",
-  "width": 2800,
-  "height": 1600,
+  "width": 4800,
+  "height": 3600,
   "metresPerPixel": 0.25,
-  "bounds": {
+  "playableBounds": {
     "minX": -350,
     "maxX": 350,
     "minZ": -200,
     "maxZ": 200
   },
+  "imageBounds": {
+    "minX": -600,
+    "maxX": 600,
+    "minZ": -450,
+    "maxZ": 450
+  },
+  "imagePaddingMetres": 250,
   "north": "+z",
   "seed": 1337,
-  "sha256": "284cbc77a05023d746cbddd53e8460f841864de54221c3ed7d01020a80d4e76c",
-  "renderFingerprint": "284cbc77a05023d746cbddd53e8460f841864de54221c3ed7d01020a80d4e76c",
+  "sha256": "3a4a5f52e04db19261bf795ff5ab100e3b0dbc83c9529367bf581f708ab2ed5f",
+  "renderFingerprint": "3a4a5f52e04db19261bf795ff5ab100e3b0dbc83c9529367bf581f708ab2ed5f",
   "tiles": {
-    "columns": 14,
-    "rows": 8,
+    "columns": 24,
+    "rows": 18,
     "metres": 50,
     "pixels": 200,
     "bleedPixels": 128

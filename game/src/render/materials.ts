@@ -451,6 +451,38 @@ interface WaterUniforms {
   uWaveScrollB: { value: THREE.Vector2 };
 }
 
+interface WindUniforms {
+  uCorealmWindTime: { value: number };
+  uCorealmWindStrength: { value: number };
+}
+
+const WIND_VERTEX_HEADER = /* glsl */ `
+uniform float uCorealmWindTime;
+uniform float uCorealmWindStrength;
+`;
+
+const WIND_VERTEX_BODY = /* glsl */ `
+{
+  // Geometry roots sit at or below local y = 0. Only the flexible height bends.
+  float gWindHeight = smoothstep( 0.0, 0.75, max( position.y, 0.0 ) );
+  vec4 gWindOrigin = vec4( 0.0, 0.0, 0.0, 1.0 );
+  #ifdef USE_BATCHING
+    gWindOrigin = batchingMatrix * gWindOrigin;
+  #endif
+  #ifdef USE_INSTANCING
+    gWindOrigin = instanceMatrix * gWindOrigin;
+  #endif
+  gWindOrigin = modelMatrix * gWindOrigin;
+
+  // Translation changes phase without another attribute or material per instance.
+  float gWindPhase = dot( gWindOrigin.xz, vec2( 0.173, 0.277 ) );
+  float gWindMain = sin( uCorealmWindTime * 0.82 + gWindPhase );
+  float gWindRipple = sin( uCorealmWindTime * 1.67 + gWindPhase * 1.31 + position.y * 0.73 );
+  vec2 gWindBend = vec2( 0.86, 0.51 ) * gWindMain + vec2( -0.22, 0.37 ) * gWindRipple;
+  transformed.xz += gWindBend * uCorealmWindStrength * gWindHeight;
+}
+`;
+
 // ------------------------------------------------------------ ground splat
 //
 // Eight surface weights per vertex, packed as two normalised Uint8 vec4s written by
@@ -724,6 +756,9 @@ export class MaterialLibrary {
   /** Held so the compiled ground program cannot outlive the atlas it samples. */
   private groundUniforms: GroundUniforms | null = null;
   private waterUniforms: WaterUniforms[] = [];
+  private windUniforms: WindUniforms[] = [];
+  private grassSpriteMaterial: THREE.MeshStandardMaterial | null = null;
+  private timeSeconds = 0;
 
   private key(parts: (string | number | boolean)[]): string {
     return parts.join("|");
@@ -847,25 +882,63 @@ export class MaterialLibrary {
    * regions and all four former grass assets keep one program and one material.
    */
   grassSprite(): THREE.MeshStandardMaterial {
-    return this.remember("grass-sprite", () => {
-      const material = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        map: createGrassSpriteTexture(),
-        alphaTest: 0.38,
-        alphaToCoverage: true,
-        transparent: false,
-        depthWrite: true,
-        // `InstancedMesh.instanceColor` enables Three's instancing-colour shader path by itself.
-        // Enabling `vertexColors` as well would make the shader multiply by a geometry `color`
-        // attribute; the shared crossed-card geometry intentionally has no such attribute, and
-        // WebGL supplies zero for that missing input, turning every instance black.
-        vertexColors: false,
-        roughness: 0.98,
-        metalness: 0,
-        side: THREE.DoubleSide,
-      });
-      material.name = "grass-sprite";
-      return material;
+    if (this.grassSpriteMaterial) return this.grassSpriteMaterial;
+
+    const source = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: createGrassSpriteTexture(),
+      alphaTest: 0.38,
+      alphaToCoverage: true,
+      transparent: false,
+      depthWrite: true,
+      // `InstancedMesh.instanceColor` enables Three's instancing-colour shader path by itself.
+      // Enabling `vertexColors` as well would make the shader multiply by a geometry `color`
+      // attribute; the shared crossed-card geometry intentionally has no such attribute, and
+      // WebGL supplies zero for that missing input, turning every instance black.
+      vertexColors: false,
+      roughness: 0.98,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
+    source.name = "grass-sprite";
+    this.grassSpriteMaterial = this.wind(source, 0.085) as THREE.MeshStandardMaterial;
+    return this.grassSpriteMaterial;
+  }
+
+  /**
+   * Adds a small GPU-side bend while preserving the source material's own shader hook.
+   *
+   * The clone shares every texture with `source`. One cached clone serves each source/strength
+   * pair, and a translation-derived phase keeps instances and BatchedMesh entries out of lockstep.
+   */
+  wind(source: THREE.Material, strength: number): THREE.Material {
+    const amount = Number.isFinite(strength) ? Math.max(0, strength) : 0;
+    if (amount === 0) return source;
+
+    const key = this.key(["wind", this.baseKey(source), amount]);
+    return this.remember(key, () => {
+      const clone = source.clone();
+      const sourceCompile = source.onBeforeCompile;
+      const sourceProgramKey = source.customProgramCacheKey.bind(source);
+      const uniforms: WindUniforms = {
+        uCorealmWindTime: { value: this.timeSeconds },
+        uCorealmWindStrength: { value: amount },
+      };
+      this.windUniforms.push(uniforms);
+
+      clone.name = `${source.name || source.type}@wind:${amount}`;
+      clone.onBeforeCompile = (shader, renderer) => {
+        sourceCompile.call(source, shader, renderer);
+        shader.uniforms.uCorealmWindTime = uniforms.uCorealmWindTime;
+        shader.uniforms.uCorealmWindStrength = uniforms.uCorealmWindStrength;
+        shader.vertexShader = `${WIND_VERTEX_HEADER}\n${shader.vertexShader}`.replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>\n${WIND_VERTEX_BODY}`,
+        );
+      };
+      // Strength is a uniform, so every wind material can share the same compiled program shape.
+      clone.customProgramCacheKey = () => `${sourceProgramKey()}|corealm-wind-v1`;
+      return clone;
     });
   }
 
@@ -909,7 +982,7 @@ export class MaterialLibrary {
       material.name = `water-${regionId}`;
 
       const uniforms = {
-        uTime: { value: 0 },
+        uTime: { value: this.timeSeconds },
         // Shallow lifts 45% toward the region's own low ground so the edge of the water agrees
         // with the bank it meets; deep darkens 30%, which is the whole depth cue.
         uShallow: { value: new THREE.Color(mixHex(palette.water, palette.groundLow, 0.45)) },
@@ -945,7 +1018,9 @@ export class MaterialLibrary {
 
   /** Advances every animated material. View-only: nothing here feeds semantic state. */
   setTime(seconds: number): void {
+    this.timeSeconds = seconds;
     for (const uniforms of this.waterUniforms) uniforms.uTime.value = seconds;
+    for (const uniforms of this.windUniforms) uniforms.uCorealmWindTime.value = seconds;
   }
 
   /** Exposed stone face for cliffs and terrace risers. */
@@ -1223,6 +1298,9 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gArchitectureTinted, ${strength} ) * $
     this.cache.clear();
     this.groundUniforms = null;
     this.waterUniforms = [];
+    this.windUniforms = [];
+    this.grassSpriteMaterial = null;
+    this.timeSeconds = 0;
     disposeGeneratedTextures();
   }
 }

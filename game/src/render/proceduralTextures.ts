@@ -793,17 +793,31 @@ export function createGrassSpriteTexture(): THREE.DataTexture {
   const size = 128;
   const data = new Uint8Array(size * size * 4);
   const blades: readonly GrassBlade[] = [
-    { base: -0.43, height: 0.62, width: 0.105, lean: -0.16, curve: 0.05 },
-    { base: -0.34, height: 0.86, width: 0.085, lean: 0.08, curve: -0.04 },
-    { base: -0.27, height: 0.72, width: 0.095, lean: -0.08, curve: 0.07 },
-    { base: -0.18, height: 0.96, width: 0.075, lean: 0.12, curve: 0.03 },
-    { base: -0.10, height: 0.78, width: 0.100, lean: -0.13, curve: -0.05 },
-    { base: -0.02, height: 1.00, width: 0.080, lean: 0.03, curve: 0.04 },
-    { base: 0.07, height: 0.83, width: 0.095, lean: 0.14, curve: -0.06 },
-    { base: 0.15, height: 0.93, width: 0.075, lean: -0.07, curve: 0.04 },
-    { base: 0.23, height: 0.69, width: 0.105, lean: 0.10, curve: 0.05 },
-    { base: 0.31, height: 0.82, width: 0.085, lean: -0.04, curve: -0.04 },
-    { base: 0.40, height: 0.60, width: 0.110, lean: 0.15, curve: -0.03 },
+    { base: -0.49, height: 0.48, width: 0.027, lean: -0.05, curve: 0.03 },
+    { base: -0.45, height: 0.69, width: 0.021, lean: -0.10, curve: 0.04 },
+    { base: -0.41, height: 0.57, width: 0.024, lean: 0.05, curve: -0.03 },
+    { base: -0.37, height: 0.82, width: 0.018, lean: -0.06, curve: 0.04 },
+    { base: -0.33, height: 0.64, width: 0.023, lean: 0.09, curve: -0.05 },
+    { base: -0.29, height: 0.91, width: 0.017, lean: -0.04, curve: 0.03 },
+    { base: -0.25, height: 0.73, width: 0.022, lean: -0.10, curve: 0.06 },
+    { base: -0.21, height: 0.54, width: 0.026, lean: 0.06, curve: -0.04 },
+    { base: -0.17, height: 0.96, width: 0.016, lean: 0.07, curve: 0.03 },
+    { base: -0.13, height: 0.77, width: 0.021, lean: -0.07, curve: -0.03 },
+    { base: -0.09, height: 0.62, width: 0.024, lean: 0.10, curve: 0.04 },
+    { base: -0.05, height: 0.87, width: 0.018, lean: -0.03, curve: 0.05 },
+    { base: -0.01, height: 1.00, width: 0.016, lean: 0.03, curve: -0.03 },
+    { base: 0.03, height: 0.68, width: 0.023, lean: -0.09, curve: 0.04 },
+    { base: 0.07, height: 0.92, width: 0.017, lean: 0.08, curve: -0.04 },
+    { base: 0.11, height: 0.58, width: 0.025, lean: -0.04, curve: 0.03 },
+    { base: 0.15, height: 0.79, width: 0.020, lean: 0.10, curve: -0.05 },
+    { base: 0.19, height: 0.97, width: 0.016, lean: -0.05, curve: 0.04 },
+    { base: 0.23, height: 0.65, width: 0.024, lean: 0.05, curve: 0.03 },
+    { base: 0.27, height: 0.86, width: 0.018, lean: -0.08, curve: -0.04 },
+    { base: 0.31, height: 0.72, width: 0.022, lean: 0.09, curve: 0.05 },
+    { base: 0.35, height: 0.53, width: 0.026, lean: -0.05, curve: -0.03 },
+    { base: 0.39, height: 0.89, width: 0.017, lean: 0.04, curve: 0.04 },
+    { base: 0.43, height: 0.66, width: 0.022, lean: 0.10, curve: -0.04 },
+    { base: 0.47, height: 0.50, width: 0.027, lean: 0.04, curve: 0.03 },
   ];
 
   for (let row = 0; row < size; row += 1) {
@@ -815,17 +829,17 @@ export function createGrassSpriteTexture(): THREE.DataTexture {
         if (y > blade.height) continue;
         const t = y / blade.height;
         const centre = blade.base + blade.lean * t + Math.sin(t * Math.PI) * blade.curve;
-        // Blades narrow toward a pointed tip. A one-texel smooth edge gives the generated mipmaps
-        // something to average without turning the entire tuft into a translucent rectangle.
+        // Fine blades narrow to pointed tips. The smooth edge gives mipmaps enough coverage to keep
+        // them visible without turning the whole card into a translucent block.
         const halfWidth = blade.width * Math.pow(1 - t, 0.72) + 0.002;
         const edge = halfWidth - Math.abs(x - centre);
-        coverage = Math.max(coverage, clamp(edge * size * 1.7, 0, 1));
+        coverage = Math.max(coverage, clamp(edge * size * 2.1, 0, 1));
       }
 
-      // Bind the blade bases with a small, ragged crown rather than a rectangular block.
-      if (y < 0.105) {
-        const crown = 1 - Math.abs(x) / (0.49 - y * 0.7);
-        coverage = Math.max(coverage, clamp(crown * 2.5, 0, 1) * clamp((0.11 - y) * 22, 0, 1));
+      // A very low crown closes pinholes where the cards meet the ground without hiding the blades.
+      if (y < 0.035) {
+        const crown = 1 - Math.abs(x) / (0.50 - y * 1.4);
+        coverage = Math.max(coverage, clamp(crown * 2.2, 0, 1) * clamp((0.038 - y) * 42, 0, 1));
       }
 
       const index = (row * size + column) * 4;

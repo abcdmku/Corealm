@@ -88,10 +88,8 @@ export interface DebugDeps {
   /**
    * Whatever the scatter system reported for its last run, one entry per region.
    *
-   * OPTIONAL because boot does not supply it yet: `scatterWorld` already returns `ScatterResult[]`
-   * (placed, rejected, instancedMeshes, estimatedDrawCalls, estimatedTriangles, byLayer,
-   * missingAssets) and boot.ts discards the value at the `await`. Until that is wired,
-   * `getScatterStats()` answers `{ available: false }` rather than guessing.
+   * Optional for small boot-fallback tests that do not build procedural dressing. The real boot
+   * supplies `ScatterResult[]`; without it `getScatterStats()` answers `{ available: false }`.
    */
   scatterStats?(): unknown;
   /** Live rig playback state; optional only for boot-fallback tests without a character rig. */
@@ -99,6 +97,8 @@ export interface DebugDeps {
   entityMotion?(entityId: EntityId): unknown;
   /** Solved shoreline contours and basin closure state for the rendered water bodies. */
   waterBodies?(): unknown;
+  /** One JSON-safe terrain/biome/coast probe for world authoring tools. */
+  worldSample?(x: number, z: number): unknown;
   /** Build-time only: one north-up tile rendered from the complete Three scene. */
   captureWorldMapTile?(options: {
     centreX: number;
@@ -597,6 +597,10 @@ export function installGameDebug(deps: DebugDeps): void {
 
     getWaterBodies(): unknown {
       return deps.waterBodies?.() ?? null;
+    },
+
+    sampleWorld(x: number, z: number): unknown {
+      return deps.worldSample?.(x, z) ?? null;
     },
 
     captureWorldMapTile(options: {

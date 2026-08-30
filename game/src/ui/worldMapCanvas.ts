@@ -6,7 +6,10 @@
  * marker layer owned by MapPanel.
  */
 import type { Vec3 } from "../contracts.js";
-import { WORLD_MAP_RENDER_FINGERPRINT } from "../generated/worldMapFingerprint.js";
+import {
+  WORLD_MAP_IMAGE_BOUNDS,
+  WORLD_MAP_RENDER_FINGERPRINT,
+} from "../generated/worldMapFingerprint.js";
 import type { MapTerrainSource } from "./panels.js";
 
 export interface MapScreenPoint {
@@ -70,7 +73,7 @@ export class WorldMapCanvas {
     private readonly source: MapTerrainSource,
   ) {
     this.context = canvas.getContext("2d", { alpha: false });
-    this.projectedBounds = this.estimateBounds();
+    this.projectedBounds = this.projectBounds(WORLD_MAP_IMAGE_BOUNDS);
   }
 
   resize(width: number, height: number): boolean {
@@ -193,7 +196,7 @@ export class WorldMapCanvas {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => {
-      const projectedBounds = this.estimateBounds();
+      const projectedBounds = this.projectBounds(WORLD_MAP_IMAGE_BOUNDS);
       this.cache = { image, bounds: projectedBounds };
       this.projectedBounds = projectedBounds;
       this.preparing = false;
@@ -215,8 +218,12 @@ export class WorldMapCanvas {
     return { u: x, v: -z };
   }
 
-  private estimateBounds(): ProjectedBounds {
-    const bounds = this.source.bounds;
+  private projectBounds(bounds: Readonly<{
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+  }>): ProjectedBounds {
     const corners = [
       this.project(bounds.minX, 0, bounds.minZ),
       this.project(bounds.maxX, 0, bounds.minZ),

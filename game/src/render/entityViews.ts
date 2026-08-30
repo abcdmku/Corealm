@@ -210,6 +210,10 @@ const TIER_BLIND_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc"]
 /** Canopy materials follow the tier ACCENT, not the rock body a trunk shares its swatch with. */
 const LEAF_MATERIAL = /leaf|leaves|foliage|canopy/i;
 
+/** Local-space bend at full height. Trunks and the below-ground crop root stay fixed. */
+const TREE_FOLIAGE_WIND = 0.055;
+const CROP_WIND = 0.04;
+
 /**
  * Materials a tier tint must never touch. Eyes, teeth and the pure black/white trims on the
  * monster packs are art direction, not tier: pulling them toward a palette colour flattens a face
@@ -2220,12 +2224,19 @@ export class EntityViews {
     }
 
     const look = this.appearanceFor(archetype, base);
-    return this.materials.variant(base, {
+    const variant = this.materials.variant(base, {
       tier,
       state: spent ? "depleted" : "normal",
       strength: look.strength,
       swatch: look.swatch,
     });
+    if (spent) return variant;
+    if (archetype === "tree" && LEAF_MATERIAL.test(base.name)) {
+      return this.materials.wind(variant, TREE_FOLIAGE_WIND);
+    }
+    // Farm beds and rails are separate landmark entities. A farm_plot material is the live crop.
+    if (archetype === "farm_plot") return this.materials.wind(variant, CROP_WIND);
+    return variant;
   }
 
   private appearanceFor(archetype: Archetype, material: THREE.Material): Appearance {

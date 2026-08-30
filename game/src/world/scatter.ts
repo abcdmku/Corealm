@@ -5,7 +5,7 @@
  * authored in region data and built by the world layer; this file places grass, trees, rocks and
  * clutter around them. If something here becomes interactable, it has been put in the wrong file.
  *
- * Four properties are load-bearing:
+ * Five properties are load-bearing:
  *
  *  1. **Deterministic.** Same seed, byte-identical layout. Every draw comes from `core/rng.ts`;
  *     `Math.random` is banned. Each layer gets its own derived stream, so adding a layer or
@@ -31,12 +31,11 @@
  *     new species costs 1-2 calls (2-4 with shadows) in every tile it appears in. Every number in
  *     `DEFAULT_SCATTER` is chosen against that asymmetry: counts run high, species lists stay
  *     short.
- *  5. **Continuous, and REGIONAL.** Two layers carry the low cover: `groundcover` clusters it into
- *     tufts and `carpet` lays a Poisson floor under the whole region so it never drops to nothing.
- *     `carpet` names the same assets, so under (4) it shares their meshes and costs no extra draw
- *     call. Each region has its own pool — `MEADOW_COVER`, `WOODLAND_COVER`, `UPLAND_COVER` —
- *     because one shared pool made all three regions the same sward with a different vertex colour
- *     under it, and because a species another layer in the SAME region already instances is free.
+ *  5. **Field-shaped, and REGIONAL.** `groundcover` supplies mixed tufts while `bladecarpet` uses
+ *     broad masked clusters for the grass floor. There is deliberately no uniform Poisson grass
+ *     layer between them. Each region has its own pool — `MEADOW_COVER`, `WOODLAND_COVER`,
+ *     `UPLAND_COVER` — because one shared pool made all three regions the same sward with a
+ *     different vertex colour under it.
  *
  * The consequence of (4) worth stating out loud, and what it used to cost: a REGION-wide
  * `InstancedMesh` has a region-wide bounding sphere, so it was never frustum-culled and never
@@ -384,7 +383,7 @@ function cellKey(col: number, row: number): number {
  *
  * 128 m over a 4,000-instance floor is the knee, and it beats the 160 m setting on BOTH axes: past
  * it, each further halving costs as many calls again for a tenth as many triangles. The small
- * buckets — bloom, fungus, the three stones, the mushrooms, and the two smaller carpets — are left
+ * buckets — bloom, fungus, the three stones, mushrooms, and small mixed-cover pools — are left
  * whole by `TILE_MIN_INSTANCES`, because each would multiply into several visible tiles for a few
  * hundred instances.
  */
@@ -438,6 +437,27 @@ function isGrassSprite(assetId: string): boolean {
   return GRASS_SPRITE_IDS.has(assetId);
 }
 
+/** Small material bend for living mesh foliage. Grass sprites animate in their own material. */
+function windStrengthForAsset(assetId: string): number {
+  if (assetId.startsWith("tree_dead_") || assetId.startsWith("mushroom_")) return 0;
+  if (
+    assetId.startsWith("rock_")
+    || assetId.startsWith("pebble_")
+    || assetId.startsWith("path_rock_")
+    || assetId.startsWith("boulder_")
+    || assetId.startsWith("cliff_")
+  ) return 0;
+  if (assetId.startsWith("tree_")) return 0.035;
+  if (
+    assetId.startsWith("fern_")
+    || assetId.startsWith("plant_")
+    || assetId.startsWith("flower_")
+    || assetId.startsWith("vine_")
+    || assetId.startsWith("bush_")
+  ) return 0.075;
+  return 0;
+}
+
 function tileIndex(x: number, z: number, metres: number): number {
   return cellKey(Math.floor(x / metres), Math.floor(z / metres));
 }
@@ -472,6 +492,9 @@ function ramp(distance: number, band: ExclusionBand): number {
  * unless a spec supplies its own, so the wiring is one import and a few `addCircle` calls.
  */
 export const worldExclusions = new ExclusionZones();
+
+/** The accepted dry island is about 1.95 times the authored gameplay area. */
+const FULL_ISLAND_FIELD_SCALE = 1.95;
 
 // ------------------------------------------------------------------ specs
 
@@ -519,7 +542,7 @@ export interface ScatterRoadSpec {
   perMetre: number;
 }
 
-/** Dressing that follows a measured waterline. */
+/** Dressing that follows the water mesh's contour. */
 export interface ScatterShoreSpec {
   /** Offset band from the waterline, in metres. Negative reaches into the water. */
   band: [number, number];
@@ -581,11 +604,7 @@ export interface ScatterLayerSpec {
   sink?: number;
   /** Only large silhouettes cast: shadow casters cost a second draw call each. */
   castShadow?: boolean;
-  /**
-   * 50% negative-X mirroring. Free variety on top of the yaw, and safe on this kit because every
-   * nature and rock material is authored `doubleSided`. Off by default and left off for shadow
-   * casters: a negative determinant flips the winding, and the shadow pass culls on winding.
-   */
+  /** 50% half-turn facing variation. Kept as the authored `mirror` switch for spec compatibility. */
   mirror?: boolean;
   /** Extra metres added to every exclusion band for this layer. */
   clearance?: number;
@@ -594,7 +613,7 @@ export interface ScatterLayerSpec {
   cluster?: ScatterClusterSpec;
   /** Low-frequency fbm that carves clearings by rejecting whole clusters. */
   mask?: { strength: number; featureSize: number };
-  /** Metres past the region rect that candidates may be generated. Defaults to the seam blend. */
+  /** Optional metres past the semantic rect. Omit to sample every dry point on the organic island. */
   bleed?: number;
   road?: ScatterRoadSpec;
   shore?: ScatterShoreSpec;
@@ -784,93 +803,44 @@ function smoothstep01(value: number): number {
 // --------------------------------------------------------- world features
 
 /**
- * A fishing pond as scatter needs to see it: where the water actually meets the land.
- *
- * The root registers fishing clusters as `cluster.radius + 3` exclusions but builds the water disc
- * at `cluster.radius + 14`, so an 11 m annulus of grass and pebbles was drawn UNDER every pond.
- * Rather than guess a margin, the shoreline is solved with `WorldScene.buildWater`'s own solver —
- * march outward at 1 m for the FIRST radius where the drawn ground rises through the water plane,
- * then bisect inside that metre — so scatter's waterline and the drawn disc's are the same number.
- * Reeds then land on the real waterline even where the bank is asymmetric, and this is the only
- * thing keeping cover out of the pond now that `COVER_EXCLUSION` reaches inside cluster rings.
+ * A built fishing pond as scatter needs to see it. The renderer owns the shoreline contour;
+ * scatter only turns its evenly spaced contour points back into radial samples for cheap queries.
  */
 interface WaterBody {
   x: number;
   z: number;
   level: number;
   maxRadius: number;
-  /** Shoreline radius per azimuth, index 0 at +x, increasing counter-clockwise. */
+  perimeter: number;
+  /** Shoreline radius per renderer-provided contour point, starting at +x. */
   shoreline: number[];
 }
 
-/**
- * Azimuths the shoreline is solved at. 32, matching `WorldScene.buildWater`'s `WATER_SEGMENTS`, so
- * scatter's idea of the waterline and the drawn disc's are sampled at the same angles.
- */
-const SHORE_AZIMUTHS = 32;
-
-/** Outward march step, in metres. 1 m is half the terrain lattice's 2 m quad — see below. */
-const SHORE_MARCH_METRES = 1;
-
-/** `WorldScene.buildWater`'s `WATER_MIN_RADIUS`: the smallest disc it will draw. */
-const SHORE_MIN_RADIUS = 2.5;
-
-/**
- * Water surface height above the carved basin floor, in metres.
- *
- * `app/worldSpec.ts` carves the basin `WATER_BASIN_DEPTH` = 0.9 m deep and `app/boot.ts` fills it
- * to `floor + WATER_BASIN_DEPTH * 0.55`. Duplicated rather than imported because world/ must not
- * depend upward on app/; if the root retunes the fill, the reed band drifts by the difference and
- * nothing else breaks.
- */
-const WATER_FILL_METRES = 0.9 * 0.55;
-
-function measureWaterBodies(scene: WorldScene, regionId: RegionId): WaterBody[] {
-  const region = REGIONS.find((entry) => entry.id === regionId);
-  if (!region) return [];
-  const bodies: WaterBody[] = [];
-  for (const cluster of region.clusters) {
-    if (cluster.archetype !== "fishing_spot") continue;
-    const [x, z] = cluster.centre;
-    const maxRadius = cluster.radius + 14;
-    const level = scene.heightAt(regionId, x, z) + WATER_FILL_METRES;
-    const shoreline: number[] = [];
-    for (let i = 0; i < SHORE_AZIMUTHS; i += 1) {
-      const angle = (i / SHORE_AZIMUTHS) * Math.PI * 2;
-      const dx = Math.cos(angle);
-      const dz = Math.sin(angle);
-      // FIRST crossing, found by marching then bisecting inside the metre it crossed in. This is
-      // `WorldScene.buildWater`'s solver, character for character, and it is not a plain bisection
-      // for the reason that file measured: the bank is not monotonic. 11% of the Redsill and Cairn
-      // Tarn disc footprints stand ABOVE the surface, because a spur crosses the plane at r = 21
-      // and drops back under it by r = 23. This function used to bisect with an early-out at
-      // `maxRadius`, so it could answer a radius the drawn disc never reaches — which is either
-      // grass floating on water or a bare annulus around the pond, depending on which way it erred.
-      let low = 0;
-      let high = maxRadius;
-      for (let radius = SHORE_MARCH_METRES; radius <= maxRadius; radius += SHORE_MARCH_METRES) {
-        if (scene.meshHeightAt(x + dx * radius, z + dz * radius) >= level) { high = radius; break; }
-        low = radius;
+function waterBodies(scene: WorldScene): WaterBody[] {
+  return scene.getWaterBodies()
+    .filter((body) => body.closed && body.contour.length >= 3)
+    .map((body) => {
+      const [x, z] = body.centre;
+      const shoreline = body.contour.map((point) => Math.hypot(point[0] - x, point[1] - z));
+      let perimeter = 0;
+      for (let index = 0; index < body.contour.length; index += 1) {
+        const current = body.contour[index]!;
+        const next = body.contour[(index + 1) % body.contour.length]!;
+        perimeter += Math.hypot(next[0] - current[0], next[1] - current[1]);
       }
-      for (let step = 0; step < 12; step += 1) {
-        const mid = (low + high) / 2;
-        if (scene.meshHeightAt(x + dx * mid, z + dz * mid) < level) low = mid;
-        else high = mid;
-      }
-      shoreline.push(Math.max(SHORE_MIN_RADIUS, low));
-    }
-    bodies.push({ x, z, level, maxRadius, shoreline });
-  }
-  return bodies;
+      return { x, z, level: body.level, maxRadius: Math.max(...shoreline), perimeter, shoreline };
+    });
 }
 
 /** Shoreline radius toward a point, linearly interpolated between azimuth samples. */
 function shorelineToward(body: WaterBody, x: number, z: number): number {
+  const samples = body.shoreline.length;
+  if (samples === 0) return 0;
   const angle = Math.atan2(z - body.z, x - body.x);
   const turns = ((angle / (Math.PI * 2)) % 1 + 1) % 1;
-  const position = turns * SHORE_AZIMUTHS;
-  const low = Math.floor(position) % SHORE_AZIMUTHS;
-  const high = (low + 1) % SHORE_AZIMUTHS;
+  const position = turns * samples;
+  const low = Math.floor(position) % samples;
+  const high = (low + 1) % samples;
   const t = position - Math.floor(position);
   return body.shoreline[low]! + (body.shoreline[high]! - body.shoreline[low]!) * t;
 }
@@ -891,42 +861,44 @@ const WATER_MARGIN_METRES = 1.2;
  * Everything here is read from `content/regions.ts`, so a settlement that gains a wall or a paved
  * square in a later pass pushes the planting back on its own.
  */
-function authoredZones(regionId: RegionId): ExclusionZones {
+function authoredZones(): ExclusionZones {
   const zones = new ExclusionZones();
-  const settlement = REGIONS.find((entry) => entry.id === regionId)?.settlement;
-  if (!settlement) return zones;
+  for (const region of REGIONS) {
+    const settlement = region.settlement;
+    if (!settlement) continue;
 
-  for (const building of settlement.buildings) {
-    // Use the authored collision footprint in its own rotated frame. The old circumscribed circle
-    // was radius hypot(width, depth)/2 + 1 m, which kept cover hard-clear 3.4 m past the narrow
-    // side of a 6 x 4 m cottage and left the lanes between neighbouring houses bald. Cover wants
-    // the wall edge, not the roof's circumscribed/eave envelope.
-    const [width, depth] = building.footprint;
-    zones.addOrientedRect(
-      building.position[0], building.position[1],
-      width, depth, building.rotationY, 0, "building", building.id,
-    );
-  }
-  for (const wall of settlement.walls ?? []) {
-    const length = Math.hypot(wall.to[0] - wall.from[0], wall.to[1] - wall.from[1]);
-    const steps = Math.max(1, Math.ceil(length / 2.5));
-    for (let step = 0; step <= steps; step += 1) {
-      const t = step / steps;
-      zones.addCircle(
-        wall.from[0] + (wall.to[0] - wall.from[0]) * t,
-        wall.from[1] + (wall.to[1] - wall.from[1]) * t,
-        1.8, "settlement", wall.id,
+    for (const building of settlement.buildings) {
+      // Use the authored collision footprint in its own rotated frame. The old circumscribed circle
+      // was radius hypot(width, depth)/2 + 1 m, which kept cover hard-clear 3.4 m past the narrow
+      // side of a 6 x 4 m cottage and left the lanes between neighbouring houses bald. Cover wants
+      // the wall edge, not the roof's circumscribed/eave envelope.
+      const [width, depth] = building.footprint;
+      zones.addOrientedRect(
+        building.position[0], building.position[1],
+        width, depth, building.rotationY, 0, "building", building.id,
       );
     }
+    for (const wall of settlement.walls ?? []) {
+      const length = Math.hypot(wall.to[0] - wall.from[0], wall.to[1] - wall.from[1]);
+      const steps = Math.max(1, Math.ceil(length / 2.5));
+      for (let step = 0; step <= steps; step += 1) {
+        const t = step / steps;
+        zones.addCircle(
+          wall.from[0] + (wall.to[0] - wall.from[0]) * t,
+          wall.from[1] + (wall.to[1] - wall.from[1]) * t,
+          1.8, "settlement", wall.id,
+        );
+      }
+    }
+    for (const paving of settlement.paving ?? []) {
+      zones.addRect(paving.rect, 0.5, "settlement", paving.id);
+    }
+    for (const station of settlement.stations) zones.addCircle(station.position[0], station.position[1], 1.8, "custom", station.id);
+    for (const shop of settlement.shops) zones.addCircle(shop.position[0], shop.position[1], 2.2, "custom", shop.id);
+    zones.addCircle(settlement.bank.position[0], settlement.bank.position[1], 2.2, "custom", settlement.bank.id);
+    for (const prop of settlement.props ?? []) zones.addCircle(prop.position[0], prop.position[1], 1.4, "custom", prop.id);
+    for (const npc of settlement.npcs) zones.addCircle(npc.position[0], npc.position[1], 1.2, "custom", npc.id);
   }
-  for (const paving of settlement.paving ?? []) {
-    zones.addRect(paving.rect, 0.5, "settlement", paving.id);
-  }
-  for (const station of settlement.stations) zones.addCircle(station.position[0], station.position[1], 1.8, "custom", station.id);
-  for (const shop of settlement.shops) zones.addCircle(shop.position[0], shop.position[1], 2.2, "custom", shop.id);
-  zones.addCircle(settlement.bank.position[0], settlement.bank.position[1], 2.2, "custom", settlement.bank.id);
-  for (const prop of settlement.props ?? []) zones.addCircle(prop.position[0], prop.position[1], 1.4, "custom", prop.id);
-  for (const npc of settlement.npcs) zones.addCircle(npc.position[0], npc.position[1], 1.2, "custom", npc.id);
   return zones;
 }
 
@@ -937,15 +909,13 @@ function regionAltitude(regionId: RegionId): { base: number; amplitude: number }
 }
 
 /**
- * Road centrelines resampled to 1 m, clipped to this region.
+ * Road centrelines resampled to 1 m. Each biome's organic weight decides which accents survive.
  *
- * These are `scene.getRoadPolylines()` — the CURVED lines after the meander — not the authored
- * endpoints. The root's road exclusion corridor is built from the straight endpoints, and
- * `curveRoadPolyline` bows a road up to `ROAD_MAX_SWAY` = 7 m off that line, so the corridor and
- * the drawn road disagree by more than the corridor's own 4 m radius on a long link. Anything that
- * dresses a road has to follow the drawn one.
+ * These are `scene.getRoadPolylines()` -- the resolved curves after the meander -- not the authored
+ * endpoints. Road dressing, exclusion corridors, and the rendered map all consume this same line,
+ * so a broad bend never leaves foliage sitting on the worn track.
  */
-function roadStations(scene: WorldScene, regionId: RegionId): { x: number; z: number; nx: number; nz: number }[] {
+function roadStations(scene: WorldScene): { x: number; z: number; nx: number; nz: number }[] {
   const stations: { x: number; z: number; nx: number; nz: number }[] = [];
   for (const line of scene.getRoadPolylines()) {
     for (let i = 0; i < line.length - 1; i += 1) {
@@ -962,7 +932,6 @@ function roadStations(scene: WorldScene, regionId: RegionId): { x: number; z: nu
         const t = step / steps;
         const x = a[0] + dx * t;
         const z = a[2] + dz * t;
-        if (scene.regionAt(x, z) !== regionId) continue;
         stations.push({ x, z, nx, nz });
       }
     }
@@ -972,7 +941,8 @@ function roadStations(scene: WorldScene, regionId: RegionId): { x: number; z: nu
 
 // -------------------------------------------------------------- placement
 
-interface Candidate { x: number; z: number; source: ScatterSource; assetId: string }
+/** Keep the selected entry so duplicate asset ids retain their own scale/tilt/sink variant. */
+interface Candidate { x: number; z: number; source: ScatterSource; species: ResolvedSpecies }
 
 interface LayerContext {
   scene: WorldScene;
@@ -1057,17 +1027,6 @@ function layerSeed(seed: number, regionId: RegionId, layerId: string): number {
 }
 
 /**
- * How far outside the region rect candidates are generated, in metres.
- *
- * The seam fade at the bottom of `siteFactor` was dead code before this: candidates only ever
- * existed inside the rect, where `regionWeightAt` returns >= 0.5 by construction, so the guard it
- * was written as (`weight < 0.5`) could never fire and every region border was a hard species swap.
- * Just under `worldSpec.ts`'s `blendMetres` of 28, so candidates land in the band where the weight
- * genuinely falls to 0 and the fade becomes live.
- */
-const SEAM_BLEED_METRES = 26;
-
-/**
  * Acceptance multipliers that depend only on where a point is.
  *
  * Returns 0 for a hard reject. Everything expensive lives here, so it is called on cluster CENTRES
@@ -1079,10 +1038,13 @@ function siteFactor(
   x: number,
   z: number,
   source: ScatterSource,
-  full: boolean,
+  applyBiomeAndPreferences: boolean,
 ): number {
+  const surface = ctx.scene.scatterSurfaceAt(x, z);
+  if (!surface || surface.density <= 0) return 0;
+
   const profile = layerProfile(layer, source);
-  let factor = ctx.exclusions.densityAt(x, z, profile);
+  let factor = ctx.exclusions.densityAt(x, z, profile) * surface.density;
   if (factor <= 0) return 0;
 
   const authoredBase = profile.authored ?? profile.base;
@@ -1106,25 +1068,29 @@ function siteFactor(
     if (distance < shorelineToward(body, x, z) + waterMargin) return 0;
   }
 
-  const seam = ctx.scene.regionWeightAt(ctx.regionId, x, z);
-  factor *= seam;
-  if (factor <= 0) return 0;
+  // A clustered layer chooses its biome once, at the centre. Members still answer to the dry
+  // surface, shore fade, water, exclusions and slope, but multiplying the biome weight here again
+  // would turn a 50/50 ecotone into 25% density from each side.
+  if (applyBiomeAndPreferences) {
+    factor *= ctx.scene.regionWeightAt(ctx.regionId, x, z);
+    if (factor <= 0) return 0;
+  }
 
   const rules = layer.terrain;
-  const slope = ctx.scene.slopeAt(x, z);
+  const slope = surface.slope;
   if (slope > (rules?.slopeMax ?? 0.85)) return 0;
   // Everything below is a PREFERENCE rather than a rule, and preferences belong to the cluster as a
   // whole. Applying them again per member would square them: a scree cluster biased x0.15 on flat
   // ground would then lose 85% of the members it did place there, and the cluster would dissolve
   // instead of moving.
-  if (!full) return factor;
+  if (!applyBiomeAndPreferences) return factor;
   if (rules?.slopeBias) {
     const { low, high, flat, steep } = rules.slopeBias;
     const t = high > low ? clamp01((slope - low) / (high - low)) : slope > low ? 1 : 0;
     factor *= flat + (steep - flat) * t;
   }
 
-  const height = ctx.scene.meshHeightAt(x, z);
+  const height = surface.height;
   if (layer.heightRange && (height < layer.heightRange[0] || height > layer.heightRange[1])) return 0;
   if (rules?.altitude) {
     const fade = rules.altitudeFade ?? 4;
@@ -1206,18 +1172,17 @@ export async function scatterRegion(
     regionId,
     rect,
     exclusions,
-    waters: measureWaterBodies(scene, regionId),
-    authored: authoredZones(regionId),
+    waters: waterBodies(scene),
+    authored: authoredZones(),
     altitude: regionAltitude(regionId),
-    roads: roadStations(scene, regionId),
+    roads: roadStations(scene),
   };
 
   // Region-wide rather than per-layer: `scatterInstanced` builds one InstancedMesh per (asset,
   // primitive), so two layers naming the same asset used to pay for it twice. Vellenwood's fern,
   // broad-leaf mat and small leafy plant each appeared in two layers, which was 5 draw calls of
-  // pure duplication world-wide. It is also what makes the continuous `carpet` layers free: they
-  // name the same assets as `groundcover`, so they add instances to an existing mesh rather than a
-  // new one.
+  // pure duplication world-wide. Layers naming the same asset add instances to this shared bucket
+  // instead of creating another mesh.
   const buckets = new Map<string, InstanceBucket>();
 
   for (const layer of spec.layers) {
@@ -1246,11 +1211,10 @@ export async function scatterRegion(
     collectShore(layer, ctx, species, rng, candidates, result);
 
     const castShadow = layer.castShadow ?? false;
-    const byAsset = new Map(species.map((entry) => [entry.assetId, entry]));
     for (const candidate of candidates) {
-      const entry = byAsset.get(candidate.assetId);
-      if (!entry) continue;
-      if (isGrassSprite(candidate.assetId)) {
+      const entry = candidate.species;
+      const assetId = entry.assetId;
+      if (isGrassSprite(assetId)) {
         const key = "grass-sprite|-";
         const found = buckets.get(key);
         const bucket: GrassInstanceBucket = found?.kind === "grass"
@@ -1266,11 +1230,11 @@ export async function scatterRegion(
       // Keyed on shadow as well as asset, because the shadow flag is a property of the
       // InstancedMesh: fern undergrowth and fern on a damp bank share one mesh, a shadow-casting
       // pine and a non-casting one could not.
-      const key = `${candidate.assetId}|${castShadow ? "s" : "-"}`;
+      const key = `${assetId}|${castShadow ? "s" : "-"}`;
       const found = buckets.get(key);
       const bucket: MeshInstanceBucket = found?.kind === "mesh"
         ? found
-        : { kind: "mesh", assetId: candidate.assetId, castShadow, placements: [] };
+        : { kind: "mesh", assetId, castShadow, placements: [] };
       bucket.placements.push(composePlacement(layer, ctx, entry, candidate, rng));
       buckets.set(key, bucket);
       result.placed += 1;
@@ -1305,7 +1269,7 @@ export async function scatterRegion(
         assets.instance(bucket.assetId),
         shard.placements,
         `scatter-${regionId}-${bucket.assetId}-t${shard.tile >>> 0}`,
-        { regionId, castShadow: bucket.castShadow },
+        { regionId, castShadow: bucket.castShadow, windStrength: windStrengthForAsset(bucket.assetId) },
       );
       result.instancedMeshes += meshes.length;
       result.estimatedDrawCalls += meshes.length * (bucket.castShadow ? 2 : 1);
@@ -1331,14 +1295,20 @@ function collectField(
   out: Candidate[],
   result: ScatterResult,
 ): void {
-  const bounds = ctx.scene.getWorldBounds();
-  const bleed = layer.bleed ?? SEAM_BLEED_METRES;
-  const sampleRect: Rect = {
-    minX: Math.max(bounds.minX, ctx.rect.minX - bleed),
-    maxX: Math.min(bounds.maxX, ctx.rect.maxX + bleed),
-    minZ: Math.max(bounds.minZ, ctx.rect.minZ - bleed),
-    maxZ: Math.min(bounds.maxZ, ctx.rect.maxZ + bleed),
-  };
+  const islandBounds = ctx.scene.getScatterBounds(Infinity);
+  // Biomes own visual land, not the semantic region rectangles. Default recipes cover the whole
+  // render collar and let scatterSurfaceAt reject ocean. A layer with an explicit bleed remains a
+  // local authoring tool whose domain starts at its semantic rect.
+  const sampleRect: Rect = layer.bleed === undefined
+    ? islandBounds
+    : {
+        minX: Math.max(islandBounds.minX, ctx.rect.minX - layer.bleed),
+        maxX: Math.min(islandBounds.maxX, ctx.rect.maxX + layer.bleed),
+        minZ: Math.max(islandBounds.minZ, ctx.rect.minZ - layer.bleed),
+        maxZ: Math.min(islandBounds.maxZ, ctx.rect.maxZ + layer.bleed),
+      };
+  const fieldScale = layer.bleed === undefined ? FULL_ISLAND_FIELD_SCALE : 1;
+  const fieldLimit = Math.ceil(layer.maxCount * fieldScale);
 
   const maskAt = (x: number, z: number): number => {
     if (!layer.mask || layer.mask.strength <= 0) return 1;
@@ -1350,21 +1320,20 @@ function collectField(
 
   const cluster = layer.cluster;
   if (!cluster) {
-    // Ordinary layers keep the historical 120k guard. Grass-only carpets may sample farther:
-    // exclusions reject roughly a quarter of their candidates around roads, water and authored
-    // structures, so a 120k candidate ceiling could never deliver Fallowmarch's 145k safe card
-    // budget. The grass ceiling remains explicit and bounded; no 3D layer can inherit it.
+    // Grass fields normally use clusters. Keep a moderate ceiling here for custom unclustered
+    // grass layers so a small spacing cannot turn boot into a several-hundred-thousand point job.
     const grassOnly = species.every((entry) => isGrassSprite(entry.assetId));
-    const candidateCeiling = grassOnly ? 220000 : 120000;
-    const candidateCap = Math.min(candidateCeiling, Math.max(60000, Math.ceil(layer.maxCount * 1.4)));
+    const candidateCeiling = Math.ceil((grassOnly ? 100000 : 120000) * fieldScale);
+    const candidateFloor = Math.ceil((grassOnly ? 40000 : 60000) * fieldScale);
+    const candidateCap = Math.min(candidateCeiling, Math.max(candidateFloor, Math.ceil(fieldLimit * 1.4)));
     const points = shuffleByHash(poissonDisc(sampleRect, layer.spacing ?? 6, rng, candidateCap), 0x5eed01);
     for (const [x, z] of points) {
-      if (out.length >= layer.maxCount) break;
+      if (out.length >= fieldLimit) break;
       const factor = siteFactor(layer, ctx, x, z, "field", true) * maskAt(x, z);
       if (factor <= 0 || rng.next() > factor) { result.rejected += 1; continue; }
       const entry = pickSpecies(species, "field", rng);
       if (!entry) break;
-      out.push({ x, z, source: "field", assetId: entry.assetId });
+      out.push({ x, z, source: "field", species: entry });
     }
     return;
   }
@@ -1373,7 +1342,7 @@ function collectField(
   const dominance = cluster.dominance ?? 0.7;
   const centres = shuffleByHash(poissonDisc(sampleRect, cluster.spacing, rng), 0x5eed02);
   for (const [cx, cz] of centres) {
-    if (out.length >= layer.maxCount) break;
+    if (out.length >= fieldLimit) break;
     const factor = siteFactor(layer, ctx, cx, cz, "field", true) * maskAt(cx, cz) * cluster.accept;
     if (factor <= 0 || rng.next() > factor) { result.rejected += 1; continue; }
 
@@ -1397,7 +1366,7 @@ function collectField(
       if (site <= 0 || rng.next() > site) { result.rejected += 1; continue; }
       const entry = rng.next() < dominance ? dominant : pickSpecies(species, "field", rng);
       if (!entry) continue;
-      out.push({ x, z, source: "field", assetId: entry.assetId });
+      out.push({ x, z, source: "field", species: entry });
     }
   }
 }
@@ -1429,7 +1398,7 @@ function collectRoad(
       if (site <= 0 || rng.next() > site) { result.rejected += 1; continue; }
       const entry = pickSpecies(species, "road", rng);
       if (!entry) return;
-      out.push({ x, z, source: "road", assetId: entry.assetId });
+      out.push({ x, z, source: "road", species: entry });
     }
   }
 }
@@ -1446,9 +1415,7 @@ function collectShore(
   const spec = layer.shore;
   if (!spec) return;
   for (const body of ctx.waters) {
-    let perimeter = 0;
-    for (const radius of body.shoreline) perimeter += (radius * Math.PI * 2) / SHORE_AZIMUTHS;
-    const wanted = Math.round(perimeter * spec.perMetre);
+    const wanted = Math.round(body.perimeter * spec.perMetre);
     for (let i = 0; i < wanted; i += 1) {
       const angle = rng.next() * Math.PI * 2;
       const dx = Math.cos(angle);
@@ -1462,7 +1429,7 @@ function collectShore(
       if (site <= 0 || rng.next() > site) { result.rejected += 1; continue; }
       const entry = pickSpecies(species, "shore", rng);
       if (!entry) return;
-      out.push({ x, z, source: "shore", assetId: entry.assetId });
+      out.push({ x, z, source: "shore", species: entry });
     }
   }
 }
@@ -1471,8 +1438,8 @@ function collectShore(
  * One instance transform.
  *
  * Three things the old composer did not do, all of them free because they ride the same matrix:
- * lean into the ground normal, vary width against height, and mirror half the instances. The
- * mirror is safe here because every material in the nature+rock kit is authored `doubleSided`.
+ * lean into the ground normal, vary width against height, and turn half the opted-in instances to
+ * the opposite facing. Scale stays positive so instancing never receives a flipped determinant.
  */
 function composePlacement(
   layer: ScatterLayerSpec,
@@ -1481,17 +1448,22 @@ function composePlacement(
   candidate: Candidate,
   rng: Rng,
 ): ScatterPlacement {
-  const height = ctx.scene.meshHeightAt(candidate.x, candidate.z);
+  const surface = ctx.scene.scatterSurfaceAt(candidate.x, candidate.z);
+  const height = surface?.height ?? ctx.scene.meshHeightAt(candidate.x, candidate.z);
   const bias = layer.sizeBias ?? 2.2;
   const size = entry.scale[0] + (entry.scale[1] - entry.scale[0]) * Math.pow(rng.next(), bias);
   const width = 1 + rng.float(-0.12, 0.12);
   const stretch = 1 + rng.float(-0.15, 0.25);
-  const mirror = (layer.mirror ?? false) && rng.next() < 0.5 ? -1 : 1;
+  // Always consume the old mirror draw when enabled so this safety fix does not move any later RNG
+  // draws. A half turn supplies the facing variation without negative scale.
+  const halfTurn = (layer.mirror ?? false) && rng.next() < 0.5 ? Math.PI : 0;
   return {
     position: [candidate.x, height - entry.sink, candidate.z],
-    rotationY: rng.next() * Math.PI * 2,
-    scale: [size * width * mirror, size * stretch, size * width],
-    normal: entry.tilt > 0 ? ctx.scene.normalAt(candidate.x, candidate.z) : undefined,
+    rotationY: rng.next() * Math.PI * 2 + halfTurn,
+    scale: [size * width, size * stretch, size * width],
+    normal: entry.tilt > 0
+      ? surface?.normal ?? ctx.scene.normalAt(candidate.x, candidate.z)
+      : undefined,
     tilt: entry.tilt,
   };
 }
@@ -1513,19 +1485,23 @@ function composeGrassPlacement(
   const scale = typeof placement.scale === "number"
     ? [placement.scale, placement.scale, placement.scale] as const
     : placement.scale;
-  const native = assets.assetSize(candidate.assetId) ?? { x: 0.8, y: 1.2, z: 0.8 };
-  // The generated cutout contains eleven blades, so its physical width needs to read as one tuft,
-  // not one stem. At the old 0.14 m floor almost every blade-carpet card collapsed to a pencil at
-  // gameplay distance. A 0.18 m floor and 90% of the source footprint increase occupied width by
-  // 1.22-1.29x without adding geometry, instances or draw calls.
-  const width = clampRange(Math.max(native.x * Math.abs(scale[0]), native.z * Math.abs(scale[2])) * 0.9, 0.18, 2.1);
+  const native = assets.assetSize(entry.assetId) ?? { x: 0.8, y: 1.2, z: 0.8 };
+  // The generated cutout contains a small fan of blades, so its physical width needs to read as
+  // one tuft, not one stem. Field cards overlap at their authored member spacing; mixed cover
+  // stays narrower so an accent clump does not become a wall.
+  const minimumWidth = layer.id === "bladecarpet" ? 0.46 : 0.18;
+  const width = clampRange(
+    Math.max(native.x * Math.abs(scale[0]), native.z * Math.abs(scale[2])) * 0.9,
+    minimumWidth,
+    2.1,
+  );
   const height = clampRange(native.y * Math.abs(scale[1]), 0.14, 2.3);
   return {
     position: placement.position,
     rotationY: placement.rotationY,
     width,
     height,
-    colour: grassColour(candidate.assetId, candidate.x, candidate.z),
+    colour: grassColour(entry.assetId, candidate.x, candidate.z),
     normal: placement.normal,
     tilt: placement.tilt,
   };
@@ -1792,67 +1768,23 @@ const UPLAND_COVER: ScatterSpeciesSpec[] = [
 ];
 
 /**
- * The continuous floor under everything, and the answer to "open ground is bare".
- *
- * `groundcover` clusters into tufts, which is right for what a tuft is and wrong for the ground
- * between tufts: measured on the shot poses, only 22% of the 3 m cells within 30 m of Palewood
- * Copse held anything at all before this layer existed. A clustered layer cannot fix that, because
- * clustering is what makes the gaps.
- *
- * So this layer is deliberately NOT clustered and carries NO mask: plain Poisson at `spacing` over
- * the whole region, thinned only by the exclusion density field and the slope rule. That is what
- * "thins near roads and settlements but never drops to nothing" has to mean mechanically.
- *
- * Every id here is already instanced by that region's `groundcover` or by `stones`, so the whole
- * layer is free in draw calls — the entire cost is triangles, and each pool is the region's own
- * cover mix cut to its cheapest three or four members and scaled a size down, so the carpet reads
- * as the same ground as the tufts standing in it rather than as a second species list.
- */
-const MEADOW_CARPET: ScatterSpeciesSpec[] = [
-  { assetId: "grass_common_short", weight: 9, scale: [0.3, 0.6] },
-  { assetId: "plant_leafy_small", weight: 1.6, scale: [0.34, 0.62] },
-  { assetId: "rock_small_2", weight: 1.6, scale: [0.45, 1.2], tilt: 1, sink: 0.04 },
-  { assetId: "pebble_round_1", weight: 0.8, scale: [0.45, 1.1], tilt: 1, sink: 0.03 },
-  // 494 triangles is expensive for a carpet, so weight 1 — about 6% of the layer. Enough that the
-  // gold reads as part of the sward rather than as a separate stratum sitting on top of it.
-  { assetId: "grass_wispy_short", weight: 0.7, scale: [0.4, 0.75], tilt: 0.2 },
-];
-
-const WOODLAND_CARPET: ScatterSpeciesSpec[] = [
-  { assetId: "plant_leafy_small", weight: 2.4, scale: [0.32, 0.6] },
-  { assetId: "fern_1", weight: 1.6, scale: [0.26, 0.5], tilt: 0.9 },
-  { assetId: "grass_common_short", weight: 4.5, scale: [0.28, 0.54] },
-  { assetId: "rock_small_2", weight: 3.4, scale: [0.45, 1.3], tilt: 1, sink: 0.04 },
-  { assetId: "pebble_round_1", weight: 1.4, scale: [0.45, 1.2], tilt: 1, sink: 0.03 },
-];
-
-const UPLAND_CARPET: ScatterSpeciesSpec[] = [
-  { assetId: "grass_common_short", weight: 8, scale: [0.26, 0.52] },
-  { assetId: "plant_leafy_small", weight: 1.4, scale: [0.34, 0.62] },
-  { assetId: "rock_small_2", weight: 4, scale: [0.45, 1.4], tilt: 1, sink: 0.04 },
-  { assetId: "pebble_round_1", weight: 2.4, scale: [0.45, 1.25], tilt: 1, sink: 0.03 },
-];
-
-/**
  * Low grass stems that buy density without multiplying the mixed cover pools.
  *
- * Keeping these pools grass-only matters. Halving the existing `carpet` spacing would multiply
- * every pebble, fern and broad plant along with the grass, undoing most of the triangle saving and
- * making paths look cluttered instead of grown in. All entries below merge with grass already
- * emitted by `groundcover` and `carpet` into the same per-region, per-tile sprite mesh.
+ * Keeping these pools grass-only matters. Every pebble, fern and broad plant belongs to the lower
+ * volume mixed-cover layers; a field can therefore become dense without multiplying those props.
  */
 const MEADOW_BLADES: ScatterSpeciesSpec[] = [
-  { assetId: "grass_common_short", weight: 10, scale: [0.14, 0.29] },
-  { assetId: "grass_wispy_short", weight: 1.4, scale: [0.18, 0.34], tilt: 0.2 },
+  { assetId: "grass_common_short", weight: 10, scale: [0.16, 0.36] },
+  { assetId: "grass_wispy_short", weight: 1.4, scale: [0.2, 0.38], tilt: 0.2 },
 ];
 
 const WOODLAND_BLADES: ScatterSpeciesSpec[] = [
-  { assetId: "grass_common_short", weight: 1, scale: [0.13, 0.26] },
+  { assetId: "grass_common_short", weight: 1, scale: [0.15, 0.3] },
 ];
 
 const UPLAND_BLADES: ScatterSpeciesSpec[] = [
-  { assetId: "grass_common_short", weight: 7, scale: [0.12, 0.25] },
-  { assetId: "grass_wispy_short", weight: 3, scale: [0.17, 0.33], tilt: 0.2 },
+  { assetId: "grass_common_short", weight: 7, scale: [0.14, 0.28] },
+  { assetId: "grass_wispy_short", weight: 3, scale: [0.18, 0.36], tilt: 0.2 },
 ];
 
 /**
@@ -1899,24 +1831,12 @@ const STONE_SPECIES: ScatterSpeciesSpec[] = [
  *     bounding spheres mean nothing is ever frustum-culled, so the whole streamed-in region is
  *     submitted every frame. The only levers are count and species.
  *
- * Round 1 shipped 2,019 instances over 28 ha — one prop per 139 m2, every one of them standing
- * alone — for 62 draw calls and 2.50M triangles. Round 2 took that to 59,534 instances and 12.0M
- * triangles by clustering. This round takes it to 128,766 and 25.0M, and the reason is that
- * instance COUNT was never the number the eye reads: measured with runs/corealm/audit/gd-cover.ts,
- * which sums each instance's drawn footprint rather than counting props, round 2's ground cover
- * covered 6% of the ground within 25 m of the Palewood pose. That is `w3-palewood_copse.png` — a
- * green shader with a few tufts on it — and it is what "the look and feel is terribly basic" and
- * "still look sparse" both point at. Coverage is linear in count and QUADRATIC in scale, so this
- * round spends on both: counts roughly double, scale bands widen about 1.35x, `sizeBias` drops
- * from 1.6 to 1.25 so more of the draw lands at the top of the band, and the pools lean on
- * `plant_leafy_small` (1.27 x 1.39 m native for 120 triangles, i.e. 87 triangles per square metre
- * covered, against `grass_common_short`'s 419). Palewood is now 26%, march_road 28%, the
- * Vellenwood floor 45%.
- *
- * The offline sweep (runs/corealm/audit/dcb-sweep.ts) puts the price at the worst of the 18 poses
- * at 201 draw calls against 166, and 17.5M triangles against 7.9M. Draw calls were the tight axis
- * and are still not tight; the 35 extra are almost all extra TILES, not extra species, because a
- * bucket that crosses `TILE_MIN_INSTANCES` starts being cut up.
+ * The first clustered blade fields still left ordinary play cameras between isolated 20 m discs.
+ * This pass makes the centre lattice tighter and the discs smaller, then softens the mask so
+ * neighbouring accepted centres join into swaths. The offline sampler lands at about 580,000 total
+ * placements: 247k Fallowmarch, 173k Vellenwood and 159k Karrowmoor. About 435k are four-triangle
+ * blade cards. No new asset bucket or material family was added; the extra draw cost comes only
+ * from spatial tiles that were empty before.
  *
  *  Fallowmarch  sparse, long sightlines (PRD, "Look"). Real copses with real gaps between them;
  *               choppable trees are entities, not scatter.
@@ -1929,17 +1849,16 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
     regionId: "fallowmarch",
     layers: [
       {
-        // The two cheapest green broadleaves in the kit (3182 and 3505 triangles). Clustered at a
-        // 86 m centre spacing with a strong mask, so the region gets a handful of real copses and
-        // long open sightlines between them rather than 38 lone trees on 13 m centres.
+        // The cheapest green broadleaf in the kit. Closely spaced centres form a few joined copses,
+        // while the 90 m mask keeps long meadow sightlines between them.
         id: "copse",
         assetIds: ["tree_common_5"],
-        maxCount: 105, scale: [0.95, 1.6], sizeBias: 1.6,
+        maxCount: 150, scale: [0.95, 1.6], sizeBias: 1.6,
         tilt: 0.1, castShadow: true, mirror: true,
         exclusion: TREE_EXCLUSION,
         terrain: { slopeMax: 0.45 },
-        cluster: { spacing: 46, radius: [14, 26], memberSpacing: 8, accept: 0.95, falloff: 0.7, dominance: 0.78 },
-        mask: { strength: 0.35, featureSize: 90 },
+        cluster: { spacing: 38, radius: [14, 28], memberSpacing: 7.5, accept: 0.96, falloff: 0.65, dominance: 0.78 },
+        mask: { strength: 0.32, featureSize: 90 },
       },
       {
         // Bare silhouettes against the sky. One species: 12 of them over 132,000 m2 never repeat
@@ -1963,17 +1882,17 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
           // 1.672 m native -> 0.84-1.51 m of dry gold moor grass, rgb(182,159,0) at its own UVs.
           { assetId: "grass_wispy_short", weight: 2, scale: [0.8, 1.4], tilt: 0.2 },
         ],
-        maxCount: 1750, scale: [0.7, 1.25], tilt: 0.35, mirror: true,
+        maxCount: 4200, scale: [0.7, 1.3], tilt: 0.35, mirror: true,
         exclusion: SHRUB_EXCLUSION,
-        cluster: { spacing: 17, radius: [5, 13], memberSpacing: 1.8, accept: 0.68, falloff: 0.75, dominance: 0.8 },
-        mask: { strength: 0.45, featureSize: 62 },
+        cluster: { spacing: 12.5, radius: [5, 14], memberSpacing: 1.25, accept: 0.78, falloff: 0.68, dominance: 0.8 },
+        mask: { strength: 0.34, featureSize: 58 },
       },
       {
         // Deliberately NOT rock_medium_*: those are the ore-node meshes, and dressing that shares a
         // silhouette with a minable node is half of why ore is unreadable. Clustered into rock
         // fields, biased onto slopes, and extended along the roads as verge gravel.
         id: "stones", species: STONE_SPECIES,
-        maxCount: 480, scale: [0.5, 1.3], tilt: 1, sink: 0.05, mirror: true,
+        maxCount: 560, scale: [0.5, 1.3], tilt: 1, sink: 0.05, mirror: true,
         exclusion: LITTER_EXCLUSION,
         terrain: { slopeBias: { low: 0.25, high: 0.55, flat: 0.5, steep: 2.2 } },
         cluster: { spacing: 30, radius: [3, 10], memberSpacing: 1.3, accept: 0.42, falloff: 0.8, dominance: 0.5 },
@@ -1981,54 +1900,39 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         shore: { band: [1.5, 12], perMetre: 0.5 },
       },
       {
-        // The layer that carries the ground read. Tufts at 0.62 m member spacing inside a
-        // 2.4-5.6 m disc on 6.4 m centres: dense where it is, honestly thinner between, which is
-        // what a grazed river meadow looks like from eye height. Member spacing came down from
-        // 0.9 m and the cap up from 11,500, which is 2.1x the instances for 2.1x the triangles and
-        // zero extra draw calls — the buckets already exist and are already tiled.
+        // Mixed-height meadow tufts. The small 5.2 m centre spacing joins nearby clumps without
+        // turning the field into an even grid; roads, water and authored footprints still thin it.
         id: "groundcover", species: MEADOW_COVER,
-        maxCount: 29000, scale: [0.2, 0.4], sizeBias: 1.25, tilt: 0.55, mirror: true,
+        maxCount: 48000, scale: [0.22, 0.46], sizeBias: 1.18, tilt: 0.55, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: {
           slopeBias: { low: 0.2, high: 0.7, flat: 1.35, steep: 0.35 },
           moisture: { reach: 18, boost: 2.5 },
         },
-        cluster: { spacing: 6.4, radius: [2.4, 5.6], memberSpacing: 0.58, accept: 0.74, falloff: 0.55, dominance: 0.55 },
-        mask: { strength: 0.22, featureSize: 46 },
-        road: { band: [2.6, 6.5], perMetre: 2.2 },
-        shore: { band: [-0.6, 9], perMetre: 3.0 },
+        cluster: { spacing: 5.2, radius: [2.8, 6.6], memberSpacing: 0.48, accept: 0.82, falloff: 0.42, dominance: 0.58 },
+        mask: { strength: 0.16, featureSize: 50 },
+        road: { band: [2.6, 6.5], perMetre: 2.8 },
+        shore: { band: [-0.6, 9], perMetre: 3.6 },
       },
       {
-        // The continuous floor. No mask and no cluster: this layer's whole job is that it never
-        // goes to zero, so it is plain Bridson over the whole region thinned only by the exclusion
-        // field and the slope rule. 1.75 m spacing rather than 2.7 m is 2.4x the points, and it is
-        // the single change that most moves the "dense grass" read: `groundcover`'s tufts are what
-        // the eye lands on, this is what stops the ground between them being bare shader.
-        id: "carpet", species: MEADOW_CARPET,
-        spacing: 1.6, maxCount: 30000, scale: [0.18, 0.4], sizeBias: 1.25, tilt: 0.8, mirror: true,
-        exclusion: COVER_EXCLUSION,
-        terrain: { slopeBias: { low: 0.3, high: 0.85, flat: 1.15, steep: 0.45 } },
-        road: { band: [2.4, 7.5], perMetre: 1.1 },
-      },
-      {
-        // A low, grass-only floor. At 0.67 m this settles at about 1.1 cards/m2 after road, water,
-        // settlement and slope rejection: dense enough for a continuous town-edge sward, while
-        // the authored road/building exclusions remain untouched. Four-triangle cards keep the
-        // 145k cap under 0.6M triangles and one already-tiled instanced material family.
+        // The grass floor. Small overlapping discs follow a broad mask, so fields connect across a
+        // normal camera view but still break into grazed clearings. Mixed cover supplies accents.
         id: "bladecarpet", species: MEADOW_BLADES,
-        spacing: 0.67, maxCount: 145000, scale: [0.14, 0.34], sizeBias: 1.4, tilt: 0.45,
+        maxCount: 190000, scale: [0.16, 0.36], sizeBias: 1.3, tilt: 0.45,
         exclusion: COVER_EXCLUSION,
         terrain: { slopeBias: { low: 0.25, high: 0.8, flat: 1.2, steep: 0.35 } },
+        cluster: { spacing: 14, radius: [7, 14], memberSpacing: 0.42, accept: 0.96, falloff: 0.28, dominance: 0.84 },
+        mask: { strength: 0.52, featureSize: 90 },
       },
       {
         // Colour accents only, as drifts rather than as a lawn. `flower_a_group` is 2.055 m native
         // and was scaled to 1.44-2.47 m in round 1; at [0.28, 0.5] it lands at 0.58-1.03 m.
         id: "bloom",
         assetIds: ["flower_a_single"],
-        maxCount: 640, scale: [0.28, 0.5], tilt: 0.4, mirror: true,
+        maxCount: 1400, scale: [0.28, 0.52], tilt: 0.4, mirror: true,
         exclusion: COVER_EXCLUSION,
-        cluster: { spacing: 24, radius: [2.5, 8], memberSpacing: 1.1, accept: 0.4, falloff: 0.8, dominance: 0.85 },
-        mask: { strength: 0.6, featureSize: 40 },
+        cluster: { spacing: 18, radius: [3, 10], memberSpacing: 0.85, accept: 0.58, falloff: 0.72, dominance: 0.85 },
+        mask: { strength: 0.48, featureSize: 46 },
       },
     ],
   },
@@ -2043,22 +1947,19 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         // broadleaf, and also the cheapest green broadleaf: 3344 triangles average against the
         // twisted family's 9596.
         //
-        // Enclosure is bought with stands and clearings, not with prop count. 38 m centres, a disc
-        // of 10-19 m and a 6.4 m member spacing give ~20 groves of 10-14 trees with real gaps; a
-        // flat sprinkle at the same total count gives uniform gloom, which is what round 1 shipped.
-        // Capped at 210: at 3344 triangles with a shadow pass, 250 trees is 1.7M triangles and this
-        // is the one number in the region that can move the frame budget.
+        // Enclosure comes from overlapping stands with clearings between them. Broadleaf count is
+        // still capped because this shadow-casting layer moves the frame budget faster than grass.
         id: "canopy",
         species: [
           { assetId: "tree_common_3", weight: 3 },
           { assetId: "tree_common_5", weight: 2 },
         ],
-        maxCount: 210, scale: [1.05, 1.7], sizeBias: 1.5,
+        maxCount: 270, scale: [1.05, 1.7], sizeBias: 1.5,
         tilt: 0.1, castShadow: true, mirror: true,
         exclusion: TREE_EXCLUSION,
         terrain: { slopeMax: 0.6 },
-        cluster: { spacing: 25, radius: [10, 19], memberSpacing: 6.4, accept: 0.95, falloff: 0.6, dominance: 0.75 },
-        mask: { strength: 0.38, featureSize: 78 },
+        cluster: { spacing: 22, radius: [11, 21], memberSpacing: 5.8, accept: 0.97, falloff: 0.6, dominance: 0.75 },
+        mask: { strength: 0.3, featureSize: 78 },
       },
       {
         // tree_pine_5 is 1646 triangles, the cheapest tree in the kit by a factor of two, so
@@ -2066,11 +1967,11 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         // is what real conifers look like, and it saves 4 draw calls. Biased uphill, because a
         // pine stand on the shoulder above a broadleaf hollow is free legibility.
         id: "conifer", assetIds: ["tree_pine_5"],
-        maxCount: 190, scale: [1.0, 1.9], sizeBias: 1.5,
+        maxCount: 220, scale: [1.0, 1.9], sizeBias: 1.5,
         tilt: 0.1, castShadow: true, mirror: true,
         exclusion: TREE_EXCLUSION,
         terrain: { slopeMax: 0.8, slopeBias: { low: 0.2, high: 0.6, flat: 0.75, steep: 1.6 } },
-        cluster: { spacing: 22, radius: [8, 16], memberSpacing: 5, accept: 0.9, falloff: 0.65, dominance: 1 },
+        cluster: { spacing: 20, radius: [9, 17], memberSpacing: 4.6, accept: 0.92, falloff: 0.65, dominance: 1 },
         mask: { strength: 0.3, featureSize: 70 },
       },
       {
@@ -2098,17 +1999,17 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
           { assetId: "plant_leafy_large", weight: 2 },
           { assetId: "plant_leafy_small", weight: 3, scale: [0.5, 1.1] },
         ],
-        maxCount: 2600, scale: [0.8, 1.5], tilt: 0.5, mirror: true,
+        maxCount: 6200, scale: [0.8, 1.55], tilt: 0.5, mirror: true,
         exclusion: SHRUB_EXCLUSION,
-        cluster: { spacing: 9.5, radius: [3, 8.5], memberSpacing: 1.45, accept: 0.74, falloff: 0.7, dominance: 0.7 },
-        mask: { strength: 0.35, featureSize: 55 },
+        cluster: { spacing: 7.5, radius: [3.5, 10], memberSpacing: 1.1, accept: 0.82, falloff: 0.62, dominance: 0.72 },
+        mask: { strength: 0.27, featureSize: 48 },
       },
       {
         // mushroom_bracket is 3216 triangles, more than a whole tree_common_5, for a prop the
         // player only ever sees from four metres. mushroom_common is 880, and in tight rings of
         // 6-10 it reads as a fairy ring rather than as scattered litter.
         id: "fungus", assetIds: ["mushroom_common"],
-        maxCount: 130, scale: [0.7, 1.4], tilt: 0.7, mirror: true,
+        maxCount: 220, scale: [0.7, 1.4], tilt: 0.7, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: { moisture: { reach: 22, boost: 2 } },
         cluster: { spacing: 32, radius: [1.2, 3.2], memberSpacing: 0.75, accept: 0.8, falloff: 0.6, dominance: 1 },
@@ -2116,7 +2017,7 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
       },
       {
         id: "stones", species: STONE_SPECIES,
-        maxCount: 320, scale: [0.5, 1.3], tilt: 1, sink: 0.06, mirror: true,
+        maxCount: 400, scale: [0.5, 1.3], tilt: 1, sink: 0.06, mirror: true,
         exclusion: LITTER_EXCLUSION,
         terrain: { slopeBias: { low: 0.25, high: 0.55, flat: 0.6, steep: 2 } },
         cluster: { spacing: 28, radius: [3, 9], memberSpacing: 1.4, accept: 0.6, falloff: 0.8, dominance: 0.5 },
@@ -2128,35 +2029,26 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         // mosaic of dense patches under the gaps and near-bare ground under a closed crown, which
         // is what the lower `accept` and the stronger mask buy.
         id: "groundcover", species: WOODLAND_COVER,
-        maxCount: 19000, scale: [0.2, 0.4], sizeBias: 1.25, tilt: 0.55, mirror: true,
+        maxCount: 38000, scale: [0.22, 0.45], sizeBias: 1.18, tilt: 0.55, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: {
           slopeBias: { low: 0.2, high: 0.75, flat: 1.3, steep: 0.4 },
           moisture: { reach: 18, boost: 2.5 },
         },
-        cluster: { spacing: 6.2, radius: [2.2, 5.2], memberSpacing: 0.66, accept: 0.72, falloff: 0.6, dominance: 0.58 },
-        mask: { strength: 0.34, featureSize: 42 },
-        road: { band: [2.6, 6.5], perMetre: 2.2 },
-        shore: { band: [-0.6, 9], perMetre: 2.8 },
+        cluster: { spacing: 4.9, radius: [2.5, 6.2], memberSpacing: 0.5, accept: 0.82, falloff: 0.48, dominance: 0.6 },
+        mask: { strength: 0.22, featureSize: 46 },
+        road: { band: [2.6, 6.5], perMetre: 2.8 },
+        shore: { band: [-0.6, 9], perMetre: 3.2 },
       },
       {
-        // Woodland floor. See the Fallowmarch `carpet` for why this layer exists and why it costs
-        // no draw calls; the difference here is that a wood's floor is leaf and stone rather than
-        // turf, so `WOODLAND_CARPET` gives the stones and the fern more of the weight.
-        id: "carpet", species: WOODLAND_CARPET,
-        spacing: 1.85, maxCount: 17000, scale: [0.18, 0.4], sizeBias: 1.25, tilt: 0.8, mirror: true,
-        exclusion: COVER_EXCLUSION,
-        terrain: { slopeBias: { low: 0.3, high: 0.9, flat: 1.15, steep: 0.5 } },
-        road: { band: [2.4, 7.5], perMetre: 1.1 },
-      },
-      {
-        // Patchy low grass under the canopy. Ferns and leaf plants stay in the mixed layers above;
-        // this count buys stems only and therefore does not turn Vellenwood's paths into clutter.
+        // Broad but broken shade-grass fields. Ferns, stones and leaf plants stay in the sparse
+        // mixed layers above, so the denser local spacing buys stems without cluttering paths.
         id: "bladecarpet", species: WOODLAND_BLADES,
-        spacing: 0.78, maxCount: 80000, scale: [0.13, 0.26], sizeBias: 1.45, tilt: 0.5,
+        maxCount: 125000, scale: [0.15, 0.3], sizeBias: 1.35, tilt: 0.5,
         exclusion: COVER_EXCLUSION,
         terrain: { slopeBias: { low: 0.25, high: 0.85, flat: 1.1, steep: 0.35 } },
-        mask: { strength: 0.12, featureSize: 34 },
+        cluster: { spacing: 12.5, radius: [7, 13], memberSpacing: 0.43, accept: 0.94, falloff: 0.34, dominance: 1 },
+        mask: { strength: 0.64, featureSize: 76 },
       },
     ],
   },
@@ -2177,7 +2069,7 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
           { assetId: "rock_medium_2", weight: 2, scale: [0.7, 1.2] },
           { assetId: "rock_medium_3", weight: 2, scale: [0.65, 1.15] },
         ],
-        maxCount: 150, scale: [0.8, 1.8], sizeBias: 1.8, mirror: true,
+        maxCount: 180, scale: [0.8, 1.8], sizeBias: 1.8, mirror: true,
         tilt: 0.3, sink: 0.6, castShadow: true,
         exclusion: SHRUB_EXCLUSION,
         terrain: { slopeBias: { low: 0.25, high: 0.55, flat: 0.5, steep: 2.4 } },
@@ -2189,7 +2081,7 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         // and banded to the middle of the region's 62 m amplitude: no pines on the tarn shore and
         // none on the summit.
         id: "cairnpine", assetIds: ["tree_pine_5"],
-        maxCount: 150, scale: [0.75, 1.2], sizeBias: 1.5,
+        maxCount: 175, scale: [0.75, 1.2], sizeBias: 1.5,
         tilt: 0.12, castShadow: true, mirror: true,
         exclusion: TREE_EXCLUSION,
         terrain: { slopeMax: 0.62, altitude: [0.06, 0.88], altitudeFade: 6 },
@@ -2207,7 +2099,7 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
         // x4 slope bias is what round 1 was missing: `scree` had no slope rule at all, so the grey
         // terrace tops carried the same stone density as the risers.
         id: "scree", species: STONE_SPECIES,
-        maxCount: 900, scale: [0.45, 1.4], sizeBias: 2, tilt: 1, sink: 0.06, mirror: true,
+        maxCount: 1400, scale: [0.45, 1.4], sizeBias: 2, tilt: 1, sink: 0.06, mirror: true,
         exclusion: LITTER_EXCLUSION,
         terrain: { slopeBias: { low: 0.25, high: 0.55, flat: 0.15, steep: 4 } },
         cluster: { spacing: 17, radius: [4, 13], memberSpacing: 1.2, accept: 0.7, falloff: 0.8, dominance: 0.45 },
@@ -2224,46 +2116,36 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
           // rgb(184,63,27) - the same red the `bush_common` swap was made to get rid of.
           { assetId: "grass_wispy_short", weight: 3, scale: [0.7, 1.3], tilt: 0.2 },
         ],
-        maxCount: 1500, scale: [0.6, 1.1], tilt: 0.5, mirror: true,
+        maxCount: 3600, scale: [0.6, 1.15], tilt: 0.5, mirror: true,
         exclusion: SHRUB_EXCLUSION,
         terrain: { slopeBias: { low: 0.3, high: 0.7, flat: 1.2, steep: 0.5 } },
-        cluster: { spacing: 14, radius: [4, 11], memberSpacing: 1.55, accept: 0.66, falloff: 0.75, dominance: 0.72 },
-        mask: { strength: 0.45, featureSize: 58 },
+        cluster: { spacing: 10.5, radius: [4, 12], memberSpacing: 1.25, accept: 0.78, falloff: 0.68, dominance: 0.72 },
+        mask: { strength: 0.34, featureSize: 58 },
       },
       {
-        // Thin upland turf, so this is the least dense of the three cover layers by design: a
-        // 0.72 m member spacing against the meadow's 0.62, a stronger mask, and `UPLAND_COVER`
-        // spending roughly a third of its weight on loose stone. Karrowmoor should read as turf
-        // growing through scree, not as a lawn on a hill.
+        // Upland turf stays rougher than the meadow: wider member spacing, more loose stone and a
+        // stronger mask. It should read as plants growing through scree, not as a lawn on a hill.
         id: "groundcover", species: UPLAND_COVER,
-        maxCount: 16000, scale: [0.2, 0.38], sizeBias: 1.25, tilt: 0.6, mirror: true,
+        maxCount: 32000, scale: [0.2, 0.42], sizeBias: 1.18, tilt: 0.6, mirror: true,
         exclusion: COVER_EXCLUSION,
         terrain: {
           slopeBias: { low: 0.25, high: 0.8, flat: 1.3, steep: 0.45 },
           moisture: { reach: 16, boost: 2.5 },
         },
-        cluster: { spacing: 6.6, radius: [2.0, 5.0], memberSpacing: 0.72, accept: 0.7, falloff: 0.62, dominance: 0.58 },
-        mask: { strength: 0.4, featureSize: 44 },
-        road: { band: [2.6, 6.5], perMetre: 2.0 },
-        shore: { band: [-0.6, 8], perMetre: 1.8 },
+        cluster: { spacing: 5.2, radius: [2.3, 5.8], memberSpacing: 0.56, accept: 0.8, falloff: 0.52, dominance: 0.6 },
+        mask: { strength: 0.28, featureSize: 46 },
+        road: { band: [2.6, 6.5], perMetre: 2.5 },
+        shore: { band: [-0.6, 8], perMetre: 2.3 },
       },
       {
-        // Moorland floor. The slope bias is harder here than in the other two regions because
-        // Karrowmoor's risers reach 60 degrees and a turf carpet on a 60-degree face reads as a
-        // texture bug; the `scree` layer is what dresses those, biased x4 the other way.
-        id: "carpet", species: UPLAND_CARPET,
-        spacing: 2.0, maxCount: 15000, scale: [0.18, 0.38], sizeBias: 1.25, tilt: 0.85, mirror: true,
-        exclusion: COVER_EXCLUSION,
-        terrain: { slopeBias: { low: 0.3, high: 0.8, flat: 1.2, steep: 0.3 } },
-        road: { band: [2.4, 7.5], perMetre: 1.1 },
-      },
-      {
-        // Wind-short moor grass, still thinner than the meadow. Gold remains common enough to
-        // separate the upland turf from Fallowmarch without adding another material or draw call.
+        // Wind-short moor fields, still thinner than the meadow. The broad mask leaves connected
+        // turf on terrace tops and real gaps on the risers instead of gold stems peppered everywhere.
         id: "bladecarpet", species: UPLAND_BLADES,
-        spacing: 0.8, maxCount: 80000, scale: [0.12, 0.33], sizeBias: 1.45, tilt: 0.55,
+        maxCount: 120000, scale: [0.14, 0.35], sizeBias: 1.35, tilt: 0.55,
         exclusion: COVER_EXCLUSION,
         terrain: { slopeBias: { low: 0.25, high: 0.78, flat: 1.15, steep: 0.25 } },
+        cluster: { spacing: 13, radius: [7, 13.5], memberSpacing: 0.45, accept: 0.92, falloff: 0.38, dominance: 0.72 },
+        mask: { strength: 0.62, featureSize: 86 },
       },
     ],
   },

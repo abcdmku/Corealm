@@ -11,3 +11,5 @@ The root agent owns architecture, shared contracts, integration, and acceptance.
 7. Source review is not gameplay proof. Test the real Vite game with Playwright and compare semantic state before and after actions.
 8. Inspect screenshots for visual work. A passing build does not prove that the view is readable.
 9. Critics are fresh-context, read-only reviewers. The root accepts changes only after build, browser play, state checks, and relevant screenshots pass.
+
+World, biome, water, scatter, and wind work must follow [docs/world-authoring.md](./docs/world-authoring.md).
