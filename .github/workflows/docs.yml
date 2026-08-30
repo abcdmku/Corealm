@@ -51,18 +51,30 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Historical run captures are hundreds of MB and are not build inputs.
+          sparse-checkout: |
+            .github
+            art/item-icons
+            docs/game
+            docs-site
+            game
+            tests
+            tools
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
           cache: npm
       - name: Install dependencies
         run: npm ci --prefer-offline
-      - name: Install Chromium
-        run: npx --no-install playwright install --with-deps chromium
       - name: Typecheck, test, and build
         run: npm run check
       - name: Verify generated guide is committed
         run: git diff --exit-code -- docs/game
+      - name: Install Chromium
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Test isolated feature lab
+        run: npm run lab:test
       - name: Browser smoke test
         run: npm run smoke -- --run runs/corealm
 
@@ -79,6 +91,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Keep the 700+ MB historical screenshot archive out of build checkout.
+          sparse-checkout: |
+            .github
+            art/item-icons
+            docs/game
+            docs-site
+            game
+            tests
+            tools
       # Pages must be enabled once in repository settings with "GitHub Actions" as its source.
       - uses: actions/configure-pages@v6
       - uses: actions/setup-node@v5
@@ -87,12 +109,14 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --prefer-offline
-      - name: Install Chromium
-        run: npx --no-install playwright install --with-deps chromium
       - name: Typecheck, test, and build
         run: npm run check
       - name: Verify generated guide is committed
         run: git diff --exit-code -- docs/game
+      - name: Install Chromium
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Test isolated feature lab
+        run: npm run lab:test
       - name: Browser smoke test
         run: npm run smoke -- --run runs/corealm
 

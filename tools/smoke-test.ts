@@ -1,9 +1,10 @@
 import path from "node:path";
 import { writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { GameDriver, type RuntimeSnapshot } from "./lib/driver.js";
+import { FAST_TEST_SETTINGS, GameDriver, type RuntimeSnapshot } from "./lib/driver.js";
 import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun } from "./lib/paths.js";
+import { installTestDeadline } from "./lib/deadline.js";
 
 export interface SmokeReport {
   passed: boolean;
@@ -34,11 +35,7 @@ export async function runSmokeTest(runCandidate: string): Promise<SmokeReport> {
   const driver = new GameDriver(server, {
     // The smoke gate proves renderer startup and gameplay state transitions, not visual quality.
     // Keep software-rendered CI fast enough to remain a useful per-change check.
-    settings: {
-      renderScale: 0.7, shadowQuality: "off", drawDistance: "near",
-      damageNumbers: true, invertCameraY: false, uiScale: "normal",
-      music: 0, ambient: 0, sfx: 0,
-    },
+    settings: FAST_TEST_SETTINGS,
   });
   const report: SmokeReport = {
     passed: false,
@@ -141,5 +138,10 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  const clearDeadline = installTestDeadline("smoke test");
+  try {
+    await main();
+  } finally {
+    clearDeadline();
+  }
 }

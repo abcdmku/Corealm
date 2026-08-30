@@ -4,6 +4,7 @@ import { GameDriver } from "./lib/driver.js";
 import { repoRoot } from "./lib/paths.js";
 import { startGameServer } from "./lib/server.js";
 import { ITEM_ICON_GAME_SIZE } from "./generate-item-icons.js";
+import { installTestDeadline } from "./lib/deadline.js";
 
 interface IconDomAudit {
   rasterCount: number;
@@ -14,8 +15,8 @@ interface IconDomAudit {
 }
 
 async function main(): Promise<void> {
-  const runDir = path.join(repoRoot, "runs", "corealm", "icon-browser");
-  const screenshotDir = path.join(runDir, "screenshots");
+  // Verification output is disposable. Tracked evidence is promoted separately and explicitly.
+  const screenshotDir = path.join(repoRoot, "test-results", "item-icons");
   await mkdir(screenshotDir, { recursive: true });
 
   const server = await startGameServer();
@@ -195,4 +196,9 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+const clearDeadline = installTestDeadline("item icon verification");
+try {
+  await main();
+} finally {
+  clearDeadline();
+}

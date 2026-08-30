@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SpellDef } from "../game/src/content/index.js";
 import { SPELLS, SPELLS_BY_RUNG, SPELL_RANGE_M } from "../game/src/content/spells.js";
 import { SPELL_ELEMENTS, SPELL_RUNGS } from "../game/src/contracts.js";
-import { spellFlightMs } from "../game/src/app/config.js";
+import { MELEE_RANGE, SPELL_RANGE, spellFlightMs } from "../game/src/app/config.js";
 import type { SpellElement, SpellId, SpellRung } from "../game/src/contracts.js";
 import { magicMaxHit } from "../game/src/systems/combat.js";
 import { TIERS, tierForLevel } from "../game/src/content/xp.js";
@@ -24,6 +24,8 @@ import { ALL_ITEMS } from "../game/src/content/items.js";
 
 /** The full kit's `magicPower` at tier 10, from `content/equipment.ts`'s solved header. */
 const TIER_10_MAGIC_POWER = 32;
+/** The legacy full-world verifier stages casts at this distance from its target. */
+const LEGACY_VERIFY_DISTANCE_M = 4;
 
 const BY_ID = new Map<SpellId, SpellDef>(SPELLS.map((spell) => [spell.id, spell]));
 
@@ -55,6 +57,13 @@ const AUTHORED: readonly [SpellId, SpellElement, SpellRung, number, number, numb
 ];
 
 describe("the spell ladder", () => {
+  it("keeps ranged combat at 15 m and the isolated cast position outside melee", () => {
+    expect(SPELL_RANGE).toBe(15);
+    expect(SPELL_RANGE_M).toBe(SPELL_RANGE);
+    expect(LEGACY_VERIFY_DISTANCE_M).toBeGreaterThan(MELEE_RANGE);
+    expect(LEGACY_VERIFY_DISTANCE_M).toBeLessThan(SPELL_RANGE);
+  });
+
   it("is the sixteen authored rows, in unlock order, with no duplicates", () => {
     expect(SPELLS).toHaveLength(AUTHORED.length);
     expect(BY_ID.size).toBe(AUTHORED.length);

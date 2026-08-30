@@ -19,7 +19,7 @@
  * resolved inside a function body instead.
  */
 import type {
-  EntityId, GameApi, ItemDef, ItemId, ItemStack, QuestId, RegionId, Result, SkillId, Vec3,
+  EntityId, FeatureLabApi, GameApi, ItemDef, ItemId, ItemStack, QuestId, RegionId, Result, SkillId, Vec3,
 } from "../contracts.js";
 import { content } from "../content/index.js";
 import { SKILLS } from "../content/skills.js";
@@ -41,6 +41,7 @@ import { DialoguePanel } from "./dialoguePanel.js";
 import { ControlsPanel } from "./controlsPanel.js";
 import { MapPanel } from "./mapPanel.js";
 import { SpellbookPanel } from "./spellbookPanel.js";
+import { FeatureLabPanel } from "./featureLabPanel.js";
 import { DeathScreen, type DeathDetail } from "./deathScreen.js";
 import { TitleScreen } from "./titleScreen.js";
 import { SettingsPanel } from "./settingsPanel.js";
@@ -628,6 +629,8 @@ export interface UiOptions {
    * destination marker. Comes from the store because `GameApi` does not expose the live path.
    */
   getDestination?(): Vec3 | null;
+  /** Present only in the transient real-engine lab; enables setup controls in production panels. */
+  featureLab?: FeatureLabApi;
 }
 
 export interface Ui {
@@ -689,12 +692,13 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   const inventory = new InventoryPanel(context);
   const skillGuide = new SkillGuidePanel(context);
   const skills = new SkillsPanel(context, (skill) => skillGuide.openFor(skill));
-  const equipment = new EquipmentPanel(context);
+  const equipment = new EquipmentPanel(context, options.featureLab);
   const quests = new QuestPanel(context);
   const dialogue = new DialoguePanel(context);
   const controls = new ControlsPanel(context);
   const map = new MapPanel(context);
   const spellbook = new SpellbookPanel(context);
+  const featureLab = options.featureLab ? new FeatureLabPanel(context, options.featureLab) : null;
   let titleCoveredBySettings = false;
   const settingsPanel = new SettingsPanel(context, settings, () => {
     if (!titleCoveredBySettings) return;
@@ -706,6 +710,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   const panels: ManagedPanel[] = [
     inventory, skills, skillGuide, equipment, quests, map, controls, dialogue, settingsPanel,
     bank, shop, spellbook,
+    ...(featureLab ? [featureLab] : []),
   ];
 
   const death = new DeathScreen(context);
@@ -735,6 +740,8 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   // are deliberately not on it: both are opened by standing at one, and a button that answers
   // "you are not at a bank" is worse than no button.
   const dock = new PanelDock([
+    ...(featureLab ? [{ id: "feature-lab", label: "Lab", key: "l", glyph: "LAB",
+      toggle: () => featureLab.frame.toggle(), isOpen: () => featureLab.frame.isOpen() }] : []),
     { id: "inventory", label: "Pack", key: "i", glyph: "▦",
       toggle: () => inventory.frame.toggle(), isOpen: () => inventory.frame.isOpen(),
       badge: () => {
@@ -792,6 +799,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       tracker.mount(root);
       dock.mount(root);
       for (const panel of panels) panel.frame.mount(root);
+      featureLab?.frame.open();
       // Both of these cover the screen, so they mount last and sit above the panels.
       death.mount(root);
       title.mount(root);

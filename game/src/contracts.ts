@@ -636,6 +636,96 @@ export interface OverlaySpec {
 
 export type MoveTarget = { entityId: EntityId } | { position: Vec3 } | { locationId: string };
 
+// ------------------------------------------------------ the real-engine feature lab
+
+/** The two semantic actor families the empty production-engine lab can place. */
+export type FeatureLabTargetKind = "npc" | "creature";
+
+/** A canonical spawn choice. Rendering and combat data stay behind the id in production content. */
+export interface FeatureLabPreset {
+  id: string;
+  label: string;
+  kind: FeatureLabTargetKind;
+  tier: number;
+}
+
+export interface FeatureLabCatalog {
+  targets: Readonly<Record<FeatureLabTargetKind, readonly FeatureLabPreset[]>>;
+  equipment: readonly {
+    slot: EquipSlot;
+    label: string;
+    items: readonly { id: ItemId; label: string }[];
+  }[];
+  skills: readonly { id: SkillId; label: string }[];
+  spells: readonly { id: SpellId; label: string }[];
+}
+
+/** Narrow animation evidence published without making contracts depend on the render layer. */
+export interface FeatureLabMotionView {
+  pose?: string;
+  motion?: string | null;
+  clip?: string | null;
+  time?: number | null;
+  liveRig?: boolean;
+}
+
+/** Semantic and visual evidence from the empty world driven by the normal Corealm engine. */
+export interface FeatureLabState {
+  ready: boolean;
+  engine: "corealm-production";
+  world: "empty-flat";
+  player: PlayerView;
+  playerPosition: Vec3;
+  playerMotion: FeatureLabMotionView | null;
+  movement: {
+    mode: "idle" | "path" | "direct";
+    destination: Vec3 | null;
+    destinationEntityId: EntityId | null;
+  };
+  selectedEntityId: EntityId | null;
+  target: {
+    kind: FeatureLabTargetKind;
+    presetId: string;
+    entityId: EntityId;
+    name: string;
+    state: string;
+    position: Vec3;
+    screen: readonly [number, number] | null;
+    health: number | null;
+    maxHealth: number | null;
+    motion: FeatureLabMotionView | null;
+  } | null;
+  equipment: Record<EquipSlot, ItemId | null>;
+  equipmentTotals: EquipmentBonuses;
+  levels: Record<SkillId, number>;
+  spellId: SpellId | null;
+  liveSpellParticles: number;
+  counters: {
+    navigationStarted: number;
+    navigationCompleted: number;
+    combatStarted: number;
+    spellLaunched: number;
+  };
+  errors: string[];
+}
+
+/** Browser/control surface for setup only; ordinary play still goes through real pointer input. */
+export interface FeatureLabApi {
+  getState(): FeatureLabState;
+  getCatalog(): FeatureLabCatalog;
+  spawnTarget(kind: FeatureLabTargetKind, presetId: string): Promise<FeatureLabState>;
+  setLevel(skillId: SkillId, level: number): FeatureLabState;
+  equipPlayer(slot: EquipSlot, itemId: ItemId | null): Promise<FeatureLabState>;
+  setSpell(spellId: SpellId): FeatureLabState;
+  perform(action: "attack" | "cast" | "reset-player"): Promise<FeatureLabState>;
+}
+
+declare global {
+  interface Window {
+    __featureLab?: FeatureLabApi;
+  }
+}
+
 // --------------------------------------------------------------- the API
 
 /**

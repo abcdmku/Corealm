@@ -21,6 +21,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Page } from "playwright";
 import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun } from "./lib/paths.js";
+import { installTestDeadline } from "./lib/deadline.js";
 import type {} from "./lib/debug-api.js";
 
 export interface ProofResult {
@@ -409,5 +410,10 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  const clearDeadline = installTestDeadline("agent proof");
+  try {
+    await main();
+  } finally {
+    clearDeadline();
+  }
 }

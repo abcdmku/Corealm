@@ -1,9 +1,15 @@
 import path from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { GameDriver, type RuntimeSnapshot } from "./lib/driver.js";
+import {
+  FAST_TEST_SETTINGS,
+  GameDriver,
+  type RuntimeSnapshot,
+  type SnapshotProfile,
+} from "./lib/driver.js";
 import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun, repoRoot, resolveInside, safeName } from "./lib/paths.js";
+import { installTestDeadline } from "./lib/deadline.js";
 
 type MouseButton = "left" | "right" | "middle";
 
@@ -21,6 +27,8 @@ type PlayAction =
 
 interface PlayScenario {
   name: string;
+  /** Full entity rows are for targeted diagnostics only; normal play reports stay lean. */
+  snapshot?: SnapshotProfile;
   actions: PlayAction[];
 }
 
@@ -54,7 +62,8 @@ export async function runPlayScenario(runCandidate: string, scenarioCandidate: s
   const scenarioPath = resolveInside(repoRoot, scenarioCandidate);
   const scenario = validateScenario(JSON.parse(await readFile(scenarioPath, "utf8")) as unknown);
   const server = await startGameServer();
-  const driver = new GameDriver(server);
+  const capturesVisuals = scenario.actions.some((action) => "screenshot" in action);
+  const driver = new GameDriver(server, capturesVisuals ? {} : { settings: FAST_TEST_SETTINGS });
   const report: PlayReport = {
     scenario: scenario.name,
     startedAt: new Date().toISOString(),
@@ -69,11 +78,12 @@ export async function runPlayScenario(runCandidate: string, scenarioCandidate: s
   try {
     await driver.launch();
     await driver.open();
-    report.initial = await driver.snapshot();
+    let current = await driver.snapshot(scenario.snapshot);
+    report.initial = current;
 
     for (let index = 0; index < scenario.actions.length; index += 1) {
       const action = scenario.actions[index]!;
-      const before = await driver.snapshot();
+      const before = current;
       const step: PlayStep = { index: index + 1, action, before, after: before, changed: false };
       try {
         if ("key" in action) await driver.press(action.key, boundedWait(action.holdMs ?? 0));
@@ -92,12 +102,13 @@ export async function runPlayScenario(runCandidate: string, scenarioCandidate: s
       } catch (error) {
         step.error = error instanceof Error ? error.message : String(error);
       }
-      step.after = await driver.snapshot();
+      step.after = await driver.snapshot(scenario.snapshot);
       step.changed = semanticFingerprint(step.before) !== semanticFingerprint(step.after);
       report.actions.push(step);
+      current = step.after;
     }
 
-    report.final = await driver.snapshot();
+    report.final = current;
     report.passed = report.actions.every((step) => !step.error) && driver.consoleErrors.length === 0 && driver.pageErrors.length === 0;
   } finally {
     await driver.close();
@@ -120,6 +131,9 @@ function validateScenario(input: unknown): PlayScenario {
   if (!input || typeof input !== "object") throw new Error("Scenario must be an object");
   const value = input as Partial<PlayScenario>;
   if (typeof value.name !== "string" || value.name.length === 0) throw new Error("Scenario needs a name");
+  if (value.snapshot !== undefined && value.snapshot !== "lean" && value.snapshot !== "full") {
+    throw new Error("Scenario snapshot must be either lean or full");
+  }
   if (!Array.isArray(value.actions) || value.actions.length === 0 || value.actions.length > MAX_ACTIONS) {
     throw new Error(`Scenario needs 1 to ${MAX_ACTIONS} actions`);
   }
@@ -171,5 +185,10 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  const clearDeadline = installTestDeadline("scripted play");
+  try {
+    await main();
+  } finally {
+    clearDeadline();
+  }
 }

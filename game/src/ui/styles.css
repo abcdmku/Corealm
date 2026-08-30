@@ -1032,6 +1032,86 @@ html, body {
 .equip-totals dd { margin: 0; text-align: right; font-weight: 700; }
 .equip-totals dd.is-zero { color: var(--ink-faint); font-weight: 400; }
 
+/* The real-engine lab extends this exact panel with catalog-complete setup choices. */
+.equip-figure--lab .slot.is-empty { cursor: pointer; }
+.equip-figure--lab .slot.is-empty:hover { border-color: var(--panel-edge-bright); background: rgba(212, 175, 78, 0.08); }
+.equip-chooser {
+  padding-top: var(--space-2);
+  border-top: var(--border);
+}
+.equip-chooser[hidden] { display: none; }
+.equip-chooser__title {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--highlight);
+  font-size: var(--size-sm);
+}
+.equip-chooser__items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  max-height: 174px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.equip-chooser__choice {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 34px;
+  padding: 1px var(--space-1);
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--size-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.equip-chooser__choice:hover { border-color: var(--panel-edge-bright); background: rgba(212, 175, 78, 0.08); }
+.equip-chooser__choice.is-selected { border-color: var(--accent); background: rgba(212, 175, 78, 0.13); }
+.equip-chooser__choice .item-icon { position: relative; display: block; width: 30px; height: 30px; }
+.equip-chooser__choice .item-icon .icon,
+.equip-chooser__choice .item-icon__raster { position: absolute; inset: 0; width: 100%; height: 100%; }
+.equip-chooser__choice .item-icon .icon { fill: #f4efe3; }
+.equip-chooser__choice .item-icon__raster { object-fit: contain; }
+.equip-chooser__choice .item-icon.is-raster-ready .icon { visibility: hidden; }
+.equip-chooser__choice:first-child { grid-template-columns: 1fr; padding-left: var(--space-2); }
+
+/* Transient setup controls around the real production game, never a second simulation. */
+.lab-intro { margin-top: 0; line-height: 1.35; }
+.lab-field {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+.lab-field select,
+.lab-field input {
+  width: 100%;
+  min-width: 0;
+}
+.lab-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.lab-actions .btn:last-child { grid-column: 1 / -1; }
+.lab-gear-note { margin: 0; line-height: 1.3; }
+.lab-structures-link { display: block; text-align: center; text-decoration: none; }
+.lab-status {
+  margin: 0;
+  padding: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-sunken);
+  color: var(--ink-dim);
+  font-size: var(--size-xs);
+  line-height: 1.35;
+}
+
 /* -------------------------------------------------------------------- bank */
 
 .bank-columns { display: flex; gap: var(--space-3); align-items: flex-start; }

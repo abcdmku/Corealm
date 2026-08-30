@@ -45,6 +45,10 @@ The game remains a normal Vite application and never imports the harness at runt
 
 ```bash
 npm run dev
+npm run test:watch
+npm run structure:contracts:watch
+npm run lab:preview
+npm run lab:test
 npm run check
 npm run smoke -- --run runs/my-game
 npm run play -- --run runs/my-game --scenario tools/scenarios/my-game.json
@@ -53,6 +57,8 @@ npm run game-agent -- critic-pack --run runs/my-game
 ```
 
 `npm run check` is the local CI loop: typecheck, all unit tests, and the game and guide production builds. `dev`, `build`, and browser commands intentionally stop with a clear message while `game/index.html` is absent.
+
+Use the persistent realtime feature lab to develop and deeply test structures, the main player, NPCs, creatures, animations, melee, and spells without booting the full world. It supports equipment selection by slot and editable player skill levels as isolated setup state for presentation and feature tests. After a feature passes the focused tests and `npm run lab:test`, its final-world test should verify wiring and representative behavior, including real progression and equipment-rule integration, rather than repeat the lab's full matrix. See the authoritative [feature-lab workflow and budgets](./docs/feature-lab.md); the lab deliberately does not replace terrain, navigation, physics, quests, economy, or world-layout integration tests.
 
 Generated icons, world maps, and guide captures are committed inputs to normal development and CI. Refresh text with `npm run docs:refresh`; use `npm run assets:refresh` or `npm run docs:refresh:visuals` only when those generated visuals intentionally need to change. The visual commands boot Chromium and are deliberately not part of `dev`, `build`, `check`, or deployment.
 

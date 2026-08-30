@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { GameDriver } from "./lib/driver.js";
 import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun } from "./lib/paths.js";
+import { installTestDeadline } from "./lib/deadline.js";
 
 export async function captureScreenshot(runCandidate: string, name: string, preset?: string): Promise<string> {
   const runDir = await prepareRun(runCandidate);
@@ -35,5 +36,10 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  const clearDeadline = installTestDeadline("screenshot capture");
+  try {
+    await main();
+  } finally {
+    clearDeadline();
+  }
 }

@@ -18,6 +18,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "playwright";
 import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun } from "./lib/paths.js";
+import { installTestDeadline } from "./lib/deadline.js";
 import type {} from "./lib/debug-api.js";
 
 const GPU_ARGS = [
@@ -57,6 +58,9 @@ export interface PerfReport {
 
 const TARGET_FPS = 60;
 const BUDGET_MS = 1000 / TARGET_FPS;
+const MIN_SAMPLE_SECONDS = 1;
+const MAX_SAMPLE_SECONDS = 30;
+const MAX_TOTAL_SAMPLE_SECONDS = 180;
 
 /**
  * Draw-call ceiling from runs/corealm/architecture.md correction R6.
@@ -97,6 +101,9 @@ export async function runPerfTest(
   shots: string[],
   seconds: number,
 ): Promise<PerfReport> {
+  if (!Number.isFinite(seconds) || seconds < MIN_SAMPLE_SECONDS || seconds > MAX_SAMPLE_SECONDS) {
+    throw new Error(`Sample duration must be between ${MIN_SAMPLE_SECONDS} and ${MAX_SAMPLE_SECONDS} seconds`);
+  }
   const runDir = await prepareRun(runCandidate);
   const server = await startGameServer();
 
@@ -140,6 +147,16 @@ export async function runPerfTest(
       return typeof api?.listShots === "function" ? api.listShots() : [];
     })) as string[];
     const requested = shots.length > 0 ? shots : available.length > 0 ? available : ["default"];
+    const unknown = requested.filter((shot) => shot !== "default" && !available.includes(shot));
+    if (unknown.length > 0) {
+      throw new Error(`Unknown performance shot(s): ${unknown.join(", ")}`);
+    }
+    if (requested.length * seconds > MAX_TOTAL_SAMPLE_SECONDS) {
+      throw new Error(
+        `Requested ${requested.length * seconds} sample-seconds; split the run into shards of at most `
+          + `${MAX_TOTAL_SAMPLE_SECONDS} sample-seconds`,
+      );
+    }
     if (requested.length === 1 && requested[0] === "default") {
       report.errors.push(
         "Only the default pose was measured. The game exposes no __gameDebug.listShots(), so this "
@@ -212,7 +229,7 @@ async function main(): Promise<void> {
   const shots = (argValue(args, "--shots") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
   const seconds = Number(argValue(args, "--seconds") ?? 6);
 
-  const report = await runPerfTest(runCandidate, shots, Number.isFinite(seconds) ? seconds : 6);
+  const report = await runPerfTest(runCandidate, shots, seconds);
   console.log(JSON.stringify({
     renderer: report.renderer,
     usedRealGpu: report.usedRealGpu,
@@ -224,5 +241,10 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  await main();
+  const clearDeadline = installTestDeadline("performance test");
+  try {
+    await main();
+  } finally {
+    clearDeadline();
+  }
 }
