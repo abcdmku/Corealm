@@ -181,6 +181,110 @@ function exactMetresPerPixel(layout: MapLayout, width: number, height: number): 
   return horizontal;
 }
 
+function medianFromHistogram(histogram: Uint32Array, count: number): number {
+  const middle = Math.ceil(count / 2);
+  let seen = 0;
+  for (let value = 0; value < histogram.length; value += 1) {
+    seen += histogram[value]!;
+    if (seen >= middle) return value;
+  }
+  throw new Error("Cannot measure an empty ocean sample.");
+}
+
+/**
+ * The capture extends to the next tile boundary beyond the coast mesh. In that outer strip, the
+ * transparent ocean plane sits over the scene background instead of the coast floor, which makes a
+ * rectangular light frame. Match only that strip to the adjacent guaranteed-ocean band. The organic
+ * shoreline ends before either sample, so terrain, roads, lakes, props and entities stay untouched.
+ */
+async function normalizeOceanBackdrop(layout: MapLayout, sourceImage: Buffer): Promise<Buffer> {
+  const coast = buildWorldTerrainSpec().coast;
+  if (!coast) throw new Error("World-map ocean normalization needs the authored coast spec.");
+  const metresPerPixel = exactMetresPerPixel(layout, layout.width, layout.height);
+  const backdropMetres = layout.imagePaddingMetres - coast.collar;
+  const backdropPixels = backdropMetres / metresPerPixel;
+  if (backdropMetres <= 0 || !Number.isInteger(backdropPixels)) {
+    throw new Error(
+      `World-map ocean backdrop is ${backdropMetres} m (${backdropPixels} px); expected a positive whole-pixel strip.`,
+    );
+  }
+  const safeOceanMetres = coast.collar - coast.shoreline[1];
+  if (safeOceanMetres <= metresPerPixel * 2) {
+    throw new Error("The authored coast leaves no safe ocean-only band for backdrop normalization.");
+  }
+  // Sample half the guaranteed gap between the maximum shoreline reach and the coast-floor edge.
+  const referenceBandPixels = Math.max(1, Math.floor((safeOceanMetres / 2) / metresPerPixel));
+  const { data, info } = await sharp(sourceImage)
+    .toColourspace("srgb")
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  if (info.width !== layout.width || info.height !== layout.height || info.channels !== 3) {
+    throw new Error("World-map ocean normalization needs an RGB capture at the authored dimensions.");
+  }
+
+  const outerHistograms = Array.from({ length: 3 }, () => new Uint32Array(256));
+  const innerHistograms = Array.from({ length: 3 }, () => new Uint32Array(256));
+  let outerCount = 0;
+  let innerCount = 0;
+  const right = info.width - backdropPixels;
+  const bottom = info.height - backdropPixels;
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      const outer = x < backdropPixels || x >= right || y < backdropPixels || y >= bottom;
+      const insideCoastFloor = x >= backdropPixels && x < right && y >= backdropPixels && y < bottom;
+      const inner = insideCoastFloor && (
+        x < backdropPixels + referenceBandPixels
+        || x >= right - referenceBandPixels
+        || y < backdropPixels + referenceBandPixels
+        || y >= bottom - referenceBandPixels
+      );
+      if (!outer && !inner) continue;
+      const offset: number = (y * info.width + x) * info.channels;
+      const histograms = outer ? outerHistograms : innerHistograms;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const histogram = histograms[channel]!;
+        const value = data[offset + channel]!;
+        histogram[value] = (histogram[value] ?? 0) + 1;
+      }
+      if (outer) outerCount += 1;
+      else innerCount += 1;
+    }
+  }
+  const outerMedian = outerHistograms.map((histogram) => medianFromHistogram(histogram, outerCount));
+  const innerMedian = innerHistograms.map((histogram) => medianFromHistogram(histogram, innerCount));
+  const channelOffsets = innerMedian.map((value, channel) => value - outerMedian[channel]!);
+  const minimumOffset = Math.min(...channelOffsets);
+  const maximumOffset = Math.max(...channelOffsets);
+  if (minimumOffset < -32 || maximumOffset > 1 || maximumOffset - minimumOffset > 2) {
+    throw new Error(
+      `Unsafe ocean backdrop correction ${JSON.stringify(channelOffsets)} from `
+        + `${JSON.stringify(outerMedian)} to ${JSON.stringify(innerMedian)}.`,
+    );
+  }
+  // A normalized checked-in source comes through this path on every targeted regeneration.
+  if (channelOffsets.every((offset) => Math.abs(offset) <= 1)) return sourceImage;
+
+  const corrected = Buffer.from(data);
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      if (x >= backdropPixels && x < right && y >= backdropPixels && y < bottom) continue;
+      const offset: number = (y * info.width + x) * info.channels;
+      for (let channel = 0; channel < 3; channel += 1) {
+        corrected[offset + channel] = Math.max(
+          0,
+          Math.min(255, corrected[offset + channel]! + channelOffsets[channel]!),
+        );
+      }
+    }
+  }
+  // True-colour PNG keeps every pixel inside the corrected ring byte-exact. Palette re-quantizing
+  // the whole capture would needlessly move colours on roads, lakes and the organic shoreline.
+  return sharp(corrected, { raw: info })
+    .png({ compressionLevel: 9, palette: false })
+    .toBuffer();
+}
+
 async function renderRendition(
   sourceImage: Buffer,
   outputDir: string,
@@ -220,6 +324,7 @@ async function writeWorldMapArtifacts(layout: MapLayout, sourceImage: Buffer): P
         + `expected ${layout.width}x${layout.height} from the authored bounds.`,
     );
   }
+  const normalizedSourceImage = await normalizeOceanBackdrop(layout, sourceImage);
 
   const outputDir = path.join(gameRoot, "public", "generated");
   const generatedSourceDir = path.join(gameRoot, "src", "generated");
@@ -227,15 +332,15 @@ async function writeWorldMapArtifacts(layout: MapLayout, sourceImage: Buffer): P
     mkdir(outputDir, { recursive: true }),
     mkdir(generatedSourceDir, { recursive: true }),
   ]);
-  await writeFile(path.join(outputDir, SOURCE_IMAGE_FILE), sourceImage);
+  await writeFile(path.join(outputDir, SOURCE_IMAGE_FILE), normalizedSourceImage);
 
-  const minimap = await renderRendition(sourceImage, outputDir, layout, MINIMAP_RENDITION);
+  const minimap = await renderRendition(normalizedSourceImage, outputDir, layout, MINIMAP_RENDITION);
   const detail: MapRenditionMetadata[] = [];
   for (const rendition of DETAIL_RENDITIONS) {
-    detail.push(await renderRendition(sourceImage, outputDir, layout, rendition));
+    detail.push(await renderRendition(normalizedSourceImage, outputDir, layout, rendition));
   }
 
-  const sourceSha256 = createHash("sha256").update(sourceImage).digest("hex");
+  const sourceSha256 = createHash("sha256").update(normalizedSourceImage).digest("hex");
   const renderFingerprint = createHash("sha256")
     .update(JSON.stringify({
       schemaVersion: 4,
@@ -256,7 +361,7 @@ async function writeWorldMapArtifacts(layout: MapLayout, sourceImage: Buffer): P
       format: "png",
       width: layout.width,
       height: layout.height,
-      bytes: sourceImage.byteLength,
+      bytes: normalizedSourceImage.byteLength,
       sha256: sourceSha256,
     },
     // Kept for consumers of the v3 metadata. The source capture is still the canonical map image.
