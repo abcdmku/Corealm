@@ -31,7 +31,7 @@ import type { Rng, RngStreams } from "../core/rng.js";
 import { COMBAT_TICK_MS } from "../core/time.js";
 import { bearingXZ, clamp, distanceXZ, turnToward } from "../core/math.js";
 import {
-  HEALTH_REGEN_BLOCKED_MS, MELEE_RANGE, SPELL_RANGE, spellFlightMs,
+  HEALTH_REGEN_BLOCKED_MS, MELEE_RANGE, PLAYER_RADIUS, SPELL_RANGE, spellFlightMs,
 } from "../app/config.js";
 import type { InteractionDispatcher } from "../world/interactions.js";
 import type { TickSystem } from "../app/loop.js";
@@ -71,8 +71,59 @@ export const UNARMED_ATTACK_SPEED_MS = 2_400;
 /** How far the player will walk to keep an auto-attack alive before giving up. */
 export const MAX_PURSUE_METRES = 32;
 
+/**
+ * Metres of daylight kept between two bodies' SURFACES when they square up to fight.
+ *
+ * Melee distances used to be centre-to-centre constants tuned on the smallest animals, and body
+ * size never entered them: a Redsill cow is 2.53 m nose to tail (`bodyRadius` 1.27 m), so the old
+ * 1.35 m standoff parked its muzzle inside the player, and the player's 1.6 m swing gate could
+ * only be satisfied from inside the cow. Reported from play as "they get too close to each other
+ * to fight". Every melee range below therefore adds the creature's own measured half-length, so
+ * the constants describe the gap between BODIES and mean the same thing for a hen and an aurochs.
+ */
+const MELEE_DAYLIGHT_METRES = 0.5;
+
+/**
+ * Where an enemy stops closing, centre to centre, before the body-size term.
+ *
+ * The floor keeps the smallest animals exactly where they have always stood — a hen's
+ * radius-aware standoff (0.35 + 0.2 + 0.5 = 1.05) is under this floor, so nothing tuned against
+ * the old constant moves.
+ */
+const ENEMY_STANDOFF_BASE_METRES = 1.35;
+
+/** Slack past its standoff an enemy may still swing from, absorbing separation shoves. */
+const ENEMY_SWING_SLACK_METRES = 0.65;
+
+/**
+ * The player stops pursuing this far inside their own reach, so one footstep of the target
+ * cannot immediately leave range. The melee analogue of `RANGED_APPROACH_SLACK`, and the number
+ * is derived, not chosen: `MELEE_RANGE - PLAYER_RADIUS - MELEE_DAYLIGHT_METRES`
+ * (1.6 - 0.35 - 0.5), so reach minus slack is `PLAYER_RADIUS + bodyRadius + daylight` — exactly
+ * the ring the enemy's own standoff stops it on. Both parties walk to the same distance and meet
+ * with the authored daylight between their bodies. `tests/meleeSpacing.test.ts` pins the identity.
+ */
+const MELEE_APPROACH_SLACK = 0.75;
+
+/** The half-length the world layer measured for this creature, or 0 when it authored none. */
+function bodyRadiusOf(entity: SemanticEntity): number {
+  return entity.combat?.bodyRadius ?? 0;
+}
+
+/** Where a creature of this half-length stops closing on the player, centre to centre. */
+export function enemyStandoffMetres(bodyRadius: number): number {
+  return Math.max(ENEMY_STANDOFF_BASE_METRES, PLAYER_RADIUS + bodyRadius + MELEE_DAYLIGHT_METRES);
+}
+
 /** An enemy needs to be a little inside melee range to land a swing. */
-export const ENEMY_ATTACK_RANGE = MELEE_RANGE + 0.4;
+export function enemyAttackRangeMetres(bodyRadius: number): number {
+  return enemyStandoffMetres(bodyRadius) + ENEMY_SWING_SLACK_METRES;
+}
+
+/** The player's melee reach to THIS creature: sword range to its surface, not its centre. */
+export function meleeReachMetres(bodyRadius: number): number {
+  return MELEE_RANGE + bodyRadius;
+}
 
 /** Enemy corpses come back on a timer. Content carries no respawn field, so these are the default. */
 export const ENEMY_RESPAWN_MS = 30_000;
@@ -389,7 +440,7 @@ export class CombatSystem implements TickSystem {
 
     const speedMs = this.weaponSpeedMs();
     this.engagePlayer(state, entity, null, atMs);
-    if (gap > MELEE_RANGE) this.pursue(state, entity, atMs);
+    if (gap > meleeReachMetres(bodyRadiusOf(entity))) this.pursue(state, entity, atMs);
     return ok({ targetId: entity.id, attackSpeedMs: attackIntervalMs(speedMs) });
   }
 
@@ -501,7 +552,7 @@ export class CombatSystem implements TickSystem {
 
     const spellId = state.combat.activeSpellId;
     const spell = spellId ? content.spell(spellId) : undefined;
-    const range = spell ? SPELL_RANGE : MELEE_RANGE;
+    const range = spell ? SPELL_RANGE : meleeReachMetres(bodyRadiusOf(entity));
     const gap = distanceXZ(state.player.position, entity.position);
 
     if (gap > range) {
@@ -713,7 +764,7 @@ export class CombatSystem implements TickSystem {
    * Walks the player back into range of a target that has moved, and no further.
    *
    * The stop distance is the reach of what is actually in hand, so a caster re-closes to the edge of
-   * SPELL_RANGE and a swordsman closes all the way. Without it a spell that lost its target by a
+   * SPELL_RANGE and a swordsman closes to the target's body. Without it a spell that lost its target by a
    * step walked the caster the full fifteen metres onto it, which threw away the whole advantage of
    * a ranged attack every time an enemy repositioned — and enemies reposition constantly.
    *
@@ -728,8 +779,12 @@ export class CombatSystem implements TickSystem {
     if (movement.mode !== "idle") return movement.destinationEntityId === entity.id;
     if (distanceXZ(state.player.position, entity.position) > MAX_PURSUE_METRES) return false;
 
-    const reach = state.combat.activeSpellId !== null ? SPELL_RANGE : MELEE_RANGE;
-    const stopDistance = reach > MELEE_RANGE ? Math.max(0, reach - RANGED_APPROACH_SLACK) : 0;
+    // Melee no longer closes all the way onto the target's CENTRE: reach minus the approach slack
+    // is the same ring the enemy's own standoff puts it on, so the two meet with daylight between
+    // their bodies instead of the player standing inside a cow.
+    const melee = state.combat.activeSpellId === null;
+    const reach = melee ? meleeReachMetres(bodyRadiusOf(entity)) : SPELL_RANGE;
+    const stopDistance = Math.max(0, reach - (melee ? MELEE_APPROACH_SLACK : RANGED_APPROACH_SLACK));
     return move.startPath(state, entity.position, entity.id, atMs, { stopDistance }) !== null;
   }
 
@@ -755,7 +810,7 @@ export class CombatSystem implements TickSystem {
 
       // Being hunted blocks regeneration even while the enemy is still closing (PRD 2.3).
       this.markInCombat(state, atMs);
-      if (gap > ENEMY_ATTACK_RANGE) continue;
+      if (gap > enemyAttackRangeMetres(bodyRadiusOf(entity))) continue;
 
       const intervalMs = attackIntervalMs(def.attackSpeedMs);
       const due = this.enemyNextAttackAtMs.get(enemyId);

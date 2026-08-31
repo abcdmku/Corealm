@@ -120,12 +120,21 @@ try {
     // the drawn root is still advancing. Every flip restarts a 0.18 s crossfade, so a handful per
     // second is a body stuck half-blended between two poses.
     let midStrideFlips = 0;
+    // And the arrival defect, which is its mirror: frames where a gait cycle is still playing
+    // while the root has not moved for 300 ms — a creature galloping on the spot after reaching
+    // its target.
+    let gaitOnSpotFrames = 0;
+    let lastRootMoveMs = frames[0]?.atMs ?? 0;
 
     for (let i = 1; i < frames.length; i += 1) {
       const a = frames[i - 1]!;
       const b = frames[i]!;
       const rootStep = Math.hypot(b.drawn[0]! - a.drawn[0]!, b.drawn[2]! - a.drawn[2]!);
+      if (rootStep > 1e-4) lastRootMoveMs = b.atMs;
       if (a.motion !== b.motion && rootStep > 1e-4) midStrideFlips += 1;
+      if ((b.motion === "walk" || b.motion === "run") && b.atMs - lastRootMoveMs > 300) {
+        gaitOnSpotFrames += 1;
+      }
       if (a.clip !== null && a.clip === b.clip && a.clipTime !== null && b.clipTime !== null
         && (b.timeScale ?? 0) > 0 && b.path === "live-rig") {
         animatedFrames += 1;
@@ -167,6 +176,7 @@ try {
     console.log(`  mixer: animated-frame pairs ${animatedFrames}, STARVED (clip frozen) ${starved}, worst streak ${worstStarveStreak}, BACKWARDS ${backwards}`);
     console.log(`  root: moving pairs ${movingFrames}, reversals ${reversals}, lateral drift total ${lateralEnergy.toFixed(4)} m`);
     console.log(`  MID-STRIDE MOTION FLIPS (the shake): ${midStrideFlips}`);
+    console.log(`  GAIT-ON-THE-SPOT frames (the extra gallop): ${gaitOnSpotFrames}`);
   }
 } finally {
   await page.close().catch(() => undefined);

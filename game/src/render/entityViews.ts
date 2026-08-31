@@ -470,6 +470,30 @@ const WALK_RATE_MAX = 3.2;
  */
 const MAX_WALK_CADENCE_HZ = 2.4;
 
+/**
+ * The fastest a RUN cycle may be played, in cycles per second.
+ *
+ * Separate from the walk ceiling because the gaits genuinely differ: quadruped walks and trots
+ * top out around 2.5 Hz, but gallop stride frequency runs to 3 and beyond. Applying the 2.4 walk
+ * cap to runs forced `content/enemies.ts` to tune pursuit speeds to exactly the cap (the cattle
+ * sit at 2.40 Hz to the second decimal), which left NO headroom for a leash return — returnSpeed
+ * is 1.16x pursuit, its cadence wants 2.79 Hz, and the cap shaved the legs 14% under the ground
+ * they covered: the run reading "a hair too slow" on every walk home.
+ */
+const MAX_RUN_CADENCE_HZ = 3.0;
+
+/**
+ * Whole sim ticks with no displacement after which a mover's gait pose drops to idle.
+ *
+ * One, and that is not hasty: the AI steps a moving creature every single 100 ms tick, so a whole
+ * tick without displacement IS the stop, not noise. Waiting for the 4 Hz structural sync's
+ * two-cycle hysteresis instead held the gait for 250-500 ms after arrival — at a cattle run
+ * cadence that is exactly "one extra gallop on the spot when it reaches its target", which is how
+ * play reported it. `MOVING_HOLD_SYNCS` stays as the structural path's own hysteresis; this is
+ * the fast path that ends the gait the moment the simulation stops moving the body.
+ */
+const SETTLED_TICKS_TO_IDLE = 1;
+
 /** Measured planted-foot speed of Jog_Fwd_Loop in the shared humanoid animation library. */
 const HUMANOID_JOG_IMPLIED_MPS = 5.92;
 
@@ -812,9 +836,15 @@ export function orderAnimationBudget(
  * speed by a walk cycle's stride asks for a rate several times too high, and the legs race.
  */
 function gaitSpeed(
-  record: { moveSpeedMps?: number; walkSpeedMps?: number },
+  record: { moveSpeedMps?: number; walkSpeedMps?: number; gaitSpeedMps?: number },
   motion: CharacterMotion,
 ): number | undefined {
+  // The published live speed wins: it is the one number that is correct in every mode, where the
+  // fallbacks have to guess which authored speed the AI happens to be using — and guess wrong
+  // for a leash return, which hurries at 1.16x the pursuit speed.
+  if ((motion === "run" || motion === "walk") && record.gaitSpeedMps !== undefined) {
+    return record.gaitSpeedMps;
+  }
   if (motion === "run") return record.moveSpeedMps;
   if (motion === "walk") return record.walkSpeedMps ?? record.moveSpeedMps;
   return record.moveSpeedMps;
@@ -1255,6 +1285,10 @@ interface ViewRecord {
   /** Pursuit speed published on the entity, used to retime the walk cycle. */
   moveSpeedMps?: number;
   walkSpeedMps?: number;
+  /** The speed the mover is ACTUALLY stepped at right now, when its owner publishes one. */
+  gaitSpeedMps?: number;
+  /** Consecutive whole sim ticks with no displacement. See `SETTLED_TICKS_TO_IDLE`. */
+  settledTicks: number;
   /** Raised only while playAction tries to move this record to the front of the rig pool. */
   actionPriority: boolean;
   scale: number;
@@ -1954,6 +1988,7 @@ export class EntityViews {
       // render frame: a creature that started chasing has to change gait on the frame it starts,
       // not up to a quarter of a second later.
       record.pursuing = isPursuing(entity);
+      if (view?.gaitSpeedMps !== undefined) record.gaitSpeedMps = view.gaitSpeedMps;
       const rotationY = view?.rotationY ?? record.targetRotationY;
       const dx = entity.position[0] - record.target.x;
       const dz = entity.position[2] - record.target.z;
@@ -1962,6 +1997,7 @@ export class EntityViews {
       if (Math.hypot(dx, dz) > MOVING_EPSILON) {
         record.previous.copy(record.target);
         record.target.set(entity.position[0], entity.position[1], entity.position[2]);
+        record.settledTicks = 0;
         // Re-arm the hold here too. Without it, calling this every frame consumes the position
         // change before `sync` ever sees one, `updateMoving` decays the counter to zero, and the
         // walking pose could never latch for anything.
@@ -1980,6 +2016,15 @@ export class EntityViews {
         // zero on every frame after the first WITHIN a tick, and that is exactly when the lerp is
         // doing its job, so collapsing there would delete interpolation and make everything step.
         record.previous.copy(record.target);
+        // The gait ends WITH the movement, not half a second after it. Zeroing `movingTicks`
+        // keeps the 4 Hz structural path agreeing, or its stale hold would flip the walk back on
+        // at the next sync. One-shots are not interrupted: `setMotion`'s own guard holds a swing
+        // that is still running, so an enemy arriving at standoff goes run -> idle -> bite.
+        record.settledTicks = Math.min(record.settledTicks + 1, SETTLED_TICKS_TO_IDLE + 1);
+        if (record.settledTicks === SETTLED_TICKS_TO_IDLE && !record.spent) {
+          record.movingTicks = 0;
+          this.setMotion(record, "idle", false);
+        }
       }
       if (rotationY !== record.targetRotationY) {
         record.previousRotationY = record.targetRotationY;
@@ -2241,8 +2286,10 @@ export class EntityViews {
       targetRotationY: view.rotationY ?? 0,
       previousRotationY: view.rotationY ?? 0,
       movingTicks: 0,
+      settledTicks: 0,
       ...(entity.combat?.moveSpeedMps === undefined ? {} : { moveSpeedMps: entity.combat.moveSpeedMps }),
       ...(entity.combat?.walkSpeedMps === undefined ? {} : { walkSpeedMps: entity.combat.walkSpeedMps }),
+      ...(view.gaitSpeedMps === undefined ? {} : { gaitSpeedMps: view.gaitSpeedMps }),
       actionPriority: false,
       scale: 1,
       scaleAxes: NO_BUILD,
@@ -3955,7 +4002,10 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     const entry = this.assets.entry(assetId);
     const own = entry?.animations ?? [];
     if ((motion === "walk" || motion === "run") && own.length === 0 && clip.name === "Jog_Fwd_Loop") {
-      return HUMANOID_AI_JOG_TIME_SCALE;
+      // The live gait speed reaches here through `gaitSpeed` now that the AI publishes one, so a
+      // jogging humanoid can be retimed exactly; the midpoint constant remains the fallback for a
+      // record that has never been stepped.
+      return moveSpeedMps ? moveSpeedMps / HUMANOID_JOG_IMPLIED_MPS : HUMANOID_AI_JOG_TIME_SCALE;
     }
     // Match the gait to the ground it covers.
     //
@@ -3979,9 +4029,11 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
       const rate = Math.min(WALK_RATE_MAX, Math.max(WALK_RATE_MIN, moveSpeedMps / implied));
       // Then the cadence ceiling, which needs the clip's own length: playing a 0.47 s cycle at 1.6x
       // is 3.4 leg cycles a second, and playing a 1.33 s cycle at the same 1.6x is 1.2. Only the
-      // first of those reads as a creature sprinting on the spot.
+      // first of those reads as a creature sprinting on the spot. Each gait gets its own ceiling:
+      // a gallop legitimately cycles faster than any walk.
+      const cadenceCap = motion === "run" ? MAX_RUN_CADENCE_HZ : MAX_WALK_CADENCE_HZ;
       const duration = clip.duration;
-      if (duration > 0) return Math.min(rate, MAX_WALK_CADENCE_HZ * duration);
+      if (duration > 0) return Math.min(rate, cadenceCap * duration);
       return rate;
     }
     return 1;

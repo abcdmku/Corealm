@@ -29,7 +29,7 @@ import { Rng } from "../core/rng.js";
 import type { BossPhase } from "../content/enemies.js";
 import { ORDRUN_PHASES } from "../content/enemies.js";
 import type { CombatEntityPort, CombatSystem } from "./combat.js";
-import { cloneVec3, spawnPositionOf } from "./combat.js";
+import { cloneVec3, enemyStandoffMetres, spawnPositionOf } from "./combat.js";
 
 // ------------------------------------------------------------------ tunables
 
@@ -202,8 +202,10 @@ function returnSpeed(entity: SemanticEntity): number {
   return pursuitSpeed(entity) * (ENEMY_RETURN_SPEED_MPS / ENEMY_SPEED_MPS);
 }
 
-/** Where an enemy stops closing. Just inside `ENEMY_ATTACK_RANGE` so it can actually swing. */
-export const ENEMY_STANDOFF_METRES = 1.35;
+// Where an enemy stops closing is no longer one constant: `combat.enemyStandoffMetres` adds the
+// creature's own measured half-length, so a cow squares up muzzle-to-sword-point instead of
+// muzzle-inside-player. The swing range in `systems/combat.ts` is derived from the same function,
+// so the standoff always remains inside it.
 
 /**
  * Idle drift, so a field of animals is not a field of statues.
@@ -414,8 +416,12 @@ export class EnemyAiSystem implements TickSystem {
           this.leash(state, entity, record, atMs);
           continue;
         }
-        if (distanceToPlayer > ENEMY_STANDOFF_METRES) {
-          this.stepToward(entity, playerPos, pursuitSpeed(entity), deltaMs, ENEMY_STANDOFF_METRES);
+        // The same `?? 0` fallback `combat.bodyRadiusOf` uses, NOT `DEFAULT_BODY_RADIUS`: the
+        // standoff and the swing gate must be computed from the same radius or a content gap
+        // could park a creature outside its own reach.
+        const standoff = enemyStandoffMetres(entity.combat?.bodyRadius ?? 0);
+        if (distanceToPlayer > standoff) {
+          this.stepToward(entity, playerPos, pursuitSpeed(entity), deltaMs, standoff);
         } else {
           // At standoff there is no displacement for stepToward to face along. Keep looking at the
           // player while the combat system swings.
@@ -895,6 +901,12 @@ export class EnemyAiSystem implements TickSystem {
     const movedZ = snapped[2] - from[2];
     entity.position = snapped;
     this.deps.entities.setPosition?.(entity.id, snapped);
+    // Publish the speed this body is ACTUALLY being stepped at, so the renderer retimes the
+    // locomotion cycle against it. Before this existed the renderer fell back to the authored
+    // pursuit speed, which is wrong for a leash return — returnSpeed is 1.16x pursuit — and
+    // that gap is a permanent 16% foot slide on every walk home, reported as the run looking
+    // "a hair too slow".
+    if (entity.view) entity.view.gaitSpeedMps = speed;
     this.faceDirection(entity, movedX, movedZ, deltaMs);
     this.deps.store.markDirty();
     return distanceXZ(snapped, target) <= stopWithin;

@@ -330,6 +330,16 @@ export interface SemanticEntity {
      */
     scaleAxes?: Vec3;
     rotationY?: number;
+    /**
+     * Ground speed this mover is currently being stepped at, in metres per second, written by
+     * whichever system owns its movement each time it takes a step.
+     *
+     * Exists because the renderer retimes a locomotion cycle against the speed the body ACTUALLY
+     * covers ground at, and without this field it has to guess which authored speed the AI is
+     * using. The guess is wrong for a leash return, which hurries at 1.16x the pursuit speed the
+     * fallback retimes against — a permanent 16% foot slide on every walk home.
+     */
+    gaitSpeedMps?: number;
     /** Swapped in when `state` is "depleted" or "dead". Falls back to a desaturated material. */
     depletedAssetId?: string;
     /**

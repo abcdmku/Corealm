@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ENEMY_BLOCKS, enemyBlockFor } from "../game/src/content/enemies.js";
 import { REGIONS } from "../game/src/content/regions.js";
-import { ENEMY_SPEED_MPS } from "../game/src/systems/enemyAI.js";
+import { ENEMY_RETURN_SPEED_MPS, ENEMY_SPEED_MPS } from "../game/src/systems/enemyAI.js";
 import { MOVING_EPSILON } from "../game/src/render/entityViews.js";
 import { SIM_TICK_MS } from "../game/src/core/time.js";
 import MANIFEST from "../game/public/assets/manifest.json" with { type: "json" };
@@ -30,6 +30,14 @@ const ASSET_BY_ID = new Map(MANIFEST.assets.map((asset) => [asset.id, asset] as 
 
 /** `MAX_WALK_CADENCE_HZ` in `render/entityViews.ts`. Duplicated so a change there has to be meant. */
 const MAX_WALK_CADENCE_HZ = 2.4;
+/**
+ * `MAX_RUN_CADENCE_HZ` there, same reasoning. Separate from the walk cap because a gallop
+ * legitimately cycles faster than any walk; sharing 2.4 forced pursuit speeds to sit exactly on
+ * the cap and left a leash return (1.16x pursuit) with its legs shaved 14% under the ground.
+ */
+const MAX_RUN_CADENCE_HZ = 3.0;
+/** `returnSpeed` in `systems/enemyAI.ts`: a leashed creature hurries home at this multiple. */
+const RETURN_SPEED_RATIO = ENEMY_RETURN_SPEED_MPS / ENEMY_SPEED_MPS;
 /** `WALK_RATE_MIN` and `WALK_RATE_MAX`, same reasoning. */
 const WALK_RATE_MIN = 0.6;
 const WALK_RATE_MAX = 3.2;
@@ -63,13 +71,15 @@ const GROUPS: Group[] = REGIONS.flatMap((region) => [
 
 interface Gait {
   groupId: string;
-  gait: "walk" | "run";
+  gait: "walk" | "run" | "return";
   impliedMps: number;
   clipSeconds: number;
   speedMps: number;
   /** The rate the renderer will actually apply, both clamps included. */
   rate: number;
   cadenceHz: number;
+  /** The ceiling this gait plays under. Runs and returns get the run cap. */
+  capHz: number;
   slide: number;
 }
 
@@ -88,16 +98,22 @@ function gaits(): Gait[] {
     } | undefined;
     const block = enemyBlockFor(group.groupId, group.family, group.tier);
     if (!asset || !block) continue;
+    const pursuit = block.moveSpeedMps ?? ENEMY_SPEED_MPS;
     const rows: [Gait["gait"], number | undefined, number | undefined, number][] = [
       ["walk", asset.impliedWalkMps, asset.walkClipSeconds, block.walkSpeedMps ?? 0],
-      ["run", asset.impliedRunMps, asset.runClipSeconds, block.moveSpeedMps ?? ENEMY_SPEED_MPS],
+      ["run", asset.impliedRunMps, asset.runClipSeconds, pursuit],
+      // The third speed every creature actually moves at: hurrying home after a leash. The
+      // renderer retimes it off the published live gait speed, so it plays under the same rate
+      // and cadence clamps as the pursuit and has to satisfy the same assertions.
+      ["return", asset.impliedRunMps, asset.runClipSeconds, pursuit * RETURN_SPEED_RATIO],
     ];
     for (const [gait, implied, clip, speed] of rows) {
       if (implied === undefined || clip === undefined || clip <= 0) continue;
       if (implied < MEASURABLE_STRIDE_MPS || speed <= 0) continue;
+      const capHz = gait === "walk" ? MAX_WALK_CADENCE_HZ : MAX_RUN_CADENCE_HZ;
       const rate = Math.min(
         Math.min(WALK_RATE_MAX, Math.max(WALK_RATE_MIN, speed / implied)),
-        MAX_WALK_CADENCE_HZ * clip,
+        capHz * clip,
       );
       out.push({
         groupId: group.groupId,
@@ -107,6 +123,7 @@ function gaits(): Gait[] {
         speedMps: speed,
         rate,
         cadenceHz: rate / clip,
+        capHz,
         slide: Math.abs(1 - (implied * rate) / speed),
       });
     }
@@ -147,7 +164,7 @@ describe("creature gait", () => {
 
   it("never lets any creature's legs race, in either gait", () => {
     const racing = gaits()
-      .filter((row) => row.cadenceHz > MAX_WALK_CADENCE_HZ + 1e-6)
+      .filter((row) => row.cadenceHz > row.capHz + 1e-6)
       .map((row) => `${row.groupId} ${row.gait} runs at ${row.cadenceHz.toFixed(2)} Hz`);
     expect(racing, racing.join(NEWLINE)).toEqual([]);
   });
@@ -168,7 +185,7 @@ describe("creature gait", () => {
     for (const row of gaits()) {
       expect(row.cadenceHz, `${row.groupId} ${row.gait} cadence`).toBeGreaterThan(0.6);
       expect(row.cadenceHz, `${row.groupId} ${row.gait} cadence`)
-        .toBeLessThanOrEqual(MAX_WALK_CADENCE_HZ + 1e-6);
+        .toBeLessThanOrEqual(row.capHz + 1e-6);
     }
   });
 
