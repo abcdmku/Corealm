@@ -4930,16 +4930,62 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
       this.pickCapsuleBase.copy(record.position).addScaledVector(THREE.Object3D.DEFAULT_UP, inset);
       this.pickCapsuleTop.copy(record.position).addScaledVector(THREE.Object3D.DEFAULT_UP, height - inset);
 
-      const gapSq = raycaster.ray.distanceSqToSegment(
+      let gapSq = raycaster.ray.distanceSqToSegment(
         this.pickCapsuleBase,
         this.pickCapsuleTop,
         this.pickRayPoint,
         this.pickCapsulePoint,
       );
-      if (gapSq > radius * radius) continue;
+      let hitRadius = radius;
+      if (gapSq > radius * radius) {
+        // Second chance, for LONG bodies: a capsule around the vertical axis is centred on the
+        // torso, and its radius is clamped to 1.35 m — a cow is 2.53 m nose to tail, so its head
+        // and rump were not clickable at all. Measured with a frozen-sim hover sweep
+        // (runs/corealm/audit/pick-map-probe.ts): the pickable region stopped ~0.3 m short of
+        // both ends. A click that misses this way falls through to the ground and WALKS the
+        // player — mid-fight, that is the character marching away from a chasing animal, which
+        // play reported as "sometimes you can't attack a monster". So anything whose footprint is
+        // meaningfully longer than it is wide also offers a capsule laid along its spine, at its
+        // drawn yaw. A union with the vertical capsule, never a replacement, so nothing that
+        // picked before can stop picking.
+        const assetId = this.groups.get(record.groupKey)?.assetId;
+        const size = assetId ? this.assets.assetSize(assetId) : null;
+        if (!size) continue;
+        const long = Math.max(size.x, size.z);
+        const short = Math.min(size.x, size.z);
+        if (long <= 0) continue;
+        // `record.radius` is the drawn half of the LONG axis; scale the short one the same way.
+        const girth = record.radius * (short / long);
+        const along = record.radius - girth;
+        if (along <= 0.15) continue;
+
+        const crossRadius = Math.max(
+          MIN_CHARACTER_PICK_RADIUS,
+          Math.min(MAX_CHARACTER_PICK_RADIUS, girth * CHARACTER_PICK_RADIUS_SCALE),
+        );
+        const spineY = Math.max(crossRadius, Math.min(height - crossRadius, height * 0.45));
+        const dirX = Math.sin(record.rotationY);
+        const dirZ = Math.cos(record.rotationY);
+        this.pickCapsuleBase.copy(record.position);
+        this.pickCapsuleBase.x -= dirX * along;
+        this.pickCapsuleBase.z -= dirZ * along;
+        this.pickCapsuleBase.y += spineY;
+        this.pickCapsuleTop.copy(record.position);
+        this.pickCapsuleTop.x += dirX * along;
+        this.pickCapsuleTop.z += dirZ * along;
+        this.pickCapsuleTop.y += spineY;
+        gapSq = raycaster.ray.distanceSqToSegment(
+          this.pickCapsuleBase,
+          this.pickCapsuleTop,
+          this.pickRayPoint,
+          this.pickCapsulePoint,
+        );
+        if (gapSq > crossRadius * crossRadius) continue;
+        hitRadius = crossRadius;
+      }
 
       const centreDistance = raycaster.ray.origin.distanceTo(this.pickRayPoint);
-      const entryDistance = Math.max(0, centreDistance - Math.sqrt(radius * radius - gapSq));
+      const entryDistance = Math.max(0, centreDistance - Math.sqrt(hitRadius * hitRadius - gapSq));
       if (entryDistance < raycaster.near || entryDistance > raycaster.far) continue;
       found.push({ entityId: record.entityId, distance: entryDistance });
     }

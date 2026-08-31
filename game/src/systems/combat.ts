@@ -80,14 +80,19 @@ export const MAX_PURSUE_METRES = 32;
  * only be satisfied from inside the cow. Reported from play as "they get too close to each other
  * to fight". Every melee range below therefore adds the creature's own measured half-length, so
  * the constants describe the gap between BODIES and mean the same thing for a hen and an aurochs.
+ *
+ * 0.25 rather than the 0.5 this started at, retuned from the follow-up report: at half a metre of
+ * air a big animal stops visibly short and its bite — a head lunge of a few tenths of a metre —
+ * lands in the air between the bodies, which reads as the creature refusing to come to you.
+ * A quarter metre keeps the muzzle out of the player's capsule and inside the bite's reach.
  */
-const MELEE_DAYLIGHT_METRES = 0.5;
+const MELEE_DAYLIGHT_METRES = 0.25;
 
 /**
  * Where an enemy stops closing, centre to centre, before the body-size term.
  *
  * The floor keeps the smallest animals exactly where they have always stood — a hen's
- * radius-aware standoff (0.35 + 0.2 + 0.5 = 1.05) is under this floor, so nothing tuned against
+ * radius-aware standoff (0.35 + 0.2 + 0.25 = 0.8) is under this floor, so nothing tuned against
  * the old constant moves.
  */
 const ENEMY_STANDOFF_BASE_METRES = 1.35;
@@ -99,11 +104,11 @@ const ENEMY_SWING_SLACK_METRES = 0.65;
  * The player stops pursuing this far inside their own reach, so one footstep of the target
  * cannot immediately leave range. The melee analogue of `RANGED_APPROACH_SLACK`, and the number
  * is derived, not chosen: `MELEE_RANGE - PLAYER_RADIUS - MELEE_DAYLIGHT_METRES`
- * (1.6 - 0.35 - 0.5), so reach minus slack is `PLAYER_RADIUS + bodyRadius + daylight` — exactly
+ * (1.6 - 0.35 - 0.25), so reach minus slack is `PLAYER_RADIUS + bodyRadius + daylight` — exactly
  * the ring the enemy's own standoff stops it on. Both parties walk to the same distance and meet
  * with the authored daylight between their bodies. `tests/meleeSpacing.test.ts` pins the identity.
  */
-const MELEE_APPROACH_SLACK = 0.75;
+const MELEE_APPROACH_SLACK = 1.0;
 
 /** The half-length the world layer measured for this creature, or 0 when it authored none. */
 function bodyRadiusOf(entity: SemanticEntity): number {

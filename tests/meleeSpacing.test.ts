@@ -35,10 +35,12 @@ describe("melee spacing", () => {
     // zero the creature is standing inside the player again.
     for (const radius of RADII) {
       const surfaceGap = enemyStandoffMetres(radius) - radius - PLAYER_RADIUS;
-      expect(surfaceGap, `radius ${radius}`).toBeGreaterThanOrEqual(0.15 - 1e-9);
+      expect(surfaceGap, `radius ${radius}`).toBeGreaterThanOrEqual(0.25 - 1e-9);
     }
-    // And for anything big enough that the radius term governs, the gap is the full daylight.
-    expect(enemyStandoffMetres(1.27) - 1.27 - PLAYER_RADIUS).toBeCloseTo(0.5, 10);
+    // And for anything big enough that the radius term governs, the gap is the full daylight —
+    // 0.25 m: enough that the muzzle stays out of the player's capsule, close enough that a bite
+    // lunge visibly reaches. 0.5 was tried first and read as the animal refusing to close.
+    expect(enemyStandoffMetres(1.27) - 1.27 - PLAYER_RADIUS).toBeCloseTo(0.25, 10);
   });
 
   it("lets the player reach every creature from outside its body", () => {
@@ -71,12 +73,12 @@ describe("melee spacing", () => {
     // standoff for every radius the radius term governs: both parties walk to the same distance
     // and meet with the authored daylight between them. This is the identity that keeps the two
     // sides from being tuned apart: MELEE_RANGE - slack = PLAYER_RADIUS + daylight.
-    const MELEE_APPROACH_SLACK = 0.75;
-    // Below 0.5 the base floor governs the standoff and the identity intentionally does not hold.
-    for (const radius of RADII.filter((r) => r >= 0.5)) {
+    const MELEE_APPROACH_SLACK = 1.0;
+    // Below 0.75 the base floor governs the standoff and the identity intentionally does not hold.
+    for (const radius of RADII.filter((r) => r >= 0.75)) {
       expect(meleeReachMetres(radius) - MELEE_APPROACH_SLACK, `radius ${radius}`)
         .toBeCloseTo(enemyStandoffMetres(radius), 10);
     }
-    expect(MELEE_RANGE - MELEE_APPROACH_SLACK).toBeCloseTo(PLAYER_RADIUS + 0.5, 10);
+    expect(MELEE_RANGE - MELEE_APPROACH_SLACK).toBeCloseTo(PLAYER_RADIUS + 0.25, 10);
   });
 });
