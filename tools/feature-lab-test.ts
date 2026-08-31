@@ -19,6 +19,8 @@ import {
   type FeatureLabStructureView,
   type ItemId,
 } from "../game/src/contracts.js";
+import { SPELLS } from "../game/src/content/spells.js";
+import { RELEASED_MAGIC_ELEMENTS } from "../game/src/systems/essence.js";
 import { installTestDeadline } from "./lib/deadline.js";
 import { repoRoot } from "./lib/paths.js";
 import { startGameServer, type RunningGameServer } from "./lib/server.js";
@@ -575,8 +577,11 @@ async function testCombat(
       await api.equipPlayer("mainHand", itemId);
     }, magicWeapon);
   }
-  const spell = catalog.spells.at(-1);
-  if (!spell) throw new Error("Feature lab has no spell presets");
+  const spell = [...catalog.spells].reverse().find((preset) => {
+    const definition = SPELLS.find((candidate) => candidate.id === preset.id);
+    return definition !== undefined && RELEASED_MAGIC_ELEMENTS.includes(definition.cost.element);
+  });
+  if (!spell) throw new Error("Feature lab has no released spell presets");
   const castBefore = await targetPage.evaluate(async ({ targetId, spellId }) => {
     const api = window.__featureLab;
     if (!api) throw new Error("window.__featureLab is unavailable");
