@@ -156,6 +156,18 @@ function recompute(state: GameState): GameState {
     ...fresh.combat,
     ...(isRecord(state.combat) ? state.combat : {}),
   } as GameState["combat"];
+  // The live engagement is dropped for the same reason `activity` is below: `inCombatUntilMs` and
+  // `nextAttackAtMs` are instants on the per-session simulation clock, which restarts at zero
+  // every reload. Restored verbatim, a save written five minutes into a session blocks EVERY
+  // player swing for the first five minutes of the next one — the swing resolver waits for a
+  // clock that has started over. Reported from play as "you can't attack a monster; it eventually
+  // attacks after like 30 seconds", the thirty seconds being that session's age at the autosave.
+  // Only `preferredSpellId` is meant to outlive a fight, and it survives the reset below.
+  state.combat.targetId = null;
+  state.combat.activeSpellId = null;
+  state.combat.engagedBy = [];
+  state.combat.inCombatUntilMs = 0;
+  state.combat.nextAttackAtMs = 0;
   state.magic = state.magic ?? fresh.magic;
   state.magic.weaponCharges = state.magic.weaponCharges ?? {};
   state.magic.consumedOrbs = state.magic.consumedOrbs ?? {};

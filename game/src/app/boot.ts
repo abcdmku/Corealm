@@ -42,6 +42,7 @@ import { SaveService } from "../persistence/storage.js";
 import {
   LOOT_PILE_VIEW,
   RECOVERY_CACHE_VIEW,
+  rehydrateEnemyRuntimes,
   rehydrateWorldContainers,
 } from "../persistence/worldContainers.js";
 import { installBootPlaceholder, installGameDebug, type RecordedError } from "../debug/gameDebug.js";
@@ -462,6 +463,10 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   rehydrateWorldContainers(store.get(), entityStore, {
     regionAt: (position) => scene.regionAt(position[0], position[2]),
   });
+  // The other half of the same restore: dead or damaged enemy runtimes reapplied onto the freshly
+  // rebuilt entities, or a monster killed just before a refresh comes back as an unattackable
+  // ghost for the rest of its respawn timer.
+  rehydrateEnemyRuntimes(store.get(), entityStore, clock.elapsedMs);
   const gameAudio = new CorealmAudioBridge({
     store,
     engine: audioEngine,
@@ -1849,6 +1854,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     entityStore.registerLocations(rebuilt.knownLocations);
     nav.setRouteGraph(rebuilt.routeNodes, rebuilt.routeEdges);
     rehydrateWorldContainers(store.get(), entityStore, { regionAt: regionAtPoint });
+    rehydrateEnemyRuntimes(store.get(), entityStore, clock.elapsedMs);
     campfireSystem.reconstruct();
     syncCampfireAmbience();
     if (profile.kind === "feature-lab") entityViews.sync(entityStore.all());

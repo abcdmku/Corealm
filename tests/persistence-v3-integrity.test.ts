@@ -122,8 +122,11 @@ describe("save v3 integrity", () => {
     const loaded = service.loadSerialized(JSON.stringify(partial));
 
     expect(loaded.status).toBe("loaded");
+    // `targetId` no longer survives a load: the live engagement is dropped with its clock
+    // instants, for the reason `tests/combat-reload-reset.test.ts` pins — a persisted
+    // `nextAttackAtMs` from the old session's clock blocked every swing of the new one.
     expect(loaded.state?.combat).toEqual({
-      targetId: "marchwolf_1",
+      targetId: null,
       inCombatUntilMs: 0,
       nextAttackAtMs: 0,
       activeSpellId: null,
