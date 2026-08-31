@@ -3,6 +3,12 @@
 This is the short path for changing terrain, biomes, water, coast, paths, foliage, and wind without
 creating a second world system.
 
+## Relationship to the feature lab
+
+This workflow owns proof of the authored full world: terrain and coast shape, biome fields, water placement, world-scale scatter and paths, final wind composition, world layout, and island-scale navigation. Those concerns may use a recorded exception to the lab-first gate because isolating them would remove the behavior under test.
+
+Keep the exception narrow. Build reusable structures, foliage assets, materials, wind response, effects, UI, controls, and local interactions in the production-backed feature lab first. The root accepts that lab proof before the world-authoring step places or composes the feature in the final world. If a task mixes reusable feature work with world generation, split those into lab and integration phases.
+
 ## Authority and ownership
 
 - `game/src/contracts.ts` is frozen shared state. Stop and report if a task needs a contract change;

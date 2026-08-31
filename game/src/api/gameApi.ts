@@ -114,6 +114,7 @@ type ShopViewLike = import("../contracts.js").ShopView;
 
 export class CorealmGameApi implements GameApiContract {
   readonly hooks: SystemHooks = {};
+  private movementCommandsEnabled = true;
 
   /**
    * The interaction to re-fire once the player finishes walking into range.
@@ -135,6 +136,16 @@ export class CorealmGameApi implements GameApiContract {
 
   register<K extends keyof SystemHooks>(key: K, hook: NonNullable<SystemHooks[K]>): void {
     this.hooks[key] = hook;
+  }
+
+  /** Runtime authoring surfaces can suspend every API path that would start navigation. */
+  setMovementCommandsEnabled(enabled: boolean): void {
+    this.movementCommandsEnabled = enabled;
+    if (enabled) return;
+    this.pending = null;
+    if (this.movement.stop(this.store.get(), this.clock.elapsedMs, "movement-disabled")) {
+      this.store.markDirty();
+    }
   }
 
   // ------------------------------------------------------------------ state
@@ -252,6 +263,9 @@ export class CorealmGameApi implements GameApiContract {
    * melee to cast a spell that already had line of sight from where they were standing.
    */
   private walkTo(target: MoveTarget, stopDistance: number): Result<{ pathLength: number; etaMs: number }> {
+    if (!this.movementCommandsEnabled) {
+      return err("UNAVAILABLE", "Walking is disabled in the building workbench");
+    }
     const state = this.store.get();
     if (state.player.health <= 0) return err("DEAD", "The player is dead");
     if (!this.nav.isReady()) return err("UNAVAILABLE", "Navigation is not ready");

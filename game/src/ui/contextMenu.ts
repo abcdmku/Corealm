@@ -229,6 +229,8 @@ export interface OpenOptions {
   subtitle?: string;
   /** Focus the first entry immediately. Set for keyboard-opened menus. */
   focusFirst?: boolean;
+  /** False in authoring mode: inspection stays available while movement-bearing actions do not. */
+  movementEnabled?: boolean;
 }
 
 /** Keeps the menu clear of the window edge. */
@@ -269,22 +271,25 @@ export class ContextMenu {
     const skills = this.deps.api.getSkills();
     const items: ContextMenuItem[] = orderInteractions(entity.interactions).map((interaction) => {
       const availability = describeAvailability(entity, interaction, skills, this.skillLabel);
+      const movementAllowed = options.movementEnabled !== false || interaction === "inspect";
       const item: ContextMenuItem = {
         id: interaction,
         label: `${INTERACTION_LABELS[interaction]} ${entity.name}`,
-        enabled: availability.enabled,
+        enabled: availability.enabled && movementAllowed,
         danger: COMBAT_VERBS.includes(interaction),
         onSelect: () => this.runInteraction(entity, interaction),
       };
-      if (availability.reason !== undefined) item.reason = availability.reason;
+      if (!movementAllowed) item.reason = "Enable walking to use this action";
+      else if (availability.reason !== undefined) item.reason = availability.reason;
       return item;
     });
 
     items.push({
       id: "walk-here",
       label: "Walk here",
-      enabled: true,
+      enabled: options.movementEnabled !== false,
       onSelect: () => { reportResult(this.deps.api.moveTo({ entityId: entity.id })); },
+      ...(options.movementEnabled === false ? { reason: "Enable walking to move" } : {}),
     });
 
     this.open(clientX, clientY, items, {
@@ -300,8 +305,9 @@ export class ContextMenu {
       {
         id: "walk-here",
         label: "Walk here",
-        enabled: true,
+        enabled: options.movementEnabled !== false,
         onSelect: () => { reportResult(this.deps.api.moveTo({ position: point })); },
+        ...(options.movementEnabled === false ? { reason: "Enable walking to move" } : {}),
       },
       {
         id: "stop",

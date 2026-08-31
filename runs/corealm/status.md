@@ -20,6 +20,10 @@
 Phase 1 is closed and playable end to end by a human. What remains is Phase 2 content depth,
 listed under "Still open" in the report.
 
+## New feature work
+
+All Phase 2 and later features use the lab-first workflow in `docs/feature-lab.md`. Build and accept an isolatable feature in the production-backed lab before assigning its final-world wiring. Only authored full-world behavior can use a recorded exception, and reusable local pieces still use the lab.
+
 ## Commands
 
 ```

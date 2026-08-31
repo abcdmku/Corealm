@@ -643,6 +643,40 @@ export type MoveTarget = { entityId: EntityId } | { position: Vec3 } | { locatio
 
 // ------------------------------------------------------ the real-engine feature lab
 
+/** The focused workbench selected by the lab route and panel. */
+export type FeatureLabMode = "combat" | "building";
+
+/** The production structure recipe families the building workbench can assemble. */
+export type FeatureLabStructureKind = "prefab" | "composition" | "wall-run";
+
+/** Regional architecture palettes available to the structure renderer. */
+export type FeatureLabStructureKit = "plaster" | "timber" | "stone";
+
+export interface FeatureLabStructureSelection {
+  kind: FeatureLabStructureKind;
+  id: string;
+  kit: FeatureLabStructureKit;
+  width: number;
+  depth: number;
+  seed: number;
+}
+
+/** JSON-safe proof of the structure currently assembled through the production entity renderer. */
+export interface FeatureLabStructureView {
+  ready: boolean;
+  revision: number;
+  selection: FeatureLabStructureSelection;
+  variant: string | null;
+  partCount: number;
+  assetCount: number;
+  collisionCount: number;
+  buildMs: number;
+  bounds: {
+    min: Vec3;
+    max: Vec3;
+  } | null;
+}
+
 /** The two semantic actor families the empty production-engine lab can place. */
 export type FeatureLabTargetKind = "npc" | "creature";
 
@@ -663,6 +697,11 @@ export interface FeatureLabCatalog {
   }[];
   skills: readonly { id: SkillId; label: string }[];
   spells: readonly { id: SpellId; label: string }[];
+  structures: {
+    prefabs: readonly { id: string; label: string }[];
+    compositions: readonly { id: string; label: string }[];
+    kits: readonly { id: FeatureLabStructureKit; label: string }[];
+  };
 }
 
 /** Narrow animation evidence published without making contracts depend on the render layer. */
@@ -674,11 +713,15 @@ export interface FeatureLabMotionView {
   liveRig?: boolean;
 }
 
-/** Semantic and visual evidence from the empty world driven by the normal Corealm engine. */
+/** Semantic and visual evidence from the shared yard driven by the normal Corealm engine. */
 export interface FeatureLabState {
   ready: boolean;
   engine: "corealm-production";
-  world: "empty-flat";
+  world: "fallowmarch-yard";
+  mode: FeatureLabMode;
+  walkingEnabled: boolean;
+  playerVisible: boolean;
+  freeCameraEnabled: boolean;
   player: PlayerView;
   playerPosition: Vec3;
   playerMotion: FeatureLabMotionView | null;
@@ -688,6 +731,7 @@ export interface FeatureLabState {
     destinationEntityId: EntityId | null;
   };
   selectedEntityId: EntityId | null;
+  structure: FeatureLabStructureView;
   target: {
     kind: FeatureLabTargetKind;
     presetId: string;
@@ -718,6 +762,12 @@ export interface FeatureLabState {
 export interface FeatureLabApi {
   getState(): FeatureLabState;
   getCatalog(): FeatureLabCatalog;
+  setMode(mode: FeatureLabMode): FeatureLabState;
+  setWalkingEnabled(enabled: boolean): FeatureLabState;
+  setPlayerVisible(visible: boolean): FeatureLabState;
+  setFreeCameraEnabled(enabled: boolean): FeatureLabState;
+  setStructure(patch: Partial<FeatureLabStructureSelection>): Promise<FeatureLabState>;
+  fitStructure(): FeatureLabState;
   spawnTarget(kind: FeatureLabTargetKind, presetId: string): Promise<FeatureLabState>;
   setLevel(skillId: SkillId, level: number): FeatureLabState;
   equipPlayer(slot: EquipSlot, itemId: ItemId | null): Promise<FeatureLabState>;

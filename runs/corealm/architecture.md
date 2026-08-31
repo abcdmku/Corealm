@@ -3,6 +3,12 @@
 Status: **PRD approved with the corrections below.** `runs/corealm/PRD.md` is authoritative for
 content, formulas, names, and numbers. This document is authoritative wherever the two disagree.
 
+## Lab-first amendment
+
+All new isolatable features now follow [the realtime feature-lab gate](../../docs/feature-lab.md), which supersedes the older direct-to-world build rounds in this document and PRD section 9. Build and prove the production feature in a deterministic lab fixture first. The root accepts browser state and screenshots there before assigning final-world registration, placement, spawn data, or authored content as a later integration step. If the lab lacks a fixture, extending it is part of the feature.
+
+Only work whose subject is the authored full world can skip the gate, such as terrain, biome, coast, water, world-scale scatter, world layout, or long-distance navigation. Record why isolation would invalidate the test. Any reusable assets, effects, UI, controls, or local interactions in that work still receive lab proof where possible.
+
 I verified the PRD's arithmetic before approving. Recomputed independently and matching:
 
 - `totalXpAt(L) = floor(873 * 1.1^(L-1) - 873 + 6*L*(L-1))` → L2 = 99, L10 = 1,725, L50 = 106,992,

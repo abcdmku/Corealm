@@ -1240,6 +1240,7 @@ export class EntityViews {
    */
   async prepare(entities: readonly SemanticEntity[]): Promise<{ loaded: number; missing: string[] }> {
     const wanted = new Set<string>();
+    const missing = new Set<string>();
     for (const entity of entities) {
       if (!entity.view) continue;
       wanted.add(entity.view.assetId);
@@ -1256,6 +1257,7 @@ export class EntityViews {
     const ids = [...wanted].filter((id) => {
       if (this.assets.entry(id)) return true;
       this.missing.add(id);
+      missing.add(id);
       return false;
     });
 
@@ -1268,9 +1270,13 @@ export class EntityViews {
         this.sources.set(id, result.value);
       } else {
         this.missing.add(id);
+        missing.add(id);
       }
     }
-    return { loaded, missing: [...this.missing] };
+    // `this.missing` is session diagnostics. Callers deciding whether this particular prepared
+    // batch is usable must only see failures from this batch; otherwise one transient typo poisons
+    // every later valid realtime feature-lab swap until a full reload.
+    return { loaded, missing: [...missing] };
   }
 
   /**

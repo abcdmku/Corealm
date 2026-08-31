@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  BUILDING_LAB_BOOT_PROFILE,
+  COMBAT_LAB_BOOT_PROFILE,
   FEATURE_LAB_BOOT_PROFILE,
   GAME_BOOT_PROFILE,
   bootProfileFor,
@@ -10,6 +12,7 @@ import { buildWorldTerrainSpec } from "../game/src/app/worldSpec.js";
 describe("boot profiles", () => {
   it("keeps the game profile on the canonical production builders", () => {
     expect(GAME_BOOT_PROFILE.kind).toBe("game");
+    expect(GAME_BOOT_PROFILE.labMode).toBeNull();
     expect(GAME_BOOT_PROFILE.terrain).toBe(buildWorldTerrainSpec);
     expect(GAME_BOOT_PROFILE.buildSemanticWorld).toBe(buildWorld);
     expect(GAME_BOOT_PROFILE.spawn.regionId).toBe("fallowmarch");
@@ -23,40 +26,64 @@ describe("boot profiles", () => {
     });
   });
 
-  it("builds one cheap, flat Fallowmarch terrain chunk for the feature lab", () => {
-    const terrain = FEATURE_LAB_BOOT_PROFILE.terrain();
+  it("shares one production Fallowmarch yard across both workbenches", () => {
+    const terrain = COMBAT_LAB_BOOT_PROFILE.terrain();
+    const secondTerrain = BUILDING_LAB_BOOT_PROFILE.terrain();
 
-    expect(terrain.bounds).toEqual({ minX: -32, maxX: 32, minZ: -24, maxZ: 24 });
+    expect(COMBAT_LAB_BOOT_PROFILE).not.toBe(BUILDING_LAB_BOOT_PROFILE);
+    expect(COMBAT_LAB_BOOT_PROFILE.terrain).toBe(BUILDING_LAB_BOOT_PROFILE.terrain);
+    expect(COMBAT_LAB_BOOT_PROFILE.buildSemanticWorld)
+      .toBe(BUILDING_LAB_BOOT_PROFILE.buildSemanticWorld);
+    expect(FEATURE_LAB_BOOT_PROFILE).toBe(COMBAT_LAB_BOOT_PROFILE);
+    expect(terrain).not.toBe(secondTerrain);
+    expect(secondTerrain).toEqual(terrain);
+
+    expect(terrain.bounds).toEqual({ minX: -128, maxX: 128, minZ: -128, maxZ: 128 });
     expect(terrain.chunkSize).toBe(64);
     expect(terrain.metresPerQuad).toBe(2);
     expect(terrain.regions).toEqual([{
       regionId: "fallowmarch",
       rect: terrain.bounds,
-      seed: 0,
+      seed: 0x0f411,
       character: "plains",
       baseHeight: 0,
-      amplitude: 0,
+      amplitude: 3,
     }]);
-    expect(FEATURE_LAB_BOOT_PROFILE.spawn).toEqual({
+    expect(terrain.flats).toEqual([{
+      x: 0,
+      z: 0,
+      radius: 48,
+      blend: 24,
+      halfExtents: [48, 48],
+    }]);
+    expect(COMBAT_LAB_BOOT_PROFILE.spawn).toEqual({
       regionId: "fallowmarch",
       x: 0,
       z: 0,
       facingRad: 0,
     });
-    expect(FEATURE_LAB_BOOT_PROFILE).toMatchObject({
-      persistent: false,
-      worldSurface: false,
-      dungeon: false,
-      scatter: false,
-      validateWorldRefs: false,
-      fullWarmup: false,
-    });
+    for (const [profile, mode] of [
+      [COMBAT_LAB_BOOT_PROFILE, "combat"],
+      [BUILDING_LAB_BOOT_PROFILE, "building"],
+    ] as const) {
+      expect(profile).toMatchObject({
+        kind: "feature-lab",
+        labMode: mode,
+        persistent: false,
+        worldSurface: false,
+        dungeon: false,
+        scatter: false,
+        validateWorldRefs: false,
+        fullWarmup: false,
+      });
+      expect(profile.spawn).toBe(COMBAT_LAB_BOOT_PROFILE.spawn);
+    }
   });
 
   it("returns a fresh, completely empty semantic world", () => {
     const heightAt = () => 0;
-    const first = FEATURE_LAB_BOOT_PROFILE.buildSemanticWorld(1, heightAt);
-    const second = FEATURE_LAB_BOOT_PROFILE.buildSemanticWorld(1, heightAt);
+    const first = COMBAT_LAB_BOOT_PROFILE.buildSemanticWorld(1, heightAt);
+    const second = BUILDING_LAB_BOOT_PROFILE.buildSemanticWorld(1, heightAt);
 
     expect(first).toEqual({
       entities: [],
@@ -70,10 +97,12 @@ describe("boot profiles", () => {
     expect(second.entities).not.toBe(first.entities);
   });
 
-  it("selects the real-engine lab only for the actors route", () => {
-    expect(bootProfileFor("?mode=actors")).toBe(FEATURE_LAB_BOOT_PROFILE);
-    expect(bootProfileFor(new URLSearchParams("mode=actors"))).toBe(FEATURE_LAB_BOOT_PROFILE);
-    expect(bootProfileFor({ search: "?mode=structures" })).toBe(GAME_BOOT_PROFILE);
+  it("routes current and legacy lab URLs to their shared-yard workbench", () => {
+    expect(bootProfileFor("?mode=combat")).toBe(COMBAT_LAB_BOOT_PROFILE);
+    expect(bootProfileFor("?mode=actors")).toBe(COMBAT_LAB_BOOT_PROFILE);
+    expect(bootProfileFor(new URLSearchParams("mode=building"))).toBe(BUILDING_LAB_BOOT_PROFILE);
+    expect(bootProfileFor({ search: "?mode=structures" })).toBe(BUILDING_LAB_BOOT_PROFILE);
+    expect(bootProfileFor("?mode=unknown")).toBe(GAME_BOOT_PROFILE);
     expect(bootProfileFor("")).toBe(GAME_BOOT_PROFILE);
   });
 });

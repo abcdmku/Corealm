@@ -8,8 +8,10 @@ if (!(canvas instanceof HTMLCanvasElement)) {
 
 const profile = bootProfileFor(window.location);
 if (profile.kind === "feature-lab") {
-  document.title = "Corealm · Feature Lab";
+  const label = profile.labMode === "building" ? "Building Lab" : "Combat Lab";
+  document.title = `Corealm · ${label}`;
   document.body.dataset["bootProfile"] = "feature-lab";
+  document.body.dataset["labMode"] = profile.labMode ?? "combat";
 }
 
 boot(canvas, { profile }).catch((error: unknown) => {

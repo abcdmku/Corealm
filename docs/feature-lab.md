@@ -1,6 +1,25 @@
-# Realtime feature lab
+# Realtime feature labs
 
-The feature lab is the canonical place to build and deeply test isolated 3D features. It renders production structures, the main player, NPCs, creatures, animations, melee actions, and spell effects without booting the terrain, simulation, or full world. Player equipment can be selected independently by slot, and editable skill levels make level-dependent presentation and feature cases reproducible. This keeps edit feedback immediate while exercising the same render, asset, rig, animation, and effect paths used by the game.
+The combat and building labs are two modes of the same compact Fallowmarch yard. Both boot through `game/index.html`, the production renderer and `WorldScene`, and the normal asset, material, rig, animation, entity-view, effect, navigation, physics, and input paths. The yard is a 256 m by 256 m plains terrain with gentle relief and a 96 m by 96 m flat central build pad. It keeps edit feedback fast by leaving out the full authored island, persistence, quests, economy, water, biome blending, scatter, and ordinary world content.
+
+The shared setting matters. A structure seen in building mode and an actor or spell seen in combat mode receive the same terrain, daylight, fog, camera stack, and scene treatment. The labs are real game scenes, not separate Three.js turntables.
+
+## Lab-first feature gate
+
+The lab is the default place to build any feature that can be exercised in a compact deterministic scene. Current controls cover structures, characters, creatures, equipment, skills, movement, camera behavior, melee, and spells. New work is not limited to that list. Resources, interactables, pickups, projectiles, UI, inventory, crafting, shops, quest interactions, audio, foliage response, and other local systems should add the smallest fixture or control they need to a lab workbench and use the production implementation there.
+
+Follow this order:
+
+1. Build or update the production module and its focused tests without registering it in authored final-world content.
+2. Expose that same production path through a deterministic lab fixture. Do not make a lab-only renderer, rig, effect, interaction, or duplicate data model.
+3. Prove the feature through real Chromium actions, semantic state before and after those actions, console checks, and relevant screenshots.
+4. Have the root accept the lab proof. A worker's source review or focused test result is not acceptance.
+5. In a later integration step, wire the accepted feature into final-world boot, placement, spawn data, authored content, progression, persistence, or cross-system flows.
+6. Run a small final-world check for loading, wiring, real data flow, representative interaction, and placement. Fix feature behavior in the lab first, then repeat integration.
+
+If the lab lacks a needed capability, extending the lab is part of the feature. Do not use the full world as a temporary development harness.
+
+The gate may be skipped only when the behavior being built is the authored full world itself and isolation would remove what needs testing. This covers terrain, biome, coast, water, world-scale scatter, world layout, island-scale navigation, and similar spatial integration. Record the exception and its reason in the task and handoff, then follow [the world-authoring workflow](./world-authoring.md). Reusable structures, actors, foliage assets, effects, UI, controls, and local interactions still use the lab whenever they can be separated from world generation.
 
 ## Development loop
 
@@ -13,39 +32,88 @@ npm run test:watch
 # Structure recipes, compositions, collisions, and asset references
 npm run structure:contracts:watch
 
-# Persistent Vite lab with realtime HMR
+# Combat mode on the persistent Vite server
 npm run lab:preview
+
+# Building mode on the same kind of persistent Vite server
+npm run lab:building:preview
 ```
 
-Keep `lab:preview` running while editing. Use its controls to swap structures; spawn the main player, NPCs, and creatures; equip the player by slot; set player skill levels; select animations; and exercise attacks and spells. Skill values are isolated setup state for presentation and feature tests, not simulated progression. Confirm both visible behavior and semantic lab state before moving on. Do not use a full-world boot as the inner development loop for a feature the lab supports.
+Both preview commands use port 4174, so run one at a time. You can switch workbenches from inside the lab without restarting Vite. A workbench change updates `mode` in the current URL, preserves every other query parameter and the hash, and performs a full document reload. The destination boots a fresh scene with its own defaults. Runtime state, spawned targets, movement, and unsaved panel setup do not transfer across that reload. Realtime HMR remains active because the Vite server stays running.
 
-When the focused behavior is ready, run the automated browser gate:
+### Combat mode
+
+`npm run lab:preview` opens `/index.html?mode=combat`. Use the lab controls to spawn production NPCs and creatures, choose equipment by slot, set presentation-only skill levels, select a spell, and exercise melee and spell effects. Walking, ground clicks, target selection, animation, damage, and effects still flow through the production game systems.
+
+Editable skill values and direct equipment choices are test setup. They do not simulate progression, item eligibility, inventory acquisition, or persistence.
+
+### Building mode
+
+`npm run lab:building:preview` opens `/index.html?mode=building`. The building controls can select a prefab, composition, or wall run; change the plaster, timber, or stone regional kit; edit supported dimensions; step through variant seeds; and fit the production camera to the result.
+
+Prefab width and depth are whole metres from 2 through 30. Compositions have authored dimensions, so their size controls are disabled. Wall runs follow the production two-metre module grid. Their total width is an even value from 6 through 30 m. The field labelled `Opening` is also even, starts at 2 m, and stops at `width - 4`, leaving at least one two-metre wall module on each side. Dimension values entered in the panel or URL are clamped and snapped to these supported ranges before a recipe runs.
+
+### Production structure and collision path
+
+Prefabs, compositions, and wall runs use the production recipes. Recipe parts become the same semantic structure entities consumed by the normal `EntityViews` renderer, with the selected regional material context. A composition can also have a separate semantic hero asset that its authored world recipe expects, such as the arch paired with a region gate. The lab adds that hero beside the composition dressing instead of showing the dressing alone.
+
+Prefab and wall-run collision comes from their production collision recipes. Composition collision is measured from collidable recipe parts and any solid hero asset. On every rebuild, the lab prepares assets through `EntityViews`, replaces the semantic structure entities, refreshes obstacle-carve objects, rebuilds the terrain heightfield and static physics boxes, and gives direct movement the resulting production solids. The browser gate checks emitted collision metadata and a ready debug state. It does not prove that each replacement carve was baked into the navmesh or that every collision face blocks the player.
+
+The published `partCount` is the number of rendered semantic structure entities, including a separate composition hero when one exists. `collisionCount` is the number of emitted solid volumes. Neither value is a visual-quality judgment.
+
+### Building view controls
+
+Building mode has three independent checkboxes. Its defaults are player visible, `Walk in yard` off, and `Free camera` off.
+
+- `Player visible` changes only whether the production player rig is drawn. It does not move the player, change walking, or change the camera mode.
+- `Walk in yard` controls player movement input. When it is off, the input controller stops any current route, clears held movement keys, and ignores WASD, arrow-key movement, ground-click movement, and `Walk here`. Hover, selection, inspection, camera gestures, and panel keybindings remain available. When it is on, normal camera-relative WASD, arrow controls, and click-to-move are active.
+- `Free camera` detaches camera focus from the player without moving or hiding the player and without changing walking. Right-drag orbits, middle-drag pans, and the wheel zooms. Turn it off to return to the normal player-follow camera.
+
+The controls may be combined. For a normal game-scale check, leave the player visible, turn walking on, and keep the follow camera. For structure inspection, turn free camera on, then hide or show the player as a scale reference without changing the camera focus. Walking can remain on while the camera is detached, although the camera does not follow the moving player in that combination.
+
+Rebuilding a structure stops movement and resets the player to the yard spawn. In free-camera mode, `Fit structure` targets the rendered structure bounds without relocating the player. With free camera off, the normal player-follow camera owns focus.
+
+A structure rebuild preserves the selected workbench and publishes its normalized selection, revision, bounds, entity count, asset count, collision count, build time, and errors through `window.__featureLab`.
+
+The old `npm run structure:preview` command and `structure-preview.html` route remain compatibility entry points. They forward into the production building mode instead of booting a separate renderer. Direct `mode=actors` and `mode=structures` queries remain aliases for combat and building respectively.
+
+## Browser gate and shared-state proof
+
+When focused behavior is ready, run the self-contained Chromium gate:
 
 ```bash
 npm run lab:test
 ```
 
-The gate proves representative production-path structure assembly, actor spawning, animation progress, melee feedback, and spell effects in the isolated scene. It is the repeatable acceptance gate for these feature details; interactive lab inspection remains necessary when appearance or readability changes.
+The command starts one Vite server and one Chromium session for the combat route, building route, and legacy redirect. It proves that both lab routes report `engine: "corealm-production"` and the same `fallowmarch-yard` identity. Combat coverage checks the production canvas and debug state, actor rigs and animation progress, direct equipment changes, pointer selection, melee damage and motion, and spell particles and damage. Building coverage checks representative prefab, composition, and wall-run rebuilds; non-empty collision output; revision changes; the three independent view controls; opt-in movement through real keyboard input; suppressed movement when walking is off; player visibility without a position change; and free-camera orbit, pan, zoom, and fit without player relocation.
 
-Then wire the accepted feature into the final environment and run a shallow integration smoke:
+Workbench-switch coverage treats the mode selector as navigation, not an in-place state mutation. The gate records the current query and hash, switches from building to combat, waits for the document and `window.__featureLab` to load again, then checks the canonical destination `mode`, preserved URL fields, shared-yard identity, and fresh combat defaults. Both options use the same navigation path, while the building-route readiness check locks its defaults to player visible, walking off, and free camera off.
+
+In that same session, the gate visits `structure-preview.html`. The page preserves `kind`, `id`, `kit`, `width`, `depth`, `seed`, extra query fields, and the hash; changes the mode to `building`; and redirects to `game/index.html`. The gate confirms that the production lab and debug APIs replace the retired `window.__structurePreview` runtime. CI runs this same command.
+
+These checks do not replace visual review. The automated gate records semantic and timing evidence, but it does not compare pixels, inspect screenshots, or maintain visual baselines. Inspect the live scene and the generated screenshots when structure readability, equipment silhouettes, animation, melee timing, spell contrast, framing, or ground contact changes.
+
+Only after root lab acceptance, wire the feature into the final environment and run a shallow integration smoke:
 
 ```bash
 npm run smoke -- --run runs/corealm
 npm run check
 ```
 
-Final-world coverage should prove loading, wiring, representative interaction, and stable semantic state. It should not duplicate every structure, actor, animation, attack, or spell combination already covered by focused tests and the lab gate.
+Final-world coverage should prove loading, wiring, representative interaction, and stable semantic state. It should not repeat every structure, actor, attack, or spell combination already covered by focused tests and the lab gate.
 
 ## Scope boundary
 
-The lab intentionally isolates features from expensive world systems. Passing it does **not** prove:
+The current labs intentionally omit expensive world systems. Add deterministic fixtures for isolatable feature logic and presentation rather than treating these omissions as permanent exceptions. Passing the labs does **not** prove:
 
-- terrain placement, biome blending, water, scatter, or world layout;
-- navigation meshes, pathfinding, collision integration, or physics behavior;
-- quest and skill progression, equipment eligibility or inventory rules, economy, persistence, or simulation rules;
+- final-world terrain placement, biome blending, water, scatter, or world layout;
+- the island navigation mesh, long-distance pathfinding, final collision integration, or final-world physics behavior;
+- final progression, equipment eligibility, inventory acquisition, economy, persistence, or simulation integration;
 - interactions that depend on several full-world systems at once.
 
-Test those concerns in their focused source tests and with a small number of representative final-world scenarios. In particular, the final world must still prove that earned skill levels and equipped items flow through progression, inventory, and equipment rules correctly. A feature is accepted only when both its lab proof and its relevant integration proof pass.
+Building-lab walking and free camera are presentation and local input checks. The gate proves that real keyboard input moves the player only when walking is enabled, and that camera pan, orbit, zoom, and fit can change framing without moving the player. It also checks that the selected structure remains stable and each representative structure emits non-empty collision metadata. It does not walk the player into a wall, through an opening, or around every recipe. It does not prove replacement navmesh carving, collision blocking, final-world navigation, physics, terrain placement, or collision behavior. Test those systems in their focused source tests and with a small number of representative final-world scenarios.
+
+Use lab fixtures to prove the local logic, UI, and interactions for progression, inventory, equipment, quests, economy, persistence, and simulation work. The final world must still prove that real authored data and cross-system flows connect correctly. A feature is accepted only when its lab proof and relevant integration proof both pass.
 
 ## Time budgets
 
@@ -55,15 +123,27 @@ These are hard design targets for every testing loop:
 | --- | ---: |
 | Focused unit or contract tests | under 10 seconds |
 | Persistent lab edit feedback | realtime HMR |
-| Cold automated lab gate | at most 60 seconds |
+| Combined labs and legacy redirect gate | at most 60 seconds |
 | Lab interactions after startup | at most 10 seconds |
 | Full-world smoke | at most 2 minutes |
 | Entire GitHub CI workflow | at most 5 minutes |
 
-If a loop exceeds its budget, split detailed coverage into focused tests or the lab instead of expanding a full-world matrix. Keep one persistent development server per loop and avoid repeated browser or world startup.
+`npm run lab:test` owns one 60-second end-to-end deadline, including server startup, both lab modes, screenshots, and compatibility routing.
+
+If a loop exceeds its budget, split detailed coverage into focused tests or the labs instead of expanding a full-world matrix. Keep one persistent development server per loop and avoid repeated browser or world startup.
 
 ## Evidence and generated files
 
+The combined gate overwrites five ignored screenshots under `test-results/feature-labs/`:
+
+- `combat-melee.png`
+- `combat-spell.png`
+- `building-authoring.png`
+- `building-walking.png`
+- `building-free-camera.png`
+
+All five capture calls must succeed, but the gate does not decide whether the scene is readable. State and camera probes can show that visibility or framing controls changed, but they do not prove that the player, structure, or camera composition looks correct. The current capture set has no dedicated image for every player-visibility combination. The gate does not clean the directory, so these fixed names are overwritten while unrelated stale files remain. The gate prints its JSON result to stdout and does not write a durable report, trace, or pixel baseline. The legacy redirect step does not capture a separate screenshot.
+
 Lab screenshots, browser reports, traces, and other generated evidence are disposable by default. Keep routine output under ignored test-result locations and overwrite it between runs. Inspect visual output during development, but do not update Markdown, commit screenshots, or create report diffs on every pass.
 
-Promote an artifact into the repository only when it is deliberately selected as durable acceptance evidence or documentation. Record why it is being retained; otherwise the command should leave the tracked worktree unchanged.
+Promote an artifact into the repository only when it is deliberately selected as durable acceptance evidence or documentation. Record why it is being retained. Otherwise the command should leave the tracked worktree unchanged.

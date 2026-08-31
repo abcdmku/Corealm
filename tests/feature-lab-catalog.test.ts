@@ -16,7 +16,13 @@ import {
   FEATURE_LAB_CATALOG,
   createFeatureLabEntity,
 } from "../game/src/featureLab/catalog.js";
+import { FEATURE_LAB_STRUCTURE_CATALOG } from "../game/src/featureLab/structures.js";
 import { npcOutfitParts } from "../game/src/render/characterAppearances.js";
+import {
+  COMPOSITION_IDS,
+  KIT_IDS,
+  PREFAB_IDS,
+} from "../game/src/render/buildings.js";
 
 const NPC_SOURCES = REGIONS.flatMap((region) => (
   region.settlement.npcs.map((npc) => ({
@@ -106,6 +112,22 @@ describe("the production-derived feature-lab catalog", () => {
     })));
     expect(new Set(FEATURE_LAB_CATALOG.skills.map((skill) => skill.id)).size).toBe(SKILL_IDS.length);
     expect(new Set(FEATURE_LAB_CATALOG.spells.map((spell) => spell.id)).size).toBe(SPELLS.length);
+  });
+
+  it("uses the production-derived structure catalog without dropping any recipe family", () => {
+    expect(FEATURE_LAB_CATALOG.structures).toEqual(FEATURE_LAB_STRUCTURE_CATALOG);
+    expect(FEATURE_LAB_CATALOG.structures.prefabs.map((row) => row.id)).toEqual(PREFAB_IDS);
+    expect(FEATURE_LAB_CATALOG.structures.compositions.map((row) => row.id)).toEqual(COMPOSITION_IDS);
+    expect(FEATURE_LAB_CATALOG.structures.kits.map((row) => row.id)).toEqual(KIT_IDS);
+
+    for (const rows of [
+      FEATURE_LAB_CATALOG.structures.prefabs,
+      FEATURE_LAB_CATALOG.structures.compositions,
+      FEATURE_LAB_CATALOG.structures.kits,
+    ]) {
+      expect(rows.every((row) => row.label.trim().length > 0)).toBe(true);
+      expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
+    }
   });
 });
 

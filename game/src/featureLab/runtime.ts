@@ -5,9 +5,12 @@ import {
   type EntityId,
   type EquipSlot,
   type FeatureLabApi,
+  type FeatureLabMode,
   type FeatureLabMotionView,
   type FeatureLabPreset,
   type FeatureLabState,
+  type FeatureLabStructureSelection,
+  type FeatureLabStructureView,
   type FeatureLabTargetKind,
   type ItemId,
   type RegionId,
@@ -31,6 +34,7 @@ import type { EntityStore } from "../world/entities.js";
 import { FEATURE_LAB_CATALOG, createFeatureLabEntity } from "./catalog.js";
 
 const TARGET_DISTANCE = 10;
+const TARGET_LATERAL_OFFSET = 3;
 const LAB_ITEM_QUANTITY = 100_000;
 
 export interface FeatureLabRuntimeDeps {
@@ -50,6 +54,19 @@ export interface FeatureLabRuntimeDeps {
   readonly camera: THREE.Camera;
   readonly spawn: Vec3;
   readonly spawnRegionId: RegionId;
+  readonly initialMode: FeatureLabMode;
+  readonly initialWalkingEnabled: boolean;
+  readonly initialPlayerVisible: boolean;
+  readonly initialFreeCameraEnabled: boolean;
+  readonly initialStructure: FeatureLabStructureView;
+  readonly replaceStructure: (
+    selection: FeatureLabStructureSelection,
+  ) => Promise<FeatureLabStructureView>;
+  readonly setWalkingEnabled: (enabled: boolean) => void;
+  readonly setPlayerVisible: (visible: boolean) => void;
+  readonly setFreeCameraEnabled: (enabled: boolean) => void;
+  readonly reloadMode: (mode: FeatureLabMode) => void;
+  readonly fitStructure: (structure: FeatureLabStructureView) => void;
   readonly resetPlayer: () => void;
   readonly selectedEntityId: () => EntityId | null;
   readonly liveSpellParticles: () => number;
@@ -66,6 +83,16 @@ export interface FeatureLabRuntimeDeps {
  */
 export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLabApi {
   let target: { preset: FeatureLabPreset; entityId: EntityId } | null = null;
+  let mode = deps.initialMode;
+  let walkingEnabled = deps.initialWalkingEnabled;
+  let playerVisible = deps.initialPlayerVisible;
+  let freeCameraEnabled = deps.initialFreeCameraEnabled;
+  let structure = cloneStructureView(deps.initialStructure);
+  let requestedStructureSelection = { ...structure.selection };
+  let structureQueue: Promise<void> = Promise.resolve();
+  let structureRequestSequence = 0;
+  let targetQueue: Promise<void> = Promise.resolve();
+  let modeRevision = 0;
   let sequence = 0;
   const runtimeErrors: string[] = [];
   const counters = {
@@ -98,24 +125,101 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
     getState,
     getCatalog: () => FEATURE_LAB_CATALOG,
 
-    async spawnTarget(kind, presetId) {
-      return guardAsync(async () => {
-        const preset = findPreset(kind, presetId);
-        deps.api.stop();
-        deps.combat.resetOnDeath(deps.clock.elapsedMs);
-        deps.combat.resetForNewWorld();
-        deps.store.get().world.enemies = {};
-        deps.resetPlayer();
+    setMode(nextMode) {
+      return guard(() => {
+        if (nextMode !== "combat" && nextMode !== "building") {
+          throw new Error(`Unknown feature-lab mode: ${String(nextMode)}`);
+        }
+        if (nextMode !== mode) deps.reloadMode(nextMode);
+        return getState();
+      });
+    },
 
-        const entityId = `feature-lab:${kind}:${++sequence}`;
-        const x = deps.spawn[0];
-        const z = deps.spawn[2] + TARGET_DISTANCE;
+    setWalkingEnabled(enabled) {
+      return guard(() => {
+        if (typeof enabled !== "boolean") {
+          throw new Error("Feature-lab walking state must be a boolean");
+        }
+        deps.setWalkingEnabled(enabled);
+        walkingEnabled = enabled;
+        return getState();
+      });
+    },
+
+    setPlayerVisible(visible) {
+      return guard(() => {
+        if (typeof visible !== "boolean") throw new Error("Player visibility must be a boolean");
+        deps.setPlayerVisible(visible);
+        playerVisible = visible;
+        return getState();
+      });
+    },
+
+    setFreeCameraEnabled(enabled) {
+      return guard(() => {
+        if (typeof enabled !== "boolean") throw new Error("Free-camera state must be a boolean");
+        deps.setFreeCameraEnabled(enabled);
+        freeCameraEnabled = enabled;
+        return getState();
+      });
+    },
+
+    async setStructure(patch) {
+      requestedStructureSelection = {
+        ...requestedStructureSelection,
+        ...patch,
+      };
+      const selection = { ...requestedStructureSelection };
+      const requestSequence = structureRequestSequence + 1;
+      structureRequestSequence = requestSequence;
+      return guardAsync(async () => {
+        const task = structureQueue
+          .catch(() => undefined)
+          .then(async () => {
+            try {
+              const next = await deps.replaceStructure(selection);
+              structure = cloneStructureView(next);
+              if (requestSequence === structureRequestSequence) {
+                requestedStructureSelection = { ...next.selection };
+              }
+            } catch (cause) {
+              if (requestSequence === structureRequestSequence) {
+                requestedStructureSelection = { ...structure.selection };
+              }
+              throw cause;
+            }
+          });
+        structureQueue = task;
+        await task;
+        return getState();
+      });
+    },
+
+    fitStructure() {
+      return guard(() => {
+        deps.fitStructure(structure);
+        return getState();
+      });
+    },
+
+    async spawnTarget(kind, presetId) {
+      const requestedModeRevision = modeRevision;
+      const task = targetQueue
+        .catch(() => undefined)
+        .then(async () => {
+        if (mode !== "combat" || requestedModeRevision !== modeRevision) return;
+        const preset = findPreset(kind, presetId);
+        const nextSequence = sequence + 1;
+        const entityId = `feature-lab:${kind}:${nextSequence}`;
+        // Keep the actor off the camera/player centreline so melee contact and spell silhouettes
+        // remain readable in the normal production camera instead of stacking into one shape.
+        const [x, z] = targetGroundPoint();
         const ground: Vec3 = [x, deps.groundHeightAt(x, z), z];
         const entity = createFeatureLabEntity(preset, {
           entityId,
           groundPosition: ground,
           baseY: (assetId) => deps.assets.baseY(assetId),
-          rotationY: Math.PI,
+          rotationY: Math.atan2(deps.spawn[0] - x, deps.spawn[2] - z),
         });
         // Authored content decides the actor's appearance and stats. Its original biome does not
         // decide which streamed world this deliberately empty session is standing in.
@@ -125,10 +229,37 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
         if (prepared.missing.length > 0) {
           throw new Error(`Missing production actor assets: ${prepared.missing.join(", ")}`);
         }
-        deps.entityStore.load([entity]);
-        deps.entityStore.clearLocations();
-        deps.entityViews.sync([entity]);
-        target = { preset, entityId };
+        if (mode !== "combat" || requestedModeRevision !== modeRevision) return;
+
+        // Asset preparation is the failure-prone step, so finish it before disturbing the live
+        // target or combat state. The yard and current structure are ordinary semantic entities
+        // and must remain in the store when one actor replaces another.
+        deps.api.stop();
+        deps.combat.resetOnDeath(deps.clock.elapsedMs);
+        deps.combat.resetForNewWorld();
+        deps.store.get().world.enemies = {};
+        deps.resetPlayer();
+
+        const previousTarget = target;
+        const previousEntity = previousTarget
+          ? deps.entityStore.get(previousTarget.entityId)
+          : undefined;
+        if (previousTarget) deps.entityStore.remove(previousTarget.entityId);
+        try {
+          deps.entityStore.add(entity);
+          deps.entityViews.sync(deps.entityStore.all());
+          target = { preset, entityId };
+          sequence = nextSequence;
+        } catch (cause) {
+          deps.entityStore.remove(entityId);
+          if (previousEntity) deps.entityStore.add(previousEntity);
+          deps.entityViews.sync(deps.entityStore.all());
+          throw cause;
+        }
+        });
+      targetQueue = task;
+      return guardAsync(async () => {
+        await task;
         return getState();
       });
     },
@@ -221,7 +352,11 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
     return {
       ready: true,
       engine: "corealm-production",
-      world: "empty-flat",
+      world: "fallowmarch-yard",
+      mode,
+      walkingEnabled,
+      playerVisible,
+      freeCameraEnabled,
       player,
       playerPosition: [...state.player.position] as Vec3,
       playerMotion,
@@ -233,6 +368,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
         destinationEntityId: state.player.movement.destinationEntityId,
       },
       selectedEntityId: deps.selectedEntityId(),
+      structure: cloneStructureView(structure),
       target: entity && target ? {
         kind: target.preset.kind,
         presetId: target.preset.id,
@@ -290,6 +426,30 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
     if (quantity > 0) requireOk(deps.inventory.removeItem(itemId, quantity, { silent: true }), `discard ${itemId}`);
   }
 
+  function clearTarget(): void {
+    if (!target) return;
+    deps.api.stop();
+    deps.combat.resetOnDeath(deps.clock.elapsedMs);
+    deps.combat.resetForNewWorld();
+    deps.store.get().world.enemies = {};
+    deps.entityStore.remove(target.entityId);
+    deps.entityViews.sync(deps.entityStore.all());
+    target = null;
+  }
+
+  function targetGroundPoint(): readonly [number, number] {
+    let x = deps.spawn[0] + TARGET_LATERAL_OFFSET;
+    const z = deps.spawn[2] + TARGET_DISTANCE;
+    const bounds = structure.bounds;
+    if (bounds && x >= bounds.min[0] - 1 && x <= bounds.max[0] + 1
+      && z >= bounds.min[2] - 1 && z <= bounds.max[2] + 1) {
+      const left = bounds.min[0] - 3;
+      const right = bounds.max[0] + 3;
+      x = Math.abs(left - deps.spawn[0]) < Math.abs(right - deps.spawn[0]) ? left : right;
+    }
+    return [x, z];
+  }
+
   function guard<T>(operation: () => T): T {
     try {
       return operation();
@@ -319,6 +479,17 @@ function toPlayerMotion(snapshot: ReturnType<CharacterRig["motionSnapshot"]>): F
     clip: snapshot.clip,
     time: snapshot.time,
     liveRig: true,
+  };
+}
+
+function cloneStructureView(view: FeatureLabStructureView): FeatureLabStructureView {
+  return {
+    ...view,
+    selection: { ...view.selection },
+    bounds: view.bounds ? {
+      min: [...view.bounds.min] as Vec3,
+      max: [...view.bounds.max] as Vec3,
+    } : null,
   };
 }
 

@@ -353,6 +353,8 @@ export class OrbitCamera {
   private readonly focus = new THREE.Vector3();
   private readonly smoothed = new THREE.Vector3();
   private readonly desired = new THREE.Vector3();
+  private readonly freeTarget = new THREE.Vector3();
+  private freeMove = false;
   /** Preallocated probe scratch. The probe contract forbids allocating; so does calling it. */
   private readonly probeRight = new THREE.Vector3();
   private readonly probeUp = new THREE.Vector3();
@@ -409,6 +411,27 @@ export class OrbitCamera {
     this.distance = clamp(this.distance + delta, CAMERA.minDistance, CAMERA.maxDistance);
   }
 
+  /** Detaches camera focus from the player while retaining the production orbit camera. */
+  setFreeTarget(position: Vec3 | null): void {
+    this.freeMove = position !== null;
+    if (position) this.freeTarget.set(position[0], position[1], position[2]);
+    this.initialised = false;
+  }
+
+  /** Screen-space middle-drag pan projected onto the world XZ plane. */
+  panPixels(deltaX: number, deltaY: number, viewportHeight: number): void {
+    if (!this.freeMove) return;
+    const metresPerPixel = (
+      2 * this.distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)
+    ) / Math.max(1, viewportHeight);
+    const rightX = Math.cos(this.yaw);
+    const rightZ = -Math.sin(this.yaw);
+    const backX = Math.sin(this.yaw);
+    const backZ = Math.cos(this.yaw);
+    this.freeTarget.x += (-deltaX * rightX + deltaY * backX) * metresPerPixel;
+    this.freeTarget.z += (-deltaX * rightZ + deltaY * backZ) * metresPerPixel;
+  }
+
   setPose(yaw: number, pitch: number, distance: number): void {
     this.yaw = yaw;
     this.pitch = clamp(pitch, CAMERA.minPitch, CAMERA.maxPitch);
@@ -444,7 +467,11 @@ export class OrbitCamera {
     const deltaMs = this.lastUpdateMs === 0 ? 16.7 : clamp(now - this.lastUpdateMs, 0, 250);
     this.lastUpdateMs = now;
 
-    this.focus.set(targetX, targetY + FOCUS_HEIGHT_METRES, targetZ);
+    if (this.freeMove) {
+      this.focus.set(this.freeTarget.x, this.freeTarget.y + FOCUS_HEIGHT_METRES, this.freeTarget.z);
+    } else {
+      this.focus.set(targetX, targetY + FOCUS_HEIGHT_METRES, targetZ);
+    }
     if (!this.initialised || snap) {
       this.smoothed.copy(this.focus);
       this.effectiveDistance = this.distance;
@@ -462,7 +489,10 @@ export class OrbitCamera {
       this.smoothed.y += (this.focus.y - this.smoothed.y) * verticalAlpha;
     }
 
-    const resolved = this.resolveOcclusion(this.distance);
+    const resolved = this.freeMove
+      ? { distance: this.distance, pitch: this.pitch }
+      : this.resolveOcclusion(this.distance);
+    if (this.freeMove) this.occluded = false;
 
     // Pull in fast so the player never disappears behind rock; ease back out slowly, and only after
     // the hold expires. Asymmetric on purpose: a symmetric spring either snaps outward through the
@@ -807,6 +837,8 @@ export class OrbitCamera {
     flatDistance: number;
     occluded: boolean;
     occlusionProbe: boolean;
+    freeMove: boolean;
+    target: { x: number; y: number; z: number };
   } {
     return {
       position: {
@@ -825,6 +857,12 @@ export class OrbitCamera {
       flatDistance: Math.round(this.flatClearance * 1000) / 1000,
       occluded: this.occluded,
       occlusionProbe: this.occlusionProbe !== null,
+      freeMove: this.freeMove,
+      target: {
+        x: Math.round(this.smoothed.x * 1000) / 1000,
+        y: Math.round(this.smoothed.y * 1000) / 1000,
+        z: Math.round(this.smoothed.z * 1000) / 1000,
+      },
     };
   }
 

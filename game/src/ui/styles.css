@@ -1131,36 +1131,208 @@ html, body {
 .equip-chooser__choice .item-icon.is-raster-ready .icon { visibility: hidden; }
 .equip-chooser__choice:first-child { grid-template-columns: 1fr; padding-left: var(--space-2); }
 
-/* Transient setup controls around the real production game, never a second simulation. */
-.lab-intro { margin-top: 0; line-height: 1.35; }
+/* ----------------------------------------------------------- feature labs */
+
+/*
+ * Combat and building share this production panel. Keep the frame below the minimap at the
+ * 1280x720 floor and at 1280x800; the body scrolls, while status stays visible at its top edge.
+ */
+#panel-feature-lab {
+  max-width: calc(100vw - 20px);
+  max-height: min(680px, calc(100vh - 224px)) !important;
+}
+
+#panel-feature-lab .panel__body {
+  min-height: 0;
+  gap: var(--space-1);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.lab-gear-note { margin: 0; line-height: 1.3; }
+
+.lab-mode-select {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Each mode groups its setup controls without competing with the shared panel border. */
+.lab-section {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.lab-section > h3 {
+  margin: 0 0 1px;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: var(--size-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.lab-section[hidden] { display: none; }
+
 .lab-field {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
+  grid-template-columns: 68px minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  min-width: 0;
 }
+
+.lab-field > span {
+  min-width: 0;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
 .lab-field select,
 .lab-field input {
   width: 100%;
   min-width: 0;
+  min-height: 22px;
+  padding: 2px var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-sunken);
+  box-shadow: var(--inset-well);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--size-sm);
 }
+
+.lab-field select:focus-visible,
+.lab-field input:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.lab-field select:disabled,
+.lab-field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: saturate(0.45);
+}
+
 .lab-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-1);
 }
-.lab-actions .btn:last-child { grid-column: 1 / -1; }
-.lab-gear-note { margin: 0; line-height: 1.3; }
-.lab-structures-link { display: block; text-align: center; text-decoration: none; }
-.lab-status {
+
+.lab-actions .btn { min-width: 0; padding-inline: var(--space-1); }
+.lab-actions .btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* The three building view controls share one compact row and wrap only when the panel is narrow. */
+#lab-building-workbench { flex-flow: row wrap; }
+
+#lab-building-workbench > h3,
+#lab-building-workbench > .lab-actions,
+#lab-building-workbench > .lab-field:not(:has(> :is(
+  #lab-walk-enabled,
+  #lab-player-visible,
+  #lab-free-move
+))) { flex: 0 0 100%; }
+
+#lab-building-workbench > .lab-field:has(> :is(
+  #lab-walk-enabled,
+  #lab-player-visible,
+  #lab-free-move
+)) {
+  display: grid;
+  flex: 1 1 78px;
+  grid-template-columns: minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
   margin: 0;
-  padding: var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border: var(--border);
+  border-left: 2px solid var(--info);
   border-radius: var(--radius);
-  background: var(--panel-sunken);
+  background: rgba(82, 123, 138, 0.1);
+  color: var(--ink);
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+:is(#lab-walk-enabled, #lab-player-visible, #lab-free-move) {
+  flex: 0 0 auto;
+  width: 14px !important;
+  min-width: 14px;
+  height: 14px;
+  min-height: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  accent-color: var(--accent);
+}
+
+#lab-building-workbench > .lab-field:has(> :is(
+  #lab-walk-enabled,
+  #lab-player-visible,
+  #lab-free-move
+):checked) {
+  border-left-color: var(--accent);
+  background: rgba(212, 175, 78, 0.12);
+}
+
+#lab-building-workbench > .lab-field:has(> :is(
+  #lab-walk-enabled,
+  #lab-player-visible,
+  #lab-free-move
+):disabled) {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.lab-status {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: 0 0 auto;
+  order: -1;
+  max-height: 132px;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  background: rgba(13, 11, 8, 0.96);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
   color: var(--ink-dim);
   font-size: var(--size-xs);
-  line-height: 1.35;
+  line-height: 1.3;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  scrollbar-color: #4a4133 transparent;
+  scrollbar-width: thin;
+}
+
+.lab-status:empty { display: none; }
+
+@media (max-width: 760px) {
+  #panel-feature-lab { max-width: calc(100vw - 16px); }
+  .lab-field { grid-template-columns: 62px minmax(0, 1fr); }
+}
+
+@media (max-height: 640px) {
+  .lab-section { padding: var(--space-1) var(--space-2); }
+  .lab-status { max-height: 104px; }
 }
 
 /* -------------------------------------------------------------------- bank */

@@ -45,7 +45,7 @@ import {
 import {
   BUILDING_KITS, GATE_GAP_METRES, MODULE_METRES,
   buildComposition, buildPrefab, buildWallRun, prefabCollision, variantSeed, wallRunCollision,
-  type BuildingKit, type CompositionId, type PartPlacement,
+  type BuildingKit, type CompositionId, type PartPlacement, type PrefabBox,
 } from "../render/buildings.js";
 import { tierSilhouetteScale } from "../core/math.js";
 import { npcOutfitParts } from "../render/characterAppearances.js";
@@ -723,31 +723,76 @@ function emitBuildingCollision(
   origin: Vec3,
   regionId: RegionId,
 ): void {
-  const cos = Math.cos(building.rotationY);
-  const sin = Math.sin(building.rotationY);
-  for (const box of prefabCollision(building.prefab, building.footprint)) {
-    const x = round2(origin[0] + box.dx * cos + box.dz * sin);
-    const z = round2(origin[2] - box.dx * sin + box.dz * cos);
-    ctx.buildings.push({
-      id: `${building.id}#${box.tag}`,
-      buildingId: building.id,
-      name: building.name,
-      regionId,
-      prefab: building.prefab,
-      position: [x, round2(origin[1] + box.height / 2), z],
-      halfExtents: [round2(box.sizeX / 2), round2(box.height / 2), round2(box.sizeZ / 2)],
+  const collision = structureCollisionFromBoxes(
+    prefabCollision(building.prefab, building.footprint),
+    {
+      origin,
       rotationY: building.rotationY,
+      regionId,
+      ownerId: building.id,
+      name: building.name,
+      prefab: building.prefab,
+    },
+  );
+  ctx.buildings.push(...collision.buildings);
+  ctx.solids.push(...collision.solids);
+}
+
+export interface StructureCollisionOptions {
+  readonly origin: Vec3;
+  readonly rotationY: number;
+  readonly regionId: RegionId;
+  readonly ownerId: string;
+  readonly name: string;
+  readonly prefab: PrefabId;
+}
+
+export interface StructureAssetMeasurements {
+  readonly assetSize: (assetId: string) => AssetSize | null;
+  readonly assetCenterXZ: (assetId: string) => AssetCenterXZ | null;
+}
+
+export interface StructureCompositionCollisionOptions {
+  readonly origin: Vec3;
+  readonly rotationY: number;
+  readonly ownerId: string;
+}
+
+/** Converts production prefab collision boxes from local space to the world's two collision views. */
+export function structureCollisionFromBoxes(
+  boxes: readonly PrefabBox[],
+  options: StructureCollisionOptions,
+): { buildings: BuildingBox[]; solids: SolidVolume[] } {
+  const buildings: BuildingBox[] = [];
+  const solids: SolidVolume[] = [];
+  const cos = Math.cos(options.rotationY);
+  const sin = Math.sin(options.rotationY);
+
+  for (const box of boxes) {
+    const x = round2(options.origin[0] + box.dx * cos + box.dz * sin);
+    const z = round2(options.origin[2] - box.dx * sin + box.dz * cos);
+    buildings.push({
+      id: `${options.ownerId}#${box.tag}`,
+      buildingId: options.ownerId,
+      name: options.name,
+      regionId: options.regionId,
+      prefab: options.prefab,
+      position: [x, round2(options.origin[1] + box.height / 2), z],
+      halfExtents: [round2(box.sizeX / 2), round2(box.height / 2), round2(box.sizeZ / 2)],
+      rotationY: options.rotationY,
     });
     // Uncapped, and it must stay that way: a building carries no interaction of its own, and a
     // 12 m hall clipped to a 2.8 m box is a hall the player walks into.
-    ctx.solids.push({
+    solids.push({
       kind: "box",
-      id: `${building.id}#${box.tag}`,
-      position: [x, origin[1], z],
+      id: `${options.ownerId}#${box.tag}`,
+      position: [x, options.origin[1], z],
       size: [round2(box.sizeX), round2(box.height), round2(box.sizeZ)],
-      rotationY: round4(building.rotationY),
+      rotationY: round4(options.rotationY),
     });
   }
+
+  return { buildings, solids };
 }
 
 /**
@@ -767,17 +812,33 @@ function pushAssetSolid(
   rotationY: number,
   capped: boolean,
 ): void {
-  const size = ctx.assetSize(assetId);
-  if (!size) return;
+  const solid = assetSolidFromMeasurements(id, position, assetId, scale, rotationY, capped, {
+    assetSize: ctx.assetSize,
+    assetCenterXZ: ctx.assetCenterXZ,
+  });
+  if (solid) ctx.solids.push(solid);
+}
+
+function assetSolidFromMeasurements(
+  id: string,
+  position: Vec3,
+  assetId: string,
+  scale: number,
+  rotationY: number,
+  capped: boolean,
+  measurements: StructureAssetMeasurements,
+): SolidVolume | null {
+  const size = measurements.assetSize(assetId);
+  if (!size) return null;
   let sizeX = size.x * scale;
   let sizeZ = size.z * scale;
-  if (sizeX * sizeZ < SOLID_MIN_FOOTPRINT_AREA) return;
+  if (sizeX * sizeZ < SOLID_MIN_FOOTPRINT_AREA) return null;
   if (capped) {
     const factor = capFactor(Math.hypot(sizeX / 2, sizeZ / 2));
     sizeX *= factor;
     sizeZ *= factor;
   }
-  const centre = ctx.assetCenterXZ(assetId) ?? { x: 0, z: 0 };
+  const centre = measurements.assetCenterXZ(assetId) ?? { x: 0, z: 0 };
   const cos = Math.cos(rotationY);
   const sin = Math.sin(rotationY);
   const offsetX = centre.x * scale;
@@ -787,13 +848,67 @@ function pushAssetSolid(
     position[1],
     round2(position[2] - offsetX * sin + offsetZ * cos),
   ];
-  ctx.solids.push({
+  return {
     kind: "box",
     id,
     position: solidPosition,
     size: [round2(sizeX), round2(Math.max(0.3, size.y * scale)), round2(sizeZ)],
     rotationY: round4(rotationY),
-  });
+  };
+}
+
+/**
+ * Production measured-asset collision exposed to realtime authoring surfaces.
+ * The returned position follows the same base-position contract as authored world entities.
+ */
+export function structureCollisionFromAsset(
+  id: string,
+  position: Vec3,
+  assetId: string,
+  scale: number,
+  rotationY: number,
+  capped: boolean,
+  measurements: StructureAssetMeasurements,
+): SolidVolume | null {
+  return assetSolidFromMeasurements(id, position, assetId, scale, rotationY, capped, measurements);
+}
+
+/**
+ * Production composition collision, shared by authored-world emission and the realtime lab.
+ * Asset measurements stay injected so world assembly never imports the render asset registry.
+ */
+export function structureCollisionFromCompositionParts(
+  composition: CompositionId,
+  parts: readonly PartPlacement[],
+  options: StructureCompositionCollisionOptions,
+  measurements: StructureAssetMeasurements,
+): SolidVolume[] {
+  const solids: SolidVolume[] = [];
+  const cos = Math.cos(options.rotationY);
+  const sin = Math.sin(options.rotationY);
+  for (const part of parts) {
+    if (Math.hypot(part.dx, part.dz) < COMPOSITION_CLEARANCE_METRES) continue;
+    const size = measurements.assetSize(part.assetId);
+    if (!compositionPartBlocks(composition, part, size)) continue;
+    const position: Vec3 = [
+      round2(options.origin[0] + part.dx * cos + part.dz * sin),
+      round2(options.origin[1] + part.dy),
+      round2(options.origin[2] - part.dx * sin + part.dz * cos),
+    ];
+    const halfDiagonal = size ? Math.hypot(size.x * part.scale / 2, size.z * part.scale / 2) : 0;
+    const capped = Math.hypot(part.dx, part.dz) - halfDiagonal < INTERACT_RANGE;
+    const solid = assetSolidFromMeasurements(
+      `${options.ownerId}#${part.tag}`,
+      position,
+      part.assetId,
+      part.scale,
+      options.rotationY + part.rotationY,
+      capped,
+      measurements,
+    );
+    if (solid) solids.push(solid);
+  }
+  return solids;
 }
 
 /**
@@ -1319,19 +1434,46 @@ function emitParts(
   meta: Record<string, string | number | boolean>,
   out: SemanticEntity[],
 ): void {
-  const cos = Math.cos(rotationY);
-  const sin = Math.sin(rotationY);
+  out.push(...structureEntitiesFromParts(parts, {
+    origin,
+    rotationY,
+    regionId,
+    tier,
+    ownerId,
+    name,
+    meta,
+  }));
+}
+
+export interface StructureEntitiesOptions {
+  readonly origin: Vec3;
+  readonly rotationY: number;
+  readonly regionId: RegionId;
+  readonly tier: number;
+  readonly ownerId: string;
+  readonly name: string;
+  readonly meta?: Record<string, string | number | boolean>;
+}
+
+/** Converts production structure parts from local space to landmark entities. */
+export function structureEntitiesFromParts(
+  parts: readonly PartPlacement[],
+  options: StructureEntitiesOptions,
+): SemanticEntity[] {
+  const out: SemanticEntity[] = [];
+  const cos = Math.cos(options.rotationY);
+  const sin = Math.sin(options.rotationY);
   for (const part of parts) {
-    out.push({
-      id: `${ownerId}#${part.tag}`,
+    const entity: SemanticEntity = {
+      id: `${options.ownerId}#${part.tag}`,
       archetype: "landmark",
-      name,
-      tier,
-      regionId,
+      name: options.name,
+      tier: options.tier,
+      regionId: options.regionId,
       position: [
-        round2(origin[0] + part.dx * cos + part.dz * sin),
-        round2(origin[1] + part.dy),
-        round2(origin[2] - part.dx * sin + part.dz * cos),
+        round2(options.origin[0] + part.dx * cos + part.dz * sin),
+        round2(options.origin[1] + part.dy),
+        round2(options.origin[2] - part.dx * sin + part.dz * cos),
       ],
       state: "present",
       // Deliberately empty. Scenery is drawn, hovered and walked to, never interacted with, and an
@@ -1341,13 +1483,15 @@ function emitParts(
         assetId: part.assetId,
         scale: round4(part.scale),
         scaleAxes: part.scaleAxes?.map(round4) as Vec3 | undefined,
-        rotationY: round4(rotationY + part.rotationY),
-        materialTier: tier,
+        rotationY: round4(options.rotationY + part.rotationY),
+        materialTier: options.tier,
         labelHeight: 2,
       },
-      meta,
-    });
+    };
+    if (options.meta !== undefined) entity.meta = options.meta;
+    out.push(entity);
   }
+  return out;
 }
 
 /**
@@ -1383,25 +1527,12 @@ function emitComposition(
   emitParts(parts, origin, rotationY, regionId, tier, ownerId, name, meta, out);
   if (!ctx) return;
 
-  const cos = Math.cos(rotationY);
-  const sin = Math.sin(rotationY);
-  for (const part of parts) {
-    if (Math.hypot(part.dx, part.dz) < COMPOSITION_CLEARANCE_METRES) continue;
-    const size = ctx.assetSize(part.assetId);
-    if (!compositionPartBlocks(composition, part, size)) continue;
-    const position: Vec3 = [
-      round2(origin[0] + part.dx * cos + part.dz * sin),
-      round2(origin[1] + part.dy),
-      round2(origin[2] - part.dx * sin + part.dz * cos),
-    ];
-    const scale = part.scale;
-    const halfDiagonal = size ? Math.hypot(size.x * scale / 2, size.z * scale / 2) : 0;
-    const capped = Math.hypot(part.dx, part.dz) - halfDiagonal < INTERACT_RANGE;
-    pushAssetSolid(
-      ctx, `${ownerId}#${part.tag}`, position, part.assetId, scale,
-      rotationY + part.rotationY, capped,
-    );
-  }
+  ctx.solids.push(...structureCollisionFromCompositionParts(
+    composition,
+    parts,
+    { origin, rotationY, ownerId },
+    { assetSize: ctx.assetSize, assetCenterXZ: ctx.assetCenterXZ },
+  ));
 }
 
 function buildDungeonEntities(

@@ -52,9 +52,9 @@ async function initRun(values: string[]): Promise<void> {
   const id = safeName(argValue(values, "--id") ?? `${new Date().toISOString().replace(/[:.]/g, "-")}-${path.basename(briefPath, path.extname(briefPath))}`);
   const runDir = await prepareRun(path.join("runs", id));
   await copyFile(briefPath, path.join(runDir, "brief.md"));
-  await writeFile(path.join(runDir, "status.md"), "# Status\n\n- [x] Brief recorded\n- [ ] Fresh PRD draft\n- [ ] Root PRD review\n- [ ] Foundation passes Chromium smoke test\n- [ ] Build round integrated\n- [ ] Play and critique loop complete\n", "utf8");
+  await writeFile(path.join(runDir, "status.md"), "# Status\n\n- [x] Brief recorded\n- [ ] Fresh PRD draft with lab coverage for each feature\n- [ ] Root PRD review\n- [ ] Foundation and production-backed feature lab boot in Chromium\n- [ ] Feature round accepted in the lab\n- [ ] Accepted feature wired into the final world\n- [ ] Shallow integration smoke and critique complete\n", "utf8");
   console.log(`Prepared ${path.relative(repoRoot, runDir)}.`);
-  console.log(`Root next step: spawn a fresh PRD agent with skills/prd.md and ${path.relative(repoRoot, path.join(runDir, "brief.md"))}.`);
+  console.log(`Root next step: spawn a fresh PRD agent with skills/prd.md, docs/feature-lab.md, and ${path.relative(repoRoot, path.join(runDir, "brief.md"))}.`);
 }
 
 async function makeCriticPacket(runCandidate: string): Promise<string> {
@@ -69,7 +69,7 @@ async function makeCriticPacket(runCandidate: string): Promise<string> {
   const packet = [
     "# Critic packet",
     "",
-    "Use `skills/critic.md`. Review only. Do not edit code.",
+    "Use `skills/critic.md` and `docs/feature-lab.md`. Require lab proof before final-world evidence for every isolatable feature. Review only. Do not edit code.",
     "",
     "## Approved PRD",
     "",

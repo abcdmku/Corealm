@@ -1,25 +1,61 @@
 /**
- * Fast browser acceptance gate for the real-engine actor lab.
+ * Self-contained real-Chromium acceptance gate for both production-engine feature-lab modes.
  *
- * Setup uses the narrow FeatureLabApi. Gameplay proof deliberately does not: target selection and
- * movement are driven through real pointer input on the production canvas.
+ * The setup API selects reproducible content. Gameplay proof still uses the production canvas,
+ * keyboard controller, equipment panel, renderer, navigation, combat, rigs, and effects.
  */
-import { chromium, type Page } from "playwright";
+import path from "node:path";
+import { mkdir } from "node:fs/promises";
+import { chromium, type Browser, type Locator, type Page } from "playwright";
 import {
   EQUIP_SLOTS,
   SKILL_IDS,
   type EquipSlot,
   type FeatureLabCatalog,
+  type FeatureLabMode,
+  type FeatureLabMotionView,
   type FeatureLabState,
+  type FeatureLabStructureSelection,
+  type FeatureLabStructureView,
   type ItemId,
 } from "../game/src/contracts.js";
 import { installTestDeadline } from "./lib/deadline.js";
-import { argValue } from "./lib/paths.js";
+import { repoRoot } from "./lib/paths.js";
+import { startGameServer, type RunningGameServer } from "./lib/server.js";
 
-const TOTAL_BUDGET_MS = 45_000;
-const READY_BUDGET_MS = 15_000;
+const TOTAL_BUDGET_MS = 60_000;
+const READY_BUDGET_MS = 18_000;
 const ACTION_BUDGET_MS = 8_000;
-const POLL_MS = 50;
+const REBUILD_BUDGET_MS = 8_000;
+const POLL_MS = 40;
+const SCREENSHOT_TIMEOUT_MS = 5_000;
+
+const PREFAB_SELECTION = {
+  kind: "prefab",
+  id: "gatehouse",
+  kit: "stone",
+  width: 8,
+  depth: 4,
+  seed: 3,
+} as const satisfies FeatureLabStructureSelection;
+
+const COMPOSITION_SELECTION = {
+  kind: "composition",
+  id: "milestone",
+  kit: "timber",
+  width: 6,
+  depth: 4,
+  seed: 7,
+} as const satisfies FeatureLabStructureSelection;
+
+const WALL_RUN_SELECTION = {
+  kind: "wall-run",
+  id: "wall_run",
+  kit: "plaster",
+  width: 10,
+  depth: 2,
+  seed: 2,
+} as const satisfies FeatureLabStructureSelection;
 
 interface Point {
   x: number;
@@ -36,157 +72,504 @@ interface EquipmentProof {
   itemId: ItemId;
 }
 
-interface PickerProof {
-  slot: EquipSlot;
-  expected: string[];
-  actual: string[];
+interface RuntimeProbe {
+  ready: boolean;
+  regionId: string | null;
+  version: unknown;
+  renderer: { drawCalls: number; triangles: number } | null;
+  navigationStatus: string | null;
+  groundSamples: number[];
+  canvas: { id: string; width: number; height: number; webgl: boolean };
 }
 
-interface ActionProof {
-  before: FeatureLabState;
-  after: FeatureLabState;
-  sawParticles?: boolean;
+interface CameraProbe {
+  position: Point3;
+  yaw: number;
+  pitch: number;
+  distance: number;
+  requestedDistance: number;
+  freeMove: boolean;
+  target: Point3;
+}
+
+interface Point3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface BrowserDiagnostics {
+  console: string[];
+  page: string[];
+}
+
+interface DocumentProbe {
+  id: string;
+  timeOrigin: number;
+  url: string;
+  oldRuntimeMarkerPresent: boolean;
+}
+
+interface ModeNavigationEvidence {
+  from: FeatureLabMode;
+  to: FeatureLabMode;
+  before: DocumentProbe;
+  after: DocumentProbe;
+  fresh: FeatureLabState;
+  queryPreserved: boolean;
+  hashPreserved: boolean;
+}
+
+interface CombatEvidence {
+  ready: FeatureLabState;
+  final: FeatureLabState;
+  probe: RuntimeProbe;
+  catalogChecks: Record<string, boolean>;
+  levelChecks: Record<string, boolean>;
+  equipment: EquipmentProof[];
+  targetPointer: {
+    entityId: string | undefined;
+    click: Point;
+    selectedEntityId: string | null;
+    navigationStarted: readonly [number, number];
+  };
+  melee: {
+    entityId: string | undefined;
+    weaponId: string;
+    weaponEquipped: boolean;
+    startedAtFullHealth: boolean;
+    health: readonly [number | null | undefined, number | null | undefined];
+    combatStarted: readonly [number, number];
+    spellLaunched: readonly [number, number];
+    motionAdvanced: boolean;
+  };
+  cast: {
+    entityId: string | undefined;
+    spellId: string;
+    health: readonly [number | null | undefined, number | null | undefined];
+    spellLaunched: readonly [number, number];
+    sawParticles: boolean;
+    motionAdvanced: boolean;
+  };
+}
+
+interface StructureProof {
+  state: FeatureLabState;
+  wallMs: number;
+}
+
+interface BuildingEvidence {
+  ready: FeatureLabState;
+  final: FeatureLabState;
+  probe: RuntimeProbe;
+  authoringControlsWired: boolean;
+  structures: {
+    initial: FeatureLabStructureView;
+    prefab: FeatureLabStructureView;
+    composition: FeatureLabStructureView;
+    wallRun: FeatureLabStructureView;
+  };
+  rebuildMs: number[];
+  playerVisibility: {
+    initial: boolean;
+    hidden: boolean;
+    restored: boolean;
+    hiddenControlChecked: boolean;
+    restoredControlChecked: boolean;
+    before: FeatureLabState["playerPosition"];
+    after: FeatureLabState["playerPosition"];
+  };
+  walking: {
+    before: FeatureLabState["playerPosition"];
+    after: FeatureLabState["playerPosition"];
+    motionAdvanced: boolean;
+    visuallyActive: boolean;
+    structureStable: boolean;
+  };
+  disabled: {
+    before: FeatureLabState["playerPosition"];
+    after: FeatureLabState["playerPosition"];
+    structureStable: boolean;
+    keyboardStable: boolean;
+    leftClickStable: boolean;
+    contextWalkDisabled: boolean;
+    navigationStarted: readonly [number, number];
+    routeStayedIdle: boolean;
+    orbitRetained: boolean;
+    zoomRetained: boolean;
+  };
+  freeCamera: {
+    enabled: boolean;
+    disabled: boolean;
+    playerBefore: FeatureLabState["playerPosition"];
+    playerAfter: FeatureLabState["playerPosition"];
+    panBefore: CameraProbe;
+    panAfter: CameraProbe;
+    orbitAfter: CameraProbe;
+    zoomAfter: CameraProbe;
+    fitAfter: CameraProbe;
+    enabledControlChecked: boolean;
+    disabledControlChecked: boolean;
+  };
+}
+
+interface LegacyRedirectEvidence {
+  state: FeatureLabState;
+  probe: RuntimeProbe;
+  finalUrl: string;
+  redirected: boolean;
+  queryPreserved: boolean;
+  hashPreserved: boolean;
+  bodyProfile: string | null;
+  legacyApiPresent: boolean;
 }
 
 const started = performance.now();
-const clearDeadline = installTestDeadline("real-engine feature lab gate", TOTAL_BUDGET_MS);
-const baseUrl = argValue(process.argv.slice(2), "--base") ?? "http://127.0.0.1:4174";
-const labUrl = new URL("/game/index.html?mode=actors", ensureUrl(baseUrl));
-const browser = await chromium.launch({
-  headless: true,
-  args: ["--enable-unsafe-swiftshader", "--mute-audio"],
-});
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
-const consoleErrors: string[] = [];
-const pageErrors: string[] = [];
-page.on("console", (message) => {
-  if (message.type() === "error") consoleErrors.push(message.text());
-});
-page.on("pageerror", (error) => pageErrors.push(error.stack ?? error.message));
-
+const clearDeadline = installTestDeadline("combined feature lab browser gate", TOTAL_BUDGET_MS);
+const screenshotDir = path.join(repoRoot, "test-results", "feature-labs");
+const diagnostics: BrowserDiagnostics = { console: [], page: [] };
+const screenshots: string[] = [];
+let server: RunningGameServer | null = null;
+let browser: Browser | null = null;
+let page: Page | null = null;
+let activeMode = "startup";
 let lastState: FeatureLabState | null = null;
 
 try {
-  const response = await page.goto(labUrl.href, {
-    waitUntil: "domcontentloaded",
-    timeout: READY_BUDGET_MS,
+  await mkdir(screenshotDir, { recursive: true });
+  server = await startGameServer({ logLevel: "error" });
+  browser = await chromium.launch({
+    headless: true,
+    args: ["--enable-unsafe-swiftshader", "--mute-audio"],
   });
-  if (!response?.ok()) {
-    throw new Error(`Feature lab returned HTTP ${response?.status() ?? "no response"}: ${labUrl.href}`);
-  }
+  page = await browser.newPage({ viewport: { width: 1100, height: 700 }, deviceScaleFactor: 1 });
+  await page.addInitScript(() => {
+    Reflect.set(
+      window,
+      "__featureLabGateDocumentId",
+      `${performance.timeOrigin}:${Math.random().toString(36).slice(2)}`,
+    );
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error") diagnostics.console.push(`[${activeMode}] ${message.text()}`);
+  });
+  page.on("pageerror", (error) => diagnostics.page.push(`[${activeMode}] ${error.stack ?? error.message}`));
 
-  const ready = await waitForState(page, "production feature lab readiness", (state) => (
+  // Use the compatibility route for the first document, then traverse to combat through the real
+  // mode control. Two production boots prove the redirect and a fresh runtime after selection.
+  activeMode = "legacy-redirect/building";
+  const legacy = await testLegacyRedirect(page, server.url, (state) => {
+    lastState = state;
+  });
+  lastState = legacy.state;
+  const building = await testBuilding(page, server.url, screenshotDir, screenshots, (state) => {
+    lastState = state;
+  }, false);
+  lastState = building.final;
+
+  activeMode = "building-to-combat-navigation";
+  const modeNavigation = await selectModeWithReload(page, "combat", building.final, (state) => {
+    lastState = state;
+  });
+
+  activeMode = "combat";
+  const combat = await testCombat(page, server.url, screenshotDir, screenshots, (state) => {
+    lastState = state;
+  }, false);
+  lastState = combat.final;
+
+  const combatStructuresValid = structureIsValid(combat.ready.structure);
+  const buildingStructuresValid = [
+    building.structures.initial,
+    building.structures.prefab,
+    building.structures.composition,
+    building.structures.wallRun,
+  ].every(structureIsValid);
+  const sharedWorld = probesShareWorld(combat.probe, building.probe)
+    && combat.ready.engine === building.ready.engine
+    && combat.ready.world === building.ready.world;
+  const checks = {
+    bothUseProductionYard: combat.ready.engine === "corealm-production"
+      && building.ready.engine === "corealm-production"
+      && combat.ready.world === "fallowmarch-yard"
+      && building.ready.world === "fallowmarch-yard",
+    bothUseSharedRendererAndNavigation: sharedWorld,
+    combatRouteSelected: combat.ready.mode === "combat" && combat.ready.walkingEnabled,
+    combatProductionStructurePresent: combatStructuresValid,
+    combatCatalogsComplete: Object.values(combat.catalogChecks).every(Boolean),
+    combatEveryLevelCanBeSet: Object.values(combat.levelChecks).every(Boolean),
+    combatRepresentativeEquipmentEquips: combat.equipment.length === 1
+      && combat.equipment[0]?.slot === "mainHand",
+    combatTargetPointerSelects: combat.targetPointer.selectedEntityId === combat.targetPointer.entityId,
+    combatMeleeDamagesWithLiveMotion: combat.melee.combatStarted[1] > combat.melee.combatStarted[0]
+      && numericFell(combat.melee.health)
+      && combat.melee.motionAdvanced,
+    combatMeleeIsSeparateFromSpellProof: combat.melee.entityId !== undefined
+      && combat.cast.entityId !== undefined
+      && combat.melee.entityId !== combat.cast.entityId
+      && combat.melee.weaponEquipped
+      && combat.melee.startedAtFullHealth
+      && combat.melee.spellLaunched[1] === combat.melee.spellLaunched[0],
+    combatSpellDrawsAndDamagesWithLiveMotion: combat.cast.spellLaunched[1] > combat.cast.spellLaunched[0]
+      && combat.cast.sawParticles
+      && numericFell(combat.cast.health)
+      && combat.cast.motionAdvanced,
+    buildingRouteStartsInAuthoringMode: building.ready.mode === "building" && !building.ready.walkingEnabled,
+    buildingAuthoringControlsWired: building.authoringControlsWired,
+    buildingProductionStructuresValid: buildingStructuresValid,
+    buildingCollisionCoverage: building.structures.initial.collisionCount > 0
+      && building.structures.prefab.collisionCount > 0
+      && building.structures.wallRun.collisionCount > 0
+      && building.structures.composition.collisionCount > 0,
+    buildingCoversAllStructureKinds: building.structures.prefab.selection.kind === "prefab"
+      && building.structures.composition.selection.kind === "composition"
+      && building.structures.wallRun.selection.kind === "wall-run",
+    buildingStructureSelectionsApplied: selectionMatches(
+      building.structures.prefab.selection,
+      PREFAB_SELECTION,
+    ) && selectionMatches(building.structures.composition.selection, COMPOSITION_SELECTION)
+      && selectionMatches(building.structures.wallRun.selection, WALL_RUN_SELECTION),
+    buildingCompositionUsesCollisionHero: building.structures.composition.selection.id === COMPOSITION_SELECTION.id
+      && building.structures.composition.collisionCount > 0,
+    buildingWallDimensionsSupported: wallDimensionsSupported(building.structures.wallRun.selection),
+    buildingRevisionsAdvance: building.structures.prefab.revision >= building.structures.initial.revision
+      && building.structures.composition.revision > building.structures.prefab.revision
+      && building.structures.wallRun.revision > building.structures.composition.revision,
+    buildingRebuildsMeetBudget: building.rebuildMs.every((duration) => duration <= REBUILD_BUDGET_MS),
+    buildingPlayerVisibilityToggleWorks: building.playerVisibility.initial
+      && !building.playerVisibility.hidden
+      && building.playerVisibility.restored
+      && !building.playerVisibility.hiddenControlChecked
+      && building.playerVisibility.restoredControlChecked
+      && distanceXZ(building.playerVisibility.before, building.playerVisibility.after) < 0.08,
+    buildingWalkingMovesPlayerAndKeepsStructure: distanceXZ(
+      building.walking.before,
+      building.walking.after,
+    ) >= 0.15
+      && building.walking.motionAdvanced
+      && building.walking.visuallyActive
+      && building.walking.structureStable,
+    buildingWalkingDisablesAndKeepsStructure: !building.final.walkingEnabled
+      && distanceXZ(building.disabled.before, building.disabled.after) < 0.08
+      && building.disabled.structureStable
+      && building.disabled.keyboardStable
+      && building.disabled.leftClickStable
+      && building.disabled.contextWalkDisabled
+      && building.disabled.navigationStarted[1] === building.disabled.navigationStarted[0]
+      && building.disabled.routeStayedIdle,
+    buildingAuthoringRetainsCameraControls: building.disabled.orbitRetained
+      && building.disabled.zoomRetained,
+    buildingFreeCameraPansAndOrbitsWithoutMovingPlayer: building.freeCamera.enabled
+      && building.freeCamera.disabled
+      && building.freeCamera.enabledControlChecked
+      && !building.freeCamera.disabledControlChecked
+      && distanceXZ(building.freeCamera.playerBefore, building.freeCamera.playerAfter) < 0.08
+      && distancePoint3(building.freeCamera.panBefore.target, building.freeCamera.panAfter.target) >= 0.1
+      && (Math.abs(building.freeCamera.orbitAfter.yaw - building.freeCamera.panAfter.yaw) >= 0.01
+        || Math.abs(building.freeCamera.orbitAfter.pitch - building.freeCamera.panAfter.pitch) >= 0.01)
+      && Math.abs(building.freeCamera.zoomAfter.requestedDistance
+        - building.freeCamera.orbitAfter.requestedDistance) >= 0.1
+      && distancePoint3(building.freeCamera.fitAfter.target, building.freeCamera.panAfter.target) >= 0.1,
+    modeSelectionReloadsFreshRuntime: modeNavigation.from === "building"
+      && modeNavigation.to === "combat"
+      && modeNavigation.before.id !== modeNavigation.after.id
+      && modeNavigation.before.timeOrigin !== modeNavigation.after.timeOrigin
+      && !modeNavigation.after.oldRuntimeMarkerPresent
+      && new URL(modeNavigation.after.url).searchParams.get("mode") === "combat"
+      && modeNavigation.queryPreserved
+      && modeNavigation.hashPreserved
+      && modeNavigation.fresh.ready
+      && modeNavigation.fresh.mode === "combat"
+      && modeNavigation.fresh.walkingEnabled
+      && Object.values(modeNavigation.fresh.counters).every((value) => value === 0)
+      && modeNavigation.fresh.structure.revision < building.final.structure.revision,
+    legacyRoutePreservesQueryAndHash: legacy.redirected && legacy.queryPreserved && legacy.hashPreserved,
+    legacyRouteBootsProductionBuildingLab: legacy.state.ready
+      && legacy.state.engine === "corealm-production"
+      && legacy.state.world === "fallowmarch-yard"
+      && legacy.state.mode === "building"
+      && !legacy.state.walkingEnabled
+      && selectionMatches(legacy.state.structure.selection, PREFAB_SELECTION)
+      && legacy.state.structure.collisionCount > 0
+      && structureIsValid(legacy.state.structure)
+      && legacy.bodyProfile === "feature-lab"
+      && !legacy.legacyApiPresent
+      && probesShareWorld(building.probe, legacy.probe),
+    screenshotsCaptured: screenshots.length >= 3,
+    noRuntimeErrors: combat.final.errors.length === 0
+      && building.final.errors.length === 0
+      && legacy.state.errors.length === 0
+      && diagnostics.console.length === 0
+      && diagnostics.page.length === 0,
+    under60Seconds: performance.now() - started < TOTAL_BUDGET_MS,
+  };
+  const passed = Object.values(checks).every(Boolean);
+
+  console.log(JSON.stringify({
+    passed,
+    elapsedMs: Math.round(performance.now() - started),
+    url: server.url,
+    checks,
+    sharedWorld: {
+      combat: combat.probe,
+      building: building.probe,
+      legacy: legacy.probe,
+    },
+    combat: {
+      catalogChecks: combat.catalogChecks,
+      levelChecks: combat.levelChecks,
+      targetPointer: combat.targetPointer,
+      melee: combat.melee,
+      cast: combat.cast,
+      equipment: combat.equipment,
+    },
+    building: {
+      structures: building.structures,
+      rebuildMs: building.rebuildMs.map(Math.round),
+      playerVisibility: building.playerVisibility,
+      walking: building.walking,
+      disabled: building.disabled,
+      freeCamera: building.freeCamera,
+    },
+    modeNavigation,
+    legacy,
+    screenshots,
+    errors: {
+      combat: combat.final.errors,
+      building: building.final.errors,
+      legacy: legacy.state.errors,
+      console: diagnostics.console,
+      page: diagnostics.page,
+    },
+  }, null, 2));
+  if (!passed) process.exitCode = 1;
+} catch (cause) {
+  if (page) lastState = await readState(page).catch(() => lastState);
+  console.error(JSON.stringify({
+    passed: false,
+    elapsedMs: Math.round(performance.now() - started),
+    mode: activeMode,
+    failure: cause instanceof Error ? cause.stack ?? cause.message : String(cause),
+    lastState,
+    screenshots,
+    errors: diagnostics,
+  }, null, 2));
+  process.exitCode = 1;
+} finally {
+  await browser?.close().catch(() => undefined);
+  await server?.close().catch(() => undefined);
+  clearDeadline();
+}
+
+async function testCombat(
+  targetPage: Page,
+  baseUrl: string,
+  captures: string,
+  captured: string[],
+  remember: (state: FeatureLabState) => void,
+  openRoute = true,
+): Promise<CombatEvidence> {
+  if (openRoute) await openLab(targetPage, baseUrl, "combat");
+  const ready = await waitForState(targetPage, "combat lab readiness", (state) => (
     state.ready
     && state.engine === "corealm-production"
-    && state.world === "empty-flat"
+    && state.world === "fallowmarch-yard"
+    && state.mode === "combat"
+    && state.walkingEnabled
+    && state.structure.ready
     && state.target !== null
     && state.target.screen !== null
+    && state.playerMotion?.liveRig === true
+    && state.target.motion?.liveRig === true
   ), READY_BUDGET_MS);
-  lastState = ready;
-  const catalog = await readCatalog(page);
+  remember(ready);
+  const probe = await readRuntimeProbe(targetPage);
+  const catalog = await readCatalog(targetPage);
   const catalogChecks = validateCatalog(catalog);
 
-  // Every skill and equipment slot is configured through the setup API. Equipping still uses the
-  // production InventorySystem and EquipmentSystem in the browser; this merely avoids 99 UI clicks.
-  const levels = await page.evaluate((skillIds) => {
+  const levels = await targetPage.evaluate((skillIds) => {
     const api = window.__featureLab;
     if (!api) throw new Error("window.__featureLab is unavailable");
     for (const skillId of skillIds) api.setLevel(skillId, 99);
     return api.getState();
   }, [...SKILL_IDS]);
+  remember(levels);
   const levelChecks = Object.fromEntries(
     SKILL_IDS.map((skillId) => [skillId, levels.levels[skillId] === 99]),
   );
 
-  const equipmentProof: EquipmentProof[] = [];
-  for (const group of catalog.equipment) {
-    const item = group.items.at(-1);
-    if (!item) continue;
-    const state = await page.evaluate(async ({ slot, itemId }) => {
-      const api = window.__featureLab;
-      if (!api) throw new Error("window.__featureLab is unavailable");
-      return api.equipPlayer(slot, itemId);
-    }, { slot: group.slot, itemId: item.id });
-    if (state.equipment[group.slot] === item.id) {
-      equipmentProof.push({ slot: group.slot, itemId: item.id });
-    }
+  // Detailed slot/catalog coverage belongs to the focused catalog and equipment tests. Keep the
+  // real-browser gate representative so its two production boots stay within the 60-second loop.
+  const equipment: EquipmentProof[] = [];
+  const setupWeapon = findItem(catalog, "mainHand", /sword|blade|axe|mace/i)
+    ?? catalog.equipment.find((group) => group.slot === "mainHand")?.items[0]?.id;
+  if (!setupWeapon) throw new Error("Feature lab has no main-hand equipment");
+  const equipped = await targetPage.evaluate(async (itemId) => {
+    const api = window.__featureLab;
+    if (!api) throw new Error("window.__featureLab is unavailable");
+    return api.equipPlayer("mainHand", itemId);
+  }, setupWeapon);
+  remember(equipped);
+  if (equipped.equipment.mainHand === setupWeapon) {
+    equipment.push({ slot: "mainHand", itemId: setupWeapon });
   }
 
-  // Fresh low-tier creature, then a literal pointer click at the renderer-published screen point.
-  const creaturePreset = catalog.targets.creature[0];
+  // Reuse the already prepared boot-target asset for the action proofs. Loading another full rig
+  // here adds no production-path coverage and can push the two-boot gate beyond its hard deadline.
+  const creaturePreset = catalog.targets.creature.find((preset) => preset.id === ready.target?.presetId)
+    ?? catalog.targets.creature[0];
   if (!creaturePreset) throw new Error("Feature lab has no creature presets");
-  const targetBase = await page.evaluate(async ({ id }) => {
-    const api = window.__featureLab;
-    if (!api) throw new Error("window.__featureLab is unavailable");
-    await api.perform("reset-player");
-    return api.spawnTarget("creature", id);
-  }, { id: creaturePreset.id });
-  lastState = targetBase;
-  const canvas = page.locator("#viewport");
+  // The boot target is already a production creature with a live screen projection. Reusing it
+  // for pointer proof avoids an unnecessary entity-view rebuild before the dedicated melee target.
+  const targetBase = ready;
+  remember(targetBase);
+  const canvas = targetPage.locator("#viewport");
   const canvasBox = await canvas.boundingBox();
-  if (!canvasBox) throw new Error("Production canvas has no visible bounds");
+  if (!canvasBox) throw new Error("Production canvas has no visible bounds in combat mode");
   const targetPoint = screenPoint(targetBase, canvasBox);
-  await page.mouse.click(targetPoint.x, targetPoint.y);
+  await targetPage.mouse.click(targetPoint.x, targetPoint.y);
+  const targetClicked = await waitForState(targetPage, "combat pointer target selection", (state) => (
+    state.selectedEntityId === targetBase.target?.entityId
+  ));
+  remember(targetClicked);
 
-  let targetPathObserved = false;
-  const targetClicked = await waitForState(page, "pointer target selection and navigation", (state) => {
-    targetPathObserved ||= state.movement.mode !== "idle";
-    return state.selectedEntityId === targetBase.target?.entityId
-      && state.counters.navigationStarted > targetBase.counters.navigationStarted
-      && (targetPathObserved
-        || state.counters.navigationCompleted > targetBase.counters.navigationCompleted);
-  });
-  lastState = targetClicked;
+  await clearMessageLog(targetPage);
 
-  // Click bare ground through that same canvas and prove the player's semantic position changes.
-  const groundBefore = await page.evaluate(async () => {
+  const meleeWeapon = findItem(catalog, "mainHand", /sword|blade|axe|mace/i);
+  if (!meleeWeapon) throw new Error("Feature lab has no canonical melee weapon");
+  const meleeEquipped = await targetPage.evaluate(async (itemId) => {
     const api = window.__featureLab;
     if (!api) throw new Error("window.__featureLab is unavailable");
-    return api.perform("reset-player");
-  });
-  const groundPoint = chooseGroundPoint(canvasBox, targetPoint);
-  await page.mouse.click(groundPoint.x, groundPoint.y);
-  let groundPathObserved = false;
-  const groundMoved = await waitForState(page, "canvas ground-click movement", (state) => {
-    groundPathObserved ||= state.movement.mode !== "idle";
-    return state.counters.navigationStarted > groundBefore.counters.navigationStarted
-      && distanceXZ(groundBefore.playerPosition, state.playerPosition) >= 0.15
-      && (groundPathObserved
-        || state.counters.navigationCompleted > groundBefore.counters.navigationCompleted);
-  });
-  lastState = groundMoved;
-
-  // Use a fresh target for each real combat path so a click-to-attack cannot consume the health
-  // evidence intended for the explicit attack/cast controls.
-  const meleeWeapon = findItem(catalog, "mainHand", /sword|blade|axe|mace/i);
-  if (meleeWeapon) {
-    await page.evaluate(async (itemId) => {
-      const api = window.__featureLab;
-      if (!api) throw new Error("window.__featureLab is unavailable");
-      await api.equipPlayer("mainHand", itemId);
-    }, meleeWeapon);
-  }
-  const meleeBefore = await page.evaluate(async ({ id }) => {
+    return api.equipPlayer("mainHand", itemId);
+  }, meleeWeapon);
+  const meleeBefore = await targetPage.evaluate(async ({ id }) => {
     const api = window.__featureLab;
     if (!api) throw new Error("window.__featureLab is unavailable");
     await api.perform("reset-player");
     return api.spawnTarget("creature", id);
   }, { id: creaturePreset.id });
-  await page.evaluate(async () => {
+  remember(meleeBefore);
+  await targetPage.evaluate(async () => {
     const api = window.__featureLab;
     if (!api) throw new Error("window.__featureLab is unavailable");
     await api.perform("attack");
   });
-  const meleeAfter = await waitForState(page, "production melee hit", (state) => (
-    state.counters.combatStarted > meleeBefore.counters.combatStarted
-    && healthFell(meleeBefore, state)
-  ));
-  const melee: ActionProof = { before: meleeBefore, after: meleeAfter };
-  lastState = meleeAfter;
+  let meleeMotionAdvanced = false;
+  const meleeAfter = await waitForState(targetPage, "production melee hit and motion", (state) => {
+    meleeMotionAdvanced ||= motionAdvanced(meleeBefore.playerMotion, state.playerMotion)
+      && motionMatches(state.playerMotion, /attack|melee/i);
+    return state.counters.combatStarted > meleeBefore.counters.combatStarted
+      && healthFell(meleeBefore, state)
+      && meleeMotionAdvanced;
+  });
+  remember(meleeAfter);
+
+  const meleeShot = path.join(captures, "combat-melee.png");
+  await capture(targetPage, meleeShot, captured);
 
   const magicWeapon = findItem(catalog, "mainHand", /staff|wand|focus/i);
   if (magicWeapon) {
-    await page.evaluate(async (itemId) => {
+    await targetPage.evaluate(async (itemId) => {
       const api = window.__featureLab;
       if (!api) throw new Error("window.__featureLab is unavailable");
       await api.equipPlayer("mainHand", itemId);
@@ -194,7 +577,7 @@ try {
   }
   const spell = catalog.spells.at(-1);
   if (!spell) throw new Error("Feature lab has no spell presets");
-  const castBefore = await page.evaluate(async ({ targetId, spellId }) => {
+  const castBefore = await targetPage.evaluate(async ({ targetId, spellId }) => {
     const api = window.__featureLab;
     if (!api) throw new Error("window.__featureLab is unavailable");
     await api.perform("reset-player");
@@ -202,144 +585,481 @@ try {
     api.setSpell(spellId);
     return api.getState();
   }, { targetId: creaturePreset.id, spellId: spell.id });
-  await page.evaluate(async () => {
+  remember(castBefore);
+  await clearMessageLog(targetPage);
+  await targetPage.evaluate(async () => {
     const api = window.__featureLab;
     if (!api) throw new Error("window.__featureLab is unavailable");
     await api.perform("cast");
   });
-  let sawParticles = false;
-  const castAfter = await waitForState(page, "production spell launch and hit", (state) => {
-    sawParticles ||= state.liveSpellParticles > 0;
+  let castMotionAdvanced = false;
+  const castParticles = await waitForState(targetPage, "production spell particles and motion", (state) => {
+    castMotionAdvanced ||= motionAdvanced(castBefore.playerMotion, state.playerMotion)
+      && motionMatches(state.playerMotion, /cast|spell|magic/i);
     return state.counters.spellLaunched > castBefore.counters.spellLaunched
-      && sawParticles
-      && healthFell(castBefore, state);
+      && state.liveSpellParticles > 0
+      && castMotionAdvanced;
   });
-  const cast: ActionProof = { before: castBefore, after: castAfter, sawParticles };
-  lastState = castAfter;
+  remember(castParticles);
+  const spellShot = path.join(captures, "combat-spell.png");
+  await capture(targetPage, spellShot, captured);
+  const castAfter = await waitForState(targetPage, "production spell damage", (state) => (
+    state.counters.spellLaunched > castBefore.counters.spellLaunched
+    && healthFell(castBefore, state)
+  ));
+  remember(castAfter);
 
-  // Open the real in-game Worn panel. Every slot must expose exactly its catalog (plus None), and
-  // an actual picker click must flow back through the production equipment state.
-  await page.keyboard.press("e");
-  const equipmentPanel = page.locator("#panel-equipment");
-  await equipmentPanel.waitFor({ state: "visible", timeout: 2_000 });
-  const pickerProof: PickerProof[] = [];
-  for (const group of catalog.equipment) {
-    await equipmentPanel.locator(`[data-equip-slot="${group.slot}"]`).click();
-    const chooser = equipmentPanel.locator(".equip-chooser:not([hidden])");
-    await chooser.waitFor({ state: "visible", timeout: 1_000 });
-    const actual = await chooser.locator("[data-equipment-item]").evaluateAll((nodes) => (
-      nodes.map((node) => (node as HTMLElement).dataset["equipmentItem"] ?? "<missing>")
-    ));
-    pickerProof.push({
-      slot: group.slot,
-      expected: ["", ...group.items.map((item) => item.id)],
-      actual,
-    });
-  }
+  const final = castAfter;
+  remember(final);
 
-  const mainHandGroup = catalog.equipment.find((group) => group.slot === "mainHand");
-  const uiItem = mainHandGroup?.items[0];
-  if (!uiItem) throw new Error("Main-hand picker has no production items");
-  await equipmentPanel.locator('[data-equip-slot="mainHand"]').click();
-  await equipmentPanel.locator('[data-equipment-item=""]').click();
-  await waitForState(page, "Worn-panel unequip", (state) => state.equipment.mainHand === null, 2_000);
-  await equipmentPanel.locator(`[data-equipment-item="${uiItem.id}"]`).click();
-  const uiEquipped = await waitForState(
-    page,
-    "Worn-panel equipment selection",
-    (state) => state.equipment.mainHand === uiItem.id,
-    2_000,
-  );
-  lastState = uiEquipped;
-  const gridItem = await equipmentPanel.locator('[data-equip-slot="mainHand"]').getAttribute("data-item");
-
-  const checks = {
-    realEngineEmptyWorld: ready.ready
-      && ready.engine === "corealm-production"
-      && ready.world === "empty-flat",
-    catalogsAreComplete: Object.values(catalogChecks).every(Boolean),
-    everyLevelCanBeSet: Object.values(levelChecks).every(Boolean),
-    everyEquipmentSlotEquips: equipmentProof.length === EQUIP_SLOTS.length
-      && sameMembers(equipmentProof.map((row) => row.slot), [...EQUIP_SLOTS]),
-    monsterCanvasClickSelects: targetClicked.selectedEntityId === targetBase.target?.entityId,
-    monsterCanvasClickNavigates: targetClicked.counters.navigationStarted > targetBase.counters.navigationStarted
-      && (targetPathObserved
-        || targetClicked.counters.navigationCompleted > targetBase.counters.navigationCompleted),
-    groundCanvasClickRuns: distanceXZ(groundBefore.playerPosition, groundMoved.playerPosition) >= 0.15
-      && groundMoved.counters.navigationStarted > groundBefore.counters.navigationStarted,
-    realMeleeDamagesTarget: melee.after.counters.combatStarted > melee.before.counters.combatStarted
-      && healthFell(melee.before, melee.after),
-    realSpellLaunchesParticlesAndDamages: cast.after.counters.spellLaunched > cast.before.counters.spellLaunched
-      && cast.sawParticles === true
-      && healthFell(cast.before, cast.after),
-    productionWornPickerCatalogs: pickerProof.length === EQUIP_SLOTS.length
-      && pickerProof.every((proof) => sameMembers(proof.actual, proof.expected)),
-    productionWornPickerEquips: uiEquipped.equipment.mainHand === uiItem.id
-      && gridItem === uiItem.id,
-    noRuntimeErrors: lastState.errors.length === 0
-      && consoleErrors.length === 0
-      && pageErrors.length === 0,
-    under45Seconds: performance.now() - started < TOTAL_BUDGET_MS,
-  };
-  const passed = Object.values(checks).every(Boolean);
-
-  console.log(JSON.stringify({
-    passed,
-    elapsedMs: Math.round(performance.now() - started),
-    url: labUrl.href,
-    checks,
+  return {
+    ready,
+    final,
+    probe,
     catalogChecks,
     levelChecks,
-    evidence: {
-      targetPointer: {
-        presetId: creaturePreset.id,
-        entityId: targetBase.target?.entityId,
-        screen: targetBase.target?.screen,
-        click: targetPoint,
-        selectedEntityId: targetClicked.selectedEntityId,
-        navigationStarted: [targetBase.counters.navigationStarted, targetClicked.counters.navigationStarted],
-        navigationCompleted: [targetBase.counters.navigationCompleted, targetClicked.counters.navigationCompleted],
-      },
-      groundPointer: {
-        click: groundPoint,
-        before: groundBefore.playerPosition,
-        after: groundMoved.playerPosition,
-      },
-      melee: {
-        health: [melee.before.target?.health, melee.after.target?.health],
-        combatStarted: [melee.before.counters.combatStarted, melee.after.counters.combatStarted],
-      },
-      cast: {
-        spellId: spell.id,
-        health: [cast.before.target?.health, cast.after.target?.health],
-        spellLaunched: [cast.before.counters.spellLaunched, cast.after.counters.spellLaunched],
-        sawParticles,
-      },
-      equipment: equipmentProof,
-      wornPicker: pickerProof,
-      wornPickerSelected: { itemId: uiItem.id, gridItem },
+    equipment,
+    targetPointer: {
+      entityId: targetBase.target?.entityId,
+      click: targetPoint,
+      selectedEntityId: targetClicked.selectedEntityId,
+      navigationStarted: [targetBase.counters.navigationStarted, targetClicked.counters.navigationStarted],
     },
-    errors: {
-      lab: lastState.errors,
-      console: consoleErrors,
-      page: pageErrors,
+    melee: {
+      entityId: meleeBefore.target?.entityId,
+      weaponId: meleeWeapon,
+      weaponEquipped: meleeEquipped.equipment.mainHand === meleeWeapon,
+      startedAtFullHealth: typeof meleeBefore.target?.health === "number"
+        && meleeBefore.target?.health === meleeBefore.target?.maxHealth,
+      health: [meleeBefore.target?.health, meleeAfter.target?.health],
+      combatStarted: [meleeBefore.counters.combatStarted, meleeAfter.counters.combatStarted],
+      spellLaunched: [meleeBefore.counters.spellLaunched, meleeAfter.counters.spellLaunched],
+      motionAdvanced: meleeMotionAdvanced,
     },
-  }, null, 2));
-  if (!passed) process.exitCode = 1;
-} catch (cause) {
-  lastState = await readState(page).catch(() => lastState);
-  console.error(JSON.stringify({
-    passed: false,
-    elapsedMs: Math.round(performance.now() - started),
-    url: labUrl.href,
-    failure: cause instanceof Error ? cause.stack ?? cause.message : String(cause),
-    lastState,
-    errors: { console: consoleErrors, page: pageErrors },
-  }, null, 2));
-  process.exitCode = 1;
-} finally {
-  await browser.close().catch(() => undefined);
-  clearDeadline();
+    cast: {
+      entityId: castBefore.target?.entityId,
+      spellId: spell.id,
+      health: [castBefore.target?.health, castAfter.target?.health],
+      spellLaunched: [castBefore.counters.spellLaunched, castAfter.counters.spellLaunched],
+      sawParticles: castParticles.liveSpellParticles > 0,
+      motionAdvanced: castMotionAdvanced,
+    },
+  };
+}
+
+async function testBuilding(
+  targetPage: Page,
+  baseUrl: string,
+  captures: string,
+  captured: string[],
+  remember: (state: FeatureLabState) => void,
+  openRoute = true,
+): Promise<BuildingEvidence> {
+  if (openRoute) await openLab(targetPage, baseUrl, "building");
+  const ready = await waitForState(targetPage, "building lab readiness", (state) => (
+    state.ready
+    && state.engine === "corealm-production"
+    && state.world === "fallowmarch-yard"
+    && state.mode === "building"
+    && !state.walkingEnabled
+    && state.playerVisible
+    && !state.freeCameraEnabled
+    && structureIsValid(state.structure)
+  ), READY_BUDGET_MS);
+  remember(ready);
+  const probe = await readRuntimeProbe(targetPage);
+  const authoringControlsWired = await verifyBuildingAuthoringControls(targetPage);
+  await targetPage.evaluate(() => window.__featureLab?.fitStructure());
+  await targetPage.waitForTimeout(80);
+  // Leave a little air around tall prefabs so the disposable evidence shows the full silhouette.
+  await targetPage.locator("#viewport").hover();
+  for (let step = 0; step < 7; step += 1) await targetPage.mouse.wheel(0, 240);
+  await targetPage.waitForTimeout(50);
+  const authoringShot = path.join(captures, "building-authoring.png");
+  await capture(targetPage, authoringShot, captured);
+  const catalog = await readCatalog(targetPage);
+  const prefab = catalog.structures.prefabs.find((row) => row.id === PREFAB_SELECTION.id);
+  const composition = catalog.structures.compositions.find((row) => row.id === COMPOSITION_SELECTION.id);
+  const plaster = catalog.structures.kits.find((row) => row.id === WALL_RUN_SELECTION.kit);
+  const timber = catalog.structures.kits.find((row) => row.id === COMPOSITION_SELECTION.kit);
+  const stone = catalog.structures.kits.find((row) => row.id === PREFAB_SELECTION.kit);
+  if (!prefab || !composition || !plaster || !timber || !stone) {
+    throw new Error("Building lab is missing a canonical structure or kit");
+  }
+
+  // The compatibility route already assembled this exact production prefab. Reuse it as the
+  // prefab proof instead of rebuilding an identical navmesh solely to increment a counter.
+  const prefabProof: StructureProof = { state: ready, wallMs: ready.structure.buildMs };
+  const compositionProof = await rebuild(targetPage, ready.structure.revision, {
+    ...COMPOSITION_SELECTION,
+    id: composition.id,
+    kit: timber.id,
+  });
+  remember(compositionProof.state);
+  const wallRunProof = await rebuild(targetPage, compositionProof.state.structure.revision, {
+    ...WALL_RUN_SELECTION,
+    kit: plaster.id,
+  });
+  remember(wallRunProof.state);
+
+  const playerVisibleToggle = targetPage.locator("#lab-player-visible");
+  await playerVisibleToggle.waitFor({ state: "visible", timeout: 2_000 });
+  const initialPlayerVisible = wallRunProof.state.playerVisible && await playerVisibleToggle.isChecked();
+  await setToggle(playerVisibleToggle, false);
+  const playerHidden = await waitForState(targetPage, "hide building player", (state) => (
+    state.mode === "building" && !state.playerVisible
+  ), 2_000);
+  remember(playerHidden);
+  const hiddenControlChecked = await playerVisibleToggle.isChecked();
+  await setToggle(playerVisibleToggle, true);
+  const playerRestored = await waitForState(targetPage, "restore building player", (state) => (
+    state.mode === "building" && state.playerVisible
+  ), 2_000);
+  remember(playerRestored);
+  const restoredControlChecked = await playerVisibleToggle.isChecked();
+
+  const toggle = targetPage.locator("#lab-walk-enabled");
+  await toggle.waitFor({ state: "visible", timeout: 2_000 });
+  await setToggle(toggle, true);
+  const walkingReady = await waitForState(targetPage, "enable building walking", (state) => (
+    state.mode === "building" && state.walkingEnabled && state.movement.mode === "idle"
+  ), 2_000);
+  remember(walkingReady);
+  const stableStructure = walkingReady.structure;
+  await targetPage.keyboard.down("w");
+  let buildingMotionAdvanced = false;
+  let visuallyActive = false;
+  let walked: FeatureLabState;
+  try {
+    walked = await waitForState(targetPage, "building real-input walking", (state) => {
+      buildingMotionAdvanced ||= motionAdvanced(walkingReady.playerMotion, state.playerMotion);
+      visuallyActive ||= motionMatches(state.playerMotion, /walk|run|locomotion/i);
+      return state.movement.mode === "direct"
+        && distanceXZ(walkingReady.playerPosition, state.playerPosition) >= 0.15
+        && buildingMotionAdvanced
+        && visuallyActive;
+    });
+    const walkingShot = path.join(captures, "building-walking.png");
+    await capture(targetPage, walkingShot, captured);
+  } finally {
+    await targetPage.keyboard.up("w");
+  }
+  remember(walked);
+  const walkingStructureStable = sameStructure(stableStructure, walked.structure);
+
+  await setToggle(toggle, false);
+  const disabledBefore = await waitForState(targetPage, "disable building walking", (state) => (
+    state.mode === "building" && !state.walkingEnabled && state.movement.mode === "idle"
+  ), 2_000);
+  remember(disabledBefore);
+  await targetPage.keyboard.down("w");
+  await targetPage.waitForTimeout(150);
+  await targetPage.keyboard.up("w");
+  await targetPage.waitForTimeout(50);
+  const keyboardDisabled = await readState(targetPage);
+  const keyboardStable = distanceXZ(disabledBefore.playerPosition, keyboardDisabled.playerPosition) < 0.08;
+  const canvas = targetPage.locator("#viewport");
+  const canvasBox = await canvas.boundingBox();
+  if (!canvasBox) throw new Error("Production canvas has no visible bounds in building mode");
+  const authoringPoint = {
+    x: canvasBox.x + canvasBox.width * 0.4,
+    y: canvasBox.y + canvasBox.height * 0.68,
+  };
+  await targetPage.mouse.click(authoringPoint.x, authoringPoint.y);
+  await targetPage.waitForTimeout(60);
+  const clickDisabled = await readState(targetPage);
+  await targetPage.mouse.click(authoringPoint.x, authoringPoint.y, { button: "right" });
+  const walkItem = targetPage.getByRole("menuitem", { name: /Walk here/ });
+  await walkItem.waitFor({ state: "visible", timeout: 1_000 });
+  const contextWalkDisabled = await walkItem.getAttribute("aria-disabled") === "true";
+  await targetPage.keyboard.press("Escape");
+
+  const cameraBefore = await readCameraProbe(targetPage);
+  await targetPage.mouse.move(authoringPoint.x, authoringPoint.y);
+  await targetPage.mouse.down({ button: "right" });
+  await targetPage.mouse.move(authoringPoint.x + 64, authoringPoint.y - 28, { steps: 4 });
+  await targetPage.mouse.up({ button: "right" });
+  await targetPage.waitForTimeout(50);
+  const cameraAfterOrbit = await readCameraProbe(targetPage);
+  // Fit can leave the authored view at the maximum distance, so zoom inward for a guaranteed
+  // non-clamped wheel response.
+  await targetPage.mouse.wheel(0, -360);
+  await targetPage.waitForTimeout(60);
+  const cameraAfterZoom = await readCameraProbe(targetPage);
+
+  const freeCameraToggle = targetPage.locator("#lab-free-move");
+  await freeCameraToggle.waitFor({ state: "visible", timeout: 2_000 });
+  await setToggle(freeCameraToggle, true);
+  const freeCameraReady = await waitForState(targetPage, "enable building free camera", (state) => (
+    state.mode === "building"
+    && !state.walkingEnabled
+    && state.freeCameraEnabled
+    && state.movement.mode === "idle"
+  ), 2_000);
+  remember(freeCameraReady);
+  const freeCameraChecked = await freeCameraToggle.isChecked();
+  const freePanBefore = await readCameraProbe(targetPage);
+  await targetPage.mouse.move(authoringPoint.x, authoringPoint.y);
+  await targetPage.mouse.down({ button: "middle" });
+  await targetPage.mouse.move(authoringPoint.x + 72, authoringPoint.y + 36, { steps: 5 });
+  await targetPage.mouse.up({ button: "middle" });
+  await targetPage.waitForTimeout(60);
+  const freePanAfter = await readCameraProbe(targetPage);
+  await targetPage.mouse.move(authoringPoint.x, authoringPoint.y);
+  await targetPage.mouse.down({ button: "right" });
+  await targetPage.mouse.move(authoringPoint.x - 56, authoringPoint.y + 24, { steps: 4 });
+  await targetPage.mouse.up({ button: "right" });
+  await targetPage.waitForTimeout(60);
+  const freeOrbitAfter = await readCameraProbe(targetPage);
+  await targetPage.mouse.wheel(0, -240);
+  await targetPage.waitForTimeout(50);
+  const freeZoomAfter = await readCameraProbe(targetPage);
+  await targetPage.getByRole("button", { name: "Fit structure" }).click();
+  await targetPage.waitForTimeout(60);
+  const freeFitAfter = await readCameraProbe(targetPage);
+  const freeCameraPlayerAfter = await readState(targetPage);
+  remember(freeCameraPlayerAfter);
+  const freeCameraShot = path.join(captures, "building-free-camera.png");
+  await capture(targetPage, freeCameraShot, captured);
+  await setToggle(freeCameraToggle, false);
+  const freeCameraDisabled = await waitForState(targetPage, "disable building free camera", (state) => (
+    state.mode === "building" && !state.freeCameraEnabled && state.movement.mode === "idle"
+  ), 2_000);
+  remember(freeCameraDisabled);
+  const freeCameraDisabledChecked = await freeCameraToggle.isChecked();
+
+  const buildingWorkbench = targetPage.locator("#lab-building-workbench");
+  if (!(await buildingWorkbench.isVisible())) {
+    throw new Error("Building workbench disappeared before the mode navigation proof");
+  }
+  const final = await readState(targetPage);
+  remember(final);
+
+  return {
+    ready,
+    final,
+    probe,
+    authoringControlsWired,
+    structures: {
+      initial: ready.structure,
+      prefab: prefabProof.state.structure,
+      composition: compositionProof.state.structure,
+      wallRun: wallRunProof.state.structure,
+    },
+    rebuildMs: [compositionProof.wallMs, wallRunProof.wallMs],
+    playerVisibility: {
+      initial: initialPlayerVisible,
+      hidden: playerHidden.playerVisible,
+      restored: playerRestored.playerVisible,
+      hiddenControlChecked,
+      restoredControlChecked,
+      before: wallRunProof.state.playerPosition,
+      after: playerRestored.playerPosition,
+    },
+    walking: {
+      before: walkingReady.playerPosition,
+      after: walked.playerPosition,
+      motionAdvanced: buildingMotionAdvanced,
+      visuallyActive,
+      structureStable: walkingStructureStable,
+    },
+    disabled: {
+      before: disabledBefore.playerPosition,
+      after: final.playerPosition,
+      structureStable: sameStructure(stableStructure, final.structure),
+      keyboardStable,
+      leftClickStable: distanceXZ(keyboardDisabled.playerPosition, clickDisabled.playerPosition) < 0.08,
+      contextWalkDisabled,
+      navigationStarted: [disabledBefore.counters.navigationStarted, clickDisabled.counters.navigationStarted],
+      routeStayedIdle: keyboardDisabled.movement.mode === "idle" && clickDisabled.movement.mode === "idle",
+      orbitRetained: Math.abs(cameraAfterOrbit.yaw - cameraBefore.yaw) >= 0.01
+        || Math.abs(cameraAfterOrbit.pitch - cameraBefore.pitch) >= 0.01,
+      zoomRetained: Math.abs(cameraAfterZoom.requestedDistance - cameraAfterOrbit.requestedDistance) >= 0.1
+        || Math.abs(cameraAfterZoom.distance - cameraAfterOrbit.distance) >= 0.1,
+    },
+    freeCamera: {
+      enabled: freeCameraReady.freeCameraEnabled && freePanBefore.freeMove,
+      disabled: !freeCameraDisabled.freeCameraEnabled,
+      playerBefore: freeCameraReady.playerPosition,
+      playerAfter: freeCameraPlayerAfter.playerPosition,
+      panBefore: freePanBefore,
+      panAfter: freePanAfter,
+      orbitAfter: freeOrbitAfter,
+      zoomAfter: freeZoomAfter,
+      fitAfter: freeFitAfter,
+      enabledControlChecked: freeCameraChecked,
+      disabledControlChecked: freeCameraDisabledChecked,
+    },
+  };
+}
+
+async function selectModeWithReload(
+  targetPage: Page,
+  mode: FeatureLabMode,
+  beforeState: FeatureLabState,
+  remember: (state: FeatureLabState) => void,
+): Promise<ModeNavigationEvidence> {
+  const before = await readDocumentProbe(targetPage);
+  await targetPage.evaluate(() => Reflect.set(window, "__featureLabGateOldRuntime", true));
+  await Promise.all([
+    targetPage.waitForNavigation({ waitUntil: "domcontentloaded", timeout: READY_BUDGET_MS }),
+    targetPage.locator("#lab-mode").selectOption(mode),
+  ]);
+  const fresh = await waitForState(targetPage, `${mode} runtime after mode navigation`, (state) => (
+    state.ready
+    && state.engine === "corealm-production"
+    && state.world === "fallowmarch-yard"
+    && state.mode === mode
+    && state.structure.ready
+  ), READY_BUDGET_MS);
+  remember(fresh);
+  const after = await readDocumentProbe(targetPage);
+  const beforeUrl = new URL(before.url);
+  const afterUrl = new URL(after.url);
+  const expectedSearch = new URLSearchParams(beforeUrl.searchParams);
+  expectedSearch.set("mode", mode);
+  return {
+    from: beforeState.mode,
+    to: mode,
+    before,
+    after,
+    fresh,
+    queryPreserved: expectedSearch.toString() === afterUrl.searchParams.toString(),
+    hashPreserved: beforeUrl.hash === afterUrl.hash,
+  };
+}
+
+async function verifyBuildingAuthoringControls(targetPage: Page): Promise<boolean> {
+  // Keep this as browser-native source. Transpiled nested callbacks gain an esbuild `__name`
+  // helper that does not exist in the page realm when Playwright serializes the function.
+  return targetPage.evaluate(`(async () => {
+    const api = window.__featureLab;
+    if (!api) throw new Error("window.__featureLab is unavailable");
+    const calls = [];
+    const original = api.setStructure;
+    api.setStructure = async function (patch) {
+      calls.push({ ...patch });
+      return api.getState();
+    };
+    function change(id, value) {
+      const control = document.querySelector("#" + id);
+      if (!control) throw new Error("Missing building authoring control #" + id);
+      control.value = value;
+      control.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    try {
+      change("lab-source-kind", "wall-run");
+      change("lab-structure-id", "gatehouse");
+      change("lab-kit-id", "timber");
+      change("lab-footprint-width", "10");
+      change("lab-footprint-depth", "2");
+      change("lab-variant-seed", "4");
+      document.querySelector("#lab-next-seed")?.click();
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    } finally {
+      api.setStructure = original;
+    }
+    return calls.some((patch) => patch.kind === "wall-run" && patch.id === "wall_run")
+      && calls.some((patch) => Object.hasOwn(patch, "id"))
+      && calls.some((patch) => patch.kit === "timber")
+      && calls.some((patch) => patch.width === 10)
+      && calls.some((patch) => patch.depth === 2)
+      && calls.some((patch) => patch.seed === 4)
+      && calls.some((patch) => patch.seed === 5);
+  })()`) as Promise<boolean>;
+}
+
+async function testLegacyRedirect(
+  targetPage: Page,
+  baseUrl: string,
+  remember: (state: FeatureLabState) => void,
+): Promise<LegacyRedirectEvidence> {
+  const legacyUrl = new URL("/structure-preview.html", ensureUrl(baseUrl));
+  legacyUrl.search = new URLSearchParams({
+    mode: "structures",
+    kind: PREFAB_SELECTION.kind,
+    id: PREFAB_SELECTION.id,
+    kit: PREFAB_SELECTION.kit,
+    width: String(PREFAB_SELECTION.width),
+    depth: String(PREFAB_SELECTION.depth),
+    seed: String(PREFAB_SELECTION.seed),
+    legacyProbe: "preserved",
+  }).toString();
+  legacyUrl.hash = "legacy-yard";
+
+  await targetPage.goto(legacyUrl.href, {
+    waitUntil: "domcontentloaded",
+    timeout: READY_BUDGET_MS,
+  });
+  await targetPage.waitForURL((url) => (
+    url.pathname.endsWith("/index.html")
+    && url.searchParams.get("mode") === "building"
+    && url.hash === "#legacy-yard"
+  ), { timeout: READY_BUDGET_MS });
+  const state = await waitForState(targetPage, "legacy building redirect readiness", (candidate) => (
+    candidate.ready
+    && candidate.engine === "corealm-production"
+    && candidate.world === "fallowmarch-yard"
+    && candidate.mode === "building"
+    && !candidate.walkingEnabled
+    && candidate.playerVisible
+    && !candidate.freeCameraEnabled
+    && structureIsValid(candidate.structure)
+    && candidate.structure.collisionCount > 0
+    && selectionMatches(candidate.structure.selection, PREFAB_SELECTION)
+  ), READY_BUDGET_MS);
+  remember(state);
+
+  const finalUrl = new URL(targetPage.url());
+  const queryPreserved = Object.entries(PREFAB_SELECTION).every(([key, value]) => (
+    finalUrl.searchParams.get(key) === String(value)
+  )) && finalUrl.searchParams.get("legacyProbe") === "preserved";
+  const pageEvidence = await targetPage.evaluate(() => ({
+    bodyProfile: document.body.dataset["bootProfile"] ?? null,
+    legacyApiPresent: Reflect.has(window, "__structurePreview"),
+  }));
+  return {
+    state,
+    probe: await readRuntimeProbe(targetPage),
+    finalUrl: finalUrl.href,
+    redirected: finalUrl.pathname.endsWith("/index.html")
+      && finalUrl.searchParams.get("mode") === "building",
+    queryPreserved,
+    hashPreserved: finalUrl.hash === "#legacy-yard",
+    bodyProfile: pageEvidence.bodyProfile,
+    legacyApiPresent: pageEvidence.legacyApiPresent,
+  };
+}
+
+async function openLab(targetPage: Page, baseUrl: string, mode: "combat" | "building"): Promise<void> {
+  const url = new URL(`/index.html?mode=${mode}`, ensureUrl(baseUrl));
+  const response = await targetPage.goto(url.href, {
+    waitUntil: "domcontentloaded",
+    timeout: READY_BUDGET_MS,
+  });
+  if (!response?.ok()) {
+    throw new Error(`${mode} feature lab returned HTTP ${response?.status() ?? "no response"}: ${url.href}`);
+  }
+}
+
+async function rebuild(
+  targetPage: Page,
+  beforeRevision: number,
+  patch: Partial<FeatureLabStructureSelection>,
+): Promise<StructureProof> {
+  const operationStarted = performance.now();
+  const state = await targetPage.evaluate(async (value) => {
+    const api = window.__featureLab;
+    if (!api) throw new Error("window.__featureLab is unavailable");
+    return api.setStructure(value);
+  }, patch);
+  if (!state.structure.ready || state.structure.revision <= beforeRevision) {
+    const waited = await waitForState(targetPage, "production structure rebuild", (candidate) => (
+      candidate.structure.ready && candidate.structure.revision > beforeRevision
+    ), REBUILD_BUDGET_MS);
+    return { state: waited, wallMs: performance.now() - operationStarted };
+  }
+  return { state, wallMs: performance.now() - operationStarted };
 }
 
 async function readState(targetPage: Page): Promise<FeatureLabState> {
@@ -358,6 +1078,100 @@ async function readCatalog(targetPage: Page): Promise<FeatureLabCatalog> {
   });
 }
 
+async function readRuntimeProbe(targetPage: Page): Promise<RuntimeProbe> {
+  return targetPage.evaluate(() => {
+    const debug = Reflect.get(window, "__gameDebug") as {
+      getState?: () => Record<string, unknown>;
+      getNavigationState?: () => Record<string, unknown>;
+      groundHeight?: (x: number, z: number) => number;
+    } | undefined;
+    if (!debug?.getState || !debug.getNavigationState || !debug.groundHeight) {
+      throw new Error("Production window.__gameDebug contract is unavailable");
+    }
+    const state = debug.getState();
+    const navigation = debug.getNavigationState();
+    const renderer = state["renderer"] as Record<string, unknown> | undefined;
+    const canvas = document.getElementById("viewport");
+    if (!(canvas instanceof HTMLCanvasElement)) throw new Error("Production #viewport is unavailable");
+    return {
+      ready: state["ready"] === true,
+      regionId: typeof state["regionId"] === "string" ? state["regionId"] : null,
+      version: state["version"] ?? null,
+      renderer: renderer
+        ? {
+            drawCalls: Number(renderer["drawCalls"] ?? 0),
+            triangles: Number(renderer["triangles"] ?? 0),
+          }
+        : null,
+      navigationStatus: typeof navigation["status"] === "string" ? navigation["status"] : null,
+      groundSamples: [
+        debug.groundHeight(-12, -8),
+        debug.groundHeight(0, 0),
+        debug.groundHeight(12, 8),
+      ].map((value) => Math.round(value * 1_000) / 1_000),
+      canvas: {
+        id: canvas.id,
+        width: canvas.width,
+        height: canvas.height,
+        webgl: Boolean(canvas.getContext("webgl2")),
+      },
+    };
+  });
+}
+
+async function readCameraProbe(targetPage: Page): Promise<CameraProbe> {
+  return targetPage.evaluate(() => {
+    const debug = Reflect.get(window, "__gameDebug") as { getCamera?: () => Record<string, unknown> } | undefined;
+    const camera = debug?.getCamera?.();
+    const position = camera?.["position"];
+    const yaw = camera?.["yaw"];
+    const pitch = camera?.["pitch"];
+    const distance = camera?.["distance"];
+    const requestedDistance = camera?.["requestedDistance"];
+    const freeMove = camera?.["freeMove"];
+    const target = camera?.["target"];
+    if (typeof position !== "object" || position === null
+      || typeof (position as Record<string, unknown>)["x"] !== "number"
+      || typeof (position as Record<string, unknown>)["y"] !== "number"
+      || typeof (position as Record<string, unknown>)["z"] !== "number"
+      || typeof yaw !== "number"
+      || typeof pitch !== "number"
+      || typeof distance !== "number"
+      || typeof requestedDistance !== "number"
+      || typeof freeMove !== "boolean"
+      || typeof target !== "object" || target === null
+      || typeof (target as Record<string, unknown>)["x"] !== "number"
+      || typeof (target as Record<string, unknown>)["y"] !== "number"
+      || typeof (target as Record<string, unknown>)["z"] !== "number") {
+      throw new Error("Production camera orbit/zoom state is unavailable");
+    }
+    const positionPoint = position as { x: number; y: number; z: number };
+    const targetPoint = target as { x: number; y: number; z: number };
+    return {
+      position: { x: positionPoint.x, y: positionPoint.y, z: positionPoint.z },
+      yaw,
+      pitch,
+      distance,
+      requestedDistance,
+      freeMove,
+      target: { x: targetPoint.x, y: targetPoint.y, z: targetPoint.z },
+    };
+  });
+}
+
+async function readDocumentProbe(targetPage: Page): Promise<DocumentProbe> {
+  return targetPage.evaluate(() => {
+    const id = Reflect.get(window, "__featureLabGateDocumentId");
+    if (typeof id !== "string") throw new Error("Feature-lab document marker is unavailable");
+    return {
+      id,
+      timeOrigin: performance.timeOrigin,
+      url: window.location.href,
+      oldRuntimeMarkerPresent: Reflect.has(window, "__featureLabGateOldRuntime"),
+    };
+  });
+}
+
 async function waitForState(
   targetPage: Page,
   label: string,
@@ -366,12 +1180,48 @@ async function waitForState(
 ): Promise<FeatureLabState> {
   const deadline = performance.now() + timeoutMs;
   let state: FeatureLabState | null = null;
+  let lastReadError: string | null = null;
   while (performance.now() < deadline) {
-    state = await readState(targetPage);
-    if (predicate(state)) return state;
+    try {
+      state = await readState(targetPage);
+      lastReadError = null;
+      if (predicate(state)) return state;
+    } catch (cause) {
+      // `domcontentloaded` deliberately returns before the asynchronous production boot has
+      // installed the lab API. Treat that short startup window as pending readiness.
+      lastReadError = cause instanceof Error ? cause.message : String(cause);
+    }
     await targetPage.waitForTimeout(POLL_MS);
   }
-  throw new Error(`${label} did not complete in ${timeoutMs}ms; last state: ${JSON.stringify(state)}`);
+  throw new Error(
+    `${label} did not complete in ${timeoutMs}ms; last state: ${JSON.stringify(state)}; `
+    + `last read error: ${lastReadError ?? "none"}`,
+  );
+}
+
+async function capture(targetPage: Page, filePath: string, captured: string[]): Promise<void> {
+  await targetPage.screenshot({
+    path: filePath,
+    animations: "disabled",
+    timeout: SCREENSHOT_TIMEOUT_MS,
+  });
+  captured.push(path.relative(repoRoot, filePath).replaceAll("\\", "/"));
+}
+
+async function clearMessageLog(targetPage: Page): Promise<void> {
+  // Pointer-path proof can intentionally supersede an in-flight route. Clear those old notices
+  // before visual evidence so later melee/spell errors would still remain visible if they occur.
+  await targetPage.locator(".msglog").evaluate((root) => root.replaceChildren());
+}
+
+async function setToggle(locator: Locator, enabled: boolean): Promise<void> {
+  const type = await locator.getAttribute("type");
+  if (type === "checkbox") {
+    if (enabled) await locator.check();
+    else await locator.uncheck();
+    return;
+  }
+  await locator.click();
 }
 
 function validateCatalog(catalog: FeatureLabCatalog): Record<string, boolean> {
@@ -381,6 +1231,9 @@ function validateCatalog(catalog: FeatureLabCatalog): Record<string, boolean> {
     creatures: catalog.targets.creature.length > 0,
     npcs: catalog.targets.npc.length > 0,
     spells: catalog.spells.length > 0,
+    prefabs: catalog.structures.prefabs.length > 0,
+    compositions: catalog.structures.compositions.length > 0,
+    kits: catalog.structures.kits.length > 0,
     everyEquipmentSlot: sameMembers(equipmentSlots, [...EQUIP_SLOTS]),
     everyEquipmentSlotHasItems: catalog.equipment.every((group) => group.items.length > 0),
     equipmentItemsUniquePerSlot: catalog.equipment.every((group) => (
@@ -388,6 +1241,76 @@ function validateCatalog(catalog: FeatureLabCatalog): Record<string, boolean> {
     )),
     everySkill: sameMembers(skillIds, [...SKILL_IDS]),
   };
+}
+
+function structureIsValid(structure: FeatureLabStructureView): boolean {
+  const bounds = structure.bounds;
+  return structure.ready
+    && structure.revision >= 1
+    && structure.partCount > 0
+    && structure.assetCount > 0
+    && structure.collisionCount >= 0
+    && Number.isFinite(structure.buildMs)
+    && structure.buildMs >= 0
+    && bounds !== null
+    && [...bounds.min, ...bounds.max].every(Number.isFinite)
+    && bounds.max[0] > bounds.min[0]
+    && bounds.max[1] > bounds.min[1]
+    && bounds.max[2] > bounds.min[2];
+}
+
+function sameStructure(before: FeatureLabStructureView, after: FeatureLabStructureView): boolean {
+  return before.revision === after.revision
+    && before.partCount === after.partCount
+    && before.assetCount === after.assetCount
+    && before.collisionCount === after.collisionCount
+    && JSON.stringify(before.selection) === JSON.stringify(after.selection)
+    && JSON.stringify(before.bounds) === JSON.stringify(after.bounds);
+}
+
+function selectionMatches(
+  actual: FeatureLabStructureSelection,
+  expected: FeatureLabStructureSelection,
+): boolean {
+  return actual.kind === expected.kind
+    && actual.id === expected.id
+    && actual.kit === expected.kit
+    && actual.width === expected.width
+    && actual.depth === expected.depth
+    && actual.seed === expected.seed;
+}
+
+function wallDimensionsSupported(selection: FeatureLabStructureSelection): boolean {
+  return selection.kind === "wall-run"
+    && selection.id === "wall_run"
+    && selection.width >= 6
+    && selection.width % 2 === 0
+    && selection.depth >= 2
+    && selection.depth % 2 === 0
+    && selection.depth <= selection.width - 4;
+}
+
+function probesShareWorld(combat: RuntimeProbe, building: RuntimeProbe): boolean {
+  return combat.ready
+    && building.ready
+    && combat.regionId === "fallowmarch"
+    && building.regionId === combat.regionId
+    && combat.navigationStatus === "ready"
+    && building.navigationStatus === combat.navigationStatus
+    && combat.canvas.id === "viewport"
+    && building.canvas.id === combat.canvas.id
+    && combat.canvas.webgl
+    && building.canvas.webgl
+    && combat.canvas.width > 0
+    && combat.canvas.height > 0
+    && building.canvas.width > 0
+    && building.canvas.height > 0
+    && (combat.renderer?.drawCalls ?? 0) > 0
+    && (combat.renderer?.triangles ?? 0) > 0
+    && (building.renderer?.drawCalls ?? 0) > 0
+    && (building.renderer?.triangles ?? 0) > 0
+    && JSON.stringify(combat.version) === JSON.stringify(building.version)
+    && JSON.stringify(combat.groundSamples) === JSON.stringify(building.groundSamples);
 }
 
 function screenPoint(state: FeatureLabState, canvas: CanvasBox): Point {
@@ -410,11 +1333,11 @@ function screenPoint(state: FeatureLabState, canvas: CanvasBox): Point {
 
 function chooseGroundPoint(canvas: CanvasBox, target: Point): Point {
   const candidates = [
-    { x: canvas.x + canvas.width * 0.22, y: canvas.y + canvas.height * 0.72 },
-    { x: canvas.x + canvas.width * 0.32, y: canvas.y + canvas.height * 0.64 },
+    { x: canvas.x + canvas.width * 0.4, y: canvas.y + canvas.height * 0.68 },
+    { x: canvas.x + canvas.width * 0.32, y: canvas.y + canvas.height * 0.62 },
   ];
   return candidates.sort((a, b) => distance2d(b, target) - distance2d(a, target))[0]
-    ?? { x: canvas.x + canvas.width * 0.25, y: canvas.y + canvas.height * 0.7 };
+    ?? { x: canvas.x + canvas.width * 0.2, y: canvas.y + canvas.height * 0.72 };
 }
 
 function findItem(
@@ -432,6 +1355,22 @@ function healthFell(before: FeatureLabState, after: FeatureLabState): boolean {
   return typeof prior === "number" && typeof current === "number" && current < prior;
 }
 
+function numericFell(values: readonly [number | null | undefined, number | null | undefined]): boolean {
+  return typeof values[0] === "number" && typeof values[1] === "number" && values[1] < values[0];
+}
+
+function motionAdvanced(before: FeatureLabMotionView | null, after: FeatureLabMotionView | null): boolean {
+  return before?.liveRig === true
+    && after?.liveRig === true
+    && typeof before.time === "number"
+    && typeof after.time === "number"
+    && Math.abs(after.time - before.time) >= 0.005;
+}
+
+function motionMatches(motion: FeatureLabMotionView | null, pattern: RegExp): boolean {
+  return pattern.test(`${motion?.pose ?? ""} ${motion?.motion ?? ""} ${motion?.clip ?? ""}`);
+}
+
 function distanceXZ(
   before: readonly [number, number, number],
   after: readonly [number, number, number],
@@ -441,6 +1380,10 @@ function distanceXZ(
 
 function distance2d(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function distancePoint3(a: Point3, b: Point3): number {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
 function sameMembers<T>(actual: readonly T[], expected: readonly T[]): boolean {
@@ -453,6 +1396,6 @@ function ensureUrl(value: string): URL {
   try {
     return new URL(value.endsWith("/") ? value : `${value}/`);
   } catch {
-    throw new Error(`--base must be an absolute URL, received: ${value}`);
+    throw new Error(`Game server returned an invalid absolute URL: ${value}`);
   }
 }

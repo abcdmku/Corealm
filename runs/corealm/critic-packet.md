@@ -1,6 +1,6 @@
 # Critic packet
 
-Use `skills/critic.md`. Review only. Do not edit code.
+Use `skills/critic.md` and `docs/feature-lab.md`. Require lab proof before final-world evidence for every isolatable feature. Review only. Do not edit code.
 
 ## Approved PRD
 
@@ -1491,6 +1491,8 @@ Each shot must show: correct tier materials, readable silhouettes at the default
 ---
 
 ## 9. Parallel build rounds with disjoint file ownership
+
+> Lab-first amendment: for all new work, [the realtime feature-lab gate](../../docs/feature-lab.md) supersedes any direct-to-final-world ordering below. Each isolatable feature gets a lab fixture and root lab acceptance before a later final-world integration step. Only authored full-world behavior may use a recorded exception, and reusable local pieces still use the lab.
 
 Round 0 is root-only, per AGENTS.md rules 3 and 4. Rounds 1 through 7 map to the seven vertical proofs in the brief. Each round ends with the root running the whole-game checks. Nobody proceeds on a failed round.
 

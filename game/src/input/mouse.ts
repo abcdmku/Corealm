@@ -39,6 +39,7 @@ export interface OrbitCameraLike {
   readonly yaw: number;
   rotate(deltaYaw: number, deltaPitch: number): void;
   zoom(delta: number): void;
+  panPixels(deltaX: number, deltaY: number, viewportHeight: number): void;
 }
 
 export interface MovementLike {
@@ -93,6 +94,8 @@ export class InputController {
   private labelAtY = Number.NaN;
   private readonly hoverThrottleMs: number;
   private readonly options: InputOptions;
+  private movementEnabled = true;
+  private freeCameraEnabled = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -143,6 +146,28 @@ export class InputController {
 
   configurePicking(sources: PickerSources): void {
     this.picker.configure(sources);
+  }
+
+  /**
+   * Enables or suspends player movement without replacing the input controller.
+   *
+   * Camera gestures, hover picking and the shared keybinding registry stay attached. Clearing the
+   * keyboard on both transitions prevents a movement key pressed in inspection mode from taking
+   * effect when walking is enabled again.
+   */
+  setMovementEnabled(enabled: boolean): void {
+    if (this.movementEnabled === enabled) return;
+    this.movementEnabled = enabled;
+    this.contextMenu.close();
+    this.keyboard.clear();
+    this.movement.setDirectInput({ forward: 0, strafe: 0, cameraYaw: this.camera.yaw });
+    if (!enabled) this.api.stop();
+  }
+
+  setFreeCameraEnabled(enabled: boolean): void {
+    this.freeCameraEnabled = enabled;
+    this.contextMenu.close();
+    this.keyboard.clear();
   }
 
   // ------------------------------------------------------------------ events
@@ -208,7 +233,11 @@ export class InputController {
     if (this.dragButton === 2 || this.dragButton === 1) {
       const deltaX = event.clientX - this.lastX;
       const deltaY = event.clientY - this.lastY;
-      this.camera.rotate(-deltaX * ORBIT_YAW_PER_PX, -deltaY * ORBIT_PITCH_PER_PX);
+      if (this.freeCameraEnabled && this.dragButton === 1) {
+        this.camera.panPixels(deltaX, deltaY, this.canvas.clientHeight);
+      } else {
+        this.camera.rotate(-deltaX * ORBIT_YAW_PER_PX, -deltaY * ORBIT_PITCH_PER_PX);
+      }
       // The world moved under a stationary cursor; the cached hover pick is stale.
       this.picker.invalidate();
     }
@@ -274,6 +303,12 @@ export class InputController {
     const pick = this.picker.pickAt(clientX, clientY);
     if (!pick) return;
 
+    if (!this.movementEnabled) {
+      this.setSelected(pick.entityId ?? null);
+      if (pick.entityId) this.inspectEntity(pick.entityId);
+      return;
+    }
+
     if (pick.entityId) {
       const interaction = this.primaryInteractionFor(pick.entityId);
       if (!interaction) {
@@ -295,11 +330,13 @@ export class InputController {
   private handleRightClick(clientX: number, clientY: number): void {
     const pick = this.picker.pickAt(clientX, clientY);
     if (!pick) return;
-    if (pick.entityId) this.contextMenu.openForEntity(pick.entityId, clientX, clientY);
-    else this.contextMenu.openForGround(pick.point, clientX, clientY);
+    const options = { movementEnabled: this.movementEnabled };
+    if (pick.entityId) this.contextMenu.openForEntity(pick.entityId, clientX, clientY, options);
+    else this.contextMenu.openForGround(pick.point, clientX, clientY, options);
   }
 
   private moveTo(target: MoveTarget, feedbackPoint: Vec3): void {
+    if (!this.movementEnabled) return;
     const moved = this.api.moveTo(target);
     if (!reportResult(moved)) return;
     this.options.onWalkDestination?.(feedbackPoint);
@@ -307,6 +344,10 @@ export class InputController {
 
   /** Resolves Space's hovered or selected target through the same interaction path as a click. */
   private interactPrimary(entityId: EntityId): void {
+    if (!this.movementEnabled) {
+      this.inspectEntity(entityId);
+      return;
+    }
     const interaction = this.primaryInteractionFor(entityId);
     if (!interaction) {
       // No interactions known yet (the entity hook may not be registered). Walking there is still
@@ -320,10 +361,9 @@ export class InputController {
 
   /** Shared by the left click and by Space, so both routes cannot drift apart. */
   private runInteraction(entityId: EntityId, interaction: InteractionId): void {
+    if (!this.movementEnabled && interaction !== "inspect") return;
     if (interaction === "inspect") {
-      const inspected = this.api.inspect(entityId);
-      if (!reportResult(inspected)) return;
-      notify(`${inspected.value.name} — tier ${inspected.value.tier}, ${inspected.value.state}.`, "info");
+      this.inspectEntity(entityId);
       return;
     }
     if (interaction === "produce" && this.options.onProduction) {
@@ -331,6 +371,12 @@ export class InputController {
       return;
     }
     reportResult(this.api.interact(entityId, interaction));
+  }
+
+  private inspectEntity(entityId: EntityId): void {
+    const inspected = this.api.inspect(entityId);
+    if (!reportResult(inspected)) return;
+    notify(`${inspected.value.name} — tier ${inspected.value.tier}, ${inspected.value.state}.`, "info");
   }
 
   private primaryInteractionFor(entityId: EntityId): InteractionId | null {
@@ -360,7 +406,9 @@ export class InputController {
    * `Picker` bounds it further, so a fast sweep across a canopy costs a handful of rays.
    */
   update(): void {
-    const { forward, strafe } = this.keyboard.axes();
+    const { forward, strafe } = this.movementEnabled
+      ? this.keyboard.axes()
+      : { forward: 0, strafe: 0 };
     this.movement.setDirectInput({ forward, strafe, cameraYaw: this.camera.yaw });
     this.updateHover();
   }

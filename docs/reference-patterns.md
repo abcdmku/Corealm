@@ -12,7 +12,10 @@ The retained loop is short:
 
 ```text
 brief -> fresh PRD -> root review -> running foundation -> frozen contracts
-      -> owned build round -> browser test -> scripted play and screenshots
-      -> fresh critic -> fixes -> browser retest
+      -> owned lab feature round -> lab state + screenshots -> root acceptance
+      -> final-world wiring -> shallow browser integration -> fresh critic
+      -> fixes in lab -> reaccept -> reintegrate
 ```
+
+This project adds one rule beyond the reference builds: any feature that can run in a compact deterministic scene is built and accepted through the production-backed feature lab before final-world wiring. See `docs/feature-lab.md` for the gate and its narrow full-world exceptions.
 

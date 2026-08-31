@@ -8,7 +8,17 @@
  * views, A4's input. Each depends only on frozen contracts, so no worker had to know about another.
  */
 import * as THREE from "three";
-import type { EntityId, FeatureLabApi, RegionId, SemanticEntity, SkillId, Vec3 } from "../contracts.js";
+import type {
+  EntityId,
+  FeatureLabApi,
+  FeatureLabStructureSelection,
+  FeatureLabStructureView,
+  RegionId,
+  SemanticEntity,
+  SkillId,
+  SolidVolume,
+  Vec3,
+} from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
 import { Store, addSkillXp, computeMaxHealth } from "../state/store.js";
 import { EventBus } from "../core/events.js";
@@ -20,6 +30,7 @@ import { AssetRegistry } from "../render/assets.js";
 import { ALL_PROCEDURAL_GEAR_ASSETS, registerProceduralGear } from "../render/proceduralGear.js";
 import { WorldScene } from "../render/scene.js";
 import { EntityViews } from "../render/entityViews.js";
+import { STOREY_METRES } from "../render/buildings.js";
 import { Physics } from "../systems/physics.js";
 import { Navigation, solidObstacleMeshes } from "../systems/navigation.js";
 import { Movement } from "../systems/movement.js";
@@ -87,6 +98,11 @@ import {
 } from "../audio/index.js";
 import { GAME_BOOT_PROFILE, type BootProfile } from "./bootProfile.js";
 import { createFeatureLabRuntime } from "../featureLab/runtime.js";
+import {
+  DEFAULT_FEATURE_LAB_STRUCTURE_SELECTION,
+  assembleFeatureLabStructure,
+  type FeatureLabStructureAssembly,
+} from "../featureLab/structures.js";
 
 export interface BootResult {
   loop: GameLoop;
@@ -391,7 +407,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // Company Hall ridge and the player could stroll five metres along it, and every teleport in the
   // game — region travel, debug teleport, focusCamera, death respawn — routes through
   // `nav.closestPoint`, so those polygons were reachable. A ring generates no roof polygon at all.
-  const navCarves = solidObstacleMeshes(built.solids);
+  let navCarves = solidObstacleMeshes(built.solids);
   const navCarveGroup = new THREE.Group();
   navCarveGroup.name = "nav-obstacles";
   navCarveGroup.visible = false;
@@ -1038,6 +1054,11 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   let featureLab: FeatureLabApi | undefined;
   if (profile.kind === "feature-lab") {
+    const structureOrigin: Vec3 = [-8, scene.meshHeightAt(-8, 12), 12];
+    let activeStructure: FeatureLabStructureAssembly | null = null;
+    let structureRevision = 0;
+    let labFreeCameraEnabled = false;
+
     const resetLabPlayer = (): void => {
       const state = store.get();
       const landed = nav.closestPoint(spawn) ?? [...spawn] as Vec3;
@@ -1057,6 +1078,191 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       store.markDirty();
     };
 
+    const replaceLabCollision = (
+      structureSolids: readonly SolidVolume[],
+    ): void => {
+      movement.stop(store.get(), clock.elapsedMs, "feature-lab-structure");
+
+      const allSolids = [...built.solids, ...structureSolids];
+      const previousCarves = navCarves;
+      const candidateCarves = solidObstacleMeshes(allSolids);
+      for (const carve of previousCarves) carve.removeFromParent();
+      for (const carve of candidateCarves) navCarveGroup.add(carve);
+      navCarveGroup.updateMatrixWorld(true);
+      if (!nav.build([...scene.getWalkableMeshes(), ...candidateCarves])) {
+        const reason = nav.snapshot(null, null, 0).error ?? "unknown";
+        for (const carve of candidateCarves) disposeCarve(carve);
+        for (const carve of previousCarves) navCarveGroup.add(carve);
+        navCarveGroup.updateMatrixWorld(true);
+        const restored = nav.build([...scene.getWalkableMeshes(), ...previousCarves]);
+        nav.setRouteGraph(built.routeNodes, built.routeEdges);
+        if (!restored) {
+          const rollbackReason = nav.snapshot(null, null, 0).error ?? "unknown";
+          throw new Error(
+            `Feature-lab navigation rebuild failed: ${reason}; rollback failed: ${rollbackReason}`,
+          );
+        }
+        throw new Error(`Feature-lab navigation rebuild failed: ${reason}`);
+      }
+      for (const carve of previousCarves) disposeCarve(carve);
+      navCarves = candidateCarves;
+      nav.setRouteGraph(built.routeNodes, built.routeEdges);
+
+      physics.clearStatic();
+      physics.addHeightfield(scene.heightfieldSamples());
+      for (const solid of allSolids) {
+        if (solid.kind === "box") {
+          physics.addStaticBox(
+            [solid.position[0], solid.position[1] + solid.size[1] / 2, solid.position[2]],
+            [solid.size[0] / 2, solid.size[1] / 2, solid.size[2] / 2],
+            solid.rotationY,
+          );
+        } else {
+          physics.addStaticCylinder(solid.position, solid.radius, solid.height);
+        }
+      }
+      movement.setPorts({ solids: new Solids(allSolids), heightAt, entities: entityStore });
+    };
+
+    const disposeCarve = (carve: THREE.Mesh): void => {
+      carve.removeFromParent();
+      carve.geometry.dispose();
+      const materials = Array.isArray(carve.material) ? carve.material : [carve.material];
+      for (const material of materials) material.dispose();
+    };
+
+    const replaceStructure = async (
+      selection: FeatureLabStructureSelection,
+    ): Promise<FeatureLabStructureView> => {
+      const started = performance.now();
+      const next = assembleFeatureLabStructure(selection, structureOrigin, {
+        baseY: (assetId) => assets.baseY(assetId),
+        assetSize: (assetId) => assets.assetSize(assetId),
+        assetCenterXZ: (assetId) => assets.assetCenterXZ(assetId),
+      });
+      const prepared = await entityViews.prepare(next.entities);
+      if (prepared.missing.length > 0) {
+        throw new Error(`Missing production structure assets: ${prepared.missing.join(", ")}`);
+      }
+
+      const previousEntities = activeStructure?.entities ?? [];
+      const installEntities = (
+        remove: readonly SemanticEntity[],
+        add: readonly SemanticEntity[],
+      ): void => {
+        for (const entity of remove) entityStore.remove(entity.id);
+        for (const entity of add) entityStore.add(entity);
+        entityViews.sync(entityStore.all());
+      };
+      try {
+        installEntities(previousEntities, next.entities);
+      } catch (cause) {
+        for (const entity of next.entities) entityStore.remove(entity.id);
+        for (const entity of previousEntities) {
+          if (!entityStore.get(entity.id)) entityStore.add(entity);
+        }
+        entityViews.sync(entityStore.all());
+        throw cause;
+      }
+      try {
+        replaceLabCollision(next.solids);
+      } catch (cause) {
+        installEntities(next.entities, previousEntities);
+        throw cause;
+      }
+      activeStructure = next;
+      const structureUrl = new URL(window.location.href);
+      structureUrl.searchParams.set("kind", next.selection.kind);
+      structureUrl.searchParams.set("id", next.selection.id);
+      structureUrl.searchParams.set("kit", next.selection.kit);
+      structureUrl.searchParams.set("width", String(next.selection.width));
+      structureUrl.searchParams.set("depth", String(next.selection.depth));
+      structureUrl.searchParams.set("seed", String(next.selection.seed));
+      window.history.replaceState(window.history.state, "", structureUrl.href);
+      resetLabPlayer();
+
+      let min: Vec3 | null = null;
+      let max: Vec3 | null = null;
+      for (const entity of next.entities) {
+        const bounds = entityViews.drawnBounds(entity.id);
+        if (!bounds) continue;
+        min = min
+          ? [Math.min(min[0], bounds.min[0]), Math.min(min[1], bounds.min[1]), Math.min(min[2], bounds.min[2])]
+          : [...bounds.min] as Vec3;
+        max = max
+          ? [Math.max(max[0], bounds.max[0]), Math.max(max[1], bounds.max[1]), Math.max(max[2], bounds.max[2])]
+          : [...bounds.max] as Vec3;
+      }
+
+      structureRevision += 1;
+      return {
+        ready: true,
+        revision: structureRevision,
+        selection: { ...next.selection },
+        variant: next.variant,
+        partCount: next.entities.length,
+        assetCount: next.assetIds.length,
+        collisionCount: next.solids.length,
+        buildMs: performance.now() - started,
+        bounds: min && max ? { min, max } : null,
+      };
+    };
+
+    const fitStructure = (view: FeatureLabStructureView): void => {
+      const current = activeStructure;
+      if (!current) return;
+      const bounds = view.bounds;
+      const centreX = bounds ? (bounds.min[0] + bounds.max[0]) / 2 : structureOrigin[0];
+      const centreZ = bounds ? (bounds.min[2] + bounds.max[2]) / 2 : structureOrigin[2];
+      const spanX = bounds ? bounds.max[0] - bounds.min[0] : current.selection.width;
+      const spanY = bounds ? bounds.max[1] - bounds.min[1] : STOREY_METRES;
+      const spanZ = bounds ? bounds.max[2] - bounds.min[2] : current.selection.depth;
+      const viewingDistance = Math.max(14, Math.min(40, Math.max(spanX, spanY * 1.4, spanZ) * 1.25));
+      const frontZ = (bounds?.min[2] ?? centreZ - spanZ / 2) - Math.max(3, spanZ * 0.2);
+      const point: Vec3 = [
+        centreX,
+        scene.meshHeightAt(centreX, frontZ),
+        frontZ,
+      ];
+      if (labFreeCameraEnabled) {
+        const focusY = bounds
+          ? Math.max(scene.meshHeightAt(centreX, centreZ), (bounds.min[1] + bounds.max[1]) / 2 - 1.2)
+          : scene.meshHeightAt(centreX, centreZ);
+        camera.setFreeTarget([centreX, focusY, centreZ]);
+        camera.setPose(Math.PI, 0.46, viewingDistance);
+        camera.update(centreX, focusY, centreZ, true);
+        return;
+      }
+      const state = store.get();
+      state.player.position = [...point] as Vec3;
+      state.player.regionId = spawnSpec.regionId;
+      state.player.facingRad = 0;
+      movement.stop(state, clock.elapsedMs, "feature-lab-fit-structure");
+      input.clear();
+      scene.syncPlayer(point, 0, true);
+      if (rigged) playerRig.setPosition(point, 0);
+      camera.setPose(Math.PI, 0.46, viewingDistance);
+      camera.update(point[0], point[1], point[2], true);
+      store.markDirty();
+    };
+
+    const initialStructure: FeatureLabStructureView = {
+      ready: false,
+      revision: 0,
+      selection: { ...DEFAULT_FEATURE_LAB_STRUCTURE_SELECTION },
+      variant: null,
+      partCount: 0,
+      assetCount: 0,
+      collisionCount: 0,
+      buildMs: 0,
+      bounds: null,
+    };
+    const initialWalkingEnabled = profile.labMode !== "building";
+    const initialPlayerVisible = true;
+    const initialFreeCameraEnabled = false;
+    input.setMovementEnabled(initialWalkingEnabled);
+    api.setMovementCommandsEnabled(initialWalkingEnabled);
+
     featureLab = createFeatureLabRuntime({
       api,
       store,
@@ -1074,15 +1280,60 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       camera: renderer.camera,
       spawn,
       spawnRegionId: spawnSpec.regionId,
+      initialMode: profile.labMode ?? "combat",
+      initialWalkingEnabled,
+      initialPlayerVisible,
+      initialFreeCameraEnabled,
+      initialStructure,
+      replaceStructure,
+      setWalkingEnabled: (enabled) => {
+        input.setMovementEnabled(enabled);
+        api.setMovementCommandsEnabled(enabled);
+      },
+      setPlayerVisible: (visible) => {
+        playerRig.root.visible = visible;
+      },
+      setFreeCameraEnabled: (enabled) => {
+        labFreeCameraEnabled = enabled;
+        input.setFreeCameraEnabled(enabled);
+        const player = store.get().player.position;
+        camera.setFreeTarget(enabled ? player : null);
+        camera.update(player[0], player[1], player[2], true);
+      },
+      reloadMode: (nextMode) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("mode", nextMode);
+        window.location.assign(url.href);
+      },
+      fitStructure,
       resetPlayer: resetLabPlayer,
       selectedEntityId: () => selectedEntityId,
       liveSpellParticles: () => spellVfx.liveParticles(),
       engineErrors: () => errors.map((entry) => `${entry.source}: ${entry.message}`),
       groundHeightAt: (x, z) => scene.meshHeightAt(x, z),
     });
-    const initialTarget = featureLab.getCatalog().targets.creature[0];
-    if (!initialTarget) throw new Error("The production content has no creature for the feature lab");
-    await featureLab.spawnTarget("creature", initialTarget.id);
+    const params = new URLSearchParams(window.location.search);
+    const structurePatch: Partial<FeatureLabStructureSelection> = {};
+    const sourceKind = params.get("kind");
+    if (sourceKind === "prefab" || sourceKind === "composition" || sourceKind === "wall-run") {
+      structurePatch.kind = sourceKind;
+    }
+    const structureId = params.get("id");
+    if (structureId) structurePatch.id = structureId;
+    const structureKit = params.get("kit");
+    if (structureKit === "plaster" || structureKit === "timber" || structureKit === "stone") {
+      structurePatch.kit = structureKit;
+    }
+    for (const key of ["width", "depth", "seed"] as const) {
+      const value = params.get(key);
+      if (value !== null) structurePatch[key] = Number(value);
+    }
+    await featureLab.setStructure(structurePatch);
+    if (profile.labMode !== "building") {
+      const initialTarget = featureLab.getCatalog().targets.creature[0];
+      if (!initialTarget) throw new Error("The production content has no creature for the feature lab");
+      await featureLab.spawnTarget("creature", initialTarget.id);
+    }
     window.__featureLab = featureLab;
   } else {
     delete window.__featureLab;

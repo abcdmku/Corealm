@@ -73,7 +73,7 @@ jobs:
         run: git diff --exit-code -- docs/game
       - name: Install Chromium
         run: npx --no-install playwright install --with-deps chromium
-      - name: Test isolated feature lab
+      - name: Accept features in labs before final-world smoke
         run: npm run lab:test
       - name: Browser smoke test
         run: npm run smoke -- --run runs/corealm
@@ -115,7 +115,7 @@ jobs:
         run: git diff --exit-code -- docs/game
       - name: Install Chromium
         run: npx --no-install playwright install --with-deps chromium
-      - name: Test isolated feature lab
+      - name: Accept features in labs before final-world smoke
         run: npm run lab:test
       - name: Browser smoke test
         run: npm run smoke -- --run runs/corealm

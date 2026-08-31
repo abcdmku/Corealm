@@ -20,6 +20,7 @@ import {
 import { SKILLS } from "../content/skills.js";
 import { SPELLS } from "../content/spells.js";
 import { npcOutfitParts } from "../render/characterAppearances.js";
+import { FEATURE_LAB_STRUCTURE_CATALOG } from "./structures.js";
 
 interface NpcTargetSource {
   readonly kind: "npc";
@@ -121,6 +122,7 @@ export const FEATURE_LAB_CATALOG = {
     id: spell.id,
     label: `${spell.name} - ${spell.element} ${spell.rung}`,
   })),
+  structures: FEATURE_LAB_STRUCTURE_CATALOG,
 } satisfies FeatureLabCatalog;
 
 /** Placement inputs owned by the empty flat session, not by authored world content. */

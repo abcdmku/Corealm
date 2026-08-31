@@ -3,75 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Corealm structure preview</title>
+    <title>Opening Corealm building lab</title>
     <script>
-      if (new URLSearchParams(location.search).get("mode") === "actors") {
-        location.replace("./index.html?mode=actors");
-      }
+      const query = new URLSearchParams(location.search);
+      query.set("mode", "building");
+      location.replace(`./index.html?${query}${location.hash}`);
     </script>
-    <link rel="stylesheet" href="./src/structure-preview/styles.css" />
   </head>
   <body>
-    <main id="structure-lab">
-      <canvas id="structure-viewport" aria-label="Interactive 3D structure preview"></canvas>
-      <aside class="controls" aria-label="Structure preview controls">
-        <header>
-          <p class="eyebrow">Isolated authoring loop</p>
-          <h1>Structure preview</h1>
-          <p>Production structure assets in a fast, isolated realtime authoring scene.</p>
-        </header>
-
-        <label>Lab
-          <select id="lab-mode">
-            <option value="structures">Structures</option>
-            <option value="actors">Actors and combat</option>
-          </select>
-        </label>
-
-        <section id="structure-controls" class="lab-panel">
-          <label>Source
-            <select id="source-kind">
-              <option value="prefab">Prefab</option>
-              <option value="composition">Composition</option>
-              <option value="wall-run">Wall run</option>
-            </select>
-          </label>
-          <label>Structure
-            <select id="structure-id"></select>
-          </label>
-          <label>Regional kit
-            <select id="kit-id">
-              <option value="plaster">Fallowmarch plaster</option>
-              <option value="timber">Vellenwood timber</option>
-              <option value="stone">Karrowmoor stone</option>
-            </select>
-          </label>
-
-          <div class="row footprint-row">
-            <label>Width <input id="footprint-width" type="number" min="2" max="30" step="1" value="6" /></label>
-            <label>Depth <input id="footprint-depth" type="number" min="2" max="30" step="1" value="4" /></label>
-          </div>
-          <label>Variant seed
-            <div class="stepper">
-              <button id="previous-seed" type="button" aria-label="Previous variant">-</button>
-              <input id="variant-seed" type="number" min="0" step="1" value="0" />
-              <button id="next-seed" type="button" aria-label="Next variant">+</button>
-            </div>
-          </label>
-        </section>
-
-        <div class="toggles">
-          <label><input id="auto-rotate" type="checkbox" /> Auto rotate</label>
-          <button id="fit-camera" type="button">Fit camera</button>
-        </div>
-
-        <section class="status" aria-live="polite">
-          <strong id="status-title">Loading preview...</strong>
-          <span id="status-detail"></span>
-        </section>
-        <p class="hint">Drag to orbit - wheel to zoom - edit source and Vite updates this view live. Choose Actors and combat to open the production-engine lab.</p>
-      </aside>
-    </main>
-    <script type="module" src="./src/structure-preview/main.ts"></script>
+    <p>Opening the Corealm building lab...</p>
+    <noscript><a href="./index.html?mode=building">Open the Corealm building lab</a></noscript>
   </body>
 </html>

@@ -22,10 +22,11 @@ That command records the brief under `runs/my-game/`. It does not call a model o
 
 1. Use a fresh-context PRD agent with `skills/prd.md`.
 2. Review and approve `runs/my-game/PRD.md`.
-3. Build the minimal browser foundation and freeze only the shared contracts the PRD needs.
-4. Pass the Chromium smoke test before delegating disjoint specialist files.
-5. Integrate in short rounds, play through Playwright, inspect state and screenshots, and use a fresh read-only critic.
-6. Convert concrete criticism into a fix round and retest.
+3. Build the minimal browser foundation, freeze only the shared contracts the PRD needs, and boot the production-backed feature lab.
+4. Pass the Chromium foundation smoke before delegating disjoint specialist files.
+5. Build each isolatable feature in the lab, inspect browser state and screenshots, and have the root accept it there.
+6. Wire accepted features into the final world, keep the integration smoke shallow, and use a fresh read-only critic.
+7. Convert concrete criticism into a lab fix round, reaccept it, then repeat the final-world integration check.
 
 Durable context belongs in the run directory, not in a long orchestration transcript.
 
@@ -48,6 +49,7 @@ npm run dev
 npm run test:watch
 npm run structure:contracts:watch
 npm run lab:preview
+npm run lab:building:preview
 npm run lab:test
 npm run check
 npm run smoke -- --run runs/my-game
@@ -58,7 +60,9 @@ npm run game-agent -- critic-pack --run runs/my-game
 
 `npm run check` is the local CI loop: typecheck, all unit tests, and the game and guide production builds. `dev`, `build`, and browser commands intentionally stop with a clear message while `game/index.html` is absent.
 
-Use the persistent realtime feature lab to develop and deeply test structures, the main player, NPCs, creatures, animations, melee, and spells without booting the full world. It supports equipment selection by slot and editable player skill levels as isolated setup state for presentation and feature tests. After a feature passes the focused tests and `npm run lab:test`, its final-world test should verify wiring and representative behavior, including real progression and equipment-rule integration, rather than repeat the lab's full matrix. See the authoritative [feature-lab workflow and budgets](./docs/feature-lab.md); the lab deliberately does not replace terrain, navigation, physics, quests, economy, or world-layout integration tests.
+Use the persistent realtime feature lab as the default development environment for every feature that can run in a compact deterministic scene. This includes structures, actors, animation, combat, effects, resources, interactables, pickups, UI, equipment, inventory, crafting, shops, quest interactions, input, camera behavior, and local collision or navigation. When the lab lacks a fixture or control, extend it as part of the feature. After focused checks and `npm run lab:test` pass and the root accepts the visual evidence, wire the feature into the final world and verify only its loading, real data flow, placement, and representative interaction.
+
+The lab-first gate may be skipped only when isolation would remove the authored full-world behavior under test, such as terrain, biome, coast, water, world-scale scatter, world layout, or long-distance navigation. Record the exception. Reusable assets, effects, UI, controls, and local interactions still belong in the lab. See the authoritative [feature-lab workflow and budgets](./docs/feature-lab.md) and [world-authoring workflow](./docs/world-authoring.md).
 
 Generated icons, world maps, and guide captures are committed inputs to normal development and CI. Refresh text with `npm run docs:refresh`; use `npm run assets:refresh` or `npm run docs:refresh:visuals` only when those generated visuals intentionally need to change. The visual commands boot Chromium and are deliberately not part of `dev`, `build`, `check`, or deployment.
 
