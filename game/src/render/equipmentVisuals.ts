@@ -521,9 +521,9 @@ const SOCKET_PARTS: Readonly<Record<string, SocketParts>> = {
   pickaxe: { bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.150], rotation: [Math.PI / 2, Math.PI / 2, 0] },
   shield: { bone: "hand_l", fist: FIST_LEFT, grip: [0.022, 0, 0], rotation: [Math.PI / 2, -Math.PI / 2, 0] },
   rpg_weapon_staff: {
-    // Hold the source mesh at its midpoint, then turn it 45 degrees clockwise from the upright
-    // pose. The rotated midpoint offset keeps the shaft seated in the fist.
-    bone: "hand_r", fist: FIST_RIGHT, grip: [0, -0.162, 0.162], rotation: [Math.PI * 0.75, 0, 0],
+    // Hold the source mesh at its midpoint and follow the authored diagonal through the fist.
+    // The rotated midpoint offset keeps the shaft seated while its crown leans forward.
+    bone: "hand_r", fist: FIST_RIGHT, grip: [0, -0.098, 0.207], rotation: [Math.PI * 0.64, 0, 0],
   },
   rpg_weapon_wand: {
     bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.200], rotation: [Math.PI / 2, 0, 0],
