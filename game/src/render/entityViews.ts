@@ -874,8 +874,28 @@ const NEAREST_ANIMATION_SHARE = 0.5;
  */
 const MAX_PENDING_ANIMATION_SECONDS = 0.25;
 
-/** Metres of movement between syncs below which an entity counts as standing still. */
-export const MOVING_EPSILON = 0.03;
+/**
+ * Metres of movement between syncs below which an entity counts as standing still.
+ *
+ * MUST STAY BELOW THE SMALLEST STEP ANY CREATURE CAN TAKE IN ONE SIM TICK, and that is not a
+ * comfortable margin — it is the whole correctness condition.
+ *
+ * `systems/enemyAI.ts` writes a position every 100 ms tick, so a creature pottering at its walk
+ * cycle's own speed moves `walkSpeedMps / 10` metres per tick. The slowest gait in the game is the
+ * frog's 0.17 m/s, which is 1.7 cm. At the 3 cm this used to be, the frog and the hen fell UNDER
+ * the threshold: `syncMotion` skipped them, so `record.target` did not advance, their drawn
+ * position jumped in doubled steps every second tick, and the motion flipped walk-idle-walk around
+ * each jump. Every one of those flips crossfades a fresh action from zero, which is what "the
+ * animation resets many times a second" is.
+ *
+ * It only appeared when pottering speeds dropped to what the walk cycles actually depict; at the
+ * old 1.2 to 3.1 m/s every creature cleared 3 cm a tick with room to spare. 5 mm keeps a threefold
+ * margin under the slowest gait and still sits five times above the 1 mm `STEP_EPSILON_METRES`
+ * that `enemyAI` treats as no movement at all, so navmesh snap noise cannot register as a step.
+ * `tests/creature-gait.test.ts` pins the relationship so slowing a creature cannot quietly
+ * reintroduce it.
+ */
+export const MOVING_EPSILON = 0.005;
 
 /**
  * Whether this render frame is the first of a new simulation tick.

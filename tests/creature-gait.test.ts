@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ENEMY_BLOCKS, enemyBlockFor } from "../game/src/content/enemies.js";
 import { REGIONS } from "../game/src/content/regions.js";
 import { ENEMY_SPEED_MPS } from "../game/src/systems/enemyAI.js";
+import { MOVING_EPSILON } from "../game/src/render/entityViews.js";
+import { SIM_TICK_MS } from "../game/src/core/time.js";
 import MANIFEST from "../game/public/assets/manifest.json" with { type: "json" };
 
 /**
@@ -178,6 +180,42 @@ describe("creature gait", () => {
       expect(block.walkSpeedMps, `${block.id} walk vs pursuit`)
         .toBeLessThanOrEqual(block.moveSpeedMps);
     }
+  });
+
+  it("moves far enough per tick for the renderer to notice", () => {
+    // `render/entityViews.ts: updateMoving` treats anything under `MOVING_EPSILON` between syncs as
+    // standing still, and `syncMotion` only advances a record's drawn target inside that same test.
+    // A creature slower than one epsilon per sim tick therefore does not merely animate late — its
+    // drawn position advances in doubled jumps and its motion flips walk-idle-walk around each one,
+    // crossfading a fresh action from zero every time. Reported as "the animation resets many many
+    // times a second", and caused by pottering speeds dropping to what the walk cycles depict.
+    const tickSeconds = SIM_TICK_MS / 1000;
+    const offenders: string[] = [];
+    for (const block of ENEMY_BLOCKS) {
+      for (const [gait, speed] of [["walk", block.walkSpeedMps], ["run", block.moveSpeedMps]] as const) {
+        if (speed === undefined) continue;
+        const perTick = speed * tickSeconds;
+        if (perTick <= MOVING_EPSILON) {
+          offenders.push(
+            `${block.id} ${gait} covers ${(perTick * 100).toFixed(1)} cm per tick, at or under the`
+            + ` ${(MOVING_EPSILON * 100).toFixed(1)} cm the renderer needs to call it moving`,
+          );
+        }
+      }
+    }
+    expect(offenders, offenders.join(NEWLINE)).toEqual([]);
+  });
+
+  it("keeps a real margin under the slowest gait, not a coincidental one", () => {
+    // Sitting just barely above the threshold is the same bug waiting for the next speed change.
+    const tickSeconds = SIM_TICK_MS / 1000;
+    const speeds = ENEMY_BLOCKS.flatMap((block) =>
+      [block.walkSpeedMps, block.moveSpeedMps].filter((s): s is number => s !== undefined));
+    const slowestPerTick = Math.min(...speeds) * tickSeconds;
+    expect(
+      slowestPerTick / MOVING_EPSILON,
+      `slowest gait is only ${(slowestPerTick / MOVING_EPSILON).toFixed(1)}x the movement threshold`,
+    ).toBeGreaterThan(3);
   });
 
   it("never lets a creature outrun the player", () => {
