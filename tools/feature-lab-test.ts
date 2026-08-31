@@ -203,7 +203,7 @@ try {
     headless: true,
     args: ["--enable-unsafe-swiftshader", "--mute-audio"],
   });
-  page = await browser.newPage({ viewport: { width: 1100, height: 700 }, deviceScaleFactor: 1 });
+  page = await browser.newPage({ viewport: { width: 900, height: 600 }, deviceScaleFactor: 1 });
   await page.addInitScript(() => {
     Reflect.set(
       window,
@@ -623,8 +623,13 @@ async function testBuilding(
   await targetPage.evaluate(() => window.__featureLab?.fitStructure());
   await targetPage.waitForTimeout(80);
   // Leave a little air around the structure so the disposable evidence shows the full silhouette.
-  await targetPage.locator("#viewport").hover();
-  for (let step = 0; step < 3; step += 1) await targetPage.mouse.wheel(0, 240);
+  // Real wheel input is proven below; these events only frame the screenshot and are dispatched in
+  // one page call to avoid three software-renderer protocol round trips.
+  await targetPage.locator("#viewport").evaluate((canvas) => {
+    for (let step = 0; step < 3; step += 1) {
+      canvas.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 240 }));
+    }
+  });
   await targetPage.waitForTimeout(50);
   const authoringShot = path.join(captures, "building-authoring.png");
   await capture(targetPage, authoringShot, captured);
@@ -999,7 +1004,7 @@ async function waitForState(
 async function capture(targetPage: Page, filePath: string, captured: string[]): Promise<void> {
   await targetPage.screenshot({
     path: filePath,
-    animations: "disabled",
+    animations: "allow",
     timeout: SCREENSHOT_TIMEOUT_MS,
   });
   captured.push(path.relative(repoRoot, filePath).replaceAll("\\", "/"));

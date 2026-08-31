@@ -191,11 +191,25 @@ export async function loadEquipmentPanel(
   return new EquipmentPanel(context, featureLab);
 }
 
+let featureLabPanelModulePromise: Promise<typeof import("./featureLabPanel.js")> | null = null;
+
+function featureLabPanelModule(): Promise<typeof import("./featureLabPanel.js")> {
+  featureLabPanelModulePromise ??= import("./featureLabPanel.js");
+  return featureLabPanelModulePromise;
+}
+
+/** Starts the required lab workbench chunk while the production scene is still booting. */
+export function preloadFeatureLabPanel(): void {
+  // Construction still owns user-facing error handling. This catch only prevents an early failed
+  // fetch from becoming an unhandled rejection before the LazyPanel awaits the shared promise.
+  void featureLabPanelModule().catch(() => undefined);
+}
+
 export async function loadFeatureLabPanel(
   context: UiContext,
   featureLab: FeatureLabApi,
 ): Promise<ManagedPanel> {
-  const { FeatureLabPanel } = await import("./featureLabPanel.js");
+  const { FeatureLabPanel } = await featureLabPanelModule();
   return new FeatureLabPanel(context, featureLab);
 }
 

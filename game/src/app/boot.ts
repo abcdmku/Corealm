@@ -96,6 +96,7 @@ import { createScatterStreaming } from "../world/scatterStreaming.js";
 import { findShot, shotIds, SHOTS } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
 import { createUi } from "../ui/panels.js";
+import { preloadFeatureLabPanel } from "../ui/lazyPanelRegistry.js";
 import { SettingsStore, type UiSettings } from "../ui/settings.js";
 import { keybindings } from "../input/keyboard.js";
 import { Overlays } from "../render/overlays.js";
@@ -145,6 +146,9 @@ export interface BootOptions {
 
 export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {}): Promise<BootResult> {
   const profile = options.profile ?? GAME_BOOT_PROFILE;
+  // The lab workbench is the primary interface for this profile, so fetch its deferred chunk while
+  // terrain, assets, and WASM initialize. Normal game boot never requests it.
+  if (profile.kind === "feature-lab") preloadFeatureLabPanel();
   const bootTotalSpan = bootTelemetry.startSpan(BOOT_SPANS.TOTAL, { startMs: 0 });
   let debugReady = false;
   const bootEntryMs = bootTelemetry.elapsedMs();
