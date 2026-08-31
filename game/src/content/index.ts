@@ -83,6 +83,8 @@ export interface GatheringProductionTierDef {
     ore: ItemId; flux: ItemId; gem: ItemId; bar: ItemId;
     log: ItemId; shaft: ItemId; handle: ItemId; hide: ItemId;
     rawFish: ItemId; cookedFish: ItemId; burntFish: ItemId;
+    /** Game meat: the hunting counterpart to the fish line, dropped by this tier's animals. */
+    rawMeat: ItemId; cookedMeat: ItemId; burntMeat: ItemId;
     dagger: ItemId; sword: ItemId; helm: ItemId; body: ItemId; legs: ItemId;
     boots: ItemId; gloves: ItemId; pickaxe: ItemId; hatchet: ItemId;
     staff: ItemId; wand: ItemId; rod: ItemId; shield: ItemId;
@@ -162,6 +164,14 @@ export interface EnemyDef {
   maxHit: number;
   attackSpeedMs: number;
   aggroRadius: number;
+  /**
+   * Pursuit speed in metres per second. Omitted means the shared default in `systems/enemyAI.ts`.
+   *
+   * Set per family from the animal's own gait: `tools/animals/build-animals.ts` measures what
+   * ground speed each walk cycle implies, and these sit at roughly 1.6x that, which is the fastest
+   * a cycle can be played without the legs reading as sped-up film.
+   */
+  moveSpeedMps?: number;
   /** Behaviour selector. Bosses add phases on top. */
   behaviour: "passive" | "aggressive" | "territorial";
   drops: { itemId: ItemId; quantity: [number, number]; chance: number }[];
@@ -345,4 +355,56 @@ export function toolBonus(tier: number): number {
 /** Sell price is 60% of the item's value, per the frozen ItemDef contract. */
 export function sellPrice(value: number): number {
   return Math.round(value * 0.6);
+}
+
+// ------------------------------------------------------------ enemy combat level
+
+/**
+ * Health the player gains per combat level, from `systems/health.ts`:
+ * `maxHealth = 20 + 3 * vitalityLevel`. Reproduced here so the enemy level formula and the
+ * player's own health curve cannot drift apart silently.
+ */
+export const PLAYER_HEALTH_PER_LEVEL = 3;
+
+/**
+ * An enemy's displayed combat level, COMPUTED from its stat block. Never authored.
+ *
+ * The rule this exists to enforce: a level is a reading of the numbers a player actually fights,
+ * so it cannot be typed in by hand. Before this, `content/regions.ts` carried a `level` field that
+ * was chosen rather than derived, and it disagreed with `enemies.ts` in both directions - the
+ * Bracken Fenmite was published as level 3 on 4 health and one damage a swing, while Ordrun was
+ * published as level 20 on 200 health and the biggest hit in the game.
+ *
+ * Three terms, weighted the way a combat level always is: offence counts double what either half
+ * of survivability counts, because offence is what kills the player.
+ *
+ *   offence  = the enemy's attack roll at style factor 1, minus the +9 floor the roll adds to
+ *              every combatant. So it is "attack level, with its accuracy bonus folded in", on the
+ *              same scale a player's attack level sits on. `systems/combat.ts: attackRoll`.
+ *   defence  = the same reading of its defence roll, against the MEAN of armour and magicArmour.
+ *              The mean, not either one, because the level is quoted before the player has chosen
+ *              which style to bring. `systems/combat.ts: defenceRoll`.
+ *   health   = the enemy's health pool expressed in player levels at 3 health per level.
+ *
+ * Weights are 1/2, 1/4, 1/4 and sum to one, so the result stays on the player's level scale rather
+ * than drifting into a score. Checked against the blocks it replaced: the Marchwolf Pup solves to
+ * 4 against an authored 4, and the Rill Skitterling to 2 against an authored 2. Where it disagrees
+ * it is because the authored number was wrong.
+ *
+ * `maxHit` and `attackSpeedMs` are deliberately NOT in here. They are already the reason a block's
+ * attack level and accuracy are set where they are, and counting damage output twice would make
+ * two enemies with identical rolls read as different levels because one holds a bigger stick.
+ */
+export function enemyCombatLevel(def: {
+  attackLevel: number;
+  defenceLevel: number;
+  accuracy: number;
+  armour: number;
+  magicArmour: number;
+  maxHealth: number;
+}): number {
+  const offence = (def.attackLevel + 9) * (1 + def.accuracy / 100) - 9;
+  const defence = (def.defenceLevel + 9) * (1 + (def.armour + def.magicArmour) / 2 / 100) - 9;
+  const health = def.maxHealth / PLAYER_HEALTH_PER_LEVEL;
+  return Math.max(1, Math.round(0.5 * offence + 0.25 * defence + 0.25 * health));
 }

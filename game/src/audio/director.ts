@@ -50,6 +50,55 @@ export function loopsForRegion(
   };
 }
 
+/**
+ * One animal family's voice.
+ *
+ * Keyed on `EnemyDef.family`, which `world/regionBuilder.ts` stamps onto every spawned entity and
+ * `content/enemies.ts` owns. Several families share a throat and therefore a cue: cattle and
+ * aurochs both low, goats and ibex both bleat, coneys and rats both squeak, scorpions and crabs
+ * both click. That is a deliberate saving of eleven recordings, not a gap.
+ *
+ * `reaver` and `quarrykeeper` are absent and return null. They are the two humanoid families, and
+ * a raider that bellows like a stag would be worse than a raider that says nothing.
+ */
+const CREATURE_VOICE: Readonly<Record<string, AudioCueId>> = {
+  hen: "creature.hen_cluck",
+  frog: "creature.frog_croak",
+  goat: "creature.goat_bleat",
+  ibex: "creature.goat_bleat",
+  cattle: "creature.cow_low",
+  aurochs: "creature.cow_low",
+  coney: "creature.coney_squeak",
+  rat: "creature.coney_squeak",
+  viper: "creature.viper_hiss",
+  deer: "creature.stag_bell",
+  hog: "creature.hog_grunt",
+  boar: "creature.hog_grunt",
+  coyote: "creature.coyote_howl",
+  bear: "creature.bear_roar",
+  scorpion: "creature.chitin_click",
+  crab: "creature.chitin_click",
+};
+
+/**
+ * The idle voice of an animal family, and the ONLY thing an animal's own voice is used for.
+ *
+ * Being hit and dying used to layer `creature.beast_hurt` and `creature.beast_death` under the
+ * weapon. That is gone. Those two cues came from a generic creature-SFX pack and were picked by
+ * filename rather than by ear, so the flinch that played under a cow was a bird call - "a cow will
+ * crow like a bird on hit". A shared cue was always going to be wrong for something; the fix is to
+ * not have one. Combat already sounds a landed blow (`combat.melee_hit`) and a kill
+ * (`combat.enemy_death`), and those carry the whole event on their own.
+ */
+export function cueForCreature(family: string | null | undefined): AudioCueId | null {
+  return CREATURE_VOICE[normalise(family)] ?? null;
+}
+
+/** Whether a family has an animal voice at all. The two humanoid families do not. */
+export function isCreatureFamily(family: string | null | undefined): boolean {
+  return CREATURE_VOICE[normalise(family)] !== undefined;
+}
+
 export function cueForGameEvent(event: GameEvent): AudioCueId | null {
   switch (event.type) {
     case "player.died": return "combat.player_death";

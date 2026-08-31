@@ -22,3 +22,6 @@ runs/*/screenshots/
 
 # Throwaway measurement scripts from build rounds.
 _*.mjs
+
+# Python bytecode from the asset staging scripts.
+__pycache__/

@@ -423,6 +423,29 @@ export class InputController {
     this.positionHoverLabel();
   }
 
+  /**
+   * Selects an entity as if the player had clicked it. For the debug surface and browser checks.
+   *
+   * Goes through the same private setter a click does, so the highlight repaint and the selection
+   * callback fire identically - which is the point. A test that sets a field directly proves the
+   * field, not the behaviour.
+   */
+  select(entityId: EntityId | null): void {
+    this.setSelected(entityId);
+  }
+
+  /**
+   * Drops an entity out of the hover and selection, because it has stopped being a thing to click.
+   *
+   * Called when an enemy dies. Without it the selection ring stays lit on a corpse and the cursor
+   * label keeps offering "Attack" over a body that is already dissolving - and the ring outlives
+   * the body it was drawn around, which leaves a circle on bare grass.
+   */
+  forget(entityId: EntityId): void {
+    if (this.hoveredEntityId === entityId) this.setHovered(null);
+    if (this.selectedEntityId === entityId) this.setSelected(null);
+  }
+
   private setHovered(entityId: EntityId | null): void {
     if (entityId === this.hoveredEntityId) return;
     this.hoveredEntityId = entityId;

@@ -67,14 +67,14 @@ describe("generated gathering and production matrix", () => {
     for (const definition of GATHERING_PRODUCTION_TIERS) {
       const { tier, items } = definition;
       const recipes = RECIPES.filter((recipe) => recipe.tier === tier);
-      expect(recipes, `tier ${tier} recipe count`).toHaveLength(tier === 1 ? 30 : 28);
+      expect(recipes, `tier ${tier} recipe count`).toHaveLength(tier === 1 ? 31 : 29);
       expect(recipes.every((recipe) => recipe.reqLevel === tier), `tier ${tier} requirements`).toBe(true);
 
       const expectedOutputs: ItemId[] = [
         items.bar,
         items.dagger, items.sword, items.helm, items.body, items.legs, items.boots, items.gloves,
         items.pickaxe, items.hatchet,
-        items.cookedFish,
+        items.cookedFish, items.cookedMeat,
         definition.magic.wand, definition.magic.staff,
         items.meleeRing, items.meleePendant, items.magicRing, items.magicCharm,
         items.robe, items.magicLegs, items.hood, items.magicBoots, items.wraps,

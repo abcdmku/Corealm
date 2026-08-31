@@ -134,6 +134,19 @@ export interface GameState {
       spawnPos: Vec3;
       respawnAtMs: number | null;
       bossPhase?: number;
+      /**
+       * When this enemy was killed, so a corpse can be given a lifetime shorter than its respawn.
+       *
+       * The authoritative copy. `systems/combat.ts` writes it here and onto the entity's view at
+       * the same instant, and `systems/enemyAI.ts` clears both on respawn; the view copy is what
+       * `render/entityViews.ts` reads, because render may not reach into world state.
+       *
+       * It is saved with the rest of the runtime, but a reload does NOT put a corpse back on the
+       * ground: entities are rebuilt from `content/regions.ts` at boot and come back with
+       * `state: "alive"` and no view copy, which is how dead enemies have always survived a reload
+       * here. This field does not change that either way.
+       */
+      diedAtMs?: number;
     }>;
     obstaclesUsed: Record<EntityId, number>;
     lootPiles: Record<EntityId, { position: Vec3; items: ItemStack[]; expiresAtMs: number; ownerOnly: boolean }>;

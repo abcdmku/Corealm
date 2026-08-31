@@ -56,6 +56,13 @@ export interface AssetEntry {
   base?: { x: number; y: number; z: number };
   animations: string[];
   materials: string[];
+  /**
+   * Ground speed this asset's `Walk` cycle looks like it travels at, metres per second.
+   *
+   * Emitted by tools/build-animals.ts, measured off the feet because the animal cycles are authored
+   * in place. `render/entityViews.ts` divides the creature's real speed by it to retime the clip.
+   */
+  impliedWalkMps?: number;
 }
 
 export interface AssetPack {

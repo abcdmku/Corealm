@@ -96,20 +96,19 @@ The anvil stands four metres from the furnace. The dagger is the cheapest thing 
 </div>
 
 
-### 4. Equip the Grithe dagger and kill 3 Rill Skitterlings on the brook flats south-east of town.
+### 4. Equip the Grithe dagger and kill 3 Redsill Frogs on the shallows south-east of town.
 
-`equipItem("grithe_dagger")` first - the stage checks the slot, not just the bag. The Rill Skitterlings are passive and sit around (-88, -70), between town and the shallows.
+`equipItem("grithe_dagger")` first - the stage checks the slot, not just the bag. The frogs are passive and sit on the bank around (-56, -72), between town and the shallows.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#redsill-shallows">Redsill Shallows</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 4"><span>Items</span><a href="../../items/#grithe-dagger">Grithe Dagger</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/rill_skitterlings.webp" alt="Rill Skitterling in the running Corealm world" loading="lazy" /><figcaption><strong>Rill Skitterling</strong><span>Coldbrace East Gate, Fallowmarch</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/redsill_frogs.webp" alt="Redsill Frog in the running Corealm world" loading="lazy" /><figcaption><strong>Redsill Frog</strong><span>Redsill Shallows, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Cold Iron, step 4">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../creatures/skitterling_t1/" style="--map-x:42.6667%;--map-y:55.8333%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Rill Skitterling, Fallowmarch" title="Rill Skitterling, Fallowmarch"><span>Rill Skitterling<small>Fallowmarch</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#redsill-shallows" style="--map-x:46.6667%;--map-y:55.0000%" data-map-side="right" data-map-kind="water" data-map-marker aria-label="Redsill Shallows, Fallowmarch" title="Redsill Shallows, Fallowmarch"><span>Redsill Shallows<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../creatures/frog_t1/" style="--map-x:45.3333%;--map-y:56.0000%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Redsill Frog, Fallowmarch" title="Redsill Frog, Fallowmarch"><span>Redsill Frog<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

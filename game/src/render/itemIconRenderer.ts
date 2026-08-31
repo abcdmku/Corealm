@@ -331,6 +331,147 @@ function buildPrimitive(part: ItemIconPrimitivePart): THREE.Group {
       gem.rotation.z = Math.PI / 4;
       group.add(gem);
     },
+
+    // ------------------------------------------------------------------ animal drops
+    // Seven shapes, added with the animals. Each one is the silhouette a player has to recognise
+    // at 48 px in an inventory grid, so they lean on outline rather than detail: meat is a bone
+    // through a mass, horn is a taper with a curl, feather is a spine with two vanes.
+    meat: () => {
+      const flesh = ownedMesh(new THREE.SphereGeometry(0.66, 24, 16), primary);
+      flesh.scale.set(1.18, 0.92, 0.72);
+      flesh.position.y = -0.12;
+      group.add(flesh);
+      // The bone reads the shape as a joint rather than a rock, which is the whole job.
+      const bone = ownedMesh(new THREE.CylinderGeometry(0.11, 0.11, 1.05, 10), secondary);
+      bone.position.set(0.12, 0.66, 0);
+      bone.rotation.z = -0.42;
+      group.add(bone);
+      for (const y of [0.42, -0.42]) {
+        const knuckle = ownedMesh(new THREE.SphereGeometry(0.16, 12, 10), secondary.clone());
+        knuckle.position.set(0.12 + y * 0.44, 0.66 + y * 0.95, 0);
+        group.add(knuckle);
+      }
+    },
+    horn: () => {
+      // One curled taper. Sampling a spiral rather than stacking cones keeps the outline smooth
+      // at icon size, where a faceted horn reads as a screw.
+      const points: THREE.Vector3[] = [];
+      for (let step = 0; step <= 16; step += 1) {
+        const t = step / 16;
+        const angle = t * Math.PI * 1.35;
+        const radius = 0.72 * (1 - 0.35 * t);
+        points.push(new THREE.Vector3(
+          Math.cos(angle) * radius - 0.34,
+          t * 1.5 - 0.72,
+          Math.sin(angle) * radius * 0.32,
+        ));
+      }
+      const curve = new THREE.CatmullRomCurve3(points);
+      const horn = ownedMesh(new THREE.TubeGeometry(curve, 40, 0.19, 12, false), primary);
+      horn.scale.set(1, 1, 1);
+      group.add(horn);
+      const cuff = ownedMesh(new THREE.TorusGeometry(0.2, 0.055, 8, 20), secondary);
+      cuff.position.copy(points[0]!);
+      cuff.rotation.x = Math.PI / 2;
+      group.add(cuff);
+    },
+    antler: () => {
+      const beam = ownedMesh(new THREE.CylinderGeometry(0.09, 0.15, 1.6, 10), primary);
+      beam.rotation.z = 0.2;
+      group.add(beam);
+      // Three tines up one side, shortening as they climb: the read that says "antler" and not
+      // "stick" is the alternating rhythm, so the spacing is uneven on purpose.
+      for (const [y, length, angle] of [[-0.28, 0.72, 1.0], [0.24, 0.6, 0.85], [0.66, 0.44, 0.7]] as const) {
+        const tine = ownedMesh(new THREE.CylinderGeometry(0.055, 0.085, length, 8), primary.clone());
+        tine.position.set(0.3 + length * 0.22, y + length * 0.3, 0);
+        tine.rotation.z = -angle;
+        group.add(tine);
+      }
+      const burr = ownedMesh(new THREE.TorusGeometry(0.17, 0.06, 8, 18), secondary);
+      burr.position.set(-0.17, -0.78, 0);
+      burr.rotation.x = Math.PI / 2;
+      group.add(burr);
+    },
+    feather: () => {
+      // The quill has to stick out below the vanes or the whole thing reads as a leaf. It is the
+      // one detail that separates the two silhouettes at 48 px, so the spine runs the full length
+      // and the vanes stop well short of its base.
+      const spine = ownedMesh(new THREE.CylinderGeometry(0.03, 0.062, 2.05, 8), secondary);
+      spine.position.y = 0.06;
+      group.add(spine);
+      const quill = ownedMesh(new THREE.CylinderGeometry(0.062, 0.05, 0.3, 8), secondary.clone());
+      quill.position.y = -1.06;
+      group.add(quill);
+      // Two vanes, deliberately unequal. A real feather is asymmetric about its shaft, and the
+      // symmetric version was exactly what made this look like a leaf.
+      for (const [side, width] of [[-1, 0.34], [1, 0.56]] as const) {
+        const vane = new THREE.Shape();
+        vane.moveTo(0, -0.72);
+        vane.quadraticCurveTo(side * width * 1.15, -0.1, side * width, 0.6);
+        vane.quadraticCurveTo(side * width * 0.62, 0.92, 0, 1.0);
+        vane.closePath();
+        const geometry = new THREE.ExtrudeGeometry(vane, {
+          depth: 0.05, bevelEnabled: true, bevelSegments: 1, bevelSize: 0.02, bevelThickness: 0.015,
+        });
+        group.add(ownedMesh(geometry, primary.clone()));
+      }
+    },
+    egg: () => {
+      const shell = ownedMesh(new THREE.SphereGeometry(0.68, 24, 18), primary);
+      // A real egg is not an ellipsoid: it is fatter below the equator. Scaling the lower half
+      // separately is cheaper than a lathe and reads correctly at icon size.
+      const position = shell.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < position.count; i += 1) {
+        const y = position.getY(i);
+        const taper = y > 0 ? 1 - 0.22 * (y / 0.68) : 1 + 0.06 * (-y / 0.68);
+        position.setX(i, position.getX(i) * taper);
+        position.setZ(i, position.getZ(i) * taper);
+        position.setY(i, y * 1.28);
+      }
+      position.needsUpdate = true;
+      shell.geometry.computeVertexNormals();
+      group.add(shell);
+      const speckle = ownedMesh(new THREE.SphereGeometry(0.07, 8, 6), secondary);
+      speckle.position.set(0.22, 0.3, 0.52);
+      group.add(speckle);
+    },
+    claw: () => {
+      // A hooked taper. Same spiral trick as `horn` over a much tighter arc, which is the whole
+      // difference between a claw and a horn at this size.
+      const points: THREE.Vector3[] = [];
+      for (let step = 0; step <= 14; step += 1) {
+        const t = step / 14;
+        const angle = -0.35 + t * 1.5;
+        points.push(new THREE.Vector3(
+          Math.cos(angle) * 1.05 - 0.5,
+          Math.sin(angle) * 1.05 - 0.45,
+          0,
+        ));
+      }
+      const curve = new THREE.CatmullRomCurve3(points);
+      const claw = ownedMesh(new THREE.TubeGeometry(curve, 32, 0.135, 10, false), primary);
+      group.add(claw);
+      const tip = ownedMesh(new THREE.ConeGeometry(0.13, 0.34, 10), primary.clone());
+      tip.position.copy(points[points.length - 1]!);
+      tip.rotation.z = -1.05;
+      group.add(tip);
+      const quick = ownedMesh(new THREE.SphereGeometry(0.19, 12, 10), secondary);
+      quick.position.copy(points[0]!);
+      group.add(quick);
+    },
+    gland: () => {
+      const sac = ownedMesh(new THREE.SphereGeometry(0.62, 22, 16), primary);
+      sac.scale.set(0.92, 1.15, 0.82);
+      sac.position.y = -0.1;
+      group.add(sac);
+      const neck = ownedMesh(new THREE.CylinderGeometry(0.13, 0.24, 0.5, 12), secondary);
+      neck.position.y = 0.66;
+      group.add(neck);
+      const tie = ownedMesh(new THREE.TorusGeometry(0.15, 0.05, 8, 18), secondary.clone());
+      tie.position.y = 0.84;
+      tie.rotation.x = Math.PI / 2;
+      group.add(tie);
+    },
   };
 
   builders[part.primitive]();

@@ -75,9 +75,15 @@ describe("resource presentation stability", () => {
     }
   });
 
+  // `buildWorld` draws every region from ONE `world` stream, and enemy groups draw from it between
+  // one region's clusters and the next region's. So this hash moves whenever a group's `count`
+  // changes, even though no resource was touched: swapping the monster roster for animals changed
+  // Vellenwood and Karrowmoor yields while Fallowmarch, which is built before the first changed
+  // group, stayed byte-identical. Node ids and the node count (85) are the invariant here; when
+  // this hash moves, check those first, and only rebaseline once they have not.
   it("keeps the authored placement and yield stream aligned", () => {
     expect(placementAndYieldFingerprint(buildWorld(SEED, FLAT_GROUND))).toBe(
-      "ebbb4c93951598bef734027c52b687f760c72214ed65ec26926abbc1f1eedc78",
+      "301a811e983e9723fe3876ea1a3ff4bdb26b59518757476b134d58f94ea543ff",
     );
   });
 });

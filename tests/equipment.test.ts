@@ -249,7 +249,7 @@ describe("gear appearance", () => {
     expect(gearAppearanceParts("grithe_cuirass")).toHaveLength(1);
     expect(gearAppearanceParts("kaldite_plate")).toHaveLength(2);
     expect(gearAppearance("kaldite_plate", "female")?.assetId).toBe("outfit_female_ranger_chest");
-    expect(gearAppearance("wightshroud_robe", "male")?.assetId).toBe("outfit_male_peasant_chest");
+    expect(gearAppearance("cairnpelt_robe", "male")?.assetId).toBe("outfit_male_peasant_chest");
   });
 
   it("attaches weapons to bones and armour to skin, and never scales a skinned part", () => {
@@ -331,7 +331,7 @@ describe("item icons", () => {
     expect(iconShapeFor(ALL_BY_ID.get("air_orb"))).toBe("orb");
     expect(iconShapeFor(BY_ID.get("storm_charm"))).toBe("amulet");
     expect(iconShapeFor(BY_ID.get("grithe_pendant"))).toBe("amulet");
-    expect(iconShapeFor(BY_ID.get("wightshroud_robe"))).toBe("robe");
+    expect(iconShapeFor(BY_ID.get("cairnpelt_robe"))).toBe("robe");
     expect(iconShapeFor(BY_ID.get("marchhide_hood"))).toBe("hood");
   });
 

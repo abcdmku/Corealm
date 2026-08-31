@@ -168,7 +168,7 @@ Where the copse track leaves the town road.
 
 ![The Open March](./assets/captures/locations/open_march_camp.webp)
 
-Open tussock. Skitterlings in the wet, wolf pups on the rise.
+Open tussock. Frogs down in the wet, billy goats on the rise.
 
 **Tier:** 1 · **Type:** camp
 
@@ -191,7 +191,7 @@ The top of the March Road, and the way into Vellenwood.
 
 ## Vellenwood
 
-Within two hundred metres of the gate the sky closes. The Duskoak here are old enough that the March Company surveyors marked them as terrain rather than trees. Rootfall is the only settlement: nine buildings and a bank chest built on and around a stump so large the stump is the town square. The people there will tell you which paths are safe. They will not tell you why the Thornbound only move at the edges of the clearings.
+Within two hundred metres of the gate the sky closes. The Duskoak here are old enough that the March Company surveyors marked them as terrain rather than trees. Rootfall is the only settlement: nine buildings and a bank chest built on and around a stump so large the stump is the town square. The people there will tell you which paths are safe. They will not tell you why the stags only move at the edges of the clearings.
 
 Tier 5. Settlement: **Rootfall**.
 
@@ -271,7 +271,7 @@ Where the gorge peters out against the northern ridge.
 
 ![The Thornline](./assets/captures/locations/thornline_camp.webp)
 
-The edge the Thornbound keep to. They do not enter the clearings and nobody says why.
+The edge the adders keep to. They do not enter the clearings and nobody says why.
 
 **Tier:** 5 · **Type:** camp
 

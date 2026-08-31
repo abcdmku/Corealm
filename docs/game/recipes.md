@@ -43,8 +43,11 @@ description: "Production recipes generated from the live game tables."
 | Recipe | Level | Station | Ingredients | Makes | Time | XP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Seared Minnow | 1 | range / campfire | 1× Silt Minnow | 1× Seared Minnow | 2.4 s | 15 |
+| Roast Game | 1 | range / campfire | 1× Raw Game Meat | 1× Roast Game | 2.4 s | 15 |
 | Seared Trout | 5 | range / campfire | 1× Bramble Trout | 1× Seared Trout | 2.4 s | 36 |
+| Roast Venison | 5 | range / campfire | 1× Raw Venison | 1× Roast Venison | 2.4 s | 36 |
 | Seared Cragfin | 10 | range / campfire | 1× Cragfin | 1× Seared Cragfin | 2.4 s | 53 |
+| Roast Haunch | 10 | range / campfire | 1× Raw Haunch | 1× Roast Haunch | 2.4 s | 53 |
 
 ## Crafting
 
@@ -78,11 +81,11 @@ description: "Production recipes generated from the live game tables."
 | Kaldite Pendant | 10 | crafting_table | 1× Kaldite Bar + 1× Cairn Garnet | 1× Kaldite Pendant | 2.4 s | 105 |
 | Storm Ring | 10 | crafting_table | 1× Kaldite Bar + 2× Cairn Garnet | 1× Storm Ring | 2.4 s | 105 |
 | Storm Charm | 10 | crafting_table | 2× Cairn Garnet | 1× Storm Charm | 2.4 s | 105 |
-| Wightshroud Robe | 10 | crafting_table | 3× Wight Shroud | 1× Wightshroud Robe | 2.4 s | 140 |
-| Wightshroud Leggings | 10 | crafting_table | 2× Wight Shroud | 1× Wightshroud Leggings | 2.4 s | 140 |
-| Wightshroud Hood | 10 | crafting_table | 1× Wight Shroud | 1× Wightshroud Hood | 3.0 s | 88 |
-| Wightshroud Boots | 10 | crafting_table | 1× Wight Shroud | 1× Wightshroud Boots | 3.0 s | 88 |
-| Wightshroud Wraps | 10 | crafting_table | 1× Wight Shroud | 1× Wightshroud Wraps | 3.0 s | 88 |
+| Cairnpelt Robe | 10 | crafting_table | 3× Cairn Pelt | 1× Cairnpelt Robe | 2.4 s | 140 |
+| Cairnpelt Leggings | 10 | crafting_table | 2× Cairn Pelt | 1× Cairnpelt Leggings | 2.4 s | 140 |
+| Cairnpelt Hood | 10 | crafting_table | 1× Cairn Pelt | 1× Cairnpelt Hood | 3.0 s | 88 |
+| Cairnpelt Boots | 10 | crafting_table | 1× Cairn Pelt | 1× Cairnpelt Boots | 3.0 s | 88 |
+| Cairnpelt Wraps | 10 | crafting_table | 1× Cairn Pelt | 1× Cairnpelt Wraps | 3.0 s | 88 |
 
 ## Fletching
 
@@ -107,4 +110,4 @@ description: "Production recipes generated from the live game tables."
 | Cairnpine Staff | 10 | fletching_bench | 3× Cairnpine Shaft | 1× Cairnpine Staff | 1.8 s | 112 |
 | Cairnpine Wand | 10 | fletching_bench | 2× Cairnpine Shaft | 1× Cairnpine Wand | 1.8 s | 84 |
 | Cairnpine Shield | 10 | fletching_bench | 2× Cairnpine Log + 1× Kaldite Bar | 1× Cairnpine Shield | 1.8 s | 98 |
-| Cairnpine Rod | 10 | fletching_bench | 2× Cairnpine Shaft + 1× Wight Shroud | 1× Cairnpine Rod | 1.8 s | 63 |
+| Cairnpine Rod | 10 | fletching_bench | 2× Cairnpine Shaft + 1× Cairn Pelt | 1× Cairnpine Rod | 1.8 s | 63 |

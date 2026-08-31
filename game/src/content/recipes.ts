@@ -154,6 +154,14 @@ function recipesForTier(definition: GatheringProductionTierDef): RecipeDef[] {
       weight: W.cookedFood, inputs: [q(m.rawFish, 1)], output: q(m.cookedFish, 1),
       burntItemId: m.burntFish,
     }),
+    row(t, {
+      // The hunting half of Cooking. Identical weight, duration and stations to the fish row on
+      // purpose: both are one raw ingredient over a fire, and a kill should not be a faster way
+      // to level the skill than a fishing spot.
+      id: `cook_${m.cookedMeat}`, name: nameOf(m.cookedMeat), kind: "cook", stations: ["range", "campfire"],
+      weight: W.cookedFood, inputs: [q(m.rawMeat, 1)], output: q(m.cookedMeat, 1),
+      burntItemId: m.burntMeat,
+    }),
 
     // --------------------------------------------------------- elemental crafting (awakened altar)
     row(t, {

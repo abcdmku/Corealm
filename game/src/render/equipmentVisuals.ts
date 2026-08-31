@@ -96,9 +96,9 @@ const KALDITE = 0x24222a;
 const KALDITE_GARNET = 0x5c1522;
 /** Marchhide: cured wolf hide. */
 const MARCHHIDE = 0x8a6a4a;
-/** Bramblehide: heavy hide, waxed. Lifted off Wightshroud's black for the same separation reason. */
+/** Bramblehide: heavy hide, waxed. Lifted off Cairnpelt's black for the same separation reason. */
 const BRAMBLEHIDE = 0x6a5943;
-/** Wightshroud: shroud cloth that "does not take dye" — so the tint is close to a no-op, correctly. */
+/** Cairnpelt: shroud cloth that "does not take dye" — so the tint is close to a no-op, correctly. */
 const WIGHTSHROUD = 0xa9a89c;
 
 /** Magic tiers share geometry. Their unlit wood colour is the only tier-specific treatment. */
@@ -228,8 +228,8 @@ const LADDER: readonly LadderTier[] = [
       { id: "water_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
       { id: "water_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
     ],
-    head: "wightshroud_hood", body: "wightshroud_robe", legs: "wightshroud_leggings",
-    feet: "wightshroud_boots", hands: "wightshroud_wraps",
+    head: "cairnpelt_hood", body: "cairnpelt_robe", legs: "cairnpelt_leggings",
+    feet: "cairnpelt_boots", hands: "cairnpelt_wraps",
     accessories: ["storm_ring", "storm_charm"],
   },
 ];

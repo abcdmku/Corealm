@@ -180,20 +180,26 @@ const COMPONENTS: readonly ItemDef[] = [
     description: "Cairnpine shaped around the grain so a Kaldite tang will not split it.",
     stackable: true, value: 53, category: "component",
   },
-  // hides, the crafting input for the magic line
+  // Hides, the crafting input for the whole magic line and every fishing rod.
+  //
+  // One hide per tier, and every animal in that tier's ground drops it. That is deliberate: the
+  // ladder must not depend on finding one particular species, so a Marchfield goat, a Redsill cow
+  // and a coney all pay Coarse Hide. The tier-10 hide was `wight_shroud` while the tier was held by
+  // undead; the id changed with the animals that now drop it, and `recipes.ts`, `shops.ts` and the
+  // icon table moved with it.
   {
     id: "coarse_hide", name: "Coarse Hide", tier: 1,
-    description: "Marchwolf pelt, scraped and salted. Stiff until you work it.",
+    description: "Goat and coney skins, scraped and salted together. Stiff until you work it.",
     stackable: false, value: 16, category: "component",
   },
   {
     id: "bramble_hide", name: "Bramble Hide", tier: 5,
-    description: "Deepwood pelt, thorns still in the seam. Sheds Thornbound spores.",
+    description: "Deepwood deer and hog, thorns still in the seam. Nothing in Vellenwood tans clean.",
     stackable: false, value: 55, category: "component",
   },
   {
-    id: "wight_shroud", name: "Wight Shroud", tier: 10,
-    description: "Whatever a cairnwight wears. It takes no dye and it does not tear.",
+    id: "cairn_pelt", name: "Cairn Pelt", tier: 10,
+    description: "Winter coat off something that lived above the treeline. Takes no dye and does not tear.",
     stackable: false, value: 130, category: "component",
   },
 ];
@@ -215,6 +221,180 @@ const ESSENCES: readonly ItemDef[] = [
     id: "water_essence", name: "Water Essence", tier: 10,
     description: "Cold blue essence gathered from the far Karrowmoor cache.",
     stackable: true, value: 55, category: "resource",
+  },
+];
+
+// ------------------------------------------------------------------------------ animal trophies
+
+/**
+ * The one drop that says which animal you killed.
+ *
+ * Every animal family also pays its tier's hide and its tier's raw meat, because the crafting and
+ * cooking ladders cannot depend on finding one species. This table is the other half: a single
+ * distinctive part per family, so a full inventory reads as a hunting record rather than as three
+ * stacks of generic hide. Values sit between the tier's gem and its hide, which puts a trophy at
+ * roughly two to four kills' worth of marks.
+ *
+ * Shared entries are shared because the real object is the same: a hog and a boar grow the same
+ * tusk, a cow and an aurochs the same horn, a viper and a scorpion the same venom.
+ */
+const TROPHIES: readonly ItemDef[] = [
+  // tier 1, Fallowmarch
+  {
+    id: "hen_feather", name: "Hen Feather", tier: 1,
+    description: "Barred brown, still stiff at the quill. Fletchers buy them by the double handful.",
+    stackable: true, value: 3, category: "component",
+  },
+  {
+    id: "hen_egg", name: "Hen Egg", tier: 1,
+    description: "Warm when you find it, which is how you know you were quick enough.",
+    stackable: true, value: 6, category: "component",
+  },
+  {
+    id: "curl_horn", name: "Curled Horn", tier: 1,
+    description: "One horn off an Open March billy. Hollow, and loud if you know how to blow it.",
+    stackable: false, value: 22, category: "component",
+  },
+  {
+    id: "ox_horn", name: "Ox Horn", tier: 1,
+    description: "Short, thick and scarred at the base. Coldbrace turns them into cups and lamp horn.",
+    stackable: false, value: 26, category: "component",
+  },
+  {
+    id: "coney_foot", name: "Coney Foot", tier: 1,
+    description: "Carried for luck by everyone who has ever admitted the moor frightens them.",
+    stackable: true, value: 18, category: "component",
+  },
+  {
+    id: "marsh_gland", name: "Marsh Gland", tier: 1,
+    description: "Pale sac from behind a frog's jaw. Keeps essence wet, which is most of the trick.",
+    stackable: true, value: 15, category: "component",
+  },
+  {
+    id: "viper_skin", name: "Viper Skin", tier: 1,
+    description: "Shed whole and inside out. Grithe fletchers back their nocks with it.",
+    stackable: false, value: 24, category: "component",
+  },
+
+  // tier 5, Vellenwood
+  {
+    id: "venom_gland", name: "Venom Gland", tier: 5,
+    description: "Still full. Handled with the same care you would give a lit lamp in a barn.",
+    stackable: true, value: 64, category: "component",
+  },
+  {
+    id: "stag_antler", name: "Stag Antler", tier: 5,
+    description: "Six points of Duskoak hart. Cut down, it makes every knife handle in Rootfall.",
+    stackable: false, value: 78, category: "component",
+  },
+  {
+    id: "curved_tusk", name: "Curved Tusk", tier: 5,
+    description: "Ivory, yellowed, and ground to an edge by the animal's own jaw.",
+    stackable: false, value: 72, category: "component",
+  },
+  {
+    id: "coyote_fang", name: "Coyote Fang", tier: 5,
+    description: "Long in the root, which is the part nobody expects until they pull one.",
+    stackable: true, value: 58, category: "component",
+  },
+
+  // tier 10, Karrowmoor and Gravelmaw
+  {
+    id: "bear_claw", name: "Bear Claw", tier: 10,
+    description: "Longer than a finger and blunt from stone. Highcairn hangs them over doorways.",
+    stackable: true, value: 150, category: "component",
+  },
+  {
+    id: "boar_bristle", name: "Boar Bristle", tier: 10,
+    description: "A fistful of black wire off a scree boar's shoulder. It will not lie flat.",
+    stackable: true, value: 96, category: "component",
+  },
+  {
+    id: "ibex_horn", name: "Ibex Horn", tier: 10,
+    description: "Ridged the whole length, one ring a winter. This one counted eleven.",
+    stackable: false, value: 165, category: "component",
+  },
+  {
+    id: "aurochs_horn", name: "Aurochs Horn", tier: 10,
+    description: "As long as your arm and heavier. The terrace herds are the last ones anywhere.",
+    stackable: false, value: 178, category: "component",
+  },
+  {
+    id: "rat_tail", name: "Rat Tail", tier: 10,
+    description: "Gravelmaw pays a bounty per tail. Nobody in Highcairn asks what the count is for.",
+    stackable: true, value: 84, category: "component",
+  },
+  {
+    id: "scorpion_stinger", name: "Scorpion Stinger", tier: 10,
+    description: "Barb and bulb both intact. Dry, it is a needle; wet, it is still a problem.",
+    stackable: true, value: 140, category: "component",
+  },
+  {
+    id: "crab_claw", name: "Crab Claw", tier: 10,
+    description: "Off a sump crab, and big enough to have taken a pick handle in half.",
+    stackable: false, value: 158, category: "component",
+  },
+];
+
+// ------------------------------------------------------------------------------ game meat
+
+/**
+ * Raw, cooked and burnt meat, one set per tier.
+ *
+ * The same shape as the fish line in `RESOURCE_ITEMS` and `FOOD`, and for the same reason: raw is a
+ * resource, cooked is food that heals `healAmount(tier)`, burnt is worth 1 and heals nothing. This
+ * is what makes an animal kill feed the Cooking skill instead of only the Crafting one, which the
+ * fish line was previously carrying alone.
+ *
+ * One set per tier rather than one per species. Nine rows across sixteen animals is already a lot
+ * of near-identical inventory, and "venison" reading off both a stag and a coyote is a smaller lie
+ * than sixteen cuts of meat that all heal the same amount.
+ */
+const GAME_MEAT: readonly ItemDef[] = [
+  {
+    id: "raw_game_meat", name: "Raw Game Meat", tier: 1,
+    description: "Whatever the Fallowmarch was carrying. Fowl, goat or coney, jointed the same way.",
+    stackable: false, value: 12, category: "resource",
+  },
+  {
+    id: "roast_game", name: "Roast Game", tier: 1,
+    description: "Turned over a range until the fat stops running. Frontier cooking, and it works.",
+    stackable: false, value: 24, category: "food", food: { healAmount: healAmount(1) },
+  },
+  {
+    id: "burnt_game", name: "Burnt Game", tier: 1,
+    description: "Left on the range. Black through and nothing left worth eating.",
+    stackable: false, value: 1, category: "food",
+  },
+  {
+    id: "raw_venison", name: "Raw Venison", tier: 5,
+    description: "Dark, close-grained deepwood meat. Hangs two days before it is worth cooking.",
+    stackable: false, value: 46, category: "resource",
+  },
+  {
+    id: "roast_venison", name: "Roast Venison", tier: 5,
+    description: "Seared hard and rested. The one meal in Rootfall nobody complains about.",
+    stackable: false, value: 66, category: "food", food: { healAmount: healAmount(5) },
+  },
+  {
+    id: "burnt_venison", name: "Burnt Venison", tier: 5,
+    description: "A stag walked all summer for this and you left it on the coals.",
+    stackable: false, value: 1, category: "food",
+  },
+  {
+    id: "raw_haunch", name: "Raw Haunch", tier: 10,
+    description: "A whole hind quarter off something that lived above the treeline. Heavy.",
+    stackable: false, value: 88, category: "resource",
+  },
+  {
+    id: "roast_haunch", name: "Roast Haunch", tier: 10,
+    description: "Four hours over Highcairn coals. It is a meal and most of a day's carrying.",
+    stackable: false, value: 118, category: "food", food: { healAmount: healAmount(10) },
+  },
+  {
+    id: "burnt_haunch", name: "Burnt Haunch", tier: 10,
+    description: "Ruined, and it was the biggest thing you killed all week.",
+    stackable: false, value: 1, category: "food",
   },
 ];
 
@@ -351,13 +531,15 @@ const TOOLS: readonly ItemDef[] = [
   },
 ];
 
-/** Everything except equipment. 51 rows. */
+/** Everything except equipment. 78 rows: 51 base, plus 18 animal trophies and 9 game meats. */
 export const ITEMS: readonly ItemDef[] = [
   ...CURRENCY,
   ...RESOURCE_ITEMS,
   ...BARS,
   ...COMPONENTS,
   ...ESSENCES,
+  ...TROPHIES,
+  ...GAME_MEAT,
   ...SEEDS,
   ...FOOD,
   ...TOOLS,

@@ -90,7 +90,7 @@ import { RECIPES } from "../content/recipes.js";
 import { SPELLS } from "../content/spells.js";
 import { ENEMIES } from "../content/enemies.js";
 import { SHOPS } from "../content/shops.js";
-import { QUESTS } from "../content/quests.js";
+import { QUESTS, type QuestPredicate } from "../content/quests.js";
 import { worldExclusions, type ScatterResult } from "../world/scatter.js";
 import { createScatterStreaming } from "../world/scatterStreaming.js";
 import { findShot, shotIds, SHOTS } from "../debug/shots.js";
@@ -472,6 +472,23 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       position,
       scene.groundSurfaceAt(position[0], position[2]),
     ),
+    // The nearest LIVING animal, for idle voices. Dead ones are excluded because a corpse that
+    // keeps lowing is the kind of bug a player hears long before they see it, and the two humanoid
+    // families are filtered by `cueForCreature` returning null rather than here, so this stays a
+    // pure "what is near me" query with no audio policy in it.
+    nearestCreature: (position, radius) => {
+      const found = entityStore.nearest(position, radius, (candidate) => (
+        (candidate.archetype === "enemy" || candidate.archetype === "boss")
+        && candidate.state === "alive"
+        && typeof candidate.meta?.family === "string"
+      ));
+      if (!found) return undefined;
+      return {
+        entityId: found.id,
+        family: String(found.meta!.family),
+        distance: straightLineDistance(position, found.position),
+      };
+    },
   });
 
   // The other half of the quest-ref check in `validateQuestObjectives`: entity and location refs
@@ -1698,6 +1715,22 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     appliedPreferences = preferences;
   });
 
+  // A killed enemy stops being something the player has selected.
+  //
+  // `systems/combat.ts killEnemy` already clears `state.combat.targetId`, but the CURSOR selection
+  // is a separate thing owned by the input controller, and nothing was clearing it. The ring stayed
+  // lit on the body, the cursor kept offering "Attack" over it, and once the corpse dissolved the
+  // ring was left drawn on bare grass.
+  events.subscribe((event) => {
+    if (event.type !== "combat.ended") return;
+    const data = event.data as Record<string, unknown>;
+    if (data["reason"] !== "killed") return;
+    const enemyId = (data["enemyId"] ?? event.entityId) as EntityId | undefined;
+    if (!enemyId) return;
+    input.forget(enemyId);
+    entityViews.clearHighlight(enemyId);
+  });
+
   // A bank or shop interaction has no event of its own, so the panel opens off the successful
   // interaction rather than off a signal that does not exist.
   events.subscribe((event) => {
@@ -1999,6 +2032,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       return entityViews.drawnBounds(entityId);
     },
     entityViewStats: () => entityViews.stats(),
+    selection: () => ({ hovered: input.hoveredEntityId, selected: input.selectedEntityId }),
+    select: (entityId) => { input.select(entityId); },
     groundHeight: (x: number, z: number) => scene.heightAtXZ(x, z),
     listBuildings: () => REGIONS.flatMap((region) => (region.settlement?.buildings ?? []).map((building) => ({
       id: building.id,
@@ -2399,6 +2434,24 @@ function validateQuestObjectives(itemIds: ReadonlySet<string>): string[] {
   const problems: string[] = [];
   const recipeIds = new Set(content.allRecipes().map((recipe) => recipe.id));
   const spellIds = new Set(content.allSpells().map((spell) => spell.id));
+  const enemyFamilies = new Set(content.allEnemies().map((enemy) => enemy.family));
+
+  /**
+   * A `kill` predicate names a family, and a family that no longer exists makes a quest
+   * unwinnable in complete silence: the counter simply never increments and the stage waits
+   * forever. That is exactly what happened when the bestiary became animals - `cold_iron` and
+   * `long_cairn` both sat on stages counting kills of families that had been renamed, and nothing
+   * in typecheck, the unit tests or the smoke test noticed. Only a full playthrough did.
+   */
+  const walkPredicate = (predicate: QuestPredicate, where: string): void => {
+    if (predicate.kind === "all") {
+      for (const child of predicate.of) walkPredicate(child, where);
+      return;
+    }
+    if (predicate.kind === "kill" && !enemyFamilies.has(predicate.enemyFamily)) {
+      problems.push(`${where} counts kills of unknown enemy family "${predicate.enemyFamily}"`);
+    }
+  };
 
   for (const quest of QUESTS) {
     for (const stage of quest.stages) {
@@ -2416,7 +2469,11 @@ function validateQuestObjectives(itemIds: ReadonlySet<string>): string[] {
         if (ref.kind === "spell" && !spellIds.has(ref.id)) {
           problems.push(`${where} ref names unknown spell "${ref.id}"`);
         }
+        if (ref.kind === "enemyFamily" && !enemyFamilies.has(ref.id)) {
+          problems.push(`${where} ref names unknown enemy family "${ref.id}"`);
+        }
       }
+      walkPredicate(stage.completion, where);
     }
   }
   return problems;

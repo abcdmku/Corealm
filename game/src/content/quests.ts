@@ -195,20 +195,20 @@ const COLD_IRON: QuestDef = {
     {
       index: 3,
       objective:
-        "Equip the Grithe dagger and kill 3 Rill Skitterlings on the brook flats south-east of town.",
+        "Equip the Grithe dagger and kill 3 Redsill Frogs on the shallows south-east of town.",
       refs: [
         { kind: "item", id: "grithe_dagger" },
-        { kind: "enemyFamily", id: "skitterling" },
+        { kind: "enemyFamily", id: "frog" },
         { kind: "location", id: "redsill_shallows" },
       ],
       hint:
         "`equipItem(\"grithe_dagger\")` first - the stage checks the slot, not just the bag. The "
-        + "Rill Skitterlings are passive and sit around (-88, -70), between town and the shallows.",
+        + "frogs are passive and sit on the bank around (-56, -72), between town and the shallows.",
       completion: {
         kind: "all",
         of: [
           { kind: "equipped", itemId: "grithe_dagger" },
-          { kind: "kill", enemyFamily: "skitterling", count: 3 },
+          { kind: "kill", enemyFamily: "frog", count: 3 },
         ],
       },
     },
@@ -650,7 +650,7 @@ const ELEVEN_EMPTY_DAYS: QuestDef = {
       ],
       hint:
         "All four are route-graph nodes: `moveTo({ locationId })` reaches each one directly. The "
-        + "Thornline is where the Thornbound Husks keep to the edge, so go there with health to "
+        + "Thornline is where the adders keep to the edge, so go there with health to "
         + "spare or take the long way round by the ford.",
       completion: {
         kind: "all",
@@ -667,14 +667,14 @@ const ELEVEN_EMPTY_DAYS: QuestDef = {
       index: 1,
       objective:
         
-        "Something has been going through the bait. Kill 3 Bramble Skitterlings between Rootfall and "
+        "Something has been going through the bait. Kill 3 Bramble Hogs between Rootfall and "
         + "the Thornline.",
       refs: [
-        { kind: "enemyFamily", id: "skitterling" },
+        { kind: "enemyFamily", id: "hog" },
         { kind: "location", id: "thornline_camp" },
       ],
-      hint: "They sit around (150, 128) and they are aggressive, so they will find you first.",
-      completion: { kind: "kill", enemyFamily: "skitterling", count: 3 },
+      hint: "They root around (150, 128) and they are aggressive, so they will find you first.",
+      completion: { kind: "kill", enemyFamily: "hog", count: 3 },
       grants: { xp: { melee: 150 } },
     },
     {
@@ -853,12 +853,12 @@ const SPARKING_STONE: QuestDef = {
       objective: "Raise Magic to level 5 by casting Voltrend at something that will hold still for it.",
       refs: [
         { kind: "spell", id: "voltrend" },
-        { kind: "enemyFamily", id: "skitterling" },
+        { kind: "enemyFamily", id: "frog" },
         { kind: "location", id: "redsill_shallows" },
         { kind: "entity", id: "fallowmarch_air_altar" },
       ],
       hint:
-        "The Air Staff spends its charge before carried Air Essence. Rill Skitterlings near "
+        "The Air Staff spends its charge before carried Air Essence. Redsill Frogs near "
         + "locationId redsill_shallows are cheap targets. Recharge at entity "
         + "fallowmarch_air_altar with 100 Air Essence when needed.",
       completion: { kind: "skill", skill: "magic", level: 5 },
@@ -923,7 +923,7 @@ const LONG_CAIRN: QuestDef = {
       refs: [{ kind: "entity", id: "great_cairn_stone" }, { kind: "location", id: "great_cairn" }],
       hint:
         "`moveTo({ locationId: \"great_cairn\" })` from Highcairn goes bank -> Second Ramp -> Third "
-        + "Ramp -> the cairn. Cairnwights hold the ground around (100, -110) on the way, so travel "
+        + "Ramp -> the cairn. Bears hold the ground around (100, -110) on the way, so travel "
         + "fed and armed. `inspect(\"great_cairn_stone\")` when you arrive.",
       completion: { kind: "reach", locationId: "great_cairn", radius: 16 },
       grants: { xp: { mining: 120 }, flags: ["saw_great_cairn"] },
@@ -957,10 +957,10 @@ const LONG_CAIRN: QuestDef = {
     {
       index: 3,
       objective:
-        "Enter the Gravelmaw, kill 4 Cairnwights in the Lit Gallery, and reach The Collapse.",
+        "Enter the Gravelmaw, kill 4 Gravelmaw Rats in the Lit Gallery, and reach The Collapse.",
       refs: [
         { kind: "entity", id: "gravelmaw_mouth_portal" },
-        { kind: "enemyFamily", id: "cairnwight" },
+        { kind: "enemyFamily", id: "rat" },
         { kind: "location", id: "gravelmaw_entrance" },
         { kind: "location", id: "gravelmaw_chamber1" },
         { kind: "location", id: "gravelmaw_chamber2" },
@@ -972,7 +972,7 @@ const LONG_CAIRN: QuestDef = {
       completion: {
         kind: "all",
         of: [
-          { kind: "kill", enemyFamily: "cairnwight", count: 4 },
+          { kind: "kill", enemyFamily: "rat", count: 4 },
           { kind: "reach", locationId: "gravelmaw_chamber2", radius: 16 },
         ],
       },
@@ -1044,21 +1044,21 @@ const LONG_CAIRN: QuestDef = {
       index: 6,
       objective:
         
-        "Carry the Cairn Garnet into The Cairn Hall, kill the 2 Thornbound Elders standing over the cairn, and set the stone on it.",
+        "Carry the Cairn Garnet into The Cairn Hall, kill the 2 cave bears standing over the cairn, and set the stone on it.",
       refs: [
         { kind: "item", id: "cairn_garnet" },
         { kind: "location", id: "gravelmaw_entrance" },
         { kind: "location", id: "gravelmaw_chamber3" },
-        { kind: "enemyFamily", id: "thornbound" },
+        { kind: "enemyFamily", id: "bear" },
       ],
       hint:
         "With the door open, chamber 2 walks straight through to chamber 3. The stage completes "
-        + "the moment all three hold at once: both Elders dead, you inside the hall, garnet still "
+        + "the moment all three hold at once: both bears dead, you inside the hall, garnet still "
         + "in your bag. Completing it takes the garnet and unseals the Quarrykeeper's Gate.",
       completion: {
         kind: "all",
         of: [
-          { kind: "kill", enemyFamily: "thornbound", count: 2 },
+          { kind: "kill", enemyFamily: "bear", count: 2 },
           { kind: "reach", locationId: "gravelmaw_chamber3", radius: 16 },
           { kind: "have", itemId: "cairn_garnet", quantity: 1 },
         ],

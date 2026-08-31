@@ -46,4 +46,4 @@ Elemental orbs are singleton altar keys. The boss drops its orb when no physical
 | [Kaldite Sword](../../items/#kaldite-sword) | 1 | 100% |
 | [Kaldite Bar](../../items/#kaldite-bar) | 3-6 | 100% |
 | [Cairn Garnet](../../items/#cairn-garnet) | 2-4 | 100% |
-| [Wight Shroud](../../items/#wight-shroud) | 1-2 | 75% |
+| [Cairn Pelt](../../items/#cairn-pelt) | 1-2 | 75% |

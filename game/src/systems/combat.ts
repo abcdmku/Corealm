@@ -78,8 +78,19 @@ export const ENEMY_ATTACK_RANGE = MELEE_RANGE + 0.4;
 export const ENEMY_RESPAWN_MS = 30_000;
 export const BOSS_RESPAWN_MS = 180_000;
 
-/** Drops sit on the floor for two minutes before the world sweeps them (PRD section 3, row 11). */
-export const LOOT_DESPAWN_MS = 120_000;
+/**
+ * How long a drop sits on the floor before the world sweeps it.
+ *
+ * One minute, not the two the PRD (section 3, row 11) asked for: two minutes of crates outlives the
+ * 30 s enemy respawn twice over, so a player working one clearing ends up fighting among the boxes
+ * from the last four kills. Changed on the owner's call, and recorded here rather than silently,
+ * because it is a deliberate departure from the spec and not a transcription slip.
+ *
+ * A pile that is emptied is removed on the spot by `systems/death.ts loot()`, and a kill that rolls
+ * nothing never creates one - `rollDrops` returns before the pile exists. So this timer only ever
+ * governs loot the player walked away from.
+ */
+export const LOOT_DESPAWN_MS = 60_000;
 
 /** Ceiling on catch-up combat ticks in one sim tick, so `advanceGameTime(3600)` cannot hang. */
 const MAX_CATCHUP_TICKS = 400;
@@ -848,7 +859,12 @@ export class CombatSystem implements TickSystem {
     runtime.health = 0;
     runtime.state = "dead";
     runtime.respawnAtMs = atMs + (entity.archetype === "boss" ? BOSS_RESPAWN_MS : ENEMY_RESPAWN_MS);
+    runtime.diedAtMs = atMs;
     entity.state = "dead";
+    // Published on the view as well as held in the runtime: the renderer fades the corpse out from
+    // this instant, and it may not read world state to find it. `systems/enemyAI.ts` clears both on
+    // respawn, so a body that comes back is not still carrying the moment it fell.
+    if (entity.view) entity.view.diedAtMs = atMs;
     if (entity.combat) entity.combat.health = 0;
     this.deps.entities.setState?.(entity.id, "dead");
 

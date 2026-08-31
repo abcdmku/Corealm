@@ -41,11 +41,13 @@
  *           hitChance   = clamp(attackRoll / (attackRoll + defenceRoll), 0.05, 0.95)
  *
  *   Weapon accuracy values are solved from the PRD's hit-chance column; see `enemies.ts` for the
- *   matching defender stat blocks and the full solved TTK table.
- *     Grithe dagger  acc  +6: Melee 3 vs Rill Skitterling  -> 12*1.06 / (12*1.06 + 10)   = 56%
- *     Corven sword   acc +14: Melee 7 vs Thornbound Husk   -> 16*1.14 / (16*1.14 + 17.6) = 51%
- *     Kaldite sword  acc +28: Melee 12 vs Scree Skitterling-> 21*1.28 / (21*1.28 + 26.0) = 51%
- *                             Melee 12 vs Cairnwight       -> 21*1.28 / (21*1.28 + 31.0) = 46%
+ *   matching defender stat blocks and the full solved TTK table. The defender names below are the
+ *   PRD's own, from before the bestiary became animals; each row's stat block now belongs to the
+ *   animal named after it, and the arithmetic is unchanged because the numbers were inherited whole.
+ *     Grithe dagger  acc  +6: Melee 3 vs Rill Skitterling  -> 12*1.06 / (12*1.06 + 10)   = 56%  (now Redsill Frog)
+ *     Corven sword   acc +14: Melee 7 vs Thornbound Husk   -> 16*1.14 / (16*1.14 + 17.6) = 51%  (now Duskoak Stag)
+ *     Kaldite sword  acc +28: Melee 12 vs Scree Skitterling-> 21*1.28 / (21*1.28 + 26.0) = 51%  (now Scree Boar)
+ *                             Melee 12 vs Cairnwight       -> 21*1.28 / (21*1.28 + 31.0) = 46%  (now Highcairn Bear)
  *
  *   Full-kit accuracy totals: 11 (t1) / 23 (t5) / 42 (t10). The t10 total is solved from the
  *   Ordrun row: 27 * 1.42 = 38.34 against Ordrun's 29 * 1.62 = 46.98 gives 45%.
@@ -347,7 +349,7 @@ const MELEE_TIER_10: readonly ItemDef[] = [
   }),
   gear({
     id: "cairnpine_shield", name: "Cairnpine Shield", tier: 10, slot: "offHand", value: 560,
-    description: "Cairnpine faced in Kaldite. It rings when a wight hits it, and the wight stops.",
+    description: "Cairnpine faced in Kaldite. It rings when a bear hits it, and the bear stops.",
     requires: { melee: 10 },
     bonuses: { accuracy: 2, armour: 14, magicArmour: 6, vitality: 1 },
   }),
@@ -531,7 +533,7 @@ const MAGIC_TIER_5: readonly ItemDef[] = [
   }),
 ];
 
-// ------------------------------------------------------------------ magic, tier 10 (Wightshroud)
+// ------------------------------------------------------------------ magic, tier 10 (Cairnpelt)
 // Kit totals: magicAccuracy 47, magicPower 32, armour 8, magicArmour 50, vitality 12.
 // Both totals are solved from the Magic 10 Rimewash-vs-Cairnwight 24 s claim; see the header block.
 
@@ -551,32 +553,32 @@ const MAGIC_TIER_10: readonly ItemDef[] = [
     bonuses: { power: 4, magicAccuracy: 24, magicPower: 20, magicArmour: 4 },
   }),
   gear({
-    id: "wightshroud_hood", name: "Wightshroud Hood", tier: 10, slot: "head", value: 700,
-    description: "Cut from a cairnwight's shroud. It does not take dye and it does not tear.",
+    id: "cairnpelt_hood", name: "Cairnpelt Hood", tier: 10, slot: "head", value: 700,
+    description: "Cut from a bear's winter coat. It does not take dye and it does not tear.",
     requires: { magic: 10 },
     bonuses: { armour: 1, magicAccuracy: 4, magicPower: 2, magicArmour: 8, vitality: 2 },
   }),
   gear({
-    id: "wightshroud_robe", name: "Wightshroud Robe", tier: 10, slot: "body", value: 1400,
-    description: "Three shrouds, stitched with Kaldite wire. Ordrun's floor is survivable in this.",
+    id: "cairnpelt_robe", name: "Cairnpelt Robe", tier: 10, slot: "body", value: 1400,
+    description: "Three pelts, stitched with Kaldite wire. Ordrun's floor is survivable in this.",
     requires: { magic: 10 },
     bonuses: { armour: 2, magicAccuracy: 6, magicPower: 3, magicArmour: 14, vitality: 4 },
   }),
   gear({
-    id: "wightshroud_leggings", name: "Wightshroud Leggings", tier: 10, slot: "legs", value: 1260,
-    description: "Shroud cloth to the ankle, weighted at the hem so it does not lift on the moor.",
+    id: "cairnpelt_leggings", name: "Cairnpelt Leggings", tier: 10, slot: "legs", value: 1260,
+    description: "Pelt to the ankle, weighted at the hem so it does not lift on the moor.",
     requires: { magic: 10 },
     bonuses: { armour: 1, magicAccuracy: 3, magicPower: 2, magicArmour: 9, vitality: 3 },
   }),
   gear({
-    id: "wightshroud_boots", name: "Wightshroud Boots", tier: 10, slot: "feet", value: 500,
+    id: "cairnpelt_boots", name: "Cairnpelt Boots", tier: 10, slot: "feet", value: 500,
     description: "Silent on stone. The quarry crews would have hated them.",
     requires: { magic: 10 },
     bonuses: { armour: 1, magicAccuracy: 1, magicArmour: 3, vitality: 1 },
   }),
   gear({
-    id: "wightshroud_wraps", name: "Wightshroud Wraps", tier: 10, slot: "hands", value: 500,
-    description: "Shroud strips to the wrist. Garnet dust worked into the weave.",
+    id: "cairnpelt_wraps", name: "Cairnpelt Wraps", tier: 10, slot: "hands", value: 500,
+    description: "Pelt strips to the wrist. Garnet dust worked into the weave.",
     requires: { magic: 10 },
     bonuses: { armour: 1, magicAccuracy: 1, magicArmour: 3, vitality: 1 },
   }),
@@ -699,7 +701,7 @@ export const KITS: Readonly<Record<string, readonly string[]>> = {
     "bramblehide_boots", "bramblehide_wraps", "stone_ring", "stone_charm",
   ],
   magic_t10: [
-    "water_staff", "wightshroud_hood", "wightshroud_robe", "wightshroud_leggings",
-    "wightshroud_boots", "wightshroud_wraps", "storm_ring", "storm_charm",
+    "water_staff", "cairnpelt_hood", "cairnpelt_robe", "cairnpelt_leggings",
+    "cairnpelt_boots", "cairnpelt_wraps", "storm_ring", "storm_charm",
   ],
 };

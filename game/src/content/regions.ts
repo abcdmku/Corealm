@@ -505,14 +505,28 @@ export interface EnemyGroupDef {
   centre: Spot;
   radius: number;
   assetId: string;
-  /** Platformer-pack enemies are 1.4-2.9 m; asset-report says ~0.7x next to a 1.82 m player. */
+  /**
+   * Multiplier on the asset's own metres, before `tierSilhouetteScale(tier)`.
+   *
+   * The animal GLBs are measured from life, so this is usually near 1 and the comment it replaces
+   * ("~0.7x next to a 1.82 m player") no longer applies. Drawn size is
+   * `manifest.size * scale * tierSilhouetteScale(tier)`, and that silhouette factor is 0.90 at
+   * tier 1, 1.075 at tier 5 and 1.15 at tier 10.
+   */
   scale: number;
-  level: number;
-  maxHealth: number;
-  aggroRadius: number;
-  behaviour: "passive" | "aggressive" | "territorial";
   boss?: boolean;
 }
+
+/**
+ * NO COMBAT STATS HERE, and that is the point.
+ *
+ * `level`, `maxHealth`, `aggroRadius` and `behaviour` used to live on this interface as placement
+ * hints written before `content/enemies.ts` existed. They then disagreed with it in both
+ * directions, and `world/regionBuilder.ts` had to pick a winner field by field. Every one of them
+ * now comes from the stat block, and the displayed level is COMPUTED from that block by
+ * `content/index.ts: enemyCombatLevel()` rather than typed anywhere. A group that has no matching
+ * stat block throws at build time instead of spawning something with invented numbers.
+ */
 
 export interface LandmarkDef {
   id: string;
@@ -755,7 +769,7 @@ const FALLOWMARCH: RegionDef = {
     { id: "west_track", name: "West Track", position: [-230, -60], kind: "junction", routeNode: true,
       blurb: "Where the copse track leaves the town road." },
     { id: "open_march_camp", name: "The Open March", position: [-250, 30], kind: "camp", routeNode: true,
-      blurb: "Open tussock. Skitterlings in the wet, wolf pups on the rise." },
+      blurb: "Open tussock. Frogs down in the wet, billy goats on the rise." },
     { id: "fallowmarch_air_cache", name: "Air Essence Cache", position: [-250, -150], kind: "landmark", routeNode: true,
       blurb: "A wind-scoured stone cache far beyond the west track, bright with trapped air essence." },
     { id: "fallowmarch_north_gate", name: "North Gate", position: [-26, 118], kind: "gate", routeNode: true,
@@ -858,72 +872,90 @@ const FALLOWMARCH: RegionDef = {
     },
   ],
 
-  enemyGroups: [
+    enemyGroups: [
+    // Fallowmarch is the plain: hens, cattle, goats and coneys on open grass, frogs on the water at
+    // its edges, and one adder in the copse. Nothing here is large, and only the goats start a
+    // fight in the open.
     {
-      id: "rill_skitterlings", family: "skitterling", name: "Rill Skitterling", tier: 1,
-      count: 6, centre: [-88, -70], radius: 20,
-      assetId: "enemy_crab", scale: 0.7,
-      level: 2, maxHealth: 18, aggroRadius: 6, behaviour: "passive",
+      // On the Redsill shallows, which is the water the Fishing tutorial already sends you to. The
+      // group centre sits 23 m south-west of the pond centre so the spread straddles the bank
+      // rather than sinking into the basin floor: the shoreline is at radius 21 and this spans
+      // roughly 11 to 35 m out.
+      //
+      // This is the first thing most characters kill. PRD 2.4 solves two of its rows against these
+      // exact numbers, so the frog inherited them whole - see `frog_t1` in content/enemies.ts.
+      id: "redsill_frogs", family: "frog", name: "Redsill Frog", tier: 1,
+      count: 6, centre: [-56, -72], radius: 12,
+      // 0.32 m of frog native. 2.2 x 0.90 draws it 0.63 m long, which is a big frog and a small
+      // enemy - readable on the bank without pretending to be dangerous.
+      assetId: "animal_frog", scale: 2.2,
     },
     {
-      id: "marchwolf_pups", family: "marchwolf", name: "Marchwolf Pup", tier: 1,
+      // The Marchfield, 90 m north-east of Coldbrace and the open ground a new character crosses
+      // first. Passive at 3 m, so you walk through the flock and fight only what you swing at.
+      id: "marchfield_hens", family: "hen", name: "Marchfield Hen", tier: 1,
+      count: 5, centre: [-88, -30], radius: 18,
+      assetId: "animal_chicken", scale: 1.0,
+    },
+    {
+      // A second flock on the Bracken Pit track, on the speckled texture so the two groups do not
+      // read as one flock spread over 100 m.
+      id: "bracken_hens", family: "hen", name: "Bracken Hen", tier: 1,
+      count: 4, centre: [-152, 44], radius: 16,
+      assetId: "animal_chicken_speckled", scale: 1.0,
+    },
+    {
+      // The aggressive tier 1 spawn, on the west track between Coldbrace and the Open March camp.
+      // 77 m from the square at its nearest, so it cannot become the closest enemy to town.
+      id: "open_march_goats", family: "goat", name: "Open March Billy", tier: 1,
       count: 4, centre: [-250, 30], radius: 26,
-      assetId: "enemy_blob", scale: 0.75,
-      level: 4, maxHealth: 26, aggroRadius: 8, behaviour: "aggressive",
+      // 1.29 m of goat native. 0.85 x 0.90 draws a 0.99 m animal against a 1.82 m player.
+      assetId: "animal_goat", scale: 0.85,
     },
     {
-      // On the March Road, 106 m north of the square at its nearest, between the Broken Milestone
-      // and the Bracken Pit. The first thing a new character walks through, and by design the
-      // cheapest: 4 health, passive at 4 m, one damage a swing.
-      id: "bracken_fenmites", family: "fenmite", name: "Bracken Fenmite", tier: 1,
-      count: 7, centre: [-152, 44], radius: 18,
-      // enemy_bee is the only rig in the library that hovers. At 0.40 x the tier 1 silhouette 0.90
-      // it draws 0.67 m tall against the Thornbound Husk's 1.36 m on the same mesh - far enough
-      // apart in size that they do not read as the same animal.
-      assetId: "enemy_bee", scale: 0.40,
-      level: 3, maxHealth: 4, aggroRadius: 4, behaviour: "passive",
+      // Pasture south of the shallows. Territorial at 5 m and off the road: at Melee 1 this fight
+      // is unwinnable (65.9 s, 32.8 damage against 23 health) and the whole point is that it never
+      // starts. A cow is also the largest thing in Fallowmarch, which does that warning visually.
+      id: "redsill_cattle", family: "cattle", name: "Redsill Cow", tier: 1,
+      count: 3, centre: [-70, -92], radius: 16,
+      // 1.57 m native, drawn at 1.41 m. Shorter than the player and roughly three times the mass.
+      assetId: "animal_cattle", scale: 1.0,
     },
     {
-      // South of the Redsill Shallows, on the water the Fishing tutorial sends you to. Territorial,
-      // 5 m aggro, off the road: at Melee 1 this fight is unwinnable (65.9 s, 32.8 damage against
-      // 23 health) and the whole point is that it never starts it.
-      id: "redsill_mudbacks", family: "mudback", name: "Redsill Mudback", tier: 1,
-      count: 3, centre: [-56, -88], radius: 14,
-      // Same crab as the Rill Skitterling 37 m west, at 1.05 against its 0.70: 1.43 m tall and
-      // 2.40 m across, half again the Skitterling's footprint.
-      assetId: "enemy_crab", scale: 1.05,
-      level: 6, maxHealth: 16, aggroRadius: 5, behaviour: "territorial",
+      // RARE on the plain, by design and by the brief. Two of them, spread over a 22 m radius of
+      // open ground between the Bracken Pit track and the Marchfield, so meeting one is luck. The
+      // forest group at Rootfall is the one a player can rely on finding.
+      id: "marchfield_coneys", family: "coney", name: "Marchfield Coney", tier: 1,
+      count: 2, centre: [-140, 10], radius: 22,
+      assetId: "animal_rabbit", scale: 0.9,
     },
     {
-      // The west track between Coldbrace and the Open March camp - empty ground before this, and
-      // the one stretch of Fallowmarch a player crosses without meeting anything. 77 m from the
-      // square at its nearest, so it cannot become the closest enemy to town.
+      // The dead ground south of the Palewood Copse, 37 m from the woodcutting cluster: close
+      // enough to be the reason you look up, territorial so it is not the reason you die.
+      id: "palewood_adders", family: "viper", name: "Palewood Adder", tier: 1,
+      count: 4, centre: [-320, -98], radius: 16,
+      // 1.51 m of snake native, drawn 1.50 m long and 7 cm tall. Low to the ground on purpose.
+      assetId: "animal_viper", scale: 1.1,
+    },
+    {
+      // The one human threat in Fallowmarch, unchanged. Humanoid, via the same body + parts path
+      // the NPCs use: `render/entityViews.ts` maps a clothes-only outfit id onto `base_male` and
+      // layers a per-entity hair pick on top, which is why three Reavers standing together are
+      // three different men rather than three copies.
       id: "march_road_reavers", family: "reaver", name: "March Road Reaver", tier: 1,
       count: 3, centre: [-234, -24], radius: 16,
-      // Humanoid, via the same body + parts path the NPCs use: `render/entityViews.ts` maps a
-      // clothes-only outfit id onto `base_male` and layers a per-entity hair pick on top, which is
-      // why three Reavers standing together are three different men rather than three copies.
-      // 1.12 x 0.90 puts a 1.84 m raider next to a 1.82 m player.
       assetId: "outfit_male_peasant", scale: 1.12,
-      level: 7, maxHealth: 9, aggroRadius: 14, behaviour: "aggressive",
-    },
-    {
-      // The dead ground south of the Palewood Copse, 37 m from the woodcutting cluster - close
-      // enough to be the reason you look up, territorial so it is not the reason you die.
-      id: "palewood_hollows", family: "hollow", name: "Palewood Hollow", tier: 1,
-      count: 4, centre: [-320, -98], radius: 16,
-      // enemy_skull, which Karrowmoor uses for the Cairnwight at 0.80. At 0.85 x 0.90 this is
-      // 1.14 m against the Cairnwight's 1.37 m, and 340 m of world plus two tier palettes apart.
-      assetId: "enemy_skull", scale: 0.85,
-      level: 8, maxHealth: 9, aggroRadius: 7, behaviour: "territorial",
     },
     {
       // West of the cache and well clear of its approach road. The four-metre hovering silhouette
       // is visible over the plain before its territorial leash can pull a traveller into combat.
       id: "tempest_roc", family: "tempest_roc", name: "Tempest Roc", tier: 1,
       count: 1, centre: [-292, -156], radius: 0,
+      // Placeholder mesh. A bee at 1.55 is not a roc; the intended model is a Fantasy Monster
+      // rig, tinted to its element with glowing seams. Health, aggro radius, behaviour and the
+      // displayed level all come from `tempest_roc_t1` in content/enemies.ts, never from here.
       assetId: "enemy_bee", scale: 1.55,
-      level: 8, maxHealth: 80, aggroRadius: 20, behaviour: "territorial", boss: true,
+      boss: true,
     },
   ],
 
@@ -1009,7 +1041,7 @@ const VELLENWOOD: RegionDef = {
     "the March Company surveyors marked them as terrain rather than trees. Rootfall is the only " +
     "settlement: nine buildings and a bank chest built on and around a stump so large the stump " +
     "is the town square. The people there will tell you which paths are safe. They will not tell " +
-    "you why the Thornbound only move at the edges of the clearings.",
+    "you why the stags only move at the edges of the clearings.",
   bounds: { min: [-20, 10], max: [350, 200] },
   terrainSeed: 0x5e11d,
   terrainAmplitude: 26,
@@ -1042,7 +1074,7 @@ const VELLENWOOD: RegionDef = {
     { id: "gorge_head", name: "Gorge Head", position: [104, 192], kind: "junction", routeNode: true,
       blurb: "Where the gorge peters out against the northern ridge." },
     { id: "thornline_camp", name: "The Thornline", position: [196, 152], kind: "camp", routeNode: true,
-      blurb: "The edge the Thornbound keep to. They do not enter the clearings and nobody says why." },
+      blurb: "The edge the adders keep to. They do not enter the clearings and nobody says why." },
     { id: "vellenwood_earth_cache", name: "Earth Essence Cache", position: [262, 176], kind: "landmark", routeNode: true,
       blurb: "An old stone heart under the eastern canopy, split through with earth essence." },
     { id: "vellenwood_east_gate", name: "Cairn Gate", position: [250, 24], kind: "gate", routeNode: true,
@@ -1142,69 +1174,68 @@ const VELLENWOOD: RegionDef = {
     },
   ],
 
-  enemyGroups: [
+    enemyGroups: [
+    // Vellenwood is the forest: deer and coyotes under the canopy, hogs in the bramble, coneys in
+    // numbers, adders on the Thornline, and frogs on the Blackwater Pools.
     {
-      id: "thornbound_husks", family: "thornbound", name: "Thornbound Husk", tier: 5,
-      count: 5, centre: [196, 152], radius: 22,
-      // The fantasy kits ship no non-humanoid monsters (asset-report gap 1). enemy_bee is the
-      // only rig that hovers, which is the read a drifting husk wants.
-      assetId: "enemy_bee", scale: 0.65,
-      level: 14, maxHealth: 58, aggroRadius: 9, behaviour: "territorial",
+      // The Duskoak Stand. Territorial at 9 m, which is a rutting hart: the one deer that does not
+      // run. Carries PRD 2.4's tier 5 defensive row (defenceLevel 7 / armour 10) verbatim.
+      id: "duskoak_stags", family: "deer", name: "Duskoak Stag", tier: 5,
+      count: 5, centre: [10, 186], radius: 18,
+      // 1.87 m native including the antlers. 0.85 x 1.075 draws a 1.71 m animal, just under the
+      // player's eye line, and the antler silhouette does the rest.
+      assetId: "animal_deer", scale: 0.85,
     },
     {
-      id: "bramble_skitterlings", family: "skitterling", name: "Bramble Skitterling", tier: 5,
+      // The bramble between Rootfall and the Thornline. magicArmour 55 makes this the tier's "put
+      // the staff away" fight, and aggressive at only 7 m makes it the one you walk into.
+      id: "bramble_hogs", family: "hog", name: "Bramble Hog", tier: 5,
       count: 5, centre: [150, 128], radius: 20,
-      assetId: "enemy_crab", scale: 0.72,
-      level: 10, maxHealth: 42, aggroRadius: 7, behaviour: "aggressive",
+      assetId: "animal_hog", scale: 1.0,
     },
     {
-      id: "marchwolves_deepwood", family: "marchwolf", name: "Marchwolf", tier: 5,
-      count: 4, centre: [40, 162], radius: 24,
-      assetId: "enemy_blob", scale: 0.8,
-      level: 12, maxHealth: 50, aggroRadius: 10, behaviour: "aggressive",
+      // Deep wood north-west of Rootfall. The pack hunter, and the block a staff answers:
+      // magicArmour 8 against the hog's 55, 100 m apart.
+      id: "deepwood_coyotes", family: "coyote", name: "Deepwood Coyote", tier: 5,
+      count: 4, centre: [46, 158], radius: 22,
+      assetId: "animal_coyote", scale: 0.9,
     },
     {
-      // The mire skirt on the Marchgate road, 20 m from the Marchgate node itself - the first
-      // thing a player crossing from Fallowmarch meets, and the passive family is why that is fair.
-      //
-      // Was [124, 96], 12 m off the Blackwater Pools node: measured in-game, that is inside the
-      // drawn water disc, and seven fenmites spawned submerged with the player standing chest-deep
-      // among them. The water surface is built by marching a shoreline outward from the fishing
-      // cluster until the terrain rises through the plane, so its true radius is not knowable from
-      // this file - the fix is distance, not arithmetic. This centre is 134 m from that pool.
-      id: "mire_fenmites", family: "fenmite", name: "Mire Fenmite", tier: 5,
-      count: 7, centre: [4, 134], radius: 12,
-      // 0.45 x the tier 5 silhouette 1.075 = 0.90 m, against the Thornbound Husk's 1.36 m on the
-      // same hovering rig 60 m north-east.
-      assetId: "enemy_bee", scale: 0.45,
-      level: 11, maxHealth: 12, aggroRadius: 5, behaviour: "passive",
+      // On the Blackwater Pools, 20 m off the pond centre so the spread sits on the bank. The tier
+      // 5 swarm, on the same 1200 ms cadence as the Marchfield hens.
+      id: "blackwater_frogs", family: "frog", name: "Blackwater Frog", tier: 5,
+      count: 7, centre: [112, 96], radius: 14,
+      assetId: "animal_frog_green", scale: 2.4,
     },
     {
-      // Between the Gorge Ford and the Thornline camp, on the road that carries every trip to the
-      // east gate. The most expensive ordinary fight in the region and the only one that starts
-      // itself from 14 m, which is what makes the gorge road a decision.
+      // COMMON in the forest, which is the other half of the coney rule: six here against two on
+      // the whole Fallowmarch plain. Still the cheapest thing in the region to kill, and still
+      // passive at 2 m.
+      id: "rootfall_coneys", family: "coney", name: "Rootfall Coney", tier: 5,
+      count: 6, centre: [76, 150], radius: 26,
+      assetId: "animal_rabbit_dark", scale: 0.9,
+    },
+    {
+      // The Thornline. Armour 6 is the lowest in Vellenwood and max hit 8 is the biggest single
+      // blow in it: it dies fast and takes a quarter of your health with it if the roll goes badly.
+      id: "thornline_adders", family: "viper", name: "Thornline Adder", tier: 5,
+      count: 4, centre: [196, 152], radius: 18,
+      assetId: "animal_viper", scale: 1.2,
+    },
+    {
       id: "gorge_reavers", family: "reaver", name: "Gorge Reaver", tier: 5,
       count: 3, centre: [214, 64], radius: 16,
-      // The female ranger set, so a Gorge Reaver is hooded where the Fallowmarch Reaver is a
-      // bare-headed peasant. 0.95 x 1.075 = 1.81 m on `base_female`'s 1.775 m frame.
       assetId: "outfit_female_ranger", scale: 0.95,
-      level: 15, maxHealth: 26, aggroRadius: 14, behaviour: "aggressive",
-    },
-    {
-      // The deep canopy north of the Duskoak stand. Territorial, and standing in the darkest fog
-      // in the world (Vellenwood's fogStart is 55 m against Fallowmarch's 180).
-      id: "canopy_hollows", family: "hollow", name: "Canopy Hollow", tier: 5,
-      count: 4, centre: [30, 182], radius: 12,
-      assetId: "enemy_skull", scale: 0.75,
-      level: 17, maxHealth: 24, aggroRadius: 8, behaviour: "territorial",
     },
     {
       // East of the cache, outside the cache ring and its Thornline approach. The scaled old-growth
       // tree is a six-metre combat silhouette without placing its roots across the route.
       id: "rootheart", family: "rootheart", name: "The Rootheart", tier: 5,
       count: 1, centre: [304, 158], radius: 0,
+      // Placeholder mesh, same as the Roc: a twisted tree stands in until the elemental boss rig
+      // is imported. Stats come from `rootheart_t5` in content/enemies.ts.
       assetId: "tree_twisted_2", scale: 0.35,
-      level: 16, maxHealth: 140, aggroRadius: 22, behaviour: "territorial", boss: true,
+      boss: true,
     },
   ],
 
@@ -1245,7 +1276,7 @@ const VELLENWOOD: RegionDef = {
       // TEXCOORD_0 and the shared Rocks atlas, so the hero belongs to its own ring.
       assetId: "rock_medium_2", scale: 1.35,
       composition: "standing_stones",
-      blurb: "Standing stones at the clearing edge. The Thornbound will not cross them.",
+      blurb: "Standing stones at the clearing edge. The stags will not cross them.",
     },
   ],
 
@@ -1432,62 +1463,52 @@ const KARROWMOOR: RegionDef = {
     },
   ],
 
-  enemyGroups: [
+    enemyGroups: [
+    // Karrowmoor is rock: bears and boar on the scree, ibex on the ridge, the last aurochs herd on
+    // the terraces, and coyotes down at the tarns. Everything here is big.
     {
-      id: "cairnwights_fields", family: "cairnwight", name: "Cairnwight", tier: 10,
-      count: 5, centre: [100, -110], radius: 26,
-      assetId: "enemy_skull", scale: 0.8,
-      level: 24, maxHealth: 96, aggroRadius: 10, behaviour: "aggressive",
+      // The cairn fields. Carries PRD 2.4's "Melee 12 Kaldite sword, 46%, 33 s" row (defenceLevel
+      // 11 / armour 55), and its magicArmour 10 against that armour 55 is the half of the magic
+      // gate where the staff wins by 27%. Aggressive at 10 m and the largest silhouette on the moor.
+      id: "highcairn_bears", family: "bear", name: "Highcairn Bear", tier: 10,
+      count: 4, centre: [100, -110], radius: 26,
+      // 2.46 m of bear native. 1.0 x 1.15 draws it 2.83 m long and 1.62 m tall - shorter than the
+      // player at the shoulder and about four times the volume.
+      assetId: "animal_bear", scale: 1.0,
     },
     {
-      id: "scree_skitterlings", family: "skitterling", name: "Scree Skitterling", tier: 10,
+      // The scree south of Highcairn. The other half of the magic gate: armour 30 against
+      // magicArmour 115, so melee wins here by 10% and the staff is the wrong tool.
+      id: "scree_boars", family: "boar", name: "Scree Boar", tier: 10,
       count: 6, centre: [170, -160], radius: 24,
-      assetId: "enemy_crab", scale: 0.75,
-      level: 20, maxHealth: 78, aggroRadius: 8, behaviour: "aggressive",
+      assetId: "animal_boar", scale: 1.0,
     },
     {
-      id: "thornbound_elders_ridge", family: "thornbound", name: "Thornbound Elder", tier: 10,
+      // The ridge line above the far tarn. 44 health is the biggest ordinary pool on the surface
+      // and the resistances are symmetric, so this is the block you simply have to out-fight.
+      id: "ridge_ibex", family: "ibex", name: "Ridge Ibex", tier: 10,
       count: 3, centre: [268, -140], radius: 18,
-      assetId: "enemy_bee", scale: 0.7,
-      level: 28, maxHealth: 120, aggroRadius: 11, behaviour: "territorial",
+      assetId: "animal_ibex", scale: 0.95,
     },
     {
-      // On the lower terrace, 30 m from the Karrowmoor terraces node and 30 m from the Gravelmaw
-      // mouth, i.e. beside the road into the dungeon rather than across it. Territorial at 6 m: a
-      // wall the player walks around until they bring a staff, not an ambush.
-      id: "terrace_mudbacks", family: "mudback", name: "Terrace Mudback", tier: 10,
+      // The terraces above the lower quarry. Armour 78 against magicArmour 0 is the widest split in
+      // the game, and at 1.1 x 1.15 this is the largest non-boss animal in Corealm at 3.20 m long:
+      // the last aurochs herd anywhere, and it reads like it.
+      id: "terrace_aurochs", family: "aurochs", name: "Terrace Aurochs", tier: 10,
       count: 3, centre: [72, -44], radius: 14,
-      // 1.15 x the tier 10 silhouette 1.151 = 2.00 m tall and 3.36 m across, the largest non-boss
-      // thing in the world and 46% wider than the Scree Skitterling on the same crab rig.
-      assetId: "enemy_crab", scale: 1.15,
-      level: 22, maxHealth: 46, aggroRadius: 6, behaviour: "territorial",
+      assetId: "animal_aurochs", scale: 1.1,
     },
     {
-      // 7.6 m off the ramp_three -> Upper Karrow Seam road, which is the tier 10 mining run the
-      // DISTANCE LEDGER at the top of this file is built on. Anyone walking it is Mining 12 and
-      // Melee 12 by construction, so this is the one place an aggressive tier 10 group can sit on a
-      // road without being a wall across the region.
-      //
-      // Was [206, -30] on the moor road, which is wrong twice: measured in-game that spot is inside
-      // a field of the large rock formations Karrowmoor scatters, so the Reavers were hidden inside
-      // geometry; and it is the FIRST junction a tier 5 player reaches walking in from Vellenwood.
+      // Down at the Cairn Tarns, where the fishing is. 1800 ms is the fastest tier 10 cadence, so
+      // this is the thing that punishes standing still at the water's edge.
+      id: "tarn_coyotes", family: "coyote", name: "Tarn Coyote", tier: 10,
+      count: 4, centre: [228, -70], radius: 14,
+      assetId: "animal_coyote", scale: 0.95,
+    },
+    {
       id: "karrow_reavers", family: "reaver", name: "Karrow Reaver", tier: 10,
       count: 4, centre: [148, -128], radius: 12,
-      // The male ranger set - hooded, and the same silhouette family as Ordrun four chambers down,
-      // which is the intended read: the Quarrykeeper's crew, still on the moor. 0.90 x 1.151 =
-      // 1.89 m, against Ordrun's 4.52 m.
       assetId: "outfit_male_ranger", scale: 0.90,
-      level: 26, maxHealth: 40, aggroRadius: 14, behaviour: "aggressive",
-    },
-    {
-      // The tarn road between Highcairn and the Ridge Pines, 20 m north of it. Placed clear of the
-      // ridge_pines_trees cluster (34 m centre to centre against a combined 32 m of radius) so a
-      // wolf cannot spawn inside a pine.
-      id: "tarn_marchwolves", family: "marchwolf", name: "Tarn Marchwolf", tier: 10,
-      count: 4, centre: [228, -70], radius: 14,
-      // 0.85 x 1.151 = 1.61 m, against the tier 5 Marchwolf's 1.42 m on the same rig.
-      assetId: "enemy_blob", scale: 0.85,
-      level: 25, maxHealth: 30, aggroRadius: 12, behaviour: "aggressive",
     },
   ],
 
@@ -1593,57 +1614,50 @@ const KARROWMOOR: RegionDef = {
         interaction: "climb",
       },
     ],
-    enemyGroups: [
+        enemyGroups: [
+      // Underground, and stocked to read as one: rats in the entry drifts, scorpions in the middle
+      // workings, crabs in the flooded sump, and two cave bears standing between you and Ordrun.
       {
-        id: "gravelmaw_ch1_wights", family: "cairnwight", name: "Cairnwight", tier: 10,
+        id: "gravelmaw_ch1_rats", family: "rat", name: "Gravelmaw Rat", tier: 10,
         count: 4, centre: [40, -40], radius: 8,
-        assetId: "enemy_skull", scale: 0.8,
-        level: 24, maxHealth: 96, aggroRadius: 9, behaviour: "aggressive",
+        // 0.60 m of rat native. 1.8 x 1.15 draws it 1.24 m long and 0.29 m tall: low, quick and
+        // clearly not an ordinary rat.
+        assetId: "animal_rat", scale: 1.8,
       },
       {
-        // The Lit Gallery is lit because somebody is keeping it lit. Two of them, at the chamber's
-        // north edge - 5.7 m from its centre with a 5 m spawn radius, so both stay inside the 11 m
-        // carved floor. Count 2 rather than 4: chamber one is the room every dungeon trip enters
-        // through, and it already holds the four Cairnwights `long_cairn` stage 4 sends you for.
-        id: "gravelmaw_ch1_reavers", family: "reaver", name: "Gravelmaw Reaver", tier: 10,
+        id: "gravelmaw_ch1_reavers", family: "reaver", name: "Karrow Reaver", tier: 10,
         count: 2, centre: [44, -36], radius: 5,
         assetId: "outfit_male_ranger", scale: 0.90,
-        level: 26, maxHealth: 40, aggroRadius: 14, behaviour: "aggressive",
       },
       {
-        id: "gravelmaw_ch2_skitterlings", family: "skitterling", name: "Scree Skitterling", tier: 10,
+        // The middle workings. High armour AND high magicArmour, the only block in the game with
+        // both, so nothing answers a scorpion cheaply and a player already committed to the dungeon
+        // cannot re-kit to solve it.
+        id: "gravelmaw_ch2_scorpions", family: "scorpion", name: "Quarry Scorpion", tier: 10,
         count: 6, centre: [30, -58], radius: 9,
-        assetId: "enemy_crab", scale: 0.75,
-        level: 20, maxHealth: 78, aggroRadius: 8, behaviour: "aggressive",
+        assetId: "animal_scorpion", scale: 2.2,
       },
       {
-        // In the fallen rock of The Collapse, beside the Scree Skitterlings on the same crab rig at
-        // 1.15 against their 0.75 - the size difference is the whole visual argument, and the
-        // 78-armour / 0-magicArmour split is the mechanical one. Territorial, so the room stays
-        // navigable while the door puzzle is being worked out.
-        id: "gravelmaw_ch2_mudbacks", family: "mudback", name: "Gravelmaw Mudback", tier: 10,
+        // The flooded sump. Armour 82 is the highest in the game.
+        id: "gravelmaw_ch2_crabs", family: "crab", name: "Sump Crab", tier: 10,
         count: 3, centre: [27, -54], radius: 4,
-        assetId: "enemy_crab", scale: 1.15,
-        level: 22, maxHealth: 46, aggroRadius: 6, behaviour: "territorial",
+        // 0.32 m across native, which is a rock-pool crab. 4.0 x 1.15 draws it 1.47 m across.
+        assetId: "animal_crab", scale: 4.0,
       },
       {
-        id: "gravelmaw_ch3_elders", family: "thornbound", name: "Thornbound Elder", tier: 10,
+        // The last room before the boss. Territorial rather than aggressive, so the fight is the
+        // player's choice right up to the door.
+        id: "gravelmaw_ch3_bears", family: "bear", name: "Gravelmaw Cave Bear", tier: 10,
         count: 2, centre: [22, -76], radius: 7,
-        assetId: "enemy_bee", scale: 0.7,
-        level: 28, maxHealth: 120, aggroRadius: 11, behaviour: "territorial",
+        assetId: "animal_bear", scale: 1.05,
       },
       {
-        // Ordrun. Two phases, 24 m leash, ground slam from 55% health. Round 4 owns the fight;
-        // this is the spawn and the silhouette. 1.6x on a 1.5 m skull is a 2.4 m stone thing.
+        // Unchanged, and the only humanoid left in the dungeon. Being the one man-shaped thing in
+        // a hall of rats, scorpions and crabs is now doing more work than it used to: the room
+        // reads as an animal den with a person standing in the middle of it.
         id: "ordrun", family: "quarrykeeper", name: "Ordrun the Quarrykeeper", tier: 10,
         count: 1, centre: [10, -96], radius: 0,
-        // Was enemy_skull, which renders as a featureless pale egg — no silhouette, no read at
-        // any distance, and nothing that says "quarrykeeper". The asset report's recommended
-        // substitute for the missing boss mesh is a humanoid given a stone treatment and scale;
-        // the tier 10 palette does the stone, and being the only man-shaped thing in a room of
-        // crabs and skulls does the rest.
-        assetId: "outfit_male_ranger", scale: 1.35,
-        level: 20, maxHealth: 200, aggroRadius: 24, behaviour: "territorial", boss: true,
+        assetId: "outfit_male_ranger", scale: 1.35, boss: true,
       },
     ],
     locations: [

@@ -259,8 +259,8 @@ const HARROW: DialogueNodeDef[] = [
   {
     id: "harrow_cold_iron_accepted",
     text:
-      "Good. Pit is north, one hundred and sixty metres. Take the east gate. Skitterlings on the "
-      + "brook flats when you are ready to test it, around minus eighty-eight, minus seventy.",
+      "Good. Pit is north, one hundred and sixty metres. Take the east gate. Frogs on the "
+      + "shallows when you are ready to test it, around minus fifty-six, minus seventy-two.",
     options: [
       { id: "harrow_cold_iron_accepted#back", text: "Anything else?", next: "harrow_root" },
       LEAVE("harrow_cold_iron_accepted#bye"),
@@ -280,7 +280,7 @@ const HARROW: DialogueNodeDef[] = [
       },
       {
         when: [{ kind: "questStage", questId: "cold_iron", min: 3, max: 3, reason: "" }],
-        text: "Wear it. Then find three Skitterlings. Carrying a blade is not owning one.",
+        text: "Wear it. Then find three frogs. Carrying a blade is not owning one.",
       },
       {
         when: [{ kind: "questStage", questId: "cold_iron", min: 4, reason: "" }],
@@ -606,8 +606,8 @@ const SYB: DialogueNodeDef[] = [
   {
     id: "syb_march",
     text:
-      "Skitterlings in the wet ground by the brook, minus eighty-eight, minus seventy. They will "
-      + "not start it. Marchwolf pups on the rise at the Open March, minus two-fifty, thirty. "
+      "Frogs in the wet ground by the shallows, minus fifty-six, minus seventy-two. They will "
+      + "not start it. Billy goats on the rise at the Open March, minus two-fifty, thirty. "
       + "They will. Neither will kill you if you have eaten. That is most of what I know and all "
       + "of what matters.",
     options: [
@@ -891,7 +891,7 @@ const ANSEL: DialogueNodeDef[] = [
   {
     id: "ansel_thornline",
     text:
-      "The Thornbound keep to the edges of the clearings. They do not come in past the standing "
+      "The stags keep to the edges of the clearings. They do not come in past the standing "
       + "stones, entity thornline_stones. ... Nobody knows why and I will not be the one to find "
       + "out. Trapper Mott sets his line out that way, which tells you what Mott is like.",
     options: [
@@ -991,7 +991,7 @@ const JUNO: DialogueNodeDef[] = [
     id: "juno_parts_taken",
     text:
       "Four and five. Grain runs true on all four, which means: you did not rush them. Right. "
-      + "Wraps, take them, bramblehide, they will not stop a Cairnwight but they will stop the "
+      + "Wraps, take them, bramblehide, they will not stop a bear but they will stop the "
       + "cold. And a stack of Air Essence, because it powers Air spells before and after an upgrade.",
     options: [
       { id: "juno_parts_taken#shards", text: "So what does the orb do?", next: "juno_shards" },
@@ -1013,8 +1013,8 @@ const JUNO: DialogueNodeDef[] = [
   {
     id: "juno_hide",
     text:
-      "Coarse hide off the march, bramble hide off anything with a thorn in it, and wight shroud, "
-      + "which is not hide and which I do not enjoy handling. Robes and wraps, mostly. Anything "
+      "Coarse hide off the march, bramble hide off anything with a thorn in it, and cairn pelt, "
+      + "which comes off the big ones and which I do not enjoy handling. Robes and wraps, mostly. Anything "
       + "that has to bend rather than stop a blade.",
     options: [
       { id: "juno_hide#back", text: "Something else.", next: "juno_root" },
@@ -1045,7 +1045,7 @@ const MOTT: DialogueNodeDef[] = [
       {
         when: [{ kind: "questStatus", questId: "eleven_empty_days", status: "complete", reason: "" }],
         text:
-          "Skitterlings. Skitterlings all along, eating the bait out from under. Well. That is a "
+          "Hogs. Hogs all along, eating the bait out from under. Well. That is a "
           + "relief, in the way that a thing can be a relief and still leave you with eleven "
           + "empty traps.",
       },
@@ -1068,7 +1068,7 @@ const MOTT: DialogueNodeDef[] = [
         requires: [
           {
             kind: "questStage", questId: "eleven_empty_days", min: 2,
-            reason: "Walk all four sites and clear the Bramble Skitterlings first.",
+            reason: "Walk all four sites and clear the Bramble Hogs first.",
           },
         ],
         next: "mott_report",
@@ -1097,8 +1097,8 @@ const MOTT: DialogueNodeDef[] = [
   {
     id: "mott_line_accepted",
     text:
-      "Thank you. Genuinely. The Thornbound at the Thornline are territorial, so they will not "
-      + "chase you far, they will simply be extremely present. Bramble Skitterlings sit between "
+      "Thank you. Genuinely. The adders on the Thornline are territorial, so they will not "
+      + "chase you far, they will simply be extremely present. Bramble Hogs sit between "
       + "here and there, around one-fifty, one-twenty-eight, and they are the ones I would bet "
       + "on for the bait.",
     options: [
@@ -1113,13 +1113,13 @@ const MOTT: DialogueNodeDef[] = [
     options: [
       {
         id: "mott_report#kind",
-        text: "Skitterlings. They have been working the bait out from under the plates.",
+        text: "Hogs. They have been working the bait out from under the plates.",
         effects: [{ kind: "setFlag", questId: "eleven_empty_days", flag: "let_him_off" }],
         next: "mott_verdict_given",
       },
       {
         id: "mott_report#truth",
-        text: "Skitterlings, yes. Also, Mott, all eleven traps are set upside down.",
+        text: "Hogs, yes. Also, Mott, all eleven traps are set upside down.",
         effects: [{ kind: "setFlag", questId: "eleven_empty_days", flag: "told_him_the_truth" }],
         next: "mott_verdict_given",
       },
@@ -1128,7 +1128,7 @@ const MOTT: DialogueNodeDef[] = [
   {
     id: "mott_verdict_given",
     text:
-      "Skitterlings. Of course it is skitterlings. It is always the small ones. Here, take the "
+      "Hogs. Of course it is hogs. It is never anything with a story in it. Here, take the "
       + "trout, I smoked them myself and they are the one thing I have not got wrong.",
     variants: [
       {
@@ -1328,7 +1328,7 @@ const VESS: DialogueNodeDef[] = [
           { kind: "questStage", questId: "sparking_stone", min: 3, max: 3, reason: "" },
         ],
         text:
-          "Now Voltrend. Get Magic to five. Use Rill Skitterlings, and return to the awakened Air "
+          "Now Voltrend. Get Magic to five. Use Redsill Frogs, and return to the awakened Air "
           + "Altar if you somehow chew through a thousand charges.",
       },
       {
@@ -1419,8 +1419,8 @@ const VESS: DialogueNodeDef[] = [
       + "fletch_palewood_staff. Use the Air Orb on entity fallowmarch_air_altar to awaken it, then "
       + "use recipe craft_air_staff at that altar. Equip the Air Staff. It starts with 1000 charges "
       + "and spends those before carried Air Essence. The same altar fills it back to 1000 for 100 "
-      + "Air Essence. Then use Voltrend on Rill Skitterlings near locationId "
-      + "redsill_shallows. Do not practise on Cairnwights.",
+      + "Air Essence. Then use Voltrend on Redsill Frogs near locationId "
+      + "redsill_shallows. Do not practise on bears.",
     options: [
       { id: "vess_stone_accepted#back", text: "Right.", next: "vess_root" },
       LEAVE("vess_stone_accepted#bye"),
@@ -1501,7 +1501,7 @@ const ODE: DialogueNodeDef[] = [
         requires: [
           {
             kind: "skill", skill: "melee", level: 10,
-            reason: "Ode will not send anyone under Melee 10 up the terraces. Cairnwights hold the ground at (100, -110).",
+            reason: "Ode will not send anyone under Melee 10 up the terraces. Bears hold the ground at (100, -110).",
           },
           {
             kind: "skill", skill: "mining", level: 10,
@@ -1604,7 +1604,7 @@ const ODE: DialogueNodeDef[] = [
   {
     id: "ode_long_cairn_accepted",
     text:
-      "Bank, Second Ramp, Third Ramp, then west. Cairnwights hold the middle ground at about one "
+      "Bank, Second Ramp, Third Ramp, then west. Bears hold the middle ground at about one "
       + "hundred, minus one hundred and ten, and they do not leash early. Go fed.",
     options: [
       { id: "ode_long_cairn_accepted#back", text: "Understood.", next: "ode_root" },
@@ -1730,7 +1730,7 @@ const ODE: DialogueNodeDef[] = [
     text:
       "Then the hall is reachable and the office can be finished properly. This is a keeping-"
       + "stone. Cairn garnet, cut and not polished, and it goes on the top course of the cairn in "
-      + "that hall, item cairn_garnet. Two Thornbound Elders stand over it and they will have to "
+      + "that hall, item cairn_garnet. Two cave bears stand over it and they will have to "
       + "be moved, and I am sorry, and I mean it. Do not sell the stone on the way.",
     options: [
       { id: "ode_long_cairn_stone_given#back", text: "Top course. Understood.", next: "ode_root" },
@@ -1810,7 +1810,7 @@ const HALE: DialogueNodeDef[] = [
   {
     id: "hale_gravelmaw_told",
     text:
-      "Plainly. Right. ... Four Cairnwights in the first chamber, the lit one. Somebody keeps "
+      "Plainly. Right. ... Four rats in the first chamber, the lit one. Somebody keeps "
       + "those torches burning, and it is not us, and I would rather they went out. Past that "
       + "there is a collapse, and it is dark, and there are a lot of the small ones in it. And "
       + "there is a door with three levers that none of us could work out, and after that... I "

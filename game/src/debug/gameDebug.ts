@@ -112,9 +112,21 @@ export interface DebugDeps {
   /** Brings a node or enemy back immediately, skipping its respawn timer. */
   forceRespawn(entityId: EntityId): boolean;
   /** World-space box the renderer draws for one entity, or null when it draws nothing. */
-  drawnBounds(entityId: EntityId): { min: Vec3; max: Vec3; meshes: number; path: string } | null;
+  drawnBounds(
+    entityId: EntityId,
+  ): { min: Vec3; max: Vec3; meshes: number; path: string; fade: number } | null;
   /** Instancing, rig and draw-call budget state for the entity layer. */
   entityViewStats(): unknown;
+  /**
+   * What the cursor currently has hovered and selected.
+   *
+   * Selection lives in the input controller, not in `GameState`, so nothing else on this surface
+   * can see it - and "the ring is still on the corpse" is exactly the kind of thing that needs a
+   * measurement rather than a screenshot.
+   */
+  selection?(): { hovered: EntityId | null; selected: EntityId | null };
+  /** Selects an entity through the same path a click takes, for checks that need one selected. */
+  select?(entityId: EntityId | null): void;
   /** Terrain height at a world XZ. The same function the world layer places entities with. */
   groundHeight(x: number, z: number): number;
   /** Every assembled building, with the footprint the terrain has to be flat across. */
@@ -192,6 +204,8 @@ export function installGameDebug(deps: DebugDeps): void {
         bankUsed: state.bank.slots.length,
         activity: state.activity ? state.activity.kind : null,
         combatTargetId: state.combat.targetId,
+        selectedEntityId: deps.selection?.().selected ?? null,
+        hoveredEntityId: deps.selection?.().hovered ?? null,
         questCount: Object.keys(state.quests).length,
         entityCount: api.hooks.entities?.all().length ?? 0,
         assets: assets.stats(),
@@ -364,6 +378,10 @@ export function installGameDebug(deps: DebugDeps): void {
       deps.advanceWorldTime?.(seconds);
     },
 
+    select(entityId: EntityId | null): void {
+      deps.select?.(entityId);
+    },
+
     teleport(to: Vec3 | { x: number; y: number; z: number } | { entityId: EntityId } | { locationId: string }): boolean {
       let target: Vec3 | null = null;
       if (Array.isArray(to)) target = to as Vec3;
@@ -505,6 +523,9 @@ export function installGameDebug(deps: DebugDeps): void {
         // "instanced" is the baked-idle fallback, "animated:<clip>" is a live rig. A screenshot
         // cannot tell them apart and the difference is the whole reason a boss looks like a statue.
         path: bounds.path,
+        // How far through dissolving a corpse is, 0 to 1. The box is measured off the object graph
+        // and an invisible corpse still has one, so this is the only thing that says it has gone.
+        fade: round3(bounds.fade),
       };
     },
 

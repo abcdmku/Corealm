@@ -2,6 +2,8 @@
 
 - Nox Sound Design, Essentials Series — CC0.
 - OpenGameArt contributors listed in `docs/audio-source-opengameart.md` — CC0.
+- Animal voices: OpenGameArt contributors listed in `docs/audio-source-animals.md`, including
+  rubberduck (80 CC0 creature SFX, volumes 1 and 2) and qubodup (two cattle recordings) — CC0.
 - TomMusic, Free Fantasy 200 SFX — used under the creator's royalty-free project license; credit
   included by request.
 - FilmCow / Jason Steele, SFX Volumes 1 and 4 — used under the FilmCow Royalty Free SFX License.

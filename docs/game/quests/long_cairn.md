@@ -17,7 +17,7 @@ Somebody has been re-stacking the cairns on Karrowmoor. Cairnkeeper Ode knows ev
 
 ### 1. Go and look at the Great Cairn on terrace four.
 
-`moveTo({ locationId: "great_cairn" })` from Highcairn goes bank -> Second Ramp -> Third Ramp -> the cairn. Cairnwights hold the ground around (100, -110) on the way, so travel fed and armed. `inspect("great_cairn_stone")` when you arrive.
+`moveTo({ locationId: "great_cairn" })` from Highcairn goes bank -> Second Ramp -> Third Ramp -> the cairn. Bears hold the ground around (100, -110) on the way, so travel fed and armed. `inspect("great_cairn_stone")` when you arrive.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#the-great-cairn">The Great Cairn</a></nav>
 <div class="corealm-quest-step-evidence">
@@ -109,14 +109,14 @@ Hale is at (152, -74), the east side of Highcairn. He watches the mouth for a li
 | --- | --- |
 | Magic XP | 90 |
 
-### 4. Enter the Gravelmaw, kill 4 Cairnwights in the Lit Gallery, and reach The Collapse.
+### 4. Enter the Gravelmaw, kill 4 Gravelmaw Rats in the Lit Gallery, and reach The Collapse.
 
 The mouth is at (46, -24) on terrace one, next to the Lower Quarry. Inside, `moveTo({ locationId: "gravelmaw_chamber1" })` then `"gravelmaw_chamber2"`. The gallery is lit; the collapse is not.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#the-gravelmaw">The Gravelmaw</a><a href="../../regions/#the-lit-gallery">The Lit Gallery</a><a href="../../regions/#the-collapse">The Collapse</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/gravelmaw_mouth_portal.webp" alt="Gravelmaw Mouth Portal in the running Corealm world" loading="lazy" /><figcaption><strong>Gravelmaw Mouth Portal</strong><span>The Gravelmaw, The Lit Gallery, The Collapse</span></figcaption></figure>
-<figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch1_wights.webp" alt="Cairnwight in the running Corealm world" loading="lazy" /><figcaption><strong>Cairnwight</strong><span>The Lit Gallery, Gravelmaw</span></figcaption></figure></div>
+<figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch1_rats.webp" alt="Gravelmaw Rat in the running Corealm world" loading="lazy" /><figcaption><strong>Gravelmaw Rat</strong><span>The Lit Gallery, Gravelmaw</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 4">
 <div class="corealm-map-stage" data-map-stage>
@@ -210,14 +210,14 @@ She will hand you a Cairn Garnet (item `cairn_garnet`). Do not sell it; stage 7 
 | [Cairn Garnet](../../items/#cairn-garnet) | 1 |
 | Marks | 300 |
 
-### 7. Carry the Cairn Garnet into The Cairn Hall, kill the 2 Thornbound Elders standing over the cairn, and set the stone on it.
+### 7. Carry the Cairn Garnet into The Cairn Hall, kill the 2 cave bears standing over the cairn, and set the stone on it.
 
-With the door open, chamber 2 walks straight through to chamber 3. The stage completes the moment all three hold at once: both Elders dead, you inside the hall, garnet still in your bag. Completing it takes the garnet and unseals the Quarrykeeper's Gate.
+With the door open, chamber 2 walks straight through to chamber 3. The stage completes the moment all three hold at once: both bears dead, you inside the hall, garnet still in your bag. Completing it takes the garnet and unseals the Quarrykeeper's Gate.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 7"><span>Where</span><a href="../../regions/#the-gravelmaw">The Gravelmaw</a><a href="../../regions/#the-cairn-hall">The Cairn Hall</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 7"><span>Items</span><a href="../../items/#cairn-garnet">Cairn Garnet</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch3_elders.webp" alt="Thornbound Elder in the running Corealm world" loading="lazy" /><figcaption><strong>Thornbound Elder</strong><span>The Cairn Hall, Gravelmaw</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch3_bears.webp" alt="Gravelmaw Cave Bear in the running Corealm world" loading="lazy" /><figcaption><strong>Gravelmaw Cave Bear</strong><span>The Cairn Hall, Gravelmaw</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 7">
 <div class="corealm-map-stage" data-map-stage>

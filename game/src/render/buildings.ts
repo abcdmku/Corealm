@@ -2766,7 +2766,7 @@ function greatCairn(): PartPlacement[] {
 }
 
 /**
- * A ring of four stacked uprights around the hero stone. The edge the Thornbound will not cross.
+ * Four uprights in a ring around the hero boulder. The edge the stags will not cross.
  *
  * `cliff_tall` was the upright and it is one of the six untextured platformer rocks
  * (`compositions/gravelmawMouth.ts` carries the measurement), so all four read as smooth tan cones.

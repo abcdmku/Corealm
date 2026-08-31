@@ -510,7 +510,12 @@ export class GameLoop {
     }
     // Animation advances on real time, not sim time: a paused sim should still idle, and a
     // time-scaled test run should not play idles at 100x.
-    this.entityViews?.update(realDeltaMs / 1000, renderer.camera.position);
+    //
+    // The corpse fade is the exception and takes the SIM clock, which is why both go in. It is a
+    // function of `nowMs - view.diedAtMs`, and that instant was stamped on the sim clock, so any
+    // other time base would make a body dissolve at the wrong moment - or on a resumed save, at a
+    // wildly wrong one.
+    this.entityViews?.update(realDeltaMs / 1000, renderer.camera.position, this.deps.clock.elapsedMs);
     this.overlays?.update(this.deps.clock.elapsedMs);
     this.paintCombatHits(nowMs);
     this.vfx?.update(nowMs);

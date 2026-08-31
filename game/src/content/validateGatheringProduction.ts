@@ -237,6 +237,18 @@ function canonicalTierRecipeExpectations(
       burntItemId: m.burntFish,
     },
     {
+      // The hunting half of Cooking, and the same row shape as the fish above it. Game meat comes
+      // off this tier's animals rather than out of the gathering ladder, but it cooks at the same
+      // fire and burns the same way, so the matrix owns it too.
+      family: "cooked meat",
+      id: `cook_${m.cookedMeat}`,
+      kind: "cook",
+      outputItemId: m.cookedMeat,
+      stations: ["range", "campfire"],
+      requiredInputItemIds: [m.rawMeat],
+      burntItemId: m.burntMeat,
+    },
+    {
       ...craft("elemental wand", tier.magic.wand),
       stations: ["essence_altar"],
       requiredInputItemIds: [m.wand],
@@ -705,8 +717,7 @@ export function validateGatheringProduction(
   }
 
   for (const assetId of foundationAssetIds) {
-    const asset = manifestAssetsById.get(assetId);
-    if (!asset) {
+    if (!manifestAssetsById.has(assetId)) {
       problems.push(`foundation asset ${assetId} has no manifest metadata entry`);
     }
   }

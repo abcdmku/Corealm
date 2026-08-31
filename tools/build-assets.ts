@@ -831,6 +831,13 @@ interface ManifestAsset {
   materials: string[];
   /** Optional for historical CC0 rows. Required and audited for imported Unity outputs. */
   sha256?: string;
+  /**
+   * Ground speed the asset's own walk cycle implies, m/s. Written by `tools/build-animals.ts`.
+   *
+   * `render/entityViews.ts` divides the creature's real `moveSpeedMps` by this to set the clip's
+   * playback rate, so legs match ground speed instead of skating.
+   */
+  impliedWalkMps?: number;
 }
 
 interface ManifestArtifact {
@@ -852,7 +859,11 @@ interface Manifest {
     author: string;
     source: string;
     license: string;
-    archiveSha256: string;
+    /**
+     * CC0 packs only. Imported Unity packs are audited per file through each asset's `sha256`
+     * instead, because there is no redistributable archive of ours to hash.
+     */
+    archiveSha256?: string;
   }>;
   assets: ManifestAsset[];
   /** Non-GLB files with third-party provenance. The runtime ignores this audit-only list. */
@@ -1899,6 +1910,7 @@ async function probe(zipKey: string, needle: string): Promise<void> {
   await zip.close();
 }
 
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args[0] === "--probe") {
@@ -2037,6 +2049,10 @@ async function main(): Promise<void> {
     if (!ids.has(id)) delete state[id];
   }
 
+  // `preserved` already carries every row this builder does not own — the imported Unity weapon and
+  // rock GLBs, and the Animal pack deluxe GLBs that `tools/build-animals.ts` converts out of a
+  // .unitypackage of binary FBX that this tool cannot read. They are replayed, not rebuilt, and
+  // `preservedManifestRows` re-checks each file's size and SHA-256 before trusting the row.
   const usedPacks = new Set(assets.map((asset) => asset.pack));
   const manifest: Manifest = {
     generatedAt: await manifestGeneratedAt(),

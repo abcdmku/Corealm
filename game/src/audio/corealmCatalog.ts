@@ -12,6 +12,18 @@ const cow4 = (name: string): string => publicAsset(`audio/sfx/filmcow-v4/${name}
 const oga = (name: string): string => publicAsset(`audio/sfx/oga/${name}.ogg`);
 const custom = (name: string): string => publicAsset(`audio/sfx/custom/${name}.ogg`);
 const music = (name: string): string => publicAsset(`audio/music/${name}.mp3`);
+/**
+ * Animal voices, all Ogg Vorbis like every other SFX directory.
+ *
+ * Four frog croaks arrived as mp3 and the two real cow moos as wav; both were transcoded at
+ * `-q:a 5` by `tools/animals/stage-audio.py`'s companion step, because `tests/audioCatalog.test.ts`
+ * asserts every sfx URL ends in `.ogg` and that convention is worth more than saving one re-encode
+ * of an already-lossy source.
+ *
+ * Routed through `publicAsset` like the rest: the game is served under a base path on Pages, and a
+ * hard-coded leading slash would 404 every animal call there.
+ */
+const animal = (name: string): string => publicAsset(`audio/sfx/animals/${name}.ogg`);
 
 /**
  * Every semantic cue has an explicit grounded-fantasy source. The curation ledgers under `docs/`
@@ -80,6 +92,29 @@ const cues = {
   "interaction.dialogue_open": { variants: [cow1("parchment-handle-01")], gain: 0.23, playbackRate: 1.05, maxConcurrent: 1 },
   "interaction.dialogue_close": { variants: [cow1("parchment-handle-01")], gain: 0.2, playbackRate: 0.92, maxConcurrent: 1 },
   "interaction.activity_stop": { variants: [cow1("cloth-ruffle-01")], gain: 0.2, playbackRate: 0.88, minIntervalMs: 180 },
+
+  // Animal voices. Sources and CC0 evidence are in docs/audio-source-animals.md.
+  //
+  // Every one carries a long `minIntervalMs` and a low `maxConcurrent` on purpose: a nine-strong
+  // shoal or a seven-strong flock would otherwise all call on the same frame the player walks into
+  // aggro range, and thirteen simultaneous voices is a wall of noise rather than a place with
+  // animals in it. The rate ranges pull individuals apart in pitch so a flock does not sound like
+  // one bird played seven times.
+  "creature.hen_cluck": { variants: [animal("hen-cluck-01"), animal("hen-cluck-02")], gain: 0.30, playbackRate: [1.06, 1.18], minIntervalMs: 900, maxConcurrent: 2 },
+  "creature.frog_croak": { variants: [animal("frog-croak-01"), animal("frog-croak-02"), animal("frog-croak-03"), animal("frog-ribbit-01")], gain: 0.34, playbackRate: [0.94, 1.08], minIntervalMs: 700, maxConcurrent: 3 },
+  "creature.goat_bleat": { variants: [animal("goat-bleat-01")], gain: 0.34, playbackRate: [0.92, 1.06], minIntervalMs: 1100, maxConcurrent: 2 },
+  // The cow clips are the two real moos in an otherwise sci-fi CC0 pack. Slowed slightly, because
+  // an aurochs is the same voice one size down in pitch.
+  "creature.cow_low": { variants: [animal("cow-moo-01"), animal("cow-moo-02")], gain: 0.36, playbackRate: [0.86, 0.96], minIntervalMs: 1400, maxConcurrent: 2 },
+  "creature.coney_squeak": { variants: [animal("rodent-squeak-01"), animal("rodent-squeak-02")], gain: 0.24, playbackRate: [1.1, 1.25], minIntervalMs: 800, maxConcurrent: 2 },
+  "creature.viper_hiss": { variants: [animal("serpent-hiss-01"), animal("serpent-hiss-02")], gain: 0.32, playbackRate: [0.94, 1.05], minIntervalMs: 1000, maxConcurrent: 2 },
+  "creature.stag_bell": { variants: [animal("stag-bellow-01"), animal("stag-bellow-02")], gain: 0.38, playbackRate: [0.9, 1.0], minIntervalMs: 1600, maxConcurrent: 1 },
+  "creature.hog_grunt": { variants: [animal("boar-grunt-01"), animal("boar-grunt-02"), animal("boar-grunt-03")], gain: 0.34, playbackRate: [0.9, 1.04], minIntervalMs: 900, maxConcurrent: 2 },
+  "creature.coyote_howl": { variants: [animal("coyote-howl-01"), animal("coyote-bark-01"), animal("coyote-bark-02")], gain: 0.38, playbackRate: [0.98, 1.1], minIntervalMs: 1200, maxConcurrent: 2 },
+  // The loudest voice in the game after the boss slam, and the only one that should carry across a
+  // valley. Two real bear growls plus one pack roar for the aggro moment.
+  "creature.bear_roar": { variants: [animal("bear-growl-01"), animal("bear-growl-02"), animal("bear-roar-01")], gain: 0.46, playbackRate: [0.88, 0.98], minIntervalMs: 1600, maxConcurrent: 1 },
+  "creature.chitin_click": { variants: [animal("chitin-click-01"), animal("chitin-click-02"), animal("chitin-click-03")], gain: 0.30, playbackRate: [0.96, 1.12], minIntervalMs: 700, maxConcurrent: 3 },
 } satisfies Record<AudioCueId, AudioCueDefinition>;
 
 export const COREALM_AUDIO_CATALOG = defineAudioCatalog({

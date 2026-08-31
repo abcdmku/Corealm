@@ -73,6 +73,12 @@ export const AUDIO_CUE_IDS = [
   "interaction.vault", "interaction.loot", "interaction.equip", "interaction.consume",
   "interaction.bank", "interaction.trade", "interaction.dialogue_open",
   "interaction.dialogue_close", "interaction.activity_stop",
+  // Animal voices, one per VOICE rather than per family, because several families share a throat:
+  // cattle and aurochs both low, goats and ibex both bleat, coneys and rats both squeak, scorpions
+  // and crabs both click. `audio/director.ts: cueForCreature` owns the family-to-voice map.
+  "creature.hen_cluck", "creature.frog_croak", "creature.goat_bleat", "creature.cow_low",
+  "creature.coney_squeak", "creature.viper_hiss", "creature.stag_bell", "creature.hog_grunt",
+  "creature.coyote_howl", "creature.bear_roar", "creature.chitin_click",
 ] as const;
 
 export type AudioCueId = (typeof AUDIO_CUE_IDS)[number];
@@ -274,7 +280,34 @@ export interface SemanticEntity {
   requirements?: Partial<Record<SkillId, number>>;
   interactions: InteractionId[];
   resource?: { remaining: number; maxYields: number; respawnSeconds: number; itemId: ItemId };
-  combat?: { health: number; maxHealth: number; level: number; aggroRadius: number };
+  combat?: {
+    health: number;
+    maxHealth: number;
+    level: number;
+    aggroRadius: number;
+    /**
+     * How fast this creature moves while pursuing, metres per second.
+     *
+     * Read by BOTH layers, which is why it is here rather than in either. `systems/enemyAI.ts`
+     * steps the entity at it, and `render/entityViews.ts` divides it by the walk cycle's own
+     * implied speed to get the playback rate that keeps the feet on the ground. A hen and a bear
+     * covering ground at the same 3.1 m/s was the visible half of that: the hen's cycle implies
+     * 0.75 m/s, so its legs were running four times too slowly for the distance it covered.
+     */
+    moveSpeedMps?: number;
+    /**
+     * Half the creature's widest ground footprint, metres, at its drawn scale.
+     *
+     * Here rather than in `render/` because it is what stops two of them standing in the same
+     * place, and that is a simulation rule: `systems/enemyAI.ts` uses the sum of two radii as the
+     * distance they have to keep. Without it every animal that aggros paths at the SAME point - the
+     * player - and nothing makes them give way, so a sett of bears arrives as one lump of fur.
+     *
+     * Measured, not authored. `world/regionBuilder.ts` reads the asset's manifest bbox, which
+     * `tools/build-animals.ts` wrote from the converted mesh, so a bear is 1.23 m and a frog 0.16.
+     */
+    bodyRadius?: number;
+  };
   npc?: { dialogueRootId: string; questIds: QuestId[] };
   station?: { kind: StationKind; skill: SkillId; recipeIds: RecipeId[] };
   /** Agility shortcut. Traversal is a route-graph edge, not a navmesh off-mesh link. */
@@ -307,6 +340,16 @@ export interface SemanticEntity {
     clipFraction?: number;
     /** Tier palette override. Defaults to the entity's own tier. */
     materialTier?: number;
+    /**
+     * Sim time this entity was killed, in the same clock `GameLoop` runs on. Absent while alive.
+     *
+     * A timestamp rather than a progress value on purpose. `render/entityViews.ts` needs to fade a
+     * corpse out smoothly at frame rate, and the view sync it would otherwise read from runs four
+     * times a second - six visible steps across a fade, which reads as a stutter rather than a
+     * dissolve. Given the instant it happened, the renderer computes the fade continuously from its
+     * own frame clock, and gets the same answer after a reload because the instant is state.
+     */
+    diedAtMs?: number;
     /** Metres above `position` for the interaction label and highlight ring. */
     labelHeight?: number;
     /**

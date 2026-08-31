@@ -9,7 +9,8 @@ import {
   type Vec3,
 } from "../contracts.js";
 import { tierSilhouetteScale } from "../core/math.js";
-import { ENEMIES, enemyIdFor } from "../content/enemies.js";
+import { enemyCombatLevel } from "../content/index.js";
+import { enemyBlockFor } from "../content/enemies.js";
 import { ALL_ITEMS } from "../content/items.js";
 import { QUESTS } from "../content/quests.js";
 import {
@@ -96,8 +97,6 @@ for (const source of [...NPC_SOURCES, ...CREATURE_SOURCES]) {
   TARGET_SOURCE_BY_KEY.set(key, source);
 }
 
-const ENEMY_BY_ID = new Map(ENEMIES.map((enemy) => [enemy.id, enemy] as const));
-
 /**
  * Every selectable actor, equipment item, skill, and spell in the real-engine lab.
  *
@@ -136,6 +135,16 @@ export interface FeatureLabEntityPlacement {
    * catalog keep render data behind the preset id while still using `AssetRegistry.baseY` directly.
    */
   readonly baseY: number | ((assetId: string) => number);
+  /**
+   * The asset's measured bounding box in metres, or a resolver for it. Creatures only.
+   *
+   * `world/regionBuilder.ts` derives `combat.bodyRadius` from this, and `systems/enemyAI.ts` uses
+   * that radius for separation and for how close a pursuer stops. Omitting it leaves the AI on its
+   * own fallback, which is a different creature footprint from the one the world spawns — so the
+   * lab passes it for the same reason production does.
+   */
+  readonly assetSize?: ((assetId: string) => { x: number; y: number; z: number } | null)
+    | { x: number; y: number; z: number } | null;
   /** Optional lab-facing override. NPCs otherwise use authored facing; creatures default to zero. */
   readonly rotationY?: number;
 }
@@ -212,11 +221,26 @@ function createCreatureEntity(
   baseY: number,
 ): SemanticEntity {
   const { group } = source;
-  const enemy = ENEMY_BY_ID.get(group.id) ?? ENEMY_BY_ID.get(enemyIdFor(group.family, group.tier));
+  // Same lookup and the same failure as `world/regionBuilder.ts: buildEnemyGroup`. Combat stats do
+  // not live on `EnemyGroupDef` any more, so there is no placement-hint fallback to fall back to:
+  // a group with no stat block is a content bug, and the lab must report it rather than spawn a
+  // creature whose numbers differ from the one in the world.
+  const stats = enemyBlockFor(group.id, group.family, group.tier);
+  if (!stats) {
+    throw new Error(
+      `Enemy group "${group.id}" (family "${group.family}", tier ${group.tier}) has no stat block in content/enemies.ts`,
+    );
+  }
   const archetype = group.boss ? "boss" as const : "enemy" as const;
   const viewScale = group.boss ? group.scale * 1.6 : group.scale;
   const drawnScale = viewScale * tierSilhouetteScale(group.tier);
   const position = placeOnFlatGround(placement.groundPosition, baseY, drawnScale);
+  // Widest ground axis, halved, at the size the creature is actually drawn. Same derivation as
+  // `buildEnemyGroup`; null when the caller supplies no box, which leaves the AI on its fallback.
+  const box = typeof placement.assetSize === "function"
+    ? placement.assetSize(group.assetId)
+    : placement.assetSize ?? null;
+  const bodyRadius = box ? (Math.max(box.x, box.z) / 2) * drawnScale : null;
   return {
     id: placement.entityId,
     archetype,
@@ -227,10 +251,13 @@ function createCreatureEntity(
     state: "alive",
     interactions: ["inspect", "attack"],
     combat: {
-      health: enemy?.maxHealth ?? group.maxHealth,
-      maxHealth: enemy?.maxHealth ?? group.maxHealth,
-      level: group.level,
-      aggroRadius: enemy?.aggroRadius ?? group.aggroRadius,
+      health: stats.maxHealth,
+      maxHealth: stats.maxHealth,
+      // Computed from the stat block, never authored. See `content/index.ts: enemyCombatLevel`.
+      level: enemyCombatLevel(stats),
+      aggroRadius: stats.aggroRadius,
+      ...(stats.moveSpeedMps === undefined ? {} : { moveSpeedMps: stats.moveSpeedMps }),
+      ...(bodyRadius === null ? {} : { bodyRadius }),
     },
     view: {
       assetId: group.assetId,
@@ -242,7 +269,7 @@ function createCreatureEntity(
     meta: {
       family: group.family,
       groupId: group.id,
-      behaviour: group.behaviour,
+      behaviour: stats.behaviour,
       spawnX: round2(position[0]),
       spawnZ: round2(position[2]),
     },

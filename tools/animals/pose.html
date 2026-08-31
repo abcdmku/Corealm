@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>animal pose viewer</title>
+<style>html,body{margin:0;background:#20242b;overflow:hidden}canvas{display:block}</style>
+</head>
+<body>
+<script type="importmap">
+{ "imports": { "three": "/node_modules/three/build/three.module.js" } }
+</script>
+<script type="module">
+/**
+ * Renders one animal at one moment of one clip, so an animation can be LOOKED at rather than
+ * inferred from keyframe counts. `tools/animals/pose-shots.ts` drives it over Playwright.
+ */
+import * as THREE from "three";
+import { GLTFLoader } from "/node_modules/three/examples/jsm/loaders/GLTFLoader.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(420, 360);
+renderer.setClearColor(0x20242b);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 2.2));
+const key = new THREE.DirectionalLight(0xffffff, 2.0);
+key.position.set(3, 5, 4);
+scene.add(key);
+
+const camera = new THREE.PerspectiveCamera(35, 420 / 360, 0.01, 100);
+const loader = new GLTFLoader();
+let current = null;
+const framing = { url: null, centre: new THREE.Vector3(), eye: new THREE.Vector3() };
+
+window.showPose = async (url, clipName, phase) => {
+  if (current) scene.remove(current);
+  const gltf = await loader.loadAsync(url);
+  const model = gltf.scene;
+  scene.add(model);
+  current = model;
+
+  const clip = gltf.animations.find((c) => c.name === clipName);
+  if (clip) {
+    const mixer = new THREE.AnimationMixer(model);
+    const action = mixer.clipAction(clip);
+    action.play();
+    mixer.setTime(clip.duration * phase);
+  }
+  model.updateMatrixWorld(true);
+
+  // Frame from the REST pose and cache it per model. Re-framing per phase would recentre the
+  // animal every shot and hide the very translation the lunge is made of.
+  if (framing.url !== url) {
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const centre = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(size.x, size.y, size.z);
+    framing.url = url;
+    framing.centre = centre.clone();
+    framing.eye = new THREE.Vector3(
+      centre.x + radius * 1.6, centre.y + radius * 0.5, centre.z + radius * 2.2,
+    );
+  }
+  camera.position.copy(framing.eye);
+  camera.lookAt(framing.centre);
+  renderer.render(scene, camera);
+  return { clip: clipName, found: Boolean(clip), duration: clip ? clip.duration : 0 };
+};
+</script>
+</body>
+</html>

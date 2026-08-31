@@ -68,9 +68,9 @@ The unlock rows below come from the same tier, resource, recipe, and item tables
 
 | Level | Unlocks |
 | --- | --- |
-| 1 | 1× Seared Minnow |
-| 5 | 1× Seared Trout |
-| 10 | 1× Seared Cragfin |
+| 1 | 1× Seared Minnow, 1× Roast Game |
+| 5 | 1× Seared Trout, 1× Roast Venison |
+| 10 | 1× Seared Cragfin, 1× Roast Haunch |
 
 ### Woodcutting
 
@@ -94,7 +94,7 @@ The unlock rows below come from the same tier, resource, recipe, and item tables
 | --- | --- |
 | 1 | 1× Air Wand, 1× Air Staff, 1× Grithe Ring, 1× Grithe Pendant, 1× Ember Ring, 1× Ember Charm, 1× Marchhide Robe, 1× Marchhide Leggings, 1× Marchhide Hood, 1× Marchhide Boots, 1× Marchhide Wraps |
 | 5 | 1× Earth Wand, 1× Earth Staff, 1× Corven Ring, 1× Corven Pendant, 1× Stone Ring, 1× Stone Charm, 1× Bramblehide Robe, 1× Bramblehide Leggings, 1× Bramblehide Hood, 1× Bramblehide Boots, 1× Bramblehide Wraps |
-| 10 | 1× Water Wand, 1× Water Staff, 1× Kaldite Ring, 1× Kaldite Pendant, 1× Storm Ring, 1× Storm Charm, 1× Wightshroud Robe, 1× Wightshroud Leggings, 1× Wightshroud Hood, 1× Wightshroud Boots, 1× Wightshroud Wraps |
+| 10 | 1× Water Wand, 1× Water Staff, 1× Kaldite Ring, 1× Kaldite Pendant, 1× Storm Ring, 1× Storm Charm, 1× Cairnpelt Robe, 1× Cairnpelt Leggings, 1× Cairnpelt Hood, 1× Cairnpelt Boots, 1× Cairnpelt Wraps |
 
 ## Combat
 

@@ -96,7 +96,7 @@ export const SHOPS: readonly ShopDef[] = [
       { itemId: "cairnleaf_seed", quantity: 30 },
       { itemId: "water_essence", quantity: 300 },
       { itemId: "cairnpine_shaft", quantity: 60 },
-      { itemId: "wight_shroud", quantity: 8 },
+      { itemId: "cairn_pelt", quantity: 8 },
     ],
   },
   {

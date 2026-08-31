@@ -13,14 +13,21 @@ import { paletteForTier } from "./materials.js";
 
 export type ItemIconPrimitive =
   | "amulet"
+  | "antler"
+  | "claw"
   | "dagger"
   | "essence"
+  | "egg"
+  | "feather"
   | "fish"
   | "handle"
+  | "gland"
   | "hide"
+  | "horn"
   | "ingot"
   | "log"
   | "orb"
+  | "meat"
   | "ring"
   | "rod"
   | "seed"
@@ -153,7 +160,7 @@ for (const id of ["palewood_handle", "duskoak_handle", "cairnpine_handle"] as co
 }
 put("coarse_hide", [primitive("hide", 0x9a7654, 0x5b4432)]);
 put("bramble_hide", [primitive("hide", 0x65503d, 0x362d26)]);
-put("wight_shroud", [primitive("hide", 0xb6b4aa, 0x686b70)]);
+put("cairn_pelt", [primitive("hide", 0x8b7f70, 0x4c443c)]);
 
 /** Element colour stays consistent between the loose essence and the boss-won orb. */
 const ELEMENT_COLOURS = {
@@ -166,6 +173,41 @@ for (const element of ["air", "earth", "water"] as const) {
   const colours = ELEMENT_COLOURS[element];
   put(`${element}_essence`, [primitive("essence", colours.body, colours.glow)], { frameScale: 1.2 });
 }
+
+// Animal trophies, one per family. Colour is the only thing separating several of these, so each
+// one is picked off the animal's own texture rather than from a palette: a coyote fang is bone
+// against a bear claw's horn-brown, and the two horn shapes differ in silhouette as well.
+put("hen_feather", [primitive("feather", 0xb08a5a, 0x6d5433)]);
+put("hen_egg", [primitive("egg", 0xefe3cc, 0xa89070)]);
+put("curl_horn", [primitive("horn", 0xa89676, 0x6b5c44)]);
+put("ox_horn", [primitive("horn", 0xd8cdb6, 0x8a7f68)]);
+put("coney_foot", [primitive("claw", 0xcfc3b0, 0x8d7f6b)]);
+put("marsh_gland", [primitive("gland", 0x9fc08a, 0x5f7a4e)]);
+put("viper_skin", [primitive("hide", 0x8d8f6b, 0x4a4a33)]);
+put("venom_gland", [primitive("gland", 0xb7d46a, 0x63803a)]);
+put("stag_antler", [primitive("antler", 0xa38f6d, 0x6b5b42)]);
+put("curved_tusk", [primitive("horn", 0xe0d3ae, 0x93855f)]);
+put("coyote_fang", [primitive("claw", 0xe6ddc8, 0x9a8f76)]);
+put("bear_claw", [primitive("claw", 0x6f5b45, 0x3a2d21)]);
+put("boar_bristle", [primitive("hide", 0x4a4038, 0x231d18)]);
+put("ibex_horn", [primitive("horn", 0x7d6a4f, 0x453a2b)]);
+put("aurochs_horn", [primitive("horn", 0xc8b995, 0x6f6349)]);
+// A tail is a curled taper, not a stick. `shaft` gave it two metal bands and read as a dowel.
+put("rat_tail", [primitive("horn", 0x9b7f74, 0x5c4a42)]);
+put("scorpion_stinger", [primitive("claw", 0xc9a24a, 0x6f5620)]);
+put("crab_claw", [primitive("claw", 0xc4552f, 0x71291a)]);
+
+// Game meat. Raw, cooked and burnt share one model; colour carries preparation state, exactly the
+// convention the fish line below already uses.
+put("raw_game_meat", [primitive("meat", 0xbe6a63, 0xe8ddc6)]);
+put("roast_game", [primitive("meat", 0x8d5330, 0xe0d4bc)]);
+put("burnt_game", [primitive("meat", 0x37302b, 0x6a625a)]);
+put("raw_venison", [primitive("meat", 0x8f4a48, 0xe4d8c1)]);
+put("roast_venison", [primitive("meat", 0x6f3d26, 0xd8ccb3)]);
+put("burnt_venison", [primitive("meat", 0x2f2926, 0x615a53)]);
+put("raw_haunch", [primitive("meat", 0xa1544d, 0xe8ddc6)]);
+put("roast_haunch", [primitive("meat", 0x7d4527, 0xdcd0b7)]);
+put("burnt_haunch", [primitive("meat", 0x2a2422, 0x585149)]);
 
 // Seeds and food. Raw and cooked fish share a model, while colour carries preparation state.
 put("bittergrain_seed", [primitive("seed", 0xc9a65a, 0x765829)]);

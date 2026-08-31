@@ -37,7 +37,84 @@ export const LEASH_METRES = 28;
 
 /** Enemies move slower than the player's 4.2 m/s, so disengaging by running is a real option. */
 export const ENEMY_SPEED_MPS = 3.1;
+
+/**
+ * How fast an enemy is allowed to be pushed out of another one, metres per second.
+ *
+ * Well under any pursuit speed, so giving way never outruns chasing and two animals cannot shove
+ * each other across the field. It only has to resolve an overlap over a handful of ticks.
+ */
+const SEPARATION_SPEED_MPS = 1.1;
+
+/**
+ * The footprint assumed for an enemy whose asset is not in the manifest.
+ *
+ * `world/regionBuilder.ts` measures the real one for everything that ships. This is the value that
+ * keeps a content gap from collapsing separation entirely, and it is deliberately small: crowding
+ * slightly is a better failure than shoving apart two things that were never touching.
+ */
+const DEFAULT_BODY_RADIUS = 0.4;
+
+/**
+ * How far to move ONE of two overlapping enemies, along the line between them.
+ *
+ * Exported and pure so the rule can be pinned by a test without standing up a store, a navmesh and
+ * a combat system. The caller applies this to the second of the pair and its negation to the first.
+ *
+ * `want` is the sum of the two body radii and `limit` is one tick of separation travel. Half the
+ * overlap each, so neither creature is privileged and the pair converges on touching rather than
+ * one of them being walked backwards out of the other.
+ *
+ * `tie` only matters when the two are exactly coincident, which has no direction to push along and
+ * whose normalisation is a NaN. It picks a fixed angle, so the same frame always resolves the same
+ * way - a random one would be a thing a replay could not reproduce.
+ */
+export function separationPush(
+  dx: number,
+  dz: number,
+  want: number,
+  limit: number,
+  tie: number,
+): { x: number; z: number } | null {
+  const gap = Math.sqrt(dx * dx + dz * dz);
+  if (gap >= want) return null;
+
+  // Direction and distance are taken apart here rather than normalising in place, because the
+  // coincident case has a distance of zero and only the direction needs inventing. Folding the two
+  // together - substituting a unit gap to keep the division alive - would also quietly shrink the
+  // overlap it thinks it is resolving, from the whole body down to whatever that unit was.
+  let ux = 0;
+  let uz = 0;
+  if (gap < 1e-4) {
+    const angle = (((tie % 360) + 360) % 360) * (Math.PI / 180);
+    ux = Math.cos(angle);
+    uz = Math.sin(angle);
+  } else {
+    ux = dx / gap;
+    uz = dz / gap;
+  }
+
+  const push = Math.min(limit, (want - gap) / 2);
+  return { x: ux * push, z: uz * push };
+}
 export const ENEMY_RETURN_SPEED_MPS = 3.6;
+
+/**
+ * How fast this creature pursues, in metres per second.
+ *
+ * `content/enemies.ts` sets it per family from the animal's own gait, because one shared speed made
+ * a hen and a bear cover ground identically and neither's legs could keep up with it: the hen's
+ * walk cycle implies 0.75 m/s against the 3.1 it was travelling at. `render/entityViews.ts` reads
+ * the same number to pick the clip's playback rate, so the two cannot drift.
+ */
+function pursuitSpeed(entity: SemanticEntity): number {
+  return entity.combat?.moveSpeedMps ?? ENEMY_SPEED_MPS;
+}
+
+/** Returning is the same gait, hurried by the ratio the shared constants already establish. */
+function returnSpeed(entity: SemanticEntity): number {
+  return pursuitSpeed(entity) * (ENEMY_RETURN_SPEED_MPS / ENEMY_SPEED_MPS);
+}
 
 /** Where an enemy stops closing. Just inside `ENEMY_ATTACK_RANGE` so it can actually swing. */
 export const ENEMY_STANDOFF_METRES = 1.35;
@@ -137,7 +214,7 @@ export class EnemyAiSystem implements TickSystem {
 
   constructor(private readonly deps: EnemyAiDeps) {
     // Being struck provokes, whatever the behaviour says. This is what makes `territorial` work
-    // and what stops a `passive` skitterling standing still while it is beaten to death.
+    // and what stops a `passive` frog standing still while it is beaten to death.
     deps.combat.onEnemyProvoked((enemyId, atMs) => this.provoke(enemyId, atMs));
   }
 
@@ -172,7 +249,7 @@ export class EnemyAiSystem implements TickSystem {
 
       // 2. return home.
       if (record.mode === "returning") {
-        const arrived = this.stepToward(entity, spawn, ENEMY_RETURN_SPEED_MPS, deltaMs, 0.6);
+        const arrived = this.stepToward(entity, spawn, returnSpeed(entity), deltaMs, 0.6);
         if (arrived) {
           record.mode = "idle";
           runtime.state = "idle";
@@ -200,7 +277,7 @@ export class EnemyAiSystem implements TickSystem {
           continue;
         }
         if (distanceToPlayer > ENEMY_STANDOFF_METRES) {
-          this.stepToward(entity, playerPos, ENEMY_SPEED_MPS, deltaMs, ENEMY_STANDOFF_METRES);
+          this.stepToward(entity, playerPos, pursuitSpeed(entity), deltaMs, ENEMY_STANDOFF_METRES);
         } else {
           // At standoff there is no displacement for stepToward to face along. Keep looking at the
           // player while the combat system swings.
@@ -208,6 +285,65 @@ export class EnemyAiSystem implements TickSystem {
         }
       }
     }
+
+    // 5. give way. Last, because it is a correction to where everything ended up this tick.
+    this.separate(deltaMs);
+  }
+
+  /**
+   * Pushes enemies that are standing inside each other apart.
+   *
+   * Every animal that aggros steers at the SAME point - the player - and steering alone has no
+   * opinion about the other animals doing it. So a sett of bears converges on one spot and arrives
+   * as one lump of fur: measured with `tools/animals/overlap.ts --chase`, a Gravelmaw rat finished
+   * a chase 0.02 m from a reaver, inside a body 1.2 m across. Nothing about the spawn scatter is
+   * wrong - at rest not one pair in the world overlaps - so the fix belongs here, on the movement,
+   * not on the placement.
+   *
+   * Pairwise over the ACTIVE list, which `refreshActive` has already cut to what is near the
+   * player, so this is a few hundred distance checks a tick rather than a sweep of the world.
+   *
+   * The push is along the line between the two, which on a standoff ring is close to tangential -
+   * so it spreads them around the player rather than fighting the pursuit that is pulling them in.
+   * It is also speed-limited like any other movement and snapped to the navmesh, because an enemy
+   * shoved through a wall to make room is worse than one standing too close.
+   */
+  private separate(deltaMs: number): void {
+    const active = this.enemies;
+    const limit = (SEPARATION_SPEED_MPS * deltaMs) / 1000;
+    const state = this.deps.store.get();
+
+    for (let i = 0; i < active.length; i += 1) {
+      const a = active[i]!;
+      if (state.world.enemies[a.id]?.state === "dead") continue;
+      const ra = a.combat?.bodyRadius ?? DEFAULT_BODY_RADIUS;
+
+      for (let j = i + 1; j < active.length; j += 1) {
+        const b = active[j]!;
+        if (state.world.enemies[b.id]?.state === "dead") continue;
+        const want = ra + (b.combat?.bodyRadius ?? DEFAULT_BODY_RADIUS);
+
+        const push = separationPush(
+          b.position[0] - a.position[0], b.position[2] - a.position[2], want, limit, i * 31 + j * 17,
+        );
+        if (!push) continue;
+        this.nudge(a, -push.x, -push.z);
+        this.nudge(b, push.x, push.z);
+      }
+    }
+  }
+
+  /** One separation step for one enemy, refused rather than forced when the navmesh says no. */
+  private nudge(entity: SemanticEntity, dx: number, dz: number): void {
+    const from = entity.position;
+    const wanted: Vec3 = [from[0] + dx, from[1], from[2] + dz];
+    const snapped = this.snapStep(wanted);
+    // No `faceDirection` here on purpose: a creature being shoved aside is still looking at what it
+    // is chasing, and turning it to face the shove is what made the animals spin.
+    if (!snapped || distanceXZ(from, snapped) <= 0.001) return;
+    entity.position = snapped;
+    this.deps.entities.setPosition?.(entity.id, snapped);
+    this.deps.store.markDirty();
   }
 
   // ------------------------------------------------------------- engagement
@@ -270,6 +406,9 @@ export class EnemyAiSystem implements TickSystem {
       runtime.state = "idle";
       runtime.respawnAtMs = null;
       delete runtime.bossPhase;
+      // Both halves, or the renderer keeps fading a creature that is alive again.
+      delete runtime.diedAtMs;
+      if (entity.view) delete entity.view.diedAtMs;
 
       if (entity.combat) entity.combat.health = runtime.health;
       this.deps.entities.setPosition?.(entityId, cloneVec3(runtime.spawnPos));

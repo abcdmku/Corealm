@@ -227,6 +227,54 @@ function essenceElementFor(entity: SemanticEntity): EssenceElement | null {
 }
 
 /**
+ * The beat between a body settling and the moment it starts to dissolve, and how long that takes.
+ *
+ * Deliberately NOT a single linger covering the longest death animation in the game. That was the
+ * first version and it read as waiting: the clips run from the deer's 0.83 s to the coyote's 4.17 s
+ * (`tools/animals/clip-durations.ts`), so one constant long enough for the coyote left a hen lying
+ * on the grass for three seconds after it had finished dying. The linger is therefore taken per
+ * creature from its OWN death clip, and this is only the pause afterwards.
+ */
+const CORPSE_DWELL_MS = 350;
+const CORPSE_FADE_MS = 900;
+
+/**
+ * The linger used when there is no rig to measure a death clip from.
+ *
+ * Only instanced corpses land here, which are the ones past the rig release radius (70 m). Chosen
+ * near the middle of the clip range rather than at the top of it, because at that distance a body
+ * is a few pixels and going early is a far cheaper mistake than lying there.
+ */
+const CORPSE_FALLBACK_LINGER_MS = 1500;
+
+/** Below this, an opacity change is not worth a material write. One step of an 8-bit channel. */
+const FADE_EPSILON = 1 / 255;
+
+/**
+ * How far through dissolving a corpse is: 0 whole, 1 gone.
+ *
+ * Exported so the shape can be pinned without a renderer, and so the two numbers above have exactly
+ * one reader. Both arguments are on the SIM clock - `view.diedAtMs` is stamped there - which is
+ * what makes this a pure function of state rather than of how many frames have been drawn.
+ */
+export function corpseFade(nowMs: number, diedAtMs: number, lingerMs: number): number {
+  const progress = (nowMs - diedAtMs - lingerMs) / CORPSE_FADE_MS;
+  return Math.min(1, Math.max(0, progress));
+}
+
+/**
+ * How long THIS corpse should lie still: the length of the death animation it actually played.
+ *
+ * Measured off the rig rather than assumed, so every creature waits exactly as long as it needs to
+ * finish falling and not a frame longer. Anything without a death clip on a live rig - an instanced
+ * body, or one of the three fish, which the pack ships no death animation for - takes the fallback.
+ */
+export function corpseLinger(deathClipSeconds: number | null): number {
+  if (deathClipSeconds === null || !(deathClipSeconds > 0)) return CORPSE_FALLBACK_LINGER_MS;
+  return deathClipSeconds * 1000 + CORPSE_DWELL_MS;
+}
+
+/**
  * Archetypes whose tier is a gameplay ladder, and are therefore allowed to move their proportions.
  *
  * Round 1 scaled EVERYTHING by `tierSilhouetteScale`, so a Karrowmoor market stall was 12% larger
@@ -286,6 +334,26 @@ const CROP_WIND = 0.04;
  * into a smear and buys no legibility.
  */
 const PROTECTED_MATERIAL = /eye|teeth|tongue|hair|white|black/i;
+
+/**
+ * The animal pack's materials, which the tier tint must also never touch.
+ *
+ * `APPEARANCE.enemy` pulls an enemy material 45% toward the tier's METAL swatch, and at tier 10
+ * that swatch is Kaldite blue-black. That policy was written when the whole bestiary was four
+ * stylized meshes sharing a stock grey texture, where the tint was the ONLY thing saying which
+ * tier a monster belonged to. Against photographic animal maps it does the opposite: measured on
+ * the first render pass, a brown bear and a black-and-white cow both came out as near-silhouettes
+ * with no fur or hide left in them.
+ *
+ * Tier legibility does not need it any more, because SPECIES now carries it and carries it better:
+ * tier 1 is hens, coneys and frogs, tier 5 is deer and coyotes, tier 10 is bears and aurochs. A
+ * player never has to read a bear's palette to know it outranks a hen.
+ *
+ * `tools/build-animals.ts` names every material `animal_<assetId>_mat`, so this prefix is a
+ * contract between the two files, not a guess. Being strength 0 also puts these groups on
+ * `groupTier`'s tier-independent path, which merges instances across tiers.
+ */
+const ANIMAL_MATERIAL = /^animal_/i;
 
 /**
  * Humanoid idles, from the shared 65-joint clip library.
@@ -355,6 +423,24 @@ const HUMANOID_CLIPS: Record<CharacterMotion, readonly string[]> = {
   hit: ["Hit_Chest", "Hit_Knockback"],
   death: ["Death01"],
 };
+
+/**
+ * Bounds on how far a walk cycle may be retimed to match the ground it covers.
+ *
+ * Below 0.6 a cycle reads as slow motion. The ceiling is 3.2 rather than the 2.0 it started at
+ * because 2.0 was not enough for the pack's small animals: they are authored as slow ambles, so the
+ * frog's cycle implies 0.43 m/s under a body the simulation moves at 1.2, and the hog's 0.29 under
+ * 1.3. Clamped at 2.0 those two kept 28% and 55% of their foot slide - the "feet barely move"
+ * report - and the only other way to close it is to slow the creatures until nothing can catch the
+ * player. A small animal taking quick steps reads as scurrying; a small animal gliding does not.
+ *
+ * Beyond 3.2 it does become sped-up film, and what is asking for it by then is a rig with no
+ * measurable stride at all: `tools/animals/gait.ts` reports the viper at 0.02 m/s and the rat at
+ * 0.06. Those have no plantable foot to slide in the first place - a snake glides - so the clamp
+ * takes them and the residual is left alone rather than blurred over.
+ */
+const WALK_RATE_MIN = 0.6;
+const WALK_RATE_MAX = 3.2;
 
 /** Measured planted-foot speed of Jog_Fwd_Loop in the shared humanoid animation library. */
 const HUMANOID_JOG_IMPLIED_MPS = 5.92;
@@ -666,7 +752,24 @@ const CHARACTER_PICK_RADIUS_SCALE = 0.85;
 const MOVING_HOLD_SYNCS = 2;
 
 /** Metres of movement between syncs below which an entity counts as standing still. */
-const MOVING_EPSILON = 0.03;
+export const MOVING_EPSILON = 0.03;
+
+/**
+ * Whether this render frame is the first of a new simulation tick.
+ *
+ * `app/loop.ts` passes `clock.alpha()`, the fraction of the current `SIM_TICK_MS` already elapsed,
+ * so it ramps 0 to 1 and drops back once per tick. A frame whose alpha is BELOW the previous
+ * frame's is therefore the frame a tick rolled over. Render rate is irrelevant: at 30 fps that is
+ * every third frame and at 165 fps every seventeenth, and both answer the same question.
+ *
+ * `syncMotion` uses it for one thing, and it is worth naming: deciding when an entity that has
+ * stopped moving should collapse its interpolation span. Without that, `previous` and `target` stay
+ * a step apart forever and the lerp between them sweeps back and forth at frame rate for as long as
+ * the entity stands still.
+ */
+export function crossedSimTick(alpha: number, lastAlpha: number): boolean {
+  return alpha < lastAlpha;
+}
 
 /** Four fish are authored into a school. Each entity shows a deterministic two to four of them. */
 const FISH_SCHOOL_CAPACITY = 4;
@@ -993,11 +1096,20 @@ interface ViewRecord {
   target: THREE.Vector3;
   /** The one before that, so a render frame can interpolate between the two. */
   previous: THREE.Vector3;
+  /**
+   * The interpolation alpha this record last drew at, used only to spot a sim-tick boundary.
+   *
+   * `alpha` sawtooths 0 to 1 once per `SIM_TICK_MS`, so a frame whose alpha is LOWER than the last
+   * one is the first frame of a new tick. See the settle branch in `syncMotion`.
+   */
+  lastAlpha: number;
   rotationY: number;
   targetRotationY: number;
   previousRotationY: number;
   /** Syncs left before this entity stops counting as moving. See `MOVING_HOLD_SYNCS`. */
   movingTicks: number;
+  /** Pursuit speed published on the entity, used to retime the walk cycle. */
+  moveSpeedMps?: number;
   /** Raised only while playAction tries to move this record to the front of the rig pool. */
   actionPriority: boolean;
   scale: number;
@@ -1023,6 +1135,26 @@ interface ViewRecord {
   /** Fish depth below the semantic surface proxy. Authored on resource presentation metadata. */
   waterOffset: number;
   spent: boolean;
+  /** Sim time this entity died, straight off `view.diedAtMs`. Null for anything alive. */
+  diedAtMs: number | null;
+  /** 0 while the corpse is whole, 1 once it has fully dissolved. See `CORPSE_FADE_MS`. */
+  fade: number;
+  /**
+   * This corpse's own linger, latched from its death clip on the first frame after it died.
+   *
+   * Latched rather than re-read, because the rig can be demoted to an instance part-way through and
+   * a linger that changed underneath the fade would make the body jump back to solid.
+   */
+  lingerMs: number | null;
+  /**
+   * Materials cloned for THIS corpse so its opacity can be driven without touching a shared one.
+   *
+   * `MaterialCache.variant` hands out one material per (source, tier, state, dye), which is the
+   * whole reason a hundred bodies cost a handful of materials - and exactly why the fade cannot be
+   * written into it. Setting opacity on that shared variant would dissolve every other corpse
+   * wearing it at the same time. Owned here and disposed with the record.
+   */
+  fadeMaterials: THREE.Material[] | null;
   /** Unit terrain normal from `view.groundNormal`, or null. */
   normal: readonly [number, number, number] | null;
   tilt: number;
@@ -1277,6 +1409,13 @@ export class EntityViews {
   private readonly bakedGeometries: THREE.BufferGeometry[] = [];
   /** Rigged records with a mixer. Kept as its own set so `update` never walks 600 ore nodes. */
   private readonly animated = new Set<ViewRecord>();
+  /**
+   * Records carrying a death instant, so the per-frame fade never sweeps the whole world.
+   *
+   * NOT the same set as `animated`: a corpse leaves that one the moment its death clip clamps, and
+   * dissolving it is precisely the work that has to happen afterwards.
+   */
+  private readonly fading = new Set<ViewRecord>();
   private readonly animationOrder: ViewRecord[] = [];
   private animatedLastFrame = 0;
   /** Meshes per rigged asset, so the budget can be checked BEFORE paying for a skeleton clone. */
@@ -1531,7 +1670,7 @@ export class EntityViews {
    * and the budget alone applies. Either way an untickled rig FREEZES on its current pose rather
    * than snapping back to bind, so the fallback is a still character, never a T-pose.
    */
-  update(deltaSeconds: number, viewer?: THREE.Vector3): void {
+  update(deltaSeconds: number, viewer?: THREE.Vector3, nowMs?: number): void {
     this.animatedLastFrame = 0;
     if (viewer) {
       this.viewer = (this.viewer ?? new THREE.Vector3()).copy(viewer);
@@ -1541,6 +1680,10 @@ export class EntityViews {
       // while the shot is held could create a newly visible unique character behind it.
       if (this.captureSubjectId === null) this.rebalanceUniques();
     }
+    // Unconditional, and deliberately: a corpse is dropped OUT of `animated` the moment its death
+    // clip clamps, so a fade gated on there being live rigs would never run on the one thing it
+    // exists for. Fishing views below are ticked on the same terms.
+    if (nowMs !== undefined) this.tickCorpseFade(nowMs);
 
     // A backgrounded tab hands back a delta of seconds. Fast-forwarding a crowd through 40 loops
     // of an idle clip costs real time and looks identical to not doing it.
@@ -1600,11 +1743,16 @@ export class EntityViews {
       if (this.captureSubjectId !== null && entity.id !== this.captureSubjectId) continue;
       const record = this.records.get(entity.id);
       if (!record) continue;
+      // A corpse that has finished dissolving is off screen and going nowhere. Interpolating and
+      // re-writing its slot sixty times a second would only re-hide something already hidden.
+      if (record.fade >= 1) continue;
 
       const view = entity.view;
       const rotationY = view?.rotationY ?? record.targetRotationY;
       const dx = entity.position[0] - record.target.x;
       const dz = entity.position[2] - record.target.z;
+      const tickRolled = crossedSimTick(blend, record.lastAlpha);
+      record.lastAlpha = blend;
       if (Math.hypot(dx, dz) > MOVING_EPSILON) {
         record.previous.copy(record.target);
         record.target.set(entity.position[0], entity.position[1], entity.position[2]);
@@ -1615,10 +1763,29 @@ export class EntityViews {
         // Structural sync runs at 4 Hz. Waiting for it to select the walking clip leaves up to a
         // quarter-second of a chasing enemy gliding in its idle pose.
         if (!record.spent) this.setMotion(record, "walk", true);
+      } else if (tickRolled) {
+        // SETTLE. Nothing else ever collapses this span, and without it a stopped entity jitters
+        // forever: `previous` keeps the second-to-last position, `target` the last, and the lerp
+        // below sweeps between them every frame as alpha sawtooths. Measured on a dead goat, whose
+        // simulated position had not changed in seconds, the drawn position oscillated 10 cm at
+        // frame rate; a chasing enemy stops after a 0.31 m step and swings over all of it.
+        //
+        // The condition is "a whole sim tick passed with no new position", not "dx is zero". dx is
+        // zero on every frame after the first WITHIN a tick, and that is exactly when the lerp is
+        // doing its job, so collapsing there would delete interpolation and make everything step.
+        record.previous.copy(record.target);
       }
       if (rotationY !== record.targetRotationY) {
         record.previousRotationY = record.targetRotationY;
         record.targetRotationY = rotationY;
+      } else if (tickRolled) {
+        // SETTLE, exactly as the position span above and for the same reason. `systems/enemyAI.ts`
+        // writes `view.rotationY = atan2(...)` while an enemy is turning, and when it stops the two
+        // ends of this span stay a step apart while `blend` keeps sawtoothing 0 to 1, so the yaw
+        // rocks back and forth at frame rate forever. It is worse than the position case: a facing
+        // that swings as an enemy passes the player can leave half a turn inside the span, and
+        // `shortestArc` then sweeps all of it every tick, which is the spinning.
+        record.previousRotationY = record.targetRotationY;
       }
 
       record.position.lerpVectors(record.previous, record.target, blend);
@@ -1770,6 +1937,7 @@ export class EntityViews {
     record.scaleAxes = scaleAxes;
     record.waterOffset = waterOffset;
     record.spent = spent;
+    this.setDiedAt(record, view.diedAtMs ?? null);
     record.normal = normal;
     record.tilt = tilt;
     record.labelHeight = view.labelHeight ?? 1.6;
@@ -1860,10 +2028,14 @@ export class EntityViews {
       position: new THREE.Vector3(entity.position[0], entity.position[1], entity.position[2]),
       target: new THREE.Vector3(entity.position[0], entity.position[1], entity.position[2]),
       previous: new THREE.Vector3(entity.position[0], entity.position[1], entity.position[2]),
+      // Starts at 1 so the first frame reads as a tick boundary and a record that spawns
+      // standing still settles immediately rather than after its first movement.
+      lastAlpha: 1,
       rotationY: view.rotationY ?? 0,
       targetRotationY: view.rotationY ?? 0,
       previousRotationY: view.rotationY ?? 0,
       movingTicks: 0,
+      ...(entity.combat?.moveSpeedMps === undefined ? {} : { moveSpeedMps: entity.combat.moveSpeedMps }),
       actionPriority: false,
       scale: 1,
       scaleAxes: NO_BUILD,
@@ -1874,6 +2046,10 @@ export class EntityViews {
       schoolPhase: (hashString(`${entity.id}:school-phase`) / 0xffff_ffff) * Math.PI * 2,
       waterOffset: typeof entity.meta?.waterOffset === "number" ? entity.meta.waterOffset : 0,
       spent: false,
+      diedAtMs: null,
+      fade: 0,
+      lingerMs: null,
+      fadeMaterials: null,
       normal: null,
       tilt: 0,
       labelHeight: view.labelHeight ?? 1.6,
@@ -1927,6 +2103,10 @@ export class EntityViews {
       // node that respawns after being mined comes back permanently grey.
       mesh.userData.baseMaterial = mesh.material;
     });
+    // A rebuilt body starts at the visibility its fade has already reached. Without this, walking
+    // up to a corpse that dissolved while it was instanced promotes it to a rig and shows it whole
+    // for the one frame before `tickCorpseFade` runs again.
+    unique.visible = record.fade < 1;
     this.group.add(unique);
 
     record.unique = unique;
@@ -2059,6 +2239,8 @@ export class EntityViews {
   private release(record: ViewRecord): void {
     this.rigCandidates.delete(record);
     this.fishingViews.delete(record);
+    this.fading.delete(record);
+    this.clearFade(record);
     if (record.unique) {
       this.releaseUnique(record);
       return;
@@ -2086,6 +2268,13 @@ export class EntityViews {
     }
     if (!record.unique) return;
     this.uniqueViewCount = Math.max(0, this.uniqueViewCount - 1);
+    // The fade clones hang off the meshes inside `record.unique` and nothing else owns them, so
+    // they go with it. `record.fade` itself is left alone: the corpse is still dead, and a demote
+    // to the instanced path has to keep dissolving from where it had got to.
+    if (record.fadeMaterials) {
+      for (const material of record.fadeMaterials) material.dispose();
+      record.fadeMaterials = null;
+    }
     record.unique.removeFromParent();
     // `DressedCharacter.dispose` frees the head-cap and merged geometries this assembly allocated
     // and nothing else owns. The source geometries and materials are shared with the loaded asset
@@ -2499,12 +2688,21 @@ export class EntityViews {
           const frozen = freezeSkin(skinned);
           if (frozen) {
             this.bakedGeometries.push(frozen);
-            // `applyBoneTransform` returns positions in the mesh's bind space, so the bind matrix
-            // is exactly the transform that puts them back where the bones live.
+            // `applyBoneTransform` returns positions in the mesh's LOCAL space: it ends by applying
+            // `bindMatrixInverse`, which is exactly what the skinning shader does before the model
+            // matrix. So the transform back to world is the mesh's own world matrix, the same one
+            // the unskinned branch below uses.
+            //
+            // This was `bindMatrix`, which is only equal to it when every node above the mesh is
+            // identity. That holds for the Quaternius characters and holds for nothing in the
+            // animal pack: those GLBs carry the centimetre-to-metre conversion as a 0.01 root
+            // scale, and several rigs park a further scale on the mesh node itself (the bear's is
+            // 72.242). Dropping the hierarchy drew every instanced animal at 100x - a 1.77 m stag
+            // measured 177.96 m through the terrain, which is what "giant things everywhere" was.
             parts.push({
               geometry: frozen,
               material,
-              matrix: skinned.bindMatrix.clone(),
+              matrix: skinned.matrixWorld.clone(),
               triangles: triangleCount(frozen),
             });
             return;
@@ -2852,6 +3050,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
 
   private appearanceFor(archetype: Archetype, material: THREE.Material): Appearance {
     if (PROTECTED_MATERIAL.test(material.name)) return NEUTRAL;
+    if (ANIMAL_MATERIAL.test(material.name)) return NEUTRAL;
     // Preserve the old tier-body treatment if a tile mesh is ever used as gameplay art. Scenery
     // takes the region-aware architecture path before this fallback and stays tier-independent.
     if (!ARCHITECTURE_ARCHETYPES.has(archetype)
@@ -3498,7 +3697,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     // `Flying` to both. Crossfading an action from itself zeroes its weight; record the state change
     // and leave the clip running.
     if (clip && clip.name === rig.clipName) {
-      rig.action.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale);
+      rig.action.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale, record.moveSpeedMps);
       rig.motion = motion;
       return;
     }
@@ -3517,7 +3716,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     const oneShot = ONE_SHOT_MOTIONS.has(motion) || motion === "death";
     next.setLoop(oneShot ? THREE.LoopOnce : THREE.LoopRepeat, oneShot ? 1 : Infinity);
     next.clampWhenFinished = oneShot;
-    next.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale);
+    next.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale, record.moveSpeedMps);
     next.reset();
     next.enabled = true;
     next.setEffectiveWeight(1);
@@ -3540,11 +3739,29 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     motion: CharacterMotion,
     clip: THREE.AnimationClip,
     idleTimeScale: number,
+    moveSpeedMps?: number,
   ): number {
     if (motion === "idle") return idleTimeScale;
-    const own = this.assets.entry(assetId)?.animations ?? [];
+    const entry = this.assets.entry(assetId);
+    const own = entry?.animations ?? [];
     if (motion === "walk" && own.length === 0 && clip.name === "Jog_Fwd_Loop") {
       return HUMANOID_AI_JOG_TIME_SCALE;
+    }
+    // Match the gait to the ground it covers.
+    //
+    // These cycles are authored in place, so playing them at their authored tempo under a body the
+    // simulation is moving is pure foot slide: the chicken's cycle implies 0.75 m/s and it was
+    // travelling at 3.1, so its legs ran four times too slowly for the distance covered - "the feet
+    // barely move and they move way too fast". `tools/build-animals.ts` measures the implied speed
+    // off the feet and puts it in the manifest; dividing the creature's real speed by it gives the
+    // rate that plants them.
+    //
+    // Clamped because a few rigs have no real stride to measure - a viper slithers, a crab scuttles
+    // sideways, a fish swims - and their implied speed is near zero, which would ask for a playback
+    // rate in the tens. Those have no plantable foot either, so the slide does not read.
+    if (motion === "walk" && entry?.impliedWalkMps && moveSpeedMps) {
+      const rate = moveSpeedMps / entry.impliedWalkMps;
+      return Math.min(WALK_RATE_MAX, Math.max(WALK_RATE_MIN, rate));
     }
     return 1;
   }
@@ -3590,8 +3807,19 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     const record = this.records.get(entityId);
     if (!record) return false;
     // Combat publishes enemy swings only inside ENEMY_ATTACK_RANGE. The render-side half of that
-    // rule is that a moving record cannot start Punch_Jab, even if a queued swing arrives late.
-    if (motion === "attack" && record.movingTicks > 0) return false;
+    // rule is that a rig which is genuinely translating should not start a planted-foot swing.
+    //
+    // The test is "is it moving RIGHT NOW", not `movingTicks`. That counter is a two-sync
+    // hysteresis decayed by `updateMoving` at 4 Hz, so it stays armed for up to half a second after
+    // the last step, and `syncMotion` re-arms it on any 3 cm change. Against a player who keeps
+    // moving, the enemy re-steps every tick, the counter never reaches zero, and the swing was
+    // dropped every single time: enemies traded damage numbers without ever visibly attacking.
+    // Comparing the interpolation span answers the same question with no lag, because `syncMotion`
+    // collapses it one tick after the entity actually stops.
+    if (motion === "attack"
+      && record.previous.distanceToSquared(record.target) > MOVING_EPSILON * MOVING_EPSILON) {
+      return false;
+    }
     if (!record.rig) {
       // A combat target is necessarily near the player, but an old rig inside release hysteresis
       // may still own the pool. Give this record one synchronous priority pass before giving up.
@@ -3922,6 +4150,15 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
   private writeSlot(group: InstanceGroup, record: ViewRecord): void {
     const slot = record.slot;
     if (slot < 0) return;
+    // A dissolved corpse is switched off here rather than only in `tickCorpseFade`, because
+    // `syncMotion` calls this for every enemy every frame and would otherwise put it straight back
+    // on screen. Enemies are in `MOVING_ARCHETYPES`, and a dead one is still an enemy.
+    if (record.fade >= 1) {
+      for (const variant of [group.live, group.spent, group.moving]) {
+        for (const draw of variant) hideInstance(draw, slot);
+      }
+      return;
+    }
     const moving = record.movingTicks > 0 && !record.spent;
     if (record.spent) this.ensureSpent(group);
     else if (moving) this.ensureMoving(group);
@@ -4121,6 +4358,126 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
   }
 
   /**
+   * Records when an entity died, and undoes the fade when it stops being dead.
+   *
+   * Kept in a set rather than found by sweeping every record, because the fade runs at frame rate
+   * over a world of ~900 entities of which at most a handful are ever dissolving at once.
+   */
+  private setDiedAt(record: ViewRecord, diedAtMs: number | null): void {
+    if (record.diedAtMs === diedAtMs) return;
+    record.diedAtMs = diedAtMs;
+    if (diedAtMs === null) {
+      this.fading.delete(record);
+      this.clearFade(record);
+      return;
+    }
+    this.fading.add(record);
+  }
+
+  /**
+   * Puts a corpse back to solid: drops the owned materials and un-hides whatever the fade hid.
+   *
+   * Called when a killed enemy respawns, and on release. `applyUniqueState` re-derives the look
+   * from the authored materials on the next state change, so nothing here has to restore them - it
+   * only has to stop pointing at the clones and free them.
+   */
+  private clearFade(record: ViewRecord): void {
+    record.lingerMs = null;
+    if (record.fade === 0 && !record.fadeMaterials) return;
+    record.fade = 0;
+    if (record.unique) record.unique.visible = true;
+    if (record.fadeMaterials) {
+      for (const material of record.fadeMaterials) material.dispose();
+      record.fadeMaterials = null;
+    }
+  }
+
+  /**
+   * Dissolves corpses, once per frame, from the instant each of them died.
+   *
+   * Driven by the SIM clock the caller passes in, not by an accumulated frame delta, so the answer
+   * survives a stalled tab, a reload and a save resumed an hour later: the fade is a function of
+   * `nowMs - diedAtMs` and of nothing this class remembers between frames.
+   *
+   * The two draw paths are handled differently, and the difference is deliberate rather than an
+   * omission. A unique gets a real opacity ramp, because it is the one a player is standing next
+   * to. An instance cannot: `BatchedMesh` shares one material across every slot in the batch, so
+   * turning transparency on for a corpse would turn it on for every living animal drawn beside it.
+   * An instanced corpse therefore holds its death pose and then switches off. That is only ever
+   * visible past the rig release radius (70 m), where a body is a few pixels.
+   */
+  private tickCorpseFade(nowMs: number): void {
+    if (this.fading.size === 0) return;
+    for (const record of this.fading) {
+      const diedAtMs = record.diedAtMs;
+      if (diedAtMs === null) continue;
+      if (record.lingerMs === null) {
+        // `syncOne` switches the rig to its death clip in the same call that stamped the instant
+        // above, so by this frame the clip is already the right one to measure.
+        const rig = record.rig;
+        const clip = rig && rig.motion === "death" ? rig.action.getClip().duration : null;
+        record.lingerMs = corpseLinger(clip);
+      }
+      const fade = corpseFade(nowMs, diedAtMs, record.lingerMs);
+      if (Math.abs(fade - record.fade) < FADE_EPSILON && fade !== 1) continue;
+      const settled = record.fade >= 1 && fade >= 1;
+      record.fade = fade;
+      if (settled) continue;
+
+      if (record.unique) {
+        if (fade >= 1) {
+          // Hidden, not released. Three skips an invisible subtree entirely, so it costs no draw
+          // call, and the record stays whole for the respawn that is coming in another 25 seconds.
+          record.unique.visible = false;
+        } else {
+          record.unique.visible = true;
+          if (fade > 0) this.applyFadeOpacity(record, 1 - fade);
+        }
+        continue;
+      }
+
+      // Only at the end, and only once. An instanced corpse has no opacity to ramp, so every frame
+      // before this one would be an identical write into the batch for no visible difference.
+      if (fade < 1) continue;
+      const group = this.groups.get(record.groupKey);
+      if (group) this.writeSlot(group, record);
+    }
+  }
+
+  /**
+   * Drives one corpse's opacity through materials it owns outright.
+   *
+   * Cloned on the first frame of the fade rather than up front, because the overwhelming majority
+   * of entities never dissolve and cloning for them would multiply the material count of the world
+   * for nothing. `depthWrite` goes off with transparency on: a half-faded body that still writes
+   * depth punches a hole in whatever is drawn behind it.
+   */
+  private applyFadeOpacity(record: ViewRecord, opacity: number): void {
+    const unique = record.unique;
+    if (!unique) return;
+
+    if (!record.fadeMaterials) {
+      const owned: THREE.Material[] = [];
+      unique.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const source = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        const clones = source.map((material) => {
+          const clone = material.clone();
+          clone.transparent = true;
+          clone.depthWrite = false;
+          owned.push(clone);
+          return clone;
+        });
+        mesh.material = clones.length === 1 ? clones[0]! : clones;
+      });
+      record.fadeMaterials = owned;
+    }
+
+    for (const material of record.fadeMaterials) material.opacity = opacity;
+  }
+
+  /**
    * Paints a non-instanced entity for its current state, always from the authored material.
    *
    * A dead character keeps its rig but stops being ticked, so it holds whatever pose it stopped in
@@ -4131,11 +4488,18 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
   private applyUniqueState(record: ViewRecord, tier: number): void {
     if (!record.unique) return;
 
+    // This pass reassigns every `mesh.material` below, which would leave the fade clones owned by
+    // nobody and pointed at by nothing. Drop them here and let the next fade frame re-clone from
+    // whatever this pass decides the corpse looks like.
+    if (record.fadeMaterials) {
+      for (const material of record.fadeMaterials) material.dispose();
+      record.fadeMaterials = null;
+    }
     restoreBaseMaterials(record.unique);
     const look = APPEARANCE[record.archetype] ?? NEUTRAL;
     if (!record.spent) {
       this.materials.retint(record.unique, tier, look.strength, look.swatch, (material) =>
-        !PROTECTED_MATERIAL.test(material.name));
+        !PROTECTED_MATERIAL.test(material.name) && !ANIMAL_MATERIAL.test(material.name));
       // After the tier pass, not instead of it: the tier says what LEAGUE a thing is in and the
       // dye says which individual it is, and both are multiplies against the same texture.
       this.applyEntityTint(record);
@@ -4147,8 +4511,17 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       // Death ignores the protected-material rule on purpose: a corpse with bright living eyes is
       // the wrong read, and this is the state the player most needs to see from across a clearing.
+      // The ANIMAL exemption is NOT ignored, though, and the two rules are answering different
+      // questions: the dead STATE desaturates and darkens, which a dead animal wants, while the
+      // tier STRENGTH pushes toward a metal swatch, which would turn a bear carcass Kaldite blue.
+      // Zeroing only the strength keeps the corpse treatment and drops the palette push.
       const mapped = materials.map((material) =>
-        this.materials.variant(material, { tier, state: "dead", strength: look.strength, swatch: look.swatch }));
+        this.materials.variant(material, {
+          tier,
+          state: "dead",
+          strength: ANIMAL_MATERIAL.test(material.name) ? 0 : look.strength,
+          swatch: look.swatch,
+        }));
       mesh.material = mapped.length === 1 ? mapped[0]! : mapped;
     });
     // A corpse keeps the individual's dye. Losing it on death would make every body in a swarm
@@ -4398,7 +4771,9 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
    * whether or not any of its slots hold a visible matrix. This reads the matrix in the entity's
    * own slot, which is the only thing that answers the question.
    */
-  drawnBounds(entityId: EntityId): { min: Vec3; max: Vec3; meshes: number; path: string } | null {
+  drawnBounds(
+    entityId: EntityId,
+  ): { min: Vec3; max: Vec3; meshes: number; path: string; fade: number } | null {
     const record = this.records.get(entityId);
     if (!record) return null;
 
@@ -4409,8 +4784,14 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
       record.unique.updateMatrixWorld(true);
       box.setFromObject(record.unique);
       record.unique.traverse((child) => { if ((child as THREE.Mesh).isMesh) meshes += 1; });
-      const path = record.rig ? `animated:${record.rig.clipName}` : "unique";
-      return box.isEmpty() ? null : boxToBounds(box, meshes, path);
+      // The playback RATE is part of the answer, not decoration: a walk cycle can be playing and
+      // still read as sliding if it is running at the wrong speed for the ground being covered, and
+      // a clip name alone cannot tell those apart.
+      const rate = record.rig ? record.rig.action.timeScale : 1;
+      const path = record.rig
+        ? `animated:${record.rig.clipName}@${rate.toFixed(2)}x`
+        : "unique";
+      return box.isEmpty() ? null : boxToBounds(box, meshes, path, record.fade);
     }
 
     const group = this.groups.get(record.groupKey);
@@ -4433,7 +4814,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
       box.union(bounds.clone().applyMatrix4(matrix));
       meshes += 1;
     }
-    return box.isEmpty() ? null : boxToBounds(box, meshes, record.spent ? "instanced-spent" : "instanced");
+    return box.isEmpty() ? null : boxToBounds(box, meshes, record.spent ? "instanced-spent" : "instanced", record.fade);
   }
 
   stats(): EntityViewStats {
@@ -4540,6 +4921,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     this.groups.clear();
     this.records.clear();
     this.animated.clear();
+    this.fading.clear();
     this.rigCandidates.clear();
     this.fishingViews.clear();
     this.resourceTimeSeconds = 0;
@@ -5077,12 +5459,16 @@ function boxToBounds(
   box: THREE.Box3,
   meshes: number,
   path: string,
-): { min: Vec3; max: Vec3; meshes: number; path: string } {
+  fade: number,
+): { min: Vec3; max: Vec3; meshes: number; path: string; fade: number } {
   return {
     min: [box.min.x, box.min.y, box.min.z] as unknown as Vec3,
     max: [box.max.x, box.max.y, box.max.z] as unknown as Vec3,
     meshes,
     path,
+    // `Box3.setFromObject` measures an invisible object exactly as it measures a visible one, so
+    // the box alone cannot say whether a corpse is still on screen. This can.
+    fade,
   };
 }
 

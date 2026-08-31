@@ -149,7 +149,7 @@
       "debug": "teleport",
       "args": [
         {
-          "entityId": "rill_skitterlings_1"
+          "entityId": "redsill_frogs_1"
         }
       ],
       "label": "Find an enemy"
@@ -162,7 +162,7 @@
       "args": [
         "corealm_attack",
         {
-          "entityId": "rill_skitterlings_1"
+          "entityId": "redsill_frogs_1"
         }
       ],
       "label": "Attack"

@@ -31,9 +31,9 @@ import type {
 } from "../contracts.js";
 import { INTERACT_RANGE } from "../app/config.js";
 import { RngStreams, type Rng } from "../core/rng.js";
-import { content } from "../content/index.js";
+import { content, enemyCombatLevel } from "../content/index.js";
 import type { GatheringResourceArchetype, ResourceDef } from "../content/index.js";
-import { enemyIdFor } from "../content/enemies.js";
+import { enemyBlockFor } from "../content/enemies.js";
 import { QUESTS } from "../content/quests.js";
 import { resourceDef } from "../content/resources.js";
 import {
@@ -1173,7 +1173,7 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
   }
 
   for (const group of region.enemyGroups) {
-    buildEnemyGroup(regionId, group, rng, place, ctx.out);
+    buildEnemyGroup(regionId, group, rng, place, ctx.out, ctx.assetSize);
   }
 
   for (const landmark of region.landmarks) {
@@ -1751,7 +1751,7 @@ function buildDungeonEntities(
   for (const group of dungeon.enemyGroups) {
     const chamberPlace: Placer = (spot, assetId, scale) =>
       placeOn(spot, nearestChamberOffset(dungeon, spot), assetId, scale);
-    buildEnemyGroup(dungeon.id, group, rng, chamberPlace, out);
+    buildEnemyGroup(dungeon.id, group, rng, chamberPlace, out, ctx.assetSize);
   }
 }
 
@@ -1954,15 +1954,33 @@ function buildEnemyGroup(
   rng: Rng,
   place: Placer,
   out: SemanticEntity[],
+  assetSize: (assetId: string) => AssetSize | null,
 ): void {
   // One lookup per group. `content/enemies.ts` publishes alias rows keyed by group id and by
-  // family, so either spelling resolves.
-  const enemyBlock = content.enemy(group.id) ?? content.enemy(enemyIdFor(group.family, group.tier));
+  // family, so either spelling resolves. It is the ONLY source of combat stats: health, aggro
+  // radius, behaviour and the displayed level all come from here, and `EnemyGroupDef` no longer
+  // carries any of them. See the level comment below. Read straight off the table rather than
+  // through `content.enemy`, so building a world does not depend on boot having registered first.
+  const enemyBlock = enemyBlockFor(group.id, group.family, group.tier);
+  if (!enemyBlock) {
+    // Loud rather than silent. Without a block there is no health, no level and no behaviour, and
+    // the old fallback fields that used to paper over this are gone. `content/regions.ts`
+    // `validateRegions()` checks the same thing at boot so this cannot reach a player.
+    throw new Error(
+      `Enemy group "${group.id}" (family "${group.family}", tier ${group.tier}) has no stat block in content/enemies.ts`,
+    );
+  }
+  const stats = enemyBlock;
   const archetype: Archetype = group.boss ? "boss" : "enemy";
   // A boss should not be the same size as the things guarding it. 1.6x on top of the authored
   // scale is the difference between "another enemy" and "the thing in the room".
   const viewScale = group.boss ? group.scale * 1.6 : group.scale;
   const scale = drawnScale(archetype, viewScale, group.tier);
+  // Widest of the two ground axes, halved: a stag is longer than it is wide and it is the long
+  // axis that decides whether two of them are standing in each other. Null when the asset is not in
+  // the manifest, which leaves `enemyAI` on its own fallback rather than inventing a size here.
+  const assetBox = assetSize(group.assetId);
+  const bodyRadius = assetBox ? (Math.max(assetBox.x, assetBox.z) / 2) * scale : null;
 
   for (let index = 0; index < group.count; index += 1) {
     const spot = group.radius <= 0
@@ -1985,14 +2003,25 @@ function buildEnemyGroup(
       // an entity's interaction list.
       interactions: ["inspect", "attack"],
       // Stats come from `content/enemies.ts`, which solves them backwards from the PRD's
-      // time-to-kill rows. `regions.ts` carried its own maxHealth as a placement hint from before
-      // that table existed; where the two disagree the derived block wins, or the balance work is
-      // silently discarded. A Rill Skitterling read 18 HP here against the content table's 6.
+      // time-to-kill rows. `regions.ts` used to carry its own maxHealth, level, aggroRadius and
+      // behaviour as placement hints from before that table existed, and they disagreed with it in
+      // both directions - a Rill Skitterling read 18 HP here against the content table's 6, and
+      // every `level` in the file was chosen by hand rather than derived. Those four fields are
+      // gone from `EnemyGroupDef`, so there is now nowhere to type a wrong one.
+      //
+      // `level` in particular is COMPUTED, never authored: `enemyCombatLevel` reads the block's
+      // attack, accuracy, defence, armour, magicArmour and health. A player who reads "level 19"
+      // off a Highcairn Bear is reading its actual stat line.
       combat: {
-        health: enemyBlock?.maxHealth ?? group.maxHealth,
-        maxHealth: enemyBlock?.maxHealth ?? group.maxHealth,
-        level: group.level,
-        aggroRadius: enemyBlock?.aggroRadius ?? group.aggroRadius,
+        health: stats.maxHealth,
+        maxHealth: stats.maxHealth,
+        level: enemyCombatLevel(stats),
+        aggroRadius: stats.aggroRadius,
+        ...(stats.moveSpeedMps === undefined ? {} : { moveSpeedMps: stats.moveSpeedMps }),
+        // The footprint the creature has to be given room for, at the size it is actually drawn.
+        // `drawnScale` and not `group.scale`, because the tier silhouette is part of how big it
+        // looks standing next to another one.
+        ...(bodyRadius === null ? {} : { bodyRadius }),
       },
       // No `groundNormal` and no solid volume: enemies walk, and a normal sampled once at spawn
       // would be a lie the moment they moved. `systems/` owns both for anything that moves.
@@ -2006,7 +2035,7 @@ function buildEnemyGroup(
       meta: {
         family: group.family,
         groupId: group.id,
-        behaviour: group.behaviour,
+        behaviour: stats.behaviour,
         spawnX: round2(position[0]),
         spawnZ: round2(position[2]),
       },

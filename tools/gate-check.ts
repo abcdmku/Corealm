@@ -528,7 +528,7 @@ function playthroughSource(): string {
     dbg.giveItem("grithe_dagger", 1);
     await agent.call("corealm_equip", { itemId: "grithe_dagger" });
     dbg.setHealth(999);
-    const enemy = await findNear(["enemy"], "attack", "march|camp|pit|skitter");
+    const enemy = await findNear(["enemy"], "attack", "march|camp|pit|frog");
     let killed = false;
     if (enemy) {
       await agent.call("corealm_move_to", { entityId: enemy.id });
@@ -564,8 +564,10 @@ function playthroughSource(): string {
     // combat verb now means "hit that with what I am holding" - so a "cast" filter matches nothing
     // and this step would quietly report "no enemy found" instead of testing magic at all. The cast
     // below still names its spell explicitly through corealm_attack, which is unchanged.
+    // "skitter" is gone from the name pattern with the Rill Skitterlings themselves; the frogs that
+    // replaced them on the Redsill shallows are what this step now finds.
     // (No backticks in here: this whole block is inside the playthroughSource template literal.)
-    const enemy = await findNear(["enemy"], "attack", "march|camp|pit|skitter");
+    const enemy = await findNear(["enemy"], "attack", "march|camp|pit|frog");
     let evidence = wand.error
       ? "wand equip refused: " + wand.error + " " + wand.message
       : "no enemy found";
@@ -715,6 +717,14 @@ function playthroughSource(): string {
     dbg.clearInventory();
     dbg.giveItem("kaldite_sword", 1);
     await agent.call("corealm_equip", { itemId: "kaldite_sword" });
+    // The sleep is load-bearing. \`setHealth\` clamps to \`player.maxHealth\` AT CALL TIME, and
+    // maxHealth is recomputed from the skills by the health system's own tick, so setting melee to
+    // 25 and healing on the same line heals to the OLD maximum: measured, 23 of an eventual 59.
+    // The boss then lands two swings of up to 12 and kills a player the harness believes it healed,
+    // and the respawn puts them in Coldbrace 171 m away, where every later re-attack is refused
+    // with OUT_OF_RANGE while \`deaths\` stays 0 because the poll never catches the zero-health frame.
+    // One tick between the two calls is the whole fix.
+    await sleep(400);
     dbg.setHealth(999);
     let entered = false;
     let enteredRegion = "none";
@@ -771,7 +781,7 @@ function playthroughSource(): string {
     dbg.giveItem("kaldite_sword", 1);
     await agent.call("corealm_equip", { itemId: "kaldite_sword" });
     dbg.setHealth(999);
-    const enemy = await findNear(["enemy"], "attack", "march|camp|pit|skitter|moor");
+    const enemy = await findNear(["enemy"], "attack", "march|camp|pit|frog|moor");
     let evidence = "no enemy found";
     let cleared = false;
     if (enemy) {
@@ -954,14 +964,14 @@ function playthroughSource(): string {
     if (quest.status === "active" && quest.stage === 3) {
       const worn = await agent.call("corealm_equip", { itemId: "grithe_dagger" });
       if (worn.error) trail.push("equip refused: " + worn.error + " " + worn.message);
-      const hunt = await slay("skitter", 3, 140, { position: [-88, 0, -70] });
-      trail.push("skitterlings killed " + hunt.killed + " [" + hunt.names.join(", ") + "]");
+      const hunt = await slay("frog", 3, 140, { position: [-56, 0, -72] });
+      trail.push("frogs killed " + hunt.killed + " [" + hunt.names.join(", ") + "]");
       quest = await waitStage("cold_iron", 3, 10000);
       reached.push(quest.stage);
       if (quest.stage === 3) {
         const counters = questRecord("cold_iron").counters || {};
-        trail.push("kill:skitterling counter reads "
-          + (counters["kill:skitterling"] === undefined ? "ABSENT" : counters["kill:skitterling"])
+        trail.push("kill:frog counter reads "
+          + (counters["kill:frog"] === undefined ? "ABSENT" : counters["kill:frog"])
           + " after " + hunt.killed + " confirmed kills");
       }
     }
@@ -1076,15 +1086,15 @@ function playthroughSource(): string {
     }
     const pastFirstStage = quest.status === "complete" || quest.stage >= 2;
 
-    // Stage 4: into the mouth, four Cairnwights in the Lit Gallery, then The Collapse.
+    // Stage 4: into the mouth, four Gravelmaw Rats in the Lit Gallery, then The Collapse.
     if (quest.status === "active" && quest.stage === 3) {
       trail.push("mouth " + await travel({ entityId: "gravelmaw_mouth_portal" }, 180000));
       const entered = await agent.call("corealm_interact",
         { entityId: "gravelmaw_mouth_portal", interaction: "enter" });
       if (entered.error) trail.push("enter refused: " + entered.error + " " + entered.message);
       await sleep(600);
-      const hunt = await slay("cairnwight", 4, 100);
-      trail.push("cairnwights killed " + hunt.killed);
+      const hunt = await slay("gravelmaw_ch1_rats|Gravelmaw Rat", 4, 100);
+      trail.push("rats killed " + hunt.killed);
       trail.push("collapse " + await travel({ locationId: "gravelmaw_chamber2" }, 90000));
       quest = await waitStage("long_cairn", 3, 10000);
       reached.push(quest.stage);
@@ -1130,7 +1140,7 @@ function playthroughSource(): string {
       await agent.call("corealm_interact", { entityId: "gravelmaw_mouth_portal", interaction: "enter" });
       await sleep(600);
       trail.push("hall " + await travel({ locationId: "gravelmaw_chamber3" }, 120000));
-      const elders = await slay("thornbound|elder", 2, 100);
+      const elders = await slay("gravelmaw_ch3_bears|Cave Bear", 2, 100);
       trail.push("elders killed " + elders.killed);
       // Back onto the cairn: the stage wants both Elders down AND the player in the hall AND the
       // garnet still in the pack, all true in the same evaluation.

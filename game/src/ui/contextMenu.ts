@@ -537,7 +537,13 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function entitySubtitle(entity: SemanticEntity, api: GameApi): string {
-  const base = `Tier ${entity.tier} · ${entity.state}`;
+  // Combat level leads for anything that fights back, because it is the one number that tells a
+  // player whether to swing. It is computed from the stat block by `enemyCombatLevel` rather than
+  // authored anywhere, so what is printed here IS the creature's attack, defence, armour and
+  // health read back out. Everything else keeps the plain tier line it had.
+  const base = entity.combat
+    ? `Level ${entity.combat.level} · Tier ${entity.tier} · ${entity.state}`
+    : `Tier ${entity.tier} · ${entity.state}`;
   if (entity.station?.kind !== "campfire") return base;
   const remainingMs = contextRemainingMs(entity, api);
   return remainingMs === null ? `${base} · portable fire` : `${base} · ${formatRemaining(remainingMs)} left`;

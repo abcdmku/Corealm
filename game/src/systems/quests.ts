@@ -27,7 +27,7 @@
  * predicates across at most ten quests, twice a second, in the worst case.
  *
  * Counters are monotonic per quest. A stage that counts something snapshots a baseline when it
- * begins (`@base:<counter>`), so "kill 4 Cairnwights" in stage 4 and "kill 2 Thornbound" in stage 7
+ * begins (`@base:<counter>`), so "kill 4 rats" in stage 4 and "kill 2 bears" in stage 7
  * do not contaminate each other and a stage can never be pre-completed by work done before it.
  *
  * ---------------------------------------------------------------------------------------------

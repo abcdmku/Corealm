@@ -1,0 +1,572 @@
+{
+  "total": 107,
+  "groups": [
+    {
+      "id": "redsill_frogs_1",
+      "name": "Redsill Frog",
+      "archetype": "enemy",
+      "regionId": "fallowmarch",
+      "tier": 1,
+      "maxHealth": 6,
+      "health": 6,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": -52.72,
+        "y": -2.61,
+        "z": -71.96
+      },
+      "count": 6
+    },
+    {
+      "id": "marchfield_hens_1",
+      "name": "Marchfield Hen",
+      "archetype": "enemy",
+      "regionId": "fallowmarch",
+      "tier": 1,
+      "maxHealth": 4,
+      "health": 4,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": -82.39,
+        "y": -3.24,
+        "z": -29.34
+      },
+      "count": 5
+    },
+    {
+      "id": "bracken_hens_1",
+      "name": "Bracken Hen",
+      "archetype": "enemy",
+      "regionId": "fallowmarch",
+      "tier": 1,
+      "maxHealth": 4,
+      "health": 4,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": -147.38,
+        "y": 5.9,
+        "z": 44.61
+      },
+      "count": 4
+    },
+    {
+      "id": "open_march_goats_1",
+      "name": "Open March Billy",
+      "archetype": "enemy",
+      "regionId": "fallowmarch",
+      "tier": 1,
+      "maxHealth": 12,
+      "health": 12,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": -242.43,
+        "y": -0.3,
+        "z": 31.59
+      },
+      "count": 4
+    },
+    {
+      "id": "redsill_cattle_1",
+      "name": "Redsill Cow",
+      "archetype": "enemy",
+      "regionId": "fallowmarch",
+      "tier": 1,
+      "maxHealth": 16,
+      "health": 16,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": -64.07,
+        "y": 2.56,
+        "z": -92.76
+      },
+      "count": 3
+    },
+    {
+      "id": "marchfield_coneys_1",
+      "name": "Marchfield Coney",
+      "archetype": "enemy",
+      "regionId": "fallowmarch",
+      "tier": 1,
+      "maxHealth": 5,
+      "health": 5,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": -130.06,
+        "y": 2.31,
+        "z": 8.27
+      },
+      "count": 2
+    },
+    {
+      "id": "palewood_adders_1",
+      "name": "Palewood Adder",
+      "archetype": "enemy",
+      "regionId": "fallowmarch",
+      "tier": 1,
+      "maxHealth": 9,
+      "health": 9,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": -314.74,
+        "y": 13.2,
+        "z": -97.83
+      },
+      "count": 4
+    },
+    {
+      "id": "march_road_reavers_1",
+      "name": "March Road Reaver",
+      "archetype": "enemy",
+      "regionId": "fallowmarch",
+      "tier": 1,
+      "maxHealth": 9,
+      "health": 9,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": -228.03,
+        "y": 1.78,
+        "z": -24.21
+      },
+      "count": 3
+    },
+    {
+      "id": "duskoak_stags_1",
+      "name": "Duskoak Stag",
+      "archetype": "enemy",
+      "regionId": "vellenwood",
+      "tier": 5,
+      "maxHealth": 26,
+      "health": 26,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 14.8,
+        "y": 3,
+        "z": 185.39
+      },
+      "count": 5
+    },
+    {
+      "id": "bramble_hogs_1",
+      "name": "Bramble Hog",
+      "archetype": "enemy",
+      "regionId": "vellenwood",
+      "tier": 5,
+      "maxHealth": 22,
+      "health": 22,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 156.32,
+        "y": 2.85,
+        "z": 128.23
+      },
+      "count": 5
+    },
+    {
+      "id": "deepwood_coyotes_1",
+      "name": "Deepwood Coyote",
+      "archetype": "enemy",
+      "regionId": "vellenwood",
+      "tier": 5,
+      "maxHealth": 28,
+      "health": 28,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 52.58,
+        "y": 5.56,
+        "z": 157.81
+      },
+      "count": 4
+    },
+    {
+      "id": "blackwater_frogs_1",
+      "name": "Blackwater Frog",
+      "archetype": "enemy",
+      "regionId": "vellenwood",
+      "tier": 5,
+      "maxHealth": 12,
+      "health": 12,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 115.3,
+        "y": 6.39,
+        "z": 96.04
+      },
+      "count": 7
+    },
+    {
+      "id": "rootfall_coneys_1",
+      "name": "Rootfall Coney",
+      "archetype": "enemy",
+      "regionId": "vellenwood",
+      "tier": 5,
+      "maxHealth": 10,
+      "health": 10,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 83.13,
+        "y": 7.11,
+        "z": 150
+      },
+      "count": 6
+    },
+    {
+      "id": "thornline_adders_1",
+      "name": "Thornline Adder",
+      "archetype": "enemy",
+      "regionId": "vellenwood",
+      "tier": 5,
+      "maxHealth": 24,
+      "health": 24,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 201.26,
+        "y": 7.87,
+        "z": 151.36
+      },
+      "count": 4
+    },
+    {
+      "id": "gorge_reavers_1",
+      "name": "Gorge Reaver",
+      "archetype": "enemy",
+      "regionId": "vellenwood",
+      "tier": 5,
+      "maxHealth": 26,
+      "health": 26,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 219.46,
+        "y": 3.4,
+        "z": 63.6
+      },
+      "count": 3
+    },
+    {
+      "id": "highcairn_bears_1",
+      "name": "Highcairn Bear",
+      "archetype": "enemy",
+      "regionId": "karrowmoor",
+      "tier": 10,
+      "maxHealth": 38,
+      "health": 38,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 107.76,
+        "y": 26.04,
+        "z": -109.17
+      },
+      "count": 4
+    },
+    {
+      "id": "scree_boars_1",
+      "name": "Scree Boar",
+      "archetype": "enemy",
+      "regionId": "karrowmoor",
+      "tier": 10,
+      "maxHealth": 34,
+      "health": 34,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 176.26,
+        "y": 57.47,
+        "z": -159.12
+      },
+      "count": 6
+    },
+    {
+      "id": "ridge_ibex_1",
+      "name": "Ridge Ibex",
+      "archetype": "enemy",
+      "regionId": "karrowmoor",
+      "tier": 10,
+      "maxHealth": 44,
+      "health": 44,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 274.8,
+        "y": 47.88,
+        "z": -140.03
+      },
+      "count": 3
+    },
+    {
+      "id": "terrace_aurochs_1",
+      "name": "Terrace Aurochs",
+      "archetype": "enemy",
+      "regionId": "karrowmoor",
+      "tier": 10,
+      "maxHealth": 46,
+      "health": 46,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 77.19,
+        "y": 12.5,
+        "z": -45.15
+      },
+      "count": 3
+    },
+    {
+      "id": "tarn_coyotes_1",
+      "name": "Tarn Coyote",
+      "archetype": "enemy",
+      "regionId": "karrowmoor",
+      "tier": 10,
+      "maxHealth": 30,
+      "health": 30,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 232.47,
+        "y": 30.55,
+        "z": -70.32
+      },
+      "count": 4
+    },
+    {
+      "id": "karrow_reavers_1",
+      "name": "Karrow Reaver",
+      "archetype": "enemy",
+      "regionId": "karrowmoor",
+      "tier": 10,
+      "maxHealth": 40,
+      "health": 40,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 151.55,
+        "y": 39.55,
+        "z": -128.15
+      },
+      "count": 4
+    },
+    {
+      "id": "gravelmaw_ch1_rats_1",
+      "name": "Gravelmaw Rat",
+      "archetype": "enemy",
+      "regionId": "gravelmaw",
+      "tier": 10,
+      "maxHealth": 26,
+      "health": 26,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 42.71,
+        "y": 11.37,
+        "z": -39.44
+      },
+      "count": 4
+    },
+    {
+      "id": "gravelmaw_ch1_reavers_1",
+      "name": "Karrow Reaver",
+      "archetype": "enemy",
+      "regionId": "gravelmaw",
+      "tier": 10,
+      "maxHealth": 40,
+      "health": 40,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 46.44,
+        "y": 11.37,
+        "z": -35.61
+      },
+      "count": 2
+    },
+    {
+      "id": "gravelmaw_ch2_scorpions_1",
+      "name": "Quarry Scorpion",
+      "archetype": "enemy",
+      "regionId": "gravelmaw",
+      "tier": 10,
+      "maxHealth": 32,
+      "health": 32,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 32.27,
+        "y": 7.37,
+        "z": -58.27
+      },
+      "count": 6
+    },
+    {
+      "id": "gravelmaw_ch2_crabs_1",
+      "name": "Sump Crab",
+      "archetype": "enemy",
+      "regionId": "gravelmaw",
+      "tier": 10,
+      "maxHealth": 42,
+      "health": 42,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 28.4,
+        "y": 7.37,
+        "z": -53.87
+      },
+      "count": 3
+    },
+    {
+      "id": "gravelmaw_ch3_bears_1",
+      "name": "Gravelmaw Cave Bear",
+      "archetype": "enemy",
+      "regionId": "gravelmaw",
+      "tier": 10,
+      "maxHealth": 38,
+      "health": 38,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 24.96,
+        "y": 3.37,
+        "z": -75.52
+      },
+      "count": 2
+    },
+    {
+      "id": "ordrun",
+      "name": "Ordrun the Quarrykeeper",
+      "archetype": "boss",
+      "regionId": "gravelmaw",
+      "tier": 10,
+      "maxHealth": 200,
+      "health": 200,
+      "state": "alive",
+      "interactions": [
+        "inspect",
+        "attack",
+        "cast"
+      ],
+      "position": {
+        "x": 10,
+        "y": 1.37,
+        "z": -96
+      },
+      "count": 1
+    }
+  ]
+}

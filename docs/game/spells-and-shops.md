@@ -102,7 +102,7 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Cairnleaf Seed](./items/#cairnleaf-seed) | 30 | 52 |
 | [Water Essence](./items/#water-essence) | 300 | 55 |
 | [Cairnpine Shaft](./items/#cairnpine-shaft) | 60 | 32 |
-| [Wight Shroud](./items/#wight-shroud) | 8 | 130 |
+| [Cairn Pelt](./items/#cairn-pelt) | 8 | 130 |
 
 ### Quarry Smith
 

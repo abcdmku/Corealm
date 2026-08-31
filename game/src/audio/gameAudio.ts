@@ -6,7 +6,8 @@ import type { Store } from "../state/store.js";
 import type { CombatHit } from "../systems/combat.js";
 import { content } from "../content/index.js";
 import {
-  cueForActivity, cueForMovement, type ActivityAudioObservation, type AudioDirector, type FootstepSurface,
+  cueForActivity, cueForCreature, cueForMovement,
+  type ActivityAudioObservation, type AudioDirector, type FootstepSurface,
 } from "./director.js";
 import type { AudioEngine, PlayCueOptions } from "./engine.js";
 import { spellCastSound, spellImpactSound } from "./spellSound.js";
@@ -18,6 +19,39 @@ interface CorealmAudioBridgeDeps {
   director: AudioDirector;
   entity: (entityId: string) => SemanticEntity | undefined;
   surfaceAt: (position: Vec3, regionId: RegionId) => FootstepSurface;
+  /**
+   * Nearest living animal within `radius`, for idle voices. Optional so the bridge still runs in
+   * tests and headless harnesses that never build a world.
+   */
+  nearestCreature?: (position: Vec3, radius: number)
+    => { entityId: string; family: string; distance: number } | undefined;
+}
+
+/** How far an animal's idle voice carries. Past this the field is silent. */
+const CREATURE_CALL_RADIUS_M = 34;
+/** Gap between idle calls, plus up to the jitter so a herd does not sound metronomic. */
+const CREATURE_CALL_BASE_MS = 4200;
+const CREATURE_CALL_JITTER_MS = 3600;
+/** Re-check cadence when nothing is in range. Short, so walking into a field is answered quickly. */
+const CREATURE_CALL_IDLE_MS = 1200;
+/**
+ * Master trim on animal idle voices, on top of each cue's own gain in `corealmCatalog.ts`.
+ *
+ * One number rather than sixteen edits, because the per-cue gains carry a deliberate balance
+ * between the animals - a bear at 0.46 against a coney at 0.24 - and that balance is right. What
+ * was wrong was the whole layer sitting too far forward against the music and ambience beds, so it
+ * is scaled rather than rewritten.
+ */
+const CREATURE_CALL_GAIN = 0.45;
+
+/** Stable 0..1 from an entity id, so per-animal call timing is deterministic across runs. */
+function hashToUnit(value: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return (hash >>> 8) / 0x00ffffff;
 }
 
 /** Adapts Corealm's semantic state and events to the browser audio runtime. */
@@ -26,6 +60,7 @@ export class CorealmAudioBridge implements TickSystem {
   readonly order = 500;
 
   private activityKey: string | null = null;
+  private nextCreatureCallMs = 0;
   private activityDeadline: number | null = null;
   private readonly suppressedStarts = new Map<AudioCueId, number>();
 
@@ -35,6 +70,7 @@ export class CorealmAudioBridge implements TickSystem {
     const state = this.deps.store.get();
     const player = state.player;
     this.deps.director.setRegion(player.regionId);
+    this.tickCreatureAmbience(player.position as Vec3, atMs);
 
     const activity = state.activity;
     const key = activityIdentity(activity);
@@ -236,6 +272,46 @@ export class CorealmAudioBridge implements TickSystem {
     if (hit.killed) this.play("combat.enemy_death");
   }
 
+  /**
+   * The idle voices of whatever animal is nearest, so a field with cattle in it sounds like one.
+   *
+   * The nearest creature only, not every creature in range. A herd is three to nine animals and a
+   * shoal is nine; calling them all would be a wall, and the engine's `maxConcurrent` would throw
+   * most of it away anyway. One voice at a time, from whichever animal is closest, is what a field
+   * actually sounds like from a hundred paces.
+   *
+   * Gain falls off linearly with distance because `AudioEngine` is a bus mixer with no panner in
+   * it: there is no 3D falloff to lean on, so distance has to be applied here or a bear 34 m away
+   * is exactly as loud as one standing on the player.
+   *
+   * The interval is deterministic. `Math.random()` is banned in world generation and the audio
+   * engine already resolves its rate ranges to a fixed midpoint, so this follows the same rule and
+   * derives its jitter from the entity id instead.
+   */
+  private tickCreatureAmbience(position: Vec3, atMs: number): void {
+    if (atMs < this.nextCreatureCallMs) return;
+    const near = this.deps.nearestCreature?.(position, CREATURE_CALL_RADIUS_M);
+    if (!near) {
+      // Nothing in range: check again soon rather than sitting out a whole interval, so walking
+      // into a field is answered within a second rather than within six.
+      this.nextCreatureCallMs = atMs + CREATURE_CALL_IDLE_MS;
+      return;
+    }
+    const cue = cueForCreature(near.family);
+    if (cue) {
+      const falloff = Math.max(0, 1 - near.distance / CREATURE_CALL_RADIUS_M);
+      // Squared, not linear: linear falloff keeps a distant animal audible for far too long, and
+      // the thing a player should hear is what is close enough to matter.
+      //
+      // The distance floor is 0.12 rather than the 0.25 it was: at 0.25 an animal at the very edge
+      // of its radius still came through at a quarter of full voice, which is most of why the layer
+      // read as loud even after the master trim.
+      this.play(cue, { gain: CREATURE_CALL_GAIN * (0.12 + 0.88 * falloff * falloff) });
+    }
+    this.nextCreatureCallMs = atMs + CREATURE_CALL_BASE_MS
+      + (hashToUnit(near.entityId) * CREATURE_CALL_JITTER_MS);
+  }
+
   handleInteraction(interaction: InteractionId, result: Result<unknown>): void {
     if (!result.ok) {
       this.play("ui.error");
@@ -293,8 +369,11 @@ export class CorealmAudioBridge implements TickSystem {
   }
 
   /**
-   * `options` is omitted by every caller but the spell voices; `playCue` defaults it to `{}`, so
-   * passing `undefined` is the same call the other twenty-odd sites were already making.
+   * `options` is omitted by every caller but two: the spell voices, and the idle animal voices,
+   * which apply their own distance falloff. `AudioEngine` is a bus mixer with no panner node, so
+   * there is no built-in 3D attenuation and a per-play gain is the only place distance can be
+   * expressed. `playCue` defaults it to `{}`, so passing `undefined` is the same call the other
+   * twenty-odd sites were already making.
    */
   private play(cue: AudioCueId, options?: PlayCueOptions): void {
     void this.deps.engine.playCue(cue, options);

@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import { AUDIO_CUE_IDS } from "../game/src/contracts.js";
 import type { GroundSurfaceSample } from "../game/src/contracts.js";
 import {
-  COREALM_AUDIO_CATALOG, FUTURE_REGION_MUSIC_FILES, cueForActivity, cueForMovement,
-  cueForGameEvent, footstepSurfaceAt, loopsForRegion,
+  COREALM_AUDIO_CATALOG, FUTURE_REGION_MUSIC_FILES, cueForActivity, cueForCreature,
+  cueForGameEvent, cueForMovement, cuesForCombatHit, footstepSurfaceAt, isCreatureFamily,
+  loopsForRegion,
 } from "../game/src/audio/index.js";
 import type { AudioVariant } from "../game/src/audio/index.js";
 
@@ -136,5 +137,48 @@ describe("Corealm audio catalog", () => {
       url: "/audio/sfx/nox/footstep-stone-01.ogg",
       gain: 0.57,
     });
+  });
+});
+
+/**
+ * An animal being hit should sound like a weapon landing on it, and nothing else.
+ *
+ * There were two shared cues for this - `creature.beast_hurt` layered under the weapon and
+ * `creature.beast_death` under the kill - and both are gone. The recordings behind them came out of
+ * a generic creature pack picked by filename rather than by ear, so what actually played under a cow
+ * being hit was a bird call. One shared cue across sixteen families was always going to be wrong for
+ * most of them, and the combat layer already carries the event.
+ */
+describe("creature voices", () => {
+  it("gives a family an idle voice and nothing else", () => {
+    expect(cueForCreature("cattle")).toBe("creature.cow_low");
+    expect(cueForCreature("bear")).toBe("creature.bear_roar");
+    // Aliases and casing resolve the same way they always did.
+    expect(cueForCreature("HEN")).toBe(cueForCreature("hen"));
+  });
+
+  it("has no cue at all for being hit or dying", () => {
+    // Stated against the frozen id list rather than against the map, so re-adding a per-creature
+    // hurt sound has to come back through this test.
+    for (const cue of AUDIO_CUE_IDS) {
+      expect(cue).not.toMatch(/^creature\.(beast_)?(hurt|death|die)/);
+    }
+  });
+
+  it("leaves the humanoid families silent", () => {
+    expect(cueForCreature("reaver")).toBeNull();
+    expect(cueForCreature("quarrykeeper")).toBeNull();
+    expect(cueForCreature(null)).toBeNull();
+    expect(isCreatureFamily("reaver")).toBe(false);
+    expect(isCreatureFamily("bear")).toBe(true);
+  });
+
+  it("still sounds a landed blow and a kill through the combat cues", () => {
+    const killing = cuesForCombatHit({
+      attacker: "player", kind: "melee", hit: true, killed: true, damage: 9,
+    });
+    expect(killing).toContain("combat.melee_hit");
+    expect(killing).toContain("combat.enemy_death");
+    expect(killing.every((cue) => !cue.startsWith("creature."))).toBe(true);
   });
 });
