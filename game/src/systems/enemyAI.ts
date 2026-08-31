@@ -24,7 +24,7 @@ import type { EntityId, SemanticEntity, Vec3 } from "../contracts.js";
 import type { GameState, Store } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
 import type { TickSystem } from "../app/loop.js";
-import { distanceXZ } from "../core/math.js";
+import { distanceXZ, turnToward } from "../core/math.js";
 import { Rng } from "../core/rng.js";
 import type { BossPhase } from "../content/enemies.js";
 import { ORDRUN_PHASES } from "../content/enemies.js";
@@ -38,6 +38,38 @@ export const LEASH_METRES = 28;
 
 /** Enemies move slower than the player's 4.2 m/s, so disengaging by running is a real option. */
 export const ENEMY_SPEED_MPS = 3.1;
+
+/**
+ * Radians per second a creature may turn.
+ *
+ * The player's path-following is capped at 7 rad/s (`systems/movement.ts: MAX_TURN_RATE`) and this
+ * is the same number for the same reason: an uncapped `atan2` assignment turns a body all the way
+ * round inside one 100 ms tick, which the renderer can only draw as a snap. A wander destination
+ * picked behind a cow used to spin it 180 degrees at 1800 deg/s against the player's own 400.
+ */
+export const ENEMY_TURN_RATE_RAD_PER_S = 7;
+
+/**
+ * Heading error above which a creature pivots in place before it walks, in radians (60 degrees).
+ *
+ * A capped turn alone still translates the body toward a target it has not turned to face, and
+ * for the half second a 180-degree pivot takes that reads as a moonwalk. Real animals turn first,
+ * then go. Errors below this are walked off mid-stride, which is what ordinary cornering looks
+ * like, so the gate only bites on genuine reversals — a new wander leg, a leash turn-around, the
+ * player stepping behind.
+ */
+export const TURN_IN_PLACE_RAD = Math.PI / 3;
+
+/**
+ * How far the drawn terrain may disagree with a step's Y before the terrain is ignored, in metres.
+ *
+ * Same constant, same reasoning, and same measurements as `GROUND_SNAP_MAX` in
+ * `systems/movement.ts`: the navmesh floats 0.147-0.417 m above the drawn ground and the float
+ * changes as a creature walks, so an animal standing on the NAVMESH is an animal hovering in the
+ * air. 1.2 m is 3x the worst measured float and far below any dungeon offset, so grounding can
+ * never fire a Gravelmaw creature up through the chamber roof to the surface terrain.
+ */
+const GROUND_SNAP_MAX_METRES = 1.2;
 
 /**
  * How fast an enemy is allowed to be pushed out of another one, metres per second.
@@ -139,6 +171,21 @@ export function wanderDestination(spawn: Vec3, rng: Rng): Vec3 {
   const angle = rng.float(0, Math.PI * 2);
   const radius = rng.float(WANDER_MIN_METRES, WANDER_RADIUS_METRES);
   return [spawn[0] + Math.cos(angle) * radius, spawn[1], spawn[2] + Math.sin(angle) * radius];
+}
+
+/**
+ * Absolute shortest-way-round difference between two headings, in radians.
+ *
+ * Exported and pure so the turn-in-place gate can be pinned without a store, a navmesh and a
+ * combat system, exactly like `separationPush`. The wrap is a loop for the reason
+ * `core/math.turnToward` gives: the inputs are near the principal range and a `%` on a negative
+ * angle needs a correction term that is easy to get wrong.
+ */
+export function headingGap(from: number, to: number): number {
+  let delta = to - from;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  return Math.abs(delta);
 }
 
 /** Stable per-entity seed, so one creature's wander is its own and survives a reload. */
@@ -259,6 +306,12 @@ export interface EnemyAiDeps {
   entities: CombatEntityPort;
   combat: CombatSystem;
   nav?: EnemyNavPort;
+  /**
+   * Height of the DRAWN ground at a point, for planting feet on it. The navmesh keeps XZ
+   * authority; see `ground`. Optional for the same reason `nav` is: the system must run in tests
+   * that stand up no scene.
+   */
+  groundHeightAt?: (x: number, z: number) => number;
 }
 
 type AiMode = "idle" | "aggro" | "returning";
@@ -366,7 +419,7 @@ export class EnemyAiSystem implements TickSystem {
         } else {
           // At standoff there is no displacement for stepToward to face along. Keep looking at the
           // player while the combat system swings.
-          this.faceless(entity, playerPos);
+          this.faceless(entity, playerPos, deltaMs);
         }
       }
     }
@@ -805,6 +858,17 @@ export class EnemyAiSystem implements TickSystem {
     // threshold and sat there for the rest of the session.
     if (gap - stopWithin <= STEP_EPSILON_METRES) return true;
 
+    // Turn before walking. With only the rate cap, a creature whose destination is behind it
+    // walks toward the new point while its body is still coming round — half a second of a cow
+    // sliding sideways. Spending those ticks pivoting on the spot instead is both what an animal
+    // does and what keeps every drawn frame's velocity aligned with its facing.
+    const current = entity.view?.rotationY;
+    const desired = Math.atan2(dx, dz);
+    if (current !== undefined && headingGap(current, desired) > TURN_IN_PLACE_RAD) {
+      this.turnTo(entity, desired, deltaMs);
+      return false;
+    }
+
     const step = Math.min(gap - stopWithin, (speed * deltaMs) / 1000);
     if (step <= 0) return false;
 
@@ -831,14 +895,31 @@ export class EnemyAiSystem implements TickSystem {
     const movedZ = snapped[2] - from[2];
     entity.position = snapped;
     this.deps.entities.setPosition?.(entity.id, snapped);
-    this.faceDirection(entity, movedX, movedZ);
+    this.faceDirection(entity, movedX, movedZ, deltaMs);
     this.deps.store.markDirty();
     return distanceXZ(snapped, target) <= stopWithin;
   }
 
   /** Uses raw steering only when no nav port exists. A nav miss is a blocker, not permission. */
   private snapStep(wanted: Vec3): Vec3 | null {
-    return this.deps.nav ? this.deps.nav.nearestWalkable(wanted, 2) : wanted;
+    const snapped = this.deps.nav ? this.deps.nav.nearestWalkable(wanted, 2) : wanted;
+    return snapped ? this.ground(snapped) : null;
+  }
+
+  /**
+   * Replaces the navmesh's Y with the drawn terrain height, when the two agree closely enough to
+   * be talking about the same surface. Keeps the navmesh authoritative for XZ.
+   *
+   * The player's movement has done exactly this since the float was measured; enemies never did,
+   * which is why every animal stood 0.15-0.42 m above its own shadow the moment it took a step.
+   */
+  private ground(point: Vec3): Vec3 {
+    const heightAt = this.deps.groundHeightAt;
+    if (!heightAt) return point;
+    const groundY = heightAt(point[0], point[2]);
+    if (!Number.isFinite(groundY)) return point;
+    if (Math.abs(groundY - point[1]) > GROUND_SNAP_MAX_METRES) return point;
+    return [point[0], groundY, point[2]];
   }
 
   /** A useful snap moves at least `STEP_EPSILON_METRES` and does not take the enemy further away. */
@@ -848,17 +929,27 @@ export class EnemyAiSystem implements TickSystem {
   }
 
   /** Faces the direction the navmesh actually allowed, including an axis fallback. */
-  private faceDirection(entity: SemanticEntity, dx: number, dz: number): void {
+  private faceDirection(entity: SemanticEntity, dx: number, dz: number, deltaMs: number): void {
     if (Math.hypot(dx, dz) <= 0.001) return;
-    const view = entity.view;
-    if (view) view.rotationY = Math.atan2(dx, dz);
+    this.turnTo(entity, Math.atan2(dx, dz), deltaMs);
   }
 
   /** Points an enemy at the player. Purely cosmetic, and cosmetics live in `meta`, not in a mesh. */
-  private faceless(entity: SemanticEntity, target: Vec3): void {
+  private faceless(entity: SemanticEntity, target: Vec3, deltaMs: number): void {
+    this.turnTo(
+      entity,
+      Math.atan2(target[0] - entity.position[0], target[2] - entity.position[2]),
+      deltaMs,
+    );
+  }
+
+  /** Every facing write goes through the one capped turn, so nothing can reintroduce the snap. */
+  private turnTo(entity: SemanticEntity, desired: number, deltaMs: number): void {
     const view = entity.view;
     if (!view) return;
-    view.rotationY = Math.atan2(target[0] - entity.position[0], target[2] - entity.position[2]);
+    view.rotationY = turnToward(
+      view.rotationY ?? desired, desired, ENEMY_TURN_RATE_RAD_PER_S, deltaMs,
+    );
   }
 
   private setEntityState(entity: SemanticEntity, state: string): void {

@@ -225,7 +225,7 @@ async function probe(targetPage: Page, presetId: string, label: string): Promise
     presetId,
     label,
     samples,
-    impliedWalkMpsFor(presetId),
+    impliedGaitsFor(presetId),
     spawned.target?.ai?.moveSpeedMps ?? null,
   );
 }
@@ -234,7 +234,7 @@ function summarise(
   presetId: string,
   label: string,
   samples: Sample[],
-  implied: number | null,
+  implied: { walk: number | null; run: number | null },
   moveSpeedMps: number | null,
 ): WalkReport {
   const speeds: number[] = [];
@@ -260,10 +260,15 @@ function summarise(
     }
   }
 
-  const walking = samples.filter((sample) => sample.motion === "walk");
-  const timeScale = walking.at(-1)?.timeScale ?? null;
+  // Since the walk/run split, a provoked creature chases on its RUN cycle, so the slide check has
+  // to retime against the gait the samples actually show — scoring a run's ground speed against
+  // the walk cycle's implied metres-per-cycle reported phantom slide on every healthy creature.
+  const locomoting = samples.filter((s) => s.motion === "walk" || s.motion === "run");
+  const gait = locomoting.at(-1);
+  const timeScale = gait?.timeScale ?? null;
   const groundSpeed = median(speeds);
-  const footSpeed = implied !== null && timeScale !== null ? implied * timeScale : null;
+  const impliedGait = gait?.motion === "run" ? implied.run : implied.walk;
+  const footSpeed = impliedGait !== null && timeScale !== null ? impliedGait * timeScale : null;
   const slide = footSpeed !== null && groundSpeed > 0.2
     ? Math.abs(groundSpeed - footSpeed) / groundSpeed
     : null;
@@ -273,7 +278,7 @@ function summarise(
   if (samples.length === 0) verdict.push("NO SAMPLES");
   else if (speeds.length === 0) verdict.push("never moved");
   if (!paths.includes("live-rig")) verdict.push("NOT ANIMATED");
-  if (walking.length === 0 && speeds.length > 0) verdict.push("moved without a walk clip");
+  if (locomoting.length === 0 && speeds.length > 0) verdict.push("moved without a locomotion clip");
   if (slide !== null && slide > SLIDE_TOLERANCE) verdict.push(`${Math.round(slide * 100)}% foot slide`);
   const drawnP90 = percentile(drawnTurns.map(Math.abs), 0.9);
   if (drawnP90 > PLAYER_TURN_CAP_DEG) verdict.push(`turns ${drawnP90.toFixed(0)} deg/s`);
@@ -282,7 +287,7 @@ function summarise(
   return {
     presetId,
     label,
-    impliedWalkMps: implied,
+    impliedWalkMps: implied.walk,
     moveSpeedMps,
     samples: samples.length,
     paths,
@@ -300,13 +305,13 @@ function summarise(
 }
 
 /**
- * The walk speed the creature's own cycle implies, straight out of the manifest.
+ * The ground speeds the creature's own cycles imply, straight out of the manifest.
  *
  * Resolved in Node rather than in the page because the manifest is already a build input here and
  * the browser has no lookup for it. Preset ids are the enemy group ids, and a dungeon group is
  * prefixed with its dungeon, which is the same key `featureLab/catalog.ts` builds.
  */
-function impliedWalkMpsFor(presetId: string): number | null {
+function impliedGaitsFor(presetId: string): { walk: number | null; run: number | null } {
   const groups = REGIONS.flatMap((region) => [
     ...region.enemyGroups.map((group) => [group.id, group.assetId] as const),
     ...(region.dungeon?.enemyGroups ?? []).map(
@@ -314,10 +319,10 @@ function impliedWalkMpsFor(presetId: string): number | null {
     ),
   ]);
   const assetId = groups.find(([id]) => id === presetId)?.[1];
-  if (assetId === undefined) return null;
+  if (assetId === undefined) return { walk: null, run: null };
   const asset = MANIFEST.assets.find((row) => row.id === assetId) as
-    { impliedWalkMps?: number } | undefined;
-  return asset?.impliedWalkMps ?? null;
+    { impliedWalkMps?: number; impliedRunMps?: number } | undefined;
+  return { walk: asset?.impliedWalkMps ?? null, run: asset?.impliedRunMps ?? null };
 }
 
 function wrap(delta: number): number {

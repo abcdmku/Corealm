@@ -609,6 +609,12 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   const entityViews = new EntityViews(scene, assets, scene.materials, {
     maxUniqueDrawCalls: 96,
     maxUniqueViews: 16,
+    // Equal to `maxUniqueViews`, because a mixer budget UNDER the rig ceiling is where the herd
+    // jitter lived: at the default 10, a field with all 16 rigs alive handed the far eleven a
+    // rotating five slots, so every walking cow in the group advanced its cycle in uneven 33-50 ms
+    // steps instead of one per frame. Sixteen small quadruped mixers are well under a millisecond;
+    // the rotation in `orderAnimationBudget` stays as the safety net rather than the steady state.
+    maxAnimatedViews: 16,
   });
   const spawnPosition: Vec3 = [spawnSpec.x, 0, spawnSpec.z];
   const surfaceEntities = entityStore.all().filter((entity) => entity.regionId !== "gravelmaw");
@@ -908,6 +914,12 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   });
   const enemyAiSystem = new EnemyAiSystem({
     store, events, entities: entityStore, combat: combatSystem, nav,
+    // `meshHeightAt`, not `heightAt`: the drawn lattice needs no region id, and a creature's feet
+    // should land on the same surface the SpellVfx impact rings chose it for. Without this port,
+    // every step kept the navmesh's Y — 0.147-0.417 m above the drawn ground — so any animal that
+    // had ever moved hovered in the air. The player's movement has carried the equivalent
+    // `heightAt` port since that float was measured; this is the same fix for everything else.
+    groundHeightAt: (x, z) => scene.meshHeightAt(x, z),
   });
   const healthSystem = new HealthSystem({ store, events, equipment: equipmentSystem });
   const deathSystem = new DeathSystem({
