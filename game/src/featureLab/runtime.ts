@@ -28,6 +28,7 @@ import type { CharacterRig } from "../render/characterRig.js";
 import type { EntityViews } from "../render/entityViews.js";
 import { SPELLS } from "../content/spells.js";
 import { enemyBlockFor } from "../content/enemies.js";
+import { enemyCombatLevel } from "../content/index.js";
 import { distanceXZ } from "../core/math.js";
 import type { GameState, Store } from "../state/store.js";
 import { setSkillLevel } from "../state/store.js";
@@ -484,7 +485,9 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
       state: runtime.state,
       behaviour,
       aggroRadius: entity.combat?.aggroRadius ?? block?.aggroRadius ?? 0,
+      level: entity.combat?.level ?? (block ? enemyCombatLevel(block) : 0),
       moveSpeedMps: entity.combat?.moveSpeedMps ?? block?.moveSpeedMps ?? null,
+      bodyRadius: entity.combat?.bodyRadius ?? null,
       spawnPosition: [...runtime.spawnPos] as Vec3,
       distanceFromSpawn: round2(distanceXZ(entity.position, runtime.spawnPos)),
       distanceFromPlayer: round2(distanceXZ(entity.position, state.player.position)),

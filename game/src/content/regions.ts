@@ -951,10 +951,12 @@ const FALLOWMARCH: RegionDef = {
       // is visible over the plain before its territorial leash can pull a traveller into combat.
       id: "tempest_roc", family: "tempest_roc", name: "Tempest Roc", tier: 1,
       count: 1, centre: [-292, -156], radius: 0,
-      // Placeholder mesh. A bee at 1.55 is not a roc; the intended model is a Fantasy Monster
-      // rig, tinted to its element with glowing seams. Health, aggro radius, behaviour and the
-      // displayed level all come from `tempest_roc_t1` in content/enemies.ts, never from here.
-      assetId: "enemy_bee", scale: 1.55,
+      // 2.63 m of rig. Boss scaling in `world/regionBuilder.ts` is 1.6x on top of this, and the
+      // tier 1 silhouette is 0.90, so it is drawn 3.79 m long — the biggest thing in Fallowmarch
+      // by a distance, which is the whole point of a region boss on a map of hens and coneys.
+      // Health, aggro radius, behaviour and the displayed level all come from `tempest_roc_t1` in
+      // content/enemies.ts, never from here.
+      assetId: "boss_rhino_air", scale: 1,
       boss: true,
     },
   ],
@@ -1232,9 +1234,10 @@ const VELLENWOOD: RegionDef = {
       // tree is a six-metre combat silhouette without placing its roots across the route.
       id: "rootheart", family: "rootheart", name: "The Rootheart", tier: 5,
       count: 1, centre: [304, 158], radius: 0,
-      // Placeholder mesh, same as the Roc: a twisted tree stands in until the elemental boss rig
-      // is imported. Stats come from `rootheart_t5` in content/enemies.ts.
-      assetId: "tree_twisted_2", scale: 0.35,
+      // The same rig as the Tempest Roc, in earth. Drawn 4.52 m long here against Fallowmarch's
+      // 3.79, because the tier 5 silhouette is 1.075 against tier 1's 0.90: one creature, three
+      // powers, and it grows with the tier that fields it. Stats come from `rootheart_t5`.
+      assetId: "boss_rhino_earth", scale: 1,
       boss: true,
     },
   ],
@@ -1652,12 +1655,16 @@ const KARROWMOOR: RegionDef = {
         assetId: "animal_bear", scale: 1.05,
       },
       {
-        // Unchanged, and the only humanoid left in the dungeon. Being the one man-shaped thing in
-        // a hall of rats, scorpions and crabs is now doing more work than it used to: the room
-        // reads as an animal den with a person standing in the middle of it.
+        // The third of the same rig, in water, and drawn 4.84 m long on the tier 10 silhouette.
+        //
+        // He was a man in ranger's clothes, which was the right call while the dungeon was full of
+        // invented monsters and being the one HUMAN thing carried the room. It reads differently
+        // now: on a floor of rats, scorpions and crabs he was the only thing that was not an
+        // animal, and looked like a lost hiker rather than what holds the Water Orb. Sharing the
+        // orb bosses' silhouette says what he is before he moves.
         id: "ordrun", family: "quarrykeeper", name: "Ordrun the Quarrykeeper", tier: 10,
         count: 1, centre: [10, -96], radius: 0,
-        assetId: "outfit_male_ranger", scale: 1.35, boss: true,
+        assetId: "boss_rhino_water", scale: 1, boss: true,
       },
     ],
     locations: [

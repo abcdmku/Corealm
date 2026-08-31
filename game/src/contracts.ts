@@ -883,8 +883,17 @@ export interface FeatureLabCreatureAi {
   /** Behaviour from the content stat block: what it takes to make this creature fight. */
   behaviour: "passive" | "aggressive" | "territorial";
   aggroRadius: number;
+  /** Combat level, COMPUTED from the stat block by `enemyCombatLevel`, never authored. */
+  level: number;
   /** Pursuit speed, or null when the creature uses the shared default in `systems/enemyAI.ts`. */
   moveSpeedMps: number | null;
+  /**
+   * Half the widest ground axis at drawn scale, or null when the asset was never measured.
+   *
+   * `systems/enemyAI.ts` uses it for separation and for how close a pursuer stops, so it is also
+   * the only readback that says how big the creature actually is on the ground.
+   */
+  bodyRadius: number | null;
   spawnPosition: Vec3;
   /** Metres from its spawn point. Compare against `LEASH_METRES` to reason about leashing. */
   distanceFromSpawn: number;

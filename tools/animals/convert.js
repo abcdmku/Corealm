@@ -283,6 +283,7 @@ window.probeFbx = async (url) => {
  *
  * spec: {
  *   rig: url, texture: url, textureOverrides?: { [meshNameSubstring]: url },
+ *   emissive?: url, emissiveIntensity?: number,   // bosses only; animals ship base colour alone
  *   clips: [{ url, name }],
  *   dropRigClips?: boolean   // the rig's own stub "Take 001" is 0.03 s of nothing
  * }
@@ -291,13 +292,16 @@ window.convertAnimal = async (spec) => {
   const root = await fbxLoader.loadAsync(spec.rig);
 
   // The pack's own materials point at .tga files that were never shipped beside the FBX and would
-  // 404 anyway. Replace them outright with one flat lit material per mesh, which is also what the
-  // rest of the asset library uses: base colour only, no normal or ORM maps.
+  // 404 anyway. Replace them outright with one lit material per mesh: base colour, plus an emissive
+  // map where the source has one. No normal or ORM maps, like the rest of the asset library.
   const baseTexture = await loadTexture(spec.texture);
   const overrides = new Map();
   for (const [match, url] of Object.entries(spec.textureOverrides ?? {})) {
     overrides.set(match, await loadTexture(url));
   }
+  // Optional, and no animal uses it. The elemental bosses do: their glow is authored as an emissive
+  // map of seams and plates, and without it a boss is the same flat-lit hide as a goat.
+  const emissiveTexture = spec.emissive ? await loadTexture(spec.emissive) : null;
 
   const meshNames = [];
   root.traverse((node) => {
@@ -309,6 +313,15 @@ window.convertAnimal = async (spec) => {
     }
     const material = new THREE.MeshStandardMaterial({
       map: texture, roughness: 0.86, metalness: 0,
+      ...(emissiveTexture
+        ? {
+            emissiveMap: emissiveTexture,
+            // White, so the map's own colour is what shows. Tinting here instead would multiply
+            // twice: the maps are already recoloured per element when they are staged.
+            emissive: new THREE.Color(0xffffff),
+            emissiveIntensity: spec.emissiveIntensity ?? 1,
+          }
+        : {}),
       // Several of these textures carry a real alpha channel for fins, fur cards and wing
       // membranes. Alpha test rather than blend: sorted transparency on an instanced crowd of
       // animals is not worth the cost, and these masks are hard-edged anyway.

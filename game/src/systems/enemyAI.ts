@@ -122,6 +122,15 @@ export const ENEMY_STANDOFF_METRES = 1.35;
 /** A provoked enemy stays interested this long after it last saw or was hit by the player. */
 export const PROVOKE_MEMORY_MS = 12_000;
 
+/**
+ * The smallest movement worth taking, in metres.
+ *
+ * Below this a step is noise: the navmesh snap alone moves a candidate by more than this, so a
+ * shorter "step" says nothing about whether the enemy actually got anywhere. Both the progress test
+ * and the arrival test read it, and they have to read the same number — see `stepToward`.
+ */
+const STEP_EPSILON_METRES = 0.001;
+
 /** Only enemies this close to the player are simulated. Everything else idles for free. */
 export const AI_ACTIVE_RADIUS = 70;
 
@@ -638,7 +647,20 @@ export class EnemyAiSystem implements TickSystem {
     const dx = target[0] - from[0];
     const dz = target[2] - from[2];
     const gap = Math.sqrt(dx * dx + dz * dz);
-    if (gap <= stopWithin) return true;
+    // The same epsilon `madeProgress` rejects a step by, and it has to be the same one.
+    //
+    // The step below is clamped to `gap - stopWithin`, so the last step of a walk home is however
+    // much is left. Once that remainder falls under a millimetre, `madeProgress` rejects the
+    // candidate for not moving far enough, rejects both axis slides for the same reason, and
+    // `stepToward` returns false — forever. The enemy freezes a fraction of a millimetre outside
+    // its own arrival threshold and never arrives.
+    //
+    // That is not cosmetic. `returning` only ends when this returns true, and arriving is what
+    // restores a leashed enemy to full health. A boss stuck here stays in `returning` and stays
+    // damaged, which is exactly the "chip it down in safe pieces" the leash heal exists to stop.
+    // Measured in the feature lab: a Redsill Cow walking home settled at 0.6001 m against a 0.6 m
+    // threshold and sat there for the rest of the session.
+    if (gap - stopWithin <= STEP_EPSILON_METRES) return true;
 
     const step = Math.min(gap - stopWithin, (speed * deltaMs) / 1000);
     if (step <= 0) return false;
@@ -676,10 +698,10 @@ export class EnemyAiSystem implements TickSystem {
     return this.deps.nav ? this.deps.nav.nearestWalkable(wanted, 2) : wanted;
   }
 
-  /** A useful snap moves at least 1 mm and does not take the enemy further from its target. */
+  /** A useful snap moves at least `STEP_EPSILON_METRES` and does not take the enemy further away. */
   private madeProgress(from: Vec3, candidate: Vec3 | null, target: Vec3, oldGap: number): boolean {
-    if (!candidate || distanceXZ(from, candidate) <= 0.001) return false;
-    return distanceXZ(candidate, target) < oldGap - 0.001;
+    if (!candidate || distanceXZ(from, candidate) <= STEP_EPSILON_METRES) return false;
+    return distanceXZ(candidate, target) < oldGap - STEP_EPSILON_METRES;
   }
 
   /** Faces the direction the navmesh actually allowed, including an axis fallback. */

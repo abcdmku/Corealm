@@ -108,6 +108,13 @@
       "author": "janpec",
       "source": "https://assetstore.unity.com/?q=Animal%20pack%20deluxe",
       "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
+    },
+    {
+      "id": "fantasy-rhino",
+      "name": "Fantasy Rhino",
+      "author": "Maksim Bugrimov",
+      "source": "https://assetstore.unity.com/?q=Fantasy%20Rhino",
+      "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
     }
   ],
   "assets": [
@@ -2323,6 +2330,122 @@
         "MI_Eyes",
         "MI_Superhero_Male"
       ]
+    },
+    {
+      "id": "boss_rhino_air",
+      "file": "models/boss/boss_rhino_air.glb",
+      "pack": "fantasy-rhino",
+      "category": "character",
+      "is": "roc",
+      "tags": [
+        "boss",
+        "roc",
+        "tempest",
+        "air",
+        "wind",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 564840,
+      "size": {
+        "x": 1.047,
+        "y": 1.707,
+        "z": 2.633
+      },
+      "base": {
+        "x": -0.524,
+        "y": 0,
+        "z": -1.001
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Attack",
+        "Death"
+      ],
+      "materials": [
+        "boss_rhino_air_mat"
+      ],
+      "sha256": "995F78406231278AB6033CBB9096F6FD3F317C8615F42E2645A1DC85A60A1456",
+      "impliedWalkMps": 1.32
+    },
+    {
+      "id": "boss_rhino_earth",
+      "file": "models/boss/boss_rhino_earth.glb",
+      "pack": "fantasy-rhino",
+      "category": "character",
+      "is": "rootheart",
+      "tags": [
+        "boss",
+        "rootheart",
+        "earth",
+        "stone",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 561768,
+      "size": {
+        "x": 1.047,
+        "y": 1.707,
+        "z": 2.633
+      },
+      "base": {
+        "x": -0.524,
+        "y": 0,
+        "z": -1.001
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Attack",
+        "Death"
+      ],
+      "materials": [
+        "boss_rhino_earth_mat"
+      ],
+      "sha256": "A4D6EA9A853598415374A4F658DBD50655FF1E22D3A989DFE7424901C857DFA3",
+      "impliedWalkMps": 1.32
+    },
+    {
+      "id": "boss_rhino_water",
+      "file": "models/boss/boss_rhino_water.glb",
+      "pack": "fantasy-rhino",
+      "category": "character",
+      "is": "quarrykeeper",
+      "tags": [
+        "boss",
+        "quarrykeeper",
+        "ordrun",
+        "water",
+        "ice",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 543456,
+      "size": {
+        "x": 1.047,
+        "y": 1.707,
+        "z": 2.633
+      },
+      "base": {
+        "x": -0.524,
+        "y": 0,
+        "z": -1.001
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Attack",
+        "Death"
+      ],
+      "materials": [
+        "boss_rhino_water_mat"
+      ],
+      "sha256": "4F7DA2AE14DD58BCCE40EDF6F49A94A4768A0295A6DDC1483897B48A913DFB92",
+      "impliedWalkMps": 1.32
     },
     {
       "id": "enemy_bee",

@@ -349,11 +349,17 @@ const PROTECTED_MATERIAL = /eye|teeth|tongue|hair|white|black/i;
  * tier 1 is hens, coneys and frogs, tier 5 is deer and coyotes, tier 10 is bears and aurochs. A
  * player never has to read a bear's palette to know it outranks a hen.
  *
- * `tools/build-animals.ts` names every material `animal_<assetId>_mat`, so this prefix is a
- * contract between the two files, not a guess. Being strength 0 also puts these groups on
- * `groupTier`'s tier-independent path, which merges instances across tiers.
+ * `tools/build-animals.ts` names every material `animal_<assetId>_mat` and `tools/build-bosses.ts`
+ * names every material `boss_<assetId>_mat`, so these prefixes are a contract between those files
+ * and this one, not a guess. Being strength 0 also puts these groups on `groupTier`'s
+ * tier-independent path, which merges instances across tiers.
+ *
+ * The bosses need it for a second reason on top of the hide: their element is carried by an
+ * EMISSIVE map of glowing seams, recoloured per element when the texture is staged. Pulling the
+ * base colour 45% toward Kaldite blue-black would leave an earth boss glowing green out of a
+ * blue-black body, which reads as a bug rather than as a creature.
  */
-const ANIMAL_MATERIAL = /^animal_/i;
+const CREATURE_MATERIAL = /^(animal|boss)_/i;
 
 /**
  * Humanoid idles, from the shared 65-joint clip library.
@@ -3050,7 +3056,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
 
   private appearanceFor(archetype: Archetype, material: THREE.Material): Appearance {
     if (PROTECTED_MATERIAL.test(material.name)) return NEUTRAL;
-    if (ANIMAL_MATERIAL.test(material.name)) return NEUTRAL;
+    if (CREATURE_MATERIAL.test(material.name)) return NEUTRAL;
     // Preserve the old tier-body treatment if a tile mesh is ever used as gameplay art. Scenery
     // takes the region-aware architecture path before this fallback and stays tier-independent.
     if (!ARCHITECTURE_ARCHETYPES.has(archetype)
@@ -4499,7 +4505,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     const look = APPEARANCE[record.archetype] ?? NEUTRAL;
     if (!record.spent) {
       this.materials.retint(record.unique, tier, look.strength, look.swatch, (material) =>
-        !PROTECTED_MATERIAL.test(material.name) && !ANIMAL_MATERIAL.test(material.name));
+        !PROTECTED_MATERIAL.test(material.name) && !CREATURE_MATERIAL.test(material.name));
       // After the tier pass, not instead of it: the tier says what LEAGUE a thing is in and the
       // dye says which individual it is, and both are multiplies against the same texture.
       this.applyEntityTint(record);
@@ -4519,7 +4525,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
         this.materials.variant(material, {
           tier,
           state: "dead",
-          strength: ANIMAL_MATERIAL.test(material.name) ? 0 : look.strength,
+          strength: CREATURE_MATERIAL.test(material.name) ? 0 : look.strength,
           swatch: look.swatch,
         }));
       mesh.material = mapped.length === 1 ? mapped[0]! : mapped;

@@ -44,6 +44,20 @@ const CREATURES = {
   tough: { presetId: "blackwater_frogs", label: "Blackwater Frog", aggroRadius: 4 },
 } as const;
 
+/**
+ * The three elemental orb bosses, which share one rig in three colours.
+ *
+ * Worth their own pass because they are the only entities in the game whose look is carried by an
+ * emissive map rather than by a texture and a tier tint, and because a boss that fails to load is
+ * a quest that cannot be finished — each of these drops the Orb its element's magic ladder is
+ * gated on. `entityViews.prepare` throws on a missing asset, so spawning one at all is the proof.
+ */
+const BOSSES = [
+  { presetId: "tempest_roc", label: "Tempest Roc", assetId: "boss_rhino_air" },
+  { presetId: "rootheart", label: "The Rootheart", assetId: "boss_rhino_earth" },
+  { presetId: "gravelmaw:ordrun", label: "Ordrun the Quarrykeeper", assetId: "boss_rhino_water" },
+] as const;
+
 /** Inside the goat's 8 m radius and well outside the hen's 3 m. One distance, opposite outcomes. */
 const AGGRO_PROBE_DISTANCE = 6;
 
@@ -103,6 +117,20 @@ interface KillEvidence {
   respawnScheduledMs: number | null;
   expectedRespawnMs: number;
   xpGained: number;
+}
+
+interface BossEvidence {
+  label: string;
+  presetId: string;
+  expectedAssetId: string;
+  spawned: boolean;
+  archetype: string | undefined;
+  maxHealth: number | null;
+  aggroRadius: number;
+  level: number;
+  behaviour: string | undefined;
+  /** Longest ground axis at the size it is drawn, from the entity's own body radius. */
+  drawnMetres: number;
 }
 
 interface RespawnEvidence {
@@ -210,7 +238,19 @@ try {
   const respawn = await observeRespawn(page, CREATURES.passive);
   await capture(page, path.join(screenshotDir, "respawn.png"));
 
+  // --------------------------------------------------------------- 5. bosses
+  stage = "bosses";
+  const bosses: BossEvidence[] = [];
+  for (const boss of BOSSES) {
+    bosses.push(await observeBoss(page, boss));
+    await capture(page, path.join(screenshotDir, `boss-${boss.assetId}.png`));
+  }
+
   const final = await readState(page);
+  const bossCatalog = Object.fromEntries(BOSSES.map((boss) => [
+    boss.presetId,
+    catalog.targets.creature.some((preset) => preset.id === boss.presetId),
+  ]));
 
   const checks = {
     labBootedProductionCombat: ready.engine === "corealm-production" && ready.mode === "combat",
@@ -245,7 +285,14 @@ try {
     respawnRestoresFullHealth: respawn.health !== null && respawn.health === respawn.maxHealth,
     respawnPutsItBackAtItsSpawn: respawn.backAtSpawn && respawn.respawnCleared,
 
-    screenshotsCaptured: screenshots.length >= 5,
+    everyOrbBossHasAPreset: Object.values(bossCatalog).every(Boolean),
+    everyOrbBossSpawnsWithItsRig: bosses.every((boss) => boss.spawned && boss.archetype === "boss"),
+    everyOrbBossCarriesItsStatBlock: bosses.every((boss) => (
+      boss.maxHealth !== null && boss.maxHealth > 0 && boss.aggroRadius > 0 && boss.level > 0
+    )),
+    orbBossesAreVisiblyBigger: bosses.every((boss) => boss.drawnMetres > 3),
+
+    screenshotsCaptured: screenshots.length >= 8,
     noRuntimeErrors: final.errors.length === 0
       && consoleErrors.length === 0 && pageErrors.length === 0,
     withinBudget: performance.now() - started < TOTAL_BUDGET_MS,
@@ -263,6 +310,8 @@ try {
       flee,
       kill,
       respawn,
+      bosses,
+      bossCatalog,
     },
     screenshots,
     errors: { runtime: final.errors, console: consoleErrors, page: pageErrors },
@@ -484,6 +533,43 @@ async function observeRespawn(
     backAtSpawn: (ai?.distanceFromSpawn ?? Number.POSITIVE_INFINITY) < 0.5,
     distanceFromSpawn: ai?.distanceFromSpawn ?? Number.POSITIVE_INFINITY,
     respawnCleared: ai?.respawnInMs === null,
+  };
+}
+
+/**
+ * Spawns one orb boss and reads back what the world gave it.
+ *
+ * The spawn itself is most of the assertion: `featureLab/runtime.ts` runs `entityViews.prepare`
+ * before it will accept a target and throws on a missing asset, so a boss whose rig failed to
+ * build or was dropped from the manifest cannot reach this point at all.
+ */
+async function observeBoss(
+  targetPage: Page,
+  boss: { presetId: string; label: string; assetId: string },
+): Promise<BossEvidence> {
+  // Well outside the widest authored aggro radius (22 m, the Rootheart) so the boss is measured
+  // standing still rather than mid-charge, and the screenshot frames the whole animal.
+  const state = await spawn(targetPage, boss.presetId, 30);
+  const ai = state.target?.ai;
+  const archetype = await targetPage.evaluate((entityId) => {
+    const debug = (window as unknown as {
+      __gameDebug?: { getEntities?: () => { id: string; archetype?: string }[] };
+    }).__gameDebug;
+    return debug?.getEntities?.().find((entity) => entity.id === entityId)?.archetype;
+  }, state.target?.entityId ?? "");
+  return {
+    label: boss.label,
+    presetId: boss.presetId,
+    expectedAssetId: boss.assetId,
+    spawned: state.target?.presetId === boss.presetId,
+    archetype,
+    maxHealth: state.target?.maxHealth ?? null,
+    aggroRadius: ai?.aggroRadius ?? 0,
+    level: ai?.level ?? 0,
+    behaviour: ai?.behaviour,
+    // `bodyRadius` is half the widest ground axis at drawn scale, so doubling it is the creature's
+    // footprint in metres. A boss under 3 m across is not reading as a boss.
+    drawnMetres: Math.round((ai?.bodyRadius ?? 0) * 200) / 100,
   };
 }
 
