@@ -741,6 +741,40 @@ const DEFAULT_TILT: Partial<Record<Archetype, number>> = {
  */
 const MOVING_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["enemy", "boss", "npc"]);
 
+/**
+ * Orders rigs for the per-frame mixer budget, in place.
+ *
+ * The front `NEAREST_ANIMATION_SHARE` of the budget is reserved for the nearest rigs, so whatever
+ * the player is standing in front of animates on every single frame. The rest of the budget goes to
+ * whichever rigs were ticked LEAST RECENTLY, which is what stops the tail freezing.
+ *
+ * The ordering key for that second half is a FRAME COUNTER, and that is the whole subtlety. Two
+ * earlier versions ranked by how much animation time a rig was owed, and both degenerated into the
+ * original bug because that quantity saturates: owed time is clamped, every starved rig reaches the
+ * ceiling within a couple of frames on a slow machine, they all tie, and the sort falls through to
+ * distance again. A counter cannot tie and cannot saturate.
+ *
+ * `viewer` may be absent, in which case there is no meaningful distance and the whole budget
+ * rotates.
+ */
+export function orderAnimationBudget(
+  ranked: { position: THREE.Vector3; lastTickedFrame: number }[],
+  cap: number,
+  viewer?: THREE.Vector3,
+): void {
+  if (ranked.length > 1 && viewer) {
+    ranked.sort((a, b) =>
+      a.position.distanceToSquared(viewer) - b.position.distanceToSquared(viewer));
+  }
+  if (ranked.length <= cap) return;
+  const reserved = viewer
+    ? Math.min(ranked.length, Math.max(1, Math.ceil(cap * NEAREST_ANIMATION_SHARE)))
+    : 0;
+  const tail = ranked.splice(reserved);
+  tail.sort((a, b) => a.lastTickedFrame - b.lastTickedFrame);
+  ranked.push(...tail);
+}
+
 /** Characters get a forgiving capsule pick target without adding invisible render geometry. */
 const EXPANDED_PICK_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "enemy", "boss"]);
 const MIN_CHARACTER_PICK_RADIUS = 0.72;
@@ -756,6 +790,29 @@ const CHARACTER_PICK_RADIUS_SCALE = 0.85;
  * player is what froze the player's run clip (animation diagnosis finding 2).
  */
 const MOVING_HOLD_SYNCS = 2;
+
+/**
+ * Fraction of the mixer budget handed out strictly nearest-first.
+ *
+ * The rest goes to whichever rigs have waited longest. Splitting it rather than ranking by one key
+ * is what makes the result frame-rate independent: a pure "most starved first" order would let the
+ * tail take a frame off the creature the player is actually fighting, and a pure distance order is
+ * what froze the tail in the first place. Half and half keeps the nearest few animating every
+ * single frame and still guarantees everything else a turn.
+ *
+ * A starvation THRESHOLD in seconds was tried here first and is a trap: at a low frame rate one
+ * frame's delta already exceeds any sensible threshold, every rig lands in the same tier, and the
+ * order collapses back to distance — which is exactly the bug, reappearing only on slow machines.
+ */
+const NEAREST_ANIMATION_SHARE = 0.5;
+
+/**
+ * Ceiling on owed animation time, in seconds. Matches the per-frame `delta` clamp in `update`.
+ *
+ * A rig that has been out of the animation radius for a minute comes back owing a minute. Without
+ * this it would fast-forward every one of those seconds in a single mixer call.
+ */
+const MAX_PENDING_ANIMATION_SECONDS = 0.25;
 
 /** Metres of movement between syncs below which an entity counts as standing still. */
 export const MOVING_EPSILON = 0.03;
@@ -1146,6 +1203,28 @@ interface ViewRecord {
   /** 0 while the corpse is whole, 1 once it has fully dissolved. See `CORPSE_FADE_MS`. */
   fade: number;
   /**
+   * Seconds of animation this rig is owed, because the per-frame mixer budget ran out before it.
+   *
+   * Zero for anything ticked every frame, which is every rig whenever there are fewer of them than
+   * the budget. Clamped, so it says how much time to ADVANCE but not how long the rig has waited —
+   * see `lastTickedFrame`, which is what the ordering uses.
+   */
+  pendingDelta: number;
+  /**
+   * The frame counter value when this rig's mixer was last advanced.
+   *
+   * The ordering key for the contested half of the budget, and it is a COUNTER rather than the
+   * owed seconds on purpose. Owed seconds saturate: `pendingDelta` is clamped, so every starved rig
+   * reaches the ceiling within a couple of frames, ties with all the others, and the sort collapses
+   * back to distance — which is the bug it was meant to fix, reappearing after two frames.
+   *
+   * Counted per RIG TICKED rather than per frame, so the values are unique and the order is strict.
+   * A per-frame number leaves every rig ticked in the same frame tied, and a stable sort settles
+   * those by array position, which is distance — so the nearest of the contested rigs took every
+   * tie and refreshed twice as often as the rest.
+   */
+  lastTickedFrame: number;
+  /**
    * This corpse's own linger, latched from its death clip on the first frame after it died.
    *
    * Latched rather than re-read, because the rig can be demoted to an instance part-way through and
@@ -1424,6 +1503,8 @@ export class EntityViews {
   private readonly fading = new Set<ViewRecord>();
   private readonly animationOrder: ViewRecord[] = [];
   private animatedLastFrame = 0;
+  /** Monotonic per-rig tick counter. Only ever compared, so wrapping is not a concern in practice. */
+  private animationTickSequence = 0;
   /** Meshes per rigged asset, so the budget can be checked BEFORE paying for a skeleton clone. */
   private readonly meshCounts = new Map<string, number>();
   /**
@@ -1707,18 +1788,43 @@ export class EntityViews {
 
     // Reused rather than rebuilt: this runs every frame, and a fresh array per frame is garbage
     // the collector has to walk during exactly the frames that are already the most expensive.
+    //
+    // Only rigs inside the animation radius are candidates, and they are FILTERED rather than
+    // sorted-then-broken-out-of: the order below is no longer distance alone, so a far record at
+    // the front of the list would end the loop for everyone behind it.
     const ranked = this.animationOrder;
     ranked.length = 0;
-    for (const record of this.animated) ranked.push(record);
-    if (viewer && ranked.length > 1) {
-      ranked.sort((a, b) =>
-        a.position.distanceToSquared(viewer) - b.position.distanceToSquared(viewer));
+    for (const record of this.animated) {
+      if (viewer && record.position.distanceToSquared(viewer) > this.animationRadiusSq) continue;
+      // Owed time accrues for every candidate, whether or not the budget reaches it this frame.
+      // Clamped for the same reason `delta` is: a rig that has been out of range for a minute must
+      // not fast-forward a minute of animation the instant it comes back.
+      record.pendingDelta = Math.min(record.pendingDelta + delta, MAX_PENDING_ANIMATION_SECONDS);
+      ranked.push(record);
     }
+
+    // THE BUDGET ROTATES. Sorting by distance alone and stopping at the cap meant the same nearest
+    // ten won every single frame, so an eleventh rig never advanced a keyframe for as long as it
+    // stayed eleventh. Measured in the Gravelmaw, where 17 creatures stand within 40 m: ten
+    // animated and five stood frozen mid-stride while sliding toward the player at 14 to 27 m.
+    // That is the "creatures do not walk smoothly" report, and it is invisible in the feature lab
+    // because the lab spawns ONE creature and one is always under the cap.
+    //
+    // The policy itself is `orderAnimationBudget`, which is a pure function so it can be tested
+    // without a scene. Two earlier versions of it degenerated back into this bug on a slow machine
+    // and neither failure was visible without measuring a live crowd; `tests/animationBudget.test.ts`
+    // now covers both.
+    orderAnimationBudget(ranked, this.maxAnimatedViews, viewer);
 
     for (const record of ranked) {
       if (this.animatedLastFrame >= this.maxAnimatedViews) break;
-      if (viewer && record.position.distanceToSquared(viewer) > this.animationRadiusSq) break;
-      record.rig?.mixer.update(delta);
+      record.rig?.mixer.update(record.pendingDelta);
+      record.pendingDelta = 0;
+      // Incremented PER RIG rather than per frame, so no two rigs ever share a value and
+      // least-recently-ticked is a strict total order. Sharing a per-frame number leaves ties, and
+      // a stable sort settles ties by array position — which is distance order, so the same
+      // nearer-but-still-contested rigs won every tie and refreshed twice as often as the rest.
+      record.lastTickedFrame = this.animationTickSequence += 1;
       this.animatedLastFrame += 1;
     }
   }
@@ -2054,6 +2160,8 @@ export class EntityViews {
       spent: false,
       diedAtMs: null,
       fade: 0,
+      pendingDelta: 0,
+      lastTickedFrame: 0,
       lingerMs: null,
       fadeMaterials: null,
       normal: null,
