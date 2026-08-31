@@ -89,7 +89,8 @@ import { SPELLS } from "../content/spells.js";
 import { ENEMIES } from "../content/enemies.js";
 import { SHOPS } from "../content/shops.js";
 import { QUESTS } from "../content/quests.js";
-import { scatterWorld, worldExclusions, type ScatterResult } from "../world/scatter.js";
+import { worldExclusions, type ScatterResult } from "../world/scatter.js";
+import { createScatterStreaming } from "../world/scatterStreaming.js";
 import { findShot, shotIds, SHOTS } from "../debug/shots.js";
 import { installAgentSurface } from "../agent/index.js";
 import { createUi } from "../ui/panels.js";
@@ -123,6 +124,12 @@ export interface BootResult {
   api: CorealmGameApi;
   featureLab?: FeatureLabApi;
 }
+
+// The user camera cannot move more than 11 m from the player. Boot makes that immediate circle
+// resident, then expands to the 64 m travel working set after first play.
+const ENTITY_BOOT_RADIUS = 12;
+const ENTITY_ACTIVE_RADIUS = 64;
+const ENTITY_ACTIVE_REPOSITION_DISTANCE = 8;
 
 export interface BootOptions {
   profile?: BootProfile;
@@ -502,13 +509,18 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   // 10. Procedural dressing, kept clear of anything authored.
   setStatus("dressing the world…");
+  const spawnSpec = profile.spawn;
+  assets.setActiveRegion(spawnSpec.regionId);
+  const scatterStreaming = createScatterStreaming(scene, assets, store.get().meta.seed);
   let scatterResults: ScatterResult[] = [];
   if (profile.scatter) {
     registerExclusions(scene);
     try {
       scatterResults = await bootTelemetry.measureAsync(
         "boot.scatter.total",
-        () => scatterWorld(scene, assets, store.get().meta.seed),
+        () => worldMapCapture
+          ? scatterStreaming.forceFullResidency()
+          : scatterStreaming.loadSpawn(spawnSpec.x, spawnSpec.z),
       );
       bootTelemetry.milestone(BOOT_MILESTONES.SCATTER_SPAWN_READY, {
         regions: scatterResults.length,
@@ -533,12 +545,29 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     maxUniqueDrawCalls: 96,
     maxUniqueViews: 16,
   });
+  const spawnPosition: Vec3 = [spawnSpec.x, 0, spawnSpec.z];
+  const surfaceEntities = entityStore.all().filter((entity) => entity.regionId !== "gravelmaw");
+  entityViews.updateActiveArea(spawnPosition, ENTITY_BOOT_RADIUS);
   await bootTelemetry.measureAsync(
     BOOT_SPANS.ENTITY_PRELOAD,
-    () => preloadEntityAssets(assets, entityStore, errors, atMs),
+    async () => {
+      if (worldMapCapture) {
+        entityViews.sync(surfaceEntities);
+        await entityViews.forceFullResidency(true);
+        return;
+      }
+      const activeRadius = entityViews.residencyStats().radius;
+      const spawnVisible = surfaceEntities.filter(
+        (entity) => distanceXZ(entity.position, spawnPosition) <= activeRadius,
+      );
+      const prepared = await entityViews.prepare(spawnVisible);
+      for (const missing of prepared.missing) {
+        errors.push({ atMs: atMs(), source: "entityViews", message: `Missing asset "${missing}"` });
+      }
+    },
   );
   try {
-    bootTelemetry.measureSync(BOOT_SPANS.FIRST_ENTITY_SYNC, () => entityViews.sync(entityStore.all()));
+    bootTelemetry.measureSync(BOOT_SPANS.FIRST_ENTITY_SYNC, () => entityViews.sync(surfaceEntities));
   } catch (cause) {
     errors.push({ atMs: atMs(), source: "entityViews", message: describeError(cause) });
   }
@@ -562,7 +591,6 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   });
 
   // 12. Player.
-  const spawnSpec = profile.spawn;
   const groundY = scene.heightAt(spawnSpec.regionId, spawnSpec.x, spawnSpec.z);
   const spawn: Vec3 = nav.closestPoint([spawnSpec.x, groundY + 0.2, spawnSpec.z]) ?? [spawnSpec.x, groundY, spawnSpec.z];
   // Facing convention matches NpcStandDef and debug/shots.ts: 0 looks toward +z.
@@ -754,7 +782,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // The first render happened before the save was loaded. Gathering construction hydrates saved
   // node semantics, and this second sync makes depleted rocks, stumps, and fishing recovery marks
   // visible before the loading screen is dismissed.
-  entityViews.sync(entityStore.all());
+  entityViews.sync(profile.kind === "feature-lab" ? entityStore.all() : surfaceEntities);
   const essenceSystem = new EssenceSystem({
     store,
     events,
@@ -914,6 +942,38 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // uses Y to distinguish Gravelmaw from the Karrowmoor terrain directly above it.
   movement.setPorts({ regionAt: (point) => regionAtPoint(point) });
 
+  let activeVisualCentre: Vec3 = [...spawn];
+  let activeVisualRegion = spawnSpec.regionId;
+  const entitiesForVisualRegion = (regionId: RegionId): SemanticEntity[] => {
+    const insideDungeon = regionId === "gravelmaw";
+    return entityStore.all().filter((entity) => (entity.regionId === "gravelmaw") === insideDungeon);
+  };
+  const refreshVisualResidency = (position: Vec3, regionId: RegionId, force = false): void => {
+    const regionChanged = regionId !== activeVisualRegion;
+    const moved = distanceXZ(position, activeVisualCentre) >= ENTITY_ACTIVE_REPOSITION_DISTANCE;
+    if (!force && !regionChanged && !moved) return;
+
+    assets.setActiveRegion(regionId);
+    scatterStreaming.setActivePosition(position[0], position[2]);
+    if (regionChanged || force) entityViews.sync(entitiesForVisualRegion(regionId));
+    entityViews.updateActivePosition(position);
+    activeVisualCentre = [...position];
+    activeVisualRegion = regionId;
+
+    if (regionChanged || force) {
+      void entityViews.preloadRegion(regionId).catch((cause) => {
+        errors.push({ atMs: atMs(), source: "entityStreaming", message: describeError(cause) });
+      });
+      if (profile.scatter) {
+        void scatterStreaming.loadSpawn(position[0], position[2]).then((results) => {
+          scatterResults = results;
+        }).catch((cause) => {
+          errors.push({ atMs: atMs(), source: "scatterStreaming", message: describeError(cause) });
+        });
+      }
+    }
+  };
+
   const teleportPlayer = (position: Vec3, regionId: RegionId): void => {
     const snapped = nav.closestPoint(position) ?? position;
     store.get().player.position = snapped;
@@ -922,6 +982,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     movement.stop(store.get(), clock.elapsedMs, "portal");
     scene.syncPlayer(snapped, store.get().player.facingRad, true);
     camera.update(snapped[0], snapped[1], snapped[2], true);
+    refreshVisualResidency(snapped, regionId, true);
   };
   const travelSystem = new TravelSystem({
     store, events, clock,
@@ -1641,8 +1702,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   if (rigged) loop.setPlayerRig(playerRig);
   loop.setEntityViews(entityViews, () => {
     if (profile.kind === "feature-lab") return entityStore.all();
-    const inside = playerInDungeon();
-    return entityStore.all().filter((entity) => (entity.regionId === "gravelmaw") === inside);
+    const player = store.get().player;
+    refreshVisualResidency(player.position, player.regionId);
+    return entitiesForVisualRegion(player.regionId);
   });
 
   const rebuildSemanticWorld = (): void => {
@@ -1653,10 +1715,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     rehydrateWorldContainers(store.get(), entityStore, { regionAt: regionAtPoint });
     campfireSystem.reconstruct();
     syncCampfireAmbience();
-    const inside = playerInDungeon();
-    entityViews.sync(profile.kind === "feature-lab"
-      ? entityStore.all()
-      : entityStore.all().filter((entity) => (entity.regionId === "gravelmaw") === inside));
+    if (profile.kind === "feature-lab") entityViews.sync(entityStore.all());
+    else refreshVisualResidency(store.get().player.position, store.get().player.regionId, true);
   };
 
   const resetWorld = (seed?: number, keepSave = false): void => {
@@ -1734,8 +1794,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     store.get().player.position = landed;
     store.get().player.regionId = regionId;
     store.get().player.facingRad = playerFacingRad;
-    entityViews.sync(entityStore.all().filter((entity) =>
-      (entity.regionId === "gravelmaw") === (regionId === "gravelmaw")));
+    if (profile.kind === "feature-lab") entityViews.sync(entityStore.all());
+    else refreshVisualResidency(landed, regionId, true);
     audioDirector.setRegion(regionId);
     movement.stop(store.get(), clock.elapsedMs, reason);
     scene.syncPlayer(landed, playerFacingRad, true);
@@ -1770,7 +1830,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     clearAudioHistory: () => audioEngine.clearHistory(),
     // "scatter placed nothing" and "nobody asked scatter" are different bugs, and the debug surface
     // could not tell them apart while boot threw this array away.
-    scatterStats: () => scatterResults,
+    scatterStats: () => scatterStreaming.getStats(),
     playerMotion: () => playerRig.motionSnapshot(),
     entityMotion: (entityId: EntityId) => entityViews.motionSnapshot(entityId),
     waterBodies: () => scene.getWaterBodies(),
@@ -1800,6 +1860,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       movement.stop(store.get(), clock.elapsedMs, "teleport");
       scene.syncPlayer(snapped, store.get().player.facingRad, true);
       camera.update(snapped[0], snapped[1], snapped[2], true);
+      refreshVisualResidency(snapped, regionId, true);
     },
     saveNow: () => { saves.save(store.get(), Date.now()); },
     getSaveBlob: () => saves.serialize(store.get()),
@@ -1842,7 +1903,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       // last 250 ms render-sync slice. Under accelerated acceptance runs a node can deplete and
       // respawn between slices; synchronizing here also makes the screenshot taken immediately
       // after the probe show the same state the returned bounds describe.
-      entityViews.sync(entityStore.all());
+      entityViews.sync(entitiesForVisualRegion(store.get().player.regionId));
       return entityViews.drawnBounds(entityId);
     },
     entityViewStats: () => entityViews.stats(),
@@ -2009,8 +2070,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       store.get().player.position = stand;
       store.get().player.regionId = regionId;
       store.get().player.facingRad = yaw + Math.PI;
-      entityViews.sync(entityStore.all().filter((entity) =>
-        (entity.regionId === "gravelmaw") === (regionId === "gravelmaw")));
+      refreshVisualResidency(stand, regionId, true);
       audioDirector.setRegion(regionId);
       movement.stop(store.get(), clock.elapsedMs, "inspect-pose");
       scene.syncPlayer(stand, yaw + Math.PI, true);
@@ -2125,6 +2185,20 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       bootTelemetry.milestone(BOOT_MILESTONES.FIRST_PLAYABLE);
       bootTotalSpan.end();
       bootTelemetry.recordPerformanceResources();
+      window.setTimeout(() => {
+        const expandEntityResidency = (): void => {
+          entityViews.updateActiveRadius(ENTITY_ACTIVE_RADIUS);
+        };
+        window.requestIdleCallback(expandEntityResidency, { timeout: 1_000 });
+        if (profile.scatter) {
+          void scatterStreaming.streamRemaining().then(() => {
+            scatterResults = scatterStreaming.getStats();
+          }).catch((cause) => {
+            errors.push({ atMs: atMs(), source: "scatterStreaming", message: describeError(cause) });
+          });
+        }
+        void preloadDeferredEntityAssets(assets, errors, atMs);
+      }, 0);
     });
   }
   return { loop, api, ...(featureLab ? { featureLab } : {}) };
@@ -2336,34 +2410,25 @@ function registerExclusions(scene: WorldScene): void {
   }
 }
 
-/** Loads every GLB the world's entities name, so the first sync does not pop meshes in late. */
 /**
  * Assets for entities the world creates while it is running rather than at build time.
  *
- * Recovery caches and player campfires can appear after the initial entity preload.
+ * Recovery caches and player campfires can appear after the initial entity preload. These are not
+ * first-play dependencies: queue them only after the first rendered frame, and let EntityViews
+ * retry hydration if a player creates one before this low-priority request finishes.
  */
 const SPAWNED_LATER_ASSET_IDS: readonly string[] = [
   "crate_wood",
   ...GATHERING_PRODUCTION_TIERS.map((definition) => definition.campfire.visualLogAssetId),
 ];
 
-async function preloadEntityAssets(
+async function preloadDeferredEntityAssets(
   assets: AssetRegistry,
-  entityStore: EntityStore,
   errors: RecordedError[],
   atMs: () => number,
 ): Promise<void> {
-  const ids = new Set<string>();
-  for (const entity of entityStore.all()) {
-    if (entity.view?.assetId) ids.add(entity.view.assetId);
-    if (entity.view?.depletedAssetId) ids.add(entity.view.depletedAssetId);
-  }
-  // Entities that do not exist yet but will. `EntityViews.syncOne` returns early when an asset is
-  // not loaded and nothing ever retries, so anything spawned mid-session has to be in memory now
-  // or it will never be drawn at all.
-  for (const id of SPAWNED_LATER_ASSET_IDS) ids.add(id);
-  const ordered = [...ids];
-  const results = await Promise.allSettled(ordered.map((id) => assets.load(id)));
+  const ordered = [...new Set(SPAWNED_LATER_ASSET_IDS)];
+  const results = await Promise.allSettled(ordered.map((id) => assets.load(id, { priority: "background" })));
   for (const [index, result] of results.entries()) {
     if (result.status === "rejected") {
       errors.push({
