@@ -279,6 +279,7 @@ function createCreatureEntity(
       level: enemyCombatLevel(stats),
       aggroRadius: stats.aggroRadius,
       ...(stats.moveSpeedMps === undefined ? {} : { moveSpeedMps: stats.moveSpeedMps }),
+      ...(stats.walkSpeedMps === undefined ? {} : { walkSpeedMps: stats.walkSpeedMps }),
       ...(bodyRadius === null ? {} : { bodyRadius }),
     },
     view: {

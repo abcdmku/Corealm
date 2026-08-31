@@ -460,14 +460,20 @@ window.convertAnimal = async (spec) => {
   root.scale.setScalar(CM_TO_M * (spec.extraScale ?? 1));
   root.updateMatrixWorld(true);
 
-  // What ground speed the walk cycle looks like it is travelling at, so the runtime can play it at
-  // the rate that keeps the feet planted. Measured from the feet because these cycles are authored
-  // in place: every rig but the frog has zero root travel, so the stride is not in the root track.
-  let impliedWalkMps = 0;
-  const walkClip = clips.find((clip) => clip.name === "Walk");
-  if (walkClip && walkClip.duration > 0) {
+  // What ground speed each locomotion cycle looks like it is travelling at, so the runtime can play
+  // it at the rate that keeps the feet planted. Measured from the feet because these cycles are
+  // authored in place: every rig but the frog has zero root travel, so the stride is not in the
+  // root track.
+  //
+  // BOTH gaits are measured. A walk and a run are different animations with different strides, and
+  // the runtime picks between them by whether the creature is pottering or pursuing, so it needs a
+  // speed for each. Measuring only the walk and reusing it for the run was not a simplification —
+  // it is what let a gallop be played as a walk for the whole roster.
+  const impliedMpsFor = (clipName) => {
+    const clip = clips.find((entry) => entry.name === clipName);
+    if (!clip || clip.duration <= 0) return 0;
     const mixer = new THREE.AnimationMixer(root);
-    mixer.clipAction(walkClip).play();
+    mixer.clipAction(clip).play();
     // FEET ONLY. The widest-swinging bone in a gallop is not always a foot: a stag's antler tip and
     // a coyote's tail sweep further than either hind leg, and taking those as the stride overstates
     // it and asks for too slow a playback rate. Restricting to bones that sit in the bottom quarter
@@ -492,7 +498,7 @@ window.convertAnimal = async (spec) => {
     const hi = new Map();
     const SAMPLES = 24;
     for (let i = 0; i < SAMPLES; i += 1) {
-      mixer.setTime((walkClip.duration * i) / SAMPLES);
+      mixer.setTime((clip.duration * i) / SAMPLES);
       root.updateMatrixWorld(true);
       for (const bone of sampled) {
         const z = bone.getWorldPosition(new THREE.Vector3()).z;
@@ -504,10 +510,11 @@ window.convertAnimal = async (spec) => {
     for (const [bone, low] of lo) stride = Math.max(stride, hi.get(bone) - low);
     // Bone world positions here are ALREADY metres: this runs after the root has been scaled, so
     // applying CM_TO_M again would divide the answer by a hundred.
-    impliedWalkMps = stride / walkClip.duration;
     mixer.stopAllAction();
-    mixer.uncacheRoot(root);
-  }
+    return stride / clip.duration;
+  };
+  const impliedWalkMps = impliedMpsFor("Walk");
+  const impliedRunMps = impliedMpsFor("Run");
 
   const box = boxOf(root);
   const size = box.getSize(new THREE.Vector3());
@@ -535,6 +542,7 @@ window.convertAnimal = async (spec) => {
     meshNames,
     clips: clipReport,
     impliedWalkMps,
+    impliedRunMps,
   };
 };
 

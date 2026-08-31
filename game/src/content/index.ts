@@ -191,6 +191,15 @@ export interface EnemyDef {
    * plantable foot to slide in the first place, so those keep a gameplay speed and lean on the cap.
    */
   moveSpeedMps?: number;
+  /**
+   * Pottering speed in metres per second, used while a creature is idle and wandering.
+   *
+   * Separate from `moveSpeedMps` because a walk and a run are separate ANIMATIONS, not one
+   * animation at two speeds. `render/entityViews.ts` plays the run cycle while a creature pursues
+   * and the walk cycle while it potters, and each is retimed against its own measured stride, so
+   * each needs the speed its own clip depicts. Omitted means the creature does not wander.
+   */
+  walkSpeedMps?: number;
   /** Behaviour selector. Bosses add phases on top. */
   behaviour: "passive" | "aggressive" | "territorial";
   drops: { itemId: ItemId; quantity: [number, number]; chance: number }[];

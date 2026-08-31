@@ -114,6 +114,17 @@ physically leapt 1.35 m on every step and every swing.
 the crab ships with no `Idle` at all. Ranges that tight get widened in `catalog.mjs`. The same
 mechanism is what turns a 230-frame chicken feeding loop into a 38-frame peck.
 
+**The run cycle was shipped as the walk cycle, for every animal.** The catalog mapped `_Run` to
+`"Walk"` across the pack, on the reasoning that enemies only ever moved while pursuing, so the run
+was the honest gait for the only speed that existed. That reasoning aged out — creatures potter
+about now, and pursuit speeds come from each animal's own gait — but the real cost was there all
+along: a gallop is a gallop at any playback rate. Every creature in the game walked with a running
+gait, and because the only lever left was retiming, the roster was tuned to three and four leg
+cycles a second and reported three times as "feet move rapidly and they are jittery". Both clips are
+built now, `render/entityViews.ts` picks between them by whether the creature is pursuing, and each
+is retimed against its OWN measured stride. The chicken is the illustration: its walk is 1.03 s
+implying 0.22 m/s, its run 0.57 s implying 0.75 — different animations, not one at two speeds.
+
 **The tier tint eats real textures.** `render/entityViews.ts` pulls enemy materials 45% toward the
 tier's metal swatch, which is Kaldite blue-black at tier 10. That was right when the bestiary was
 four stylized meshes sharing a grey texture and wrong for photographic hide. Materials named

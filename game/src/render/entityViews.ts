@@ -392,7 +392,7 @@ const HUMANOID_IDLES: readonly string[] = [
  * between syncs, and those two cover idle / walk / death. `attack` and `hit` are one-shots the
  * owner of the combat stream pushes in through `playAction`.
  */
-export type CharacterMotion = "idle" | "walk" | "attack" | "hit" | "death";
+export type CharacterMotion = "idle" | "walk" | "run" | "attack" | "hit" | "death";
 
 /**
  * Clip names to try per motion for an asset that ships its OWN clips, best first.
@@ -406,6 +406,9 @@ export type CharacterMotion = "idle" | "walk" | "attack" | "hit" | "death";
 const OWN_CLIP_PATTERNS: Record<CharacterMotion, readonly RegExp[]> = {
   idle: [/^idle/i, /^flying/i],
   walk: [/^walk/i, /^flying/i, /^jump/i],
+  // Falls back to the walk clip, because not every rig ships a run: the hog, the rat and the fish
+  // have one locomotion cycle each and pursuing on it is correct for them.
+  run: [/^run/i, /^walk/i, /^flying/i, /^jump/i],
   attack: [/^bite_front/i, /^bite/i, /attack/i],
   hit: [/^hitrecieve/i, /^hit/i],
   death: [/^death/i],
@@ -419,10 +422,11 @@ const OWN_CLIP_PATTERNS: Record<CharacterMotion, readonly RegExp[]> = {
  */
 const HUMANOID_CLIPS: Record<CharacterMotion, readonly string[]> = {
   idle: HUMANOID_IDLES,
-  // EnemyAI moves at 3.1 m/s while pursuing and 3.6 m/s while returning. Walk_Loop implies only
-  // 0.98 m/s, so selecting it first makes a humanoid slide more than two metres on every second
-  // of ground it covers. Jog is the honest gait for both speeds.
-  walk: ["Jog_Fwd_Loop", "Walk_Loop"],
+  // A humanoid now gets both gaits, chosen by whether it is pursuing. Jog was the only option here
+  // while pursuit was the only time anything moved; a reaver pottering around its camp on a jog
+  // cycle is the same defect the animals had.
+  walk: ["Walk_Loop", "Jog_Fwd_Loop"],
+  run: ["Jog_Fwd_Loop", "Walk_Loop"],
   // Humanoid enemies do not carry a weapon attachment. A punch reads correctly; a sword clip
   // makes them swing a blade that is not there.
   attack: ["Punch_Jab", "Sword_Attack", "Sword_Regular_A"],
@@ -793,6 +797,44 @@ export function orderAnimationBudget(
   ranked.push(...tail);
 }
 
+/**
+ * Which locomotion cycle a moving creature should be playing.
+ *
+ * A walk and a run are different animations, not one animation at two speeds, so retiming cannot
+ * substitute one for the other: a gallop played slowly is still a gallop. Everything in the game
+ * used to move on its run cycle, which is why the roster read as racing and jittering however the
+ * playback rate was tuned.
+ */
+/**
+ * The ground speed to retime a gait against: the walk cycle's speed for a walk, the run's for a run.
+ *
+ * Pairing a clip with the wrong speed is the whole original defect in one line — dividing a pursuit
+ * speed by a walk cycle's stride asks for a rate several times too high, and the legs race.
+ */
+function gaitSpeed(
+  record: { moveSpeedMps?: number; walkSpeedMps?: number },
+  motion: CharacterMotion,
+): number | undefined {
+  if (motion === "run") return record.moveSpeedMps;
+  if (motion === "walk") return record.walkSpeedMps ?? record.moveSpeedMps;
+  return record.moveSpeedMps;
+}
+
+function gaitFor(record: { pursuing: boolean }): CharacterMotion {
+  return record.pursuing ? "run" : "walk";
+}
+
+/**
+ * Whether `systems/enemyAI.ts` currently has this creature chasing or walking home.
+ *
+ * `entity.state` is the only channel the render layer is allowed to read for this — the AI's own
+ * `state.world.enemies[id].state` lives in the store and `render/` never touches it — and the AI
+ * writes `aggro` and `returning` onto the entity at the same instant it sets its own runtime.
+ */
+function isPursuing(entity: SemanticEntity): boolean {
+  return entity.state === "aggro" || entity.state === "returning";
+}
+
 /** Characters get a forgiving capsule pick target without adding invisible render geometry. */
 const EXPANDED_PICK_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc", "enemy", "boss"]);
 const MIN_CHARACTER_PICK_RADIUS = 0.72;
@@ -902,6 +944,7 @@ const CROP_STUBBLE_FRACTION = 0.3;
 const BAKE_PHASES: Record<CharacterMotion, number> = {
   idle: 0.35,
   walk: 0.28,
+  run: 0.28,
   attack: 0.5,
   hit: 0.5,
   death: 0.98,
@@ -1191,6 +1234,7 @@ interface ViewRecord {
   movingTicks: number;
   /** Pursuit speed published on the entity, used to retime the walk cycle. */
   moveSpeedMps?: number;
+  walkSpeedMps?: number;
   /** Raised only while playAction tries to move this record to the front of the rig pool. */
   actionPriority: boolean;
   scale: number;
@@ -1218,6 +1262,14 @@ interface ViewRecord {
   spent: boolean;
   /** Sim time this entity died, straight off `view.diedAtMs`. Null for anything alive. */
   diedAtMs: number | null;
+  /**
+   * True while `systems/enemyAI.ts` has this creature chasing the player or walking home.
+   *
+   * Chooses the RUN cycle over the WALK cycle. `entity.state` carries `aggro` and `returning`
+   * alongside `alive` and `dead`, so the render layer can tell a pursuit from a potter without
+   * reaching into the store for `state.world.enemies`.
+   */
+  pursuing: boolean;
   /** 0 while the corpse is whole, 1 once it has fully dissolved. See `CORPSE_FADE_MS`. */
   fade: number;
   /**
@@ -1878,6 +1930,10 @@ export class EntityViews {
       if (record.fade >= 1) continue;
 
       const view = entity.view;
+      // Refreshed here rather than in `sync`, because `sync` runs at 4 Hz and this runs every
+      // render frame: a creature that started chasing has to change gait on the frame it starts,
+      // not up to a quarter of a second later.
+      record.pursuing = isPursuing(entity);
       const rotationY = view?.rotationY ?? record.targetRotationY;
       const dx = entity.position[0] - record.target.x;
       const dz = entity.position[2] - record.target.z;
@@ -1892,7 +1948,7 @@ export class EntityViews {
         record.movingTicks = MOVING_HOLD_SYNCS;
         // Structural sync runs at 4 Hz. Waiting for it to select the walking clip leaves up to a
         // quarter-second of a chasing enemy gliding in its idle pose.
-        if (!record.spent) this.setMotion(record, "walk", true);
+        if (!record.spent) this.setMotion(record, record.pursuing ? "run" : "walk", true);
       } else if (tickRolled) {
         // SETTLE. Nothing else ever collapses this span, and without it a stopped entity jitters
         // forever: `previous` keeps the second-to-last position, `target` the last, and the lerp
@@ -2079,7 +2135,7 @@ export class EntityViews {
     const group = this.groups.get(groupKey);
     if (!group) return;
 
-    this.setMotion(record, spent ? "death" : moving ? "walk" : "idle", moving);
+    this.setMotion(record, spent ? "death" : moving ? gaitFor(record) : "idle", moving);
 
     if (record.unique) {
       this.placeUnique(record);
@@ -2166,6 +2222,7 @@ export class EntityViews {
       previousRotationY: view.rotationY ?? 0,
       movingTicks: 0,
       ...(entity.combat?.moveSpeedMps === undefined ? {} : { moveSpeedMps: entity.combat.moveSpeedMps }),
+      ...(entity.combat?.walkSpeedMps === undefined ? {} : { walkSpeedMps: entity.combat.walkSpeedMps }),
       actionPriority: false,
       scale: 1,
       scaleAxes: NO_BUILD,
@@ -2177,6 +2234,7 @@ export class EntityViews {
       waterOffset: typeof entity.meta?.waterOffset === "number" ? entity.meta.waterOffset : 0,
       spent: false,
       diedAtMs: null,
+      pursuing: false,
       fade: 0,
       pendingDelta: 0,
       lastTickedFrame: 0,
@@ -2302,7 +2360,7 @@ export class EntityViews {
       record.slot = -1;
       this.placeUnique(record);
       this.applyUniqueState(record, group.tier);
-      this.setMotion(record, record.spent ? "death" : record.movingTicks > 0 ? "walk" : "idle");
+      this.setMotion(record, record.spent ? "death" : record.movingTicks > 0 ? gaitFor(record) : "idle");
     }
   }
 
@@ -3829,7 +3887,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     // `Flying` to both. Crossfading an action from itself zeroes its weight; record the state change
     // and leave the clip running.
     if (clip && clip.name === rig.clipName) {
-      rig.action.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale, record.moveSpeedMps);
+      rig.action.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale, gaitSpeed(record, motion));
       rig.motion = motion;
       return;
     }
@@ -3848,7 +3906,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     const oneShot = ONE_SHOT_MOTIONS.has(motion) || motion === "death";
     next.setLoop(oneShot ? THREE.LoopOnce : THREE.LoopRepeat, oneShot ? 1 : Infinity);
     next.clampWhenFinished = oneShot;
-    next.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale, record.moveSpeedMps);
+    next.timeScale = this.motionTimeScale(assetId, motion, clip, rig.idleTimeScale, gaitSpeed(record, motion));
     next.reset();
     next.enabled = true;
     next.setEffectiveWeight(1);
@@ -3876,7 +3934,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     if (motion === "idle") return idleTimeScale;
     const entry = this.assets.entry(assetId);
     const own = entry?.animations ?? [];
-    if (motion === "walk" && own.length === 0 && clip.name === "Jog_Fwd_Loop") {
+    if ((motion === "walk" || motion === "run") && own.length === 0 && clip.name === "Jog_Fwd_Loop") {
       return HUMANOID_AI_JOG_TIME_SCALE;
     }
     // Match the gait to the ground it covers.
@@ -3891,8 +3949,14 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     // Clamped because a few rigs have no real stride to measure - a viper slithers, a crab scuttles
     // sideways, a fish swims - and their implied speed is near zero, which would ask for a playback
     // rate in the tens. Those have no plantable foot either, so the slide does not read.
-    if (motion === "walk" && entry?.impliedWalkMps && moveSpeedMps) {
-      const rate = Math.min(WALK_RATE_MAX, Math.max(WALK_RATE_MIN, moveSpeedMps / entry.impliedWalkMps));
+    // Each gait is retimed against its OWN measured stride. A run cycle covers far more ground per
+    // cycle than a walk, so dividing a pursuit speed by the walk's implied speed asks for a rate
+    // several times too high — which is the shape of the original bug, in miniature.
+    const implied = motion === "run"
+      ? entry?.impliedRunMps ?? entry?.impliedWalkMps
+      : entry?.impliedWalkMps;
+    if ((motion === "walk" || motion === "run") && implied && moveSpeedMps) {
+      const rate = Math.min(WALK_RATE_MAX, Math.max(WALK_RATE_MIN, moveSpeedMps / implied));
       // Then the cadence ceiling, which needs the clip's own length: playing a 0.47 s cycle at 1.6x
       // is 3.4 leg cycles a second, and playing a 1.33 s cycle at the same 1.6x is 1.2. Only the
       // first of those reads as a creature sprinting on the spot.

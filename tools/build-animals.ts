@@ -68,6 +68,8 @@ interface ManifestAsset {
    */
   impliedWalkMps?: number;
   walkClipSeconds?: number;
+  impliedRunMps?: number;
+  runClipSeconds?: number;
 }
 
 const STAGE_DIR = path.join(repoRoot, ".asset-cache", "animal-pack");
@@ -142,7 +144,13 @@ async function optimize(document: Document): Promise<void> {
  * rather than a diagnostic.
  */
 function walkClipSeconds(document: Document): number | undefined {
-  const walk = document.getRoot().listAnimations().find((entry) => /^walk/i.test(entry.getName()));
+  return clipSeconds(document, "walk");
+}
+
+/** Length of a named locomotion clip in seconds, or undefined when the asset has none. */
+function clipSeconds(document: Document, name: "walk" | "run"): number | undefined {
+  const pattern = name === "walk" ? /^walk/i : /^run/i;
+  const walk = document.getRoot().listAnimations().find((entry) => pattern.test(entry.getName()));
   if (!walk) return undefined;
   let duration = 0;
   for (const sampler of walk.listSamplers()) {
@@ -227,6 +235,7 @@ async function main(): Promise<void> {
           base64: string; bytes: number; size: number[]; base: number[];
           meshNames: string[];
           impliedWalkMps: number;
+          impliedRunMps: number;
           clips: { name: string; ok: boolean; duration?: number; tracks?: number; missing?: string[]; reason?: string; sealed?: boolean; seam?: number }[];
         }> }).convertAnimal(payload),
         {
@@ -288,6 +297,12 @@ async function main(): Promise<void> {
         ...(result.impliedWalkMps > 0.02
           ? { impliedWalkMps: Math.round(result.impliedWalkMps * 100) / 100 }
           : {}),
+        ...(result.impliedRunMps > 0.02
+          ? { impliedRunMps: Math.round(result.impliedRunMps * 100) / 100 }
+          : {}),
+        ...(clipSeconds(document, "run") === undefined
+          ? {}
+          : { runClipSeconds: clipSeconds(document, "run") }),
       });
 
       const dims = `${(bounds.max[0] - bounds.min[0]).toFixed(2)} x ${(bounds.max[1] - bounds.min[1]).toFixed(2)} x ${(bounds.max[2] - bounds.min[2]).toFixed(2)} m`;

@@ -2018,6 +2018,7 @@ function buildEnemyGroup(
         level: enemyCombatLevel(stats),
         aggroRadius: stats.aggroRadius,
         ...(stats.moveSpeedMps === undefined ? {} : { moveSpeedMps: stats.moveSpeedMps }),
+        ...(stats.walkSpeedMps === undefined ? {} : { walkSpeedMps: stats.walkSpeedMps }),
         // The footprint the creature has to be given room for, at the size it is actually drawn.
         // `drawnScale` and not `group.scale`, because the tier silhouette is part of how big it
         // looks standing next to another one.

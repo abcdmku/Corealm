@@ -295,6 +295,8 @@ export interface SemanticEntity {
      * 0.75 m/s, so its legs were running four times too slowly for the distance it covered.
      */
     moveSpeedMps?: number;
+    /** Pottering speed. See `walkSpeedMps` on `EnemyDef`; the render layer picks the gait to match. */
+    walkSpeedMps?: number;
     /**
      * Half the creature's widest ground footprint, metres, at its drawn scale.
      *

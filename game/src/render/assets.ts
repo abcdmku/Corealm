@@ -73,6 +73,9 @@ export interface AssetEntry {
    * second on the goat's 0.47 s clip and 1.2 on the hog's 1.33 s one.
    */
   walkClipSeconds?: number;
+  /** The same two numbers for the RUN cycle, used while a creature is pursuing. */
+  impliedRunMps?: number;
+  runClipSeconds?: number;
 }
 
 export interface AssetPack {

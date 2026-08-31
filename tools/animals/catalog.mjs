@@ -7,10 +7,23 @@
  * nothing, and every source file's single clip is called "Take 001", so both have to be renamed
  * here or a rig ships five colliding clips and no death.
  *
- * WALK IS THE RUN CYCLE, deliberately. `systems/enemyAI.ts` only ever moves an enemy while it is
- * pursuing (3.1 m/s) or returning (3.6 m/s); nothing wanders. `motionTimeScale` returns 1 for an
- * asset's own clips, so a 0.9 m/s walk cycle under a 3.4 m/s body is two and a half metres of foot
- * slide every second. The run cycle is the honest gait for the only speeds that exist.
+ * WALK AND RUN ARE BOTH SHIPPED, and each is the pack's own clip of that name.
+ *
+ * CORRECTION, and it is the root of a bug reported three times. This used to map the RUN clip to
+ * "Walk" for every animal, on the reasoning that `systems/enemyAI.ts` only ever moved an enemy
+ * while pursuing at 3.1 m/s, so the run cycle was the honest gait for the only speed that existed.
+ * Both halves of that stopped being true: enemies now potter about while idle, and pursuit speeds
+ * are solved from each animal's gait rather than fixed at 3.1.
+ *
+ * What it cost while it was true is worse. A gallop is a gallop at any playback rate, so every
+ * creature in the game walked with a running gait, and the only lever left was to retime it — which
+ * is why the roster ended up at three and four leg cycles a second and was reported as "their feet
+ * move rapidly and they are jittery". No amount of speed tuning reaches that, because the POSES are
+ * wrong, not the timing.
+ *
+ * The pack ships a real `_Walk` for every one of these. Measured on the chicken: the walk cycle is
+ * 1.03 s implying 0.22 m/s, against the run's 0.57 s implying 0.75. Those are different animations,
+ * and using the second where the first belongs is the whole defect.
  *
  * ATTACK SUBSTITUTES. Chicken, deer and rabbit ship no attack clip. Their eat clip is a head-down
  * lunge, which is a peck, a butt and a nibble respectively, and that is the correct read for those
@@ -34,57 +47,57 @@ export const ANIMALS = [
   {
     id: "animal_chicken", rig: "Chicken_Rig.fbx", texture: "chicken_col14_unity.png",
     is: "chicken", tags: ["chicken", "hen", "fowl", "bird", "farm", "plains", "animal", "passive"],
-    clips: [["Chicken_Idle", "Idle"], ["Chicken_Run", "Walk"], ["Chicken_Eat", "Attack", [1, 40]], ["Chicken_Die", "Death"]],
+    clips: [["Chicken_Idle", "Idle"], ["Chicken_Walk", "Walk"], ["Chicken_Run", "Run"], ["Chicken_Eat", "Attack", [1, 40]], ["Chicken_Die", "Death"]],
     substitutes: { attack: "synthesised peck lunge" },
     synthAttack: { reach: 0.12, dip: 4, ms: 520 },
   },
   {
     id: "animal_chicken_speckled", rig: "Chicken_Rig.fbx", texture: "chicken_col_v3_unity.png",
     is: "chicken", tags: ["chicken", "hen", "fowl", "bird", "farm", "plains", "animal", "variant"],
-    clips: [["Chicken_Idle", "Idle"], ["Chicken_Run", "Walk"], ["Chicken_Eat", "Attack", [1, 40]], ["Chicken_Die", "Death"]],
+    clips: [["Chicken_Idle", "Idle"], ["Chicken_Walk", "Walk"], ["Chicken_Run", "Run"], ["Chicken_Eat", "Attack", [1, 40]], ["Chicken_Die", "Death"]],
     substitutes: { attack: "synthesised peck lunge" },
     synthAttack: { reach: 0.12, dip: 4, ms: 520 },
   },
   {
     id: "animal_cattle", rig: "Cattle_Rig.fbx", texture: "iron_age_cattle_col_unity.png",
     is: "cow", tags: ["cow", "cattle", "ox", "bovine", "farm", "plains", "animal", "territorial"],
-    clips: [["Cattle_Idle", "Idle"], ["Cattle_Run", "Walk"], ["Cattle_Attack", "Attack"], ["Cattle_Die", "Death"]],
+    clips: [["Cattle_Idle", "Idle"], ["Cattle_Walk", "Walk"], ["Cattle_Run", "Run"], ["Cattle_Attack", "Attack"], ["Cattle_Die", "Death"]],
   },
   {
     id: "animal_aurochs", rig: "Cattle_Rig.fbx", texture: "iron_age_cattle_v2_col3_unity.png",
     is: "aurochs", tags: ["aurochs", "cattle", "bull", "bovine", "highland", "animal", "variant"],
-    clips: [["Cattle_Idle", "Idle"], ["Cattle_Run", "Walk"], ["Cattle_Attack", "Attack"], ["Cattle_Die", "Death"]],
+    clips: [["Cattle_Idle", "Idle"], ["Cattle_Walk", "Walk"], ["Cattle_Run", "Run"], ["Cattle_Attack", "Attack"], ["Cattle_Die", "Death"]],
   },
   {
     id: "animal_goat", rig: "Goat_Rig.fbx", texture: "goat_col_v5_unity.png",
     is: "goat", tags: ["goat", "billy", "horned", "farm", "plains", "animal", "aggressive"],
-    clips: [["Goat_Idle", "Idle"], ["Goat_Run", "Walk"], ["Goat_Attack", "Attack"], ["Goat_Die", "Death"]],
+    clips: [["Goat_Idle", "Idle"], ["Goat_Walk", "Walk"], ["Goat_Run", "Run"], ["Goat_Attack", "Attack"], ["Goat_Die", "Death"]],
   },
   {
     id: "animal_rabbit", rig: "WildRabbit_Rig.fbx", texture: "wild_rabbit_col5_unity.png",
     is: "rabbit", tags: ["rabbit", "bunny", "hare", "coney", "plains", "forest", "animal", "passive"],
-    clips: [["WildRabbit_Idle", "Idle"], ["WildRabbit_Run", "Walk"], ["WildRabbit_Eat", "Attack", [1, 26]], ["WildRabbit_Die", "Death"]],
+    clips: [["WildRabbit_Idle", "Idle"], ["WildRabbit_Walk", "Walk"], ["WildRabbit_Run", "Run"], ["WildRabbit_Eat", "Attack", [1, 26]], ["WildRabbit_Die", "Death"]],
     substitutes: { attack: "synthesised nip lunge" },
     synthAttack: { reach: 0.11, dip: 3, ms: 520 },
   },
   {
     id: "animal_rabbit_dark", rig: "WildRabbit_Rig.fbx", texture: "wild_rabbit_col_v3_unity.png",
     is: "rabbit", tags: ["rabbit", "bunny", "hare", "coney", "forest", "animal", "variant"],
-    clips: [["WildRabbit_Idle", "Idle"], ["WildRabbit_Run", "Walk"], ["WildRabbit_Eat", "Attack", [1, 26]], ["WildRabbit_Die", "Death"]],
+    clips: [["WildRabbit_Idle", "Idle"], ["WildRabbit_Walk", "Walk"], ["WildRabbit_Run", "Run"], ["WildRabbit_Eat", "Attack", [1, 26]], ["WildRabbit_Die", "Death"]],
     substitutes: { attack: "synthesised nip lunge" },
     synthAttack: { reach: 0.11, dip: 3, ms: 520 },
   },
   {
     id: "animal_frog", rig: "common_frog_rig_exp.FBX", texture: "common_frog_col_unity.png",
     is: "frog", tags: ["frog", "toad", "amphibian", "water", "marsh", "pond", "animal", "passive"],
-    clips: [["common_frog_idle_anim", "Idle"], ["common_frog_run_anim", "Walk"], ["common_frog_run_anim", "Attack"], ["common_frog_die_anim", "Death"]],
+    clips: [["common_frog_idle_anim", "Idle"], ["common_frog_walk_anim", "Walk"], ["common_frog_run_anim", "Run"], ["common_frog_run_anim", "Attack"], ["common_frog_die_anim", "Death"]],
     substitutes: { attack: "synthesised snap lunge" },
     synthAttack: { reach: 0.14, dip: 4, ms: 460 },
   },
   {
     id: "animal_frog_green", rig: "common_frog_rig_exp.FBX", texture: "common_frog_col_v2_unity.png",
     is: "frog", tags: ["frog", "toad", "amphibian", "water", "marsh", "pool", "animal", "variant"],
-    clips: [["common_frog_idle_anim", "Idle"], ["common_frog_run_anim", "Walk"], ["common_frog_run_anim", "Attack"], ["common_frog_die_anim", "Death"]],
+    clips: [["common_frog_idle_anim", "Idle"], ["common_frog_walk_anim", "Walk"], ["common_frog_run_anim", "Run"], ["common_frog_run_anim", "Attack"], ["common_frog_die_anim", "Death"]],
     substitutes: { attack: "synthesised snap lunge" },
     synthAttack: { reach: 0.14, dip: 4, ms: 460 },
   },
@@ -93,14 +106,14 @@ export const ANIMALS = [
   {
     id: "animal_deer", rig: "Deer_Rig.fbx", texture: "deer_col6_unity.png",
     is: "deer", tags: ["deer", "stag", "hart", "doe", "antler", "forest", "animal", "territorial"],
-    clips: [["Deer_Idle", "Idle"], ["Deer_Run", "Walk"], ["Deer_Eat", "Attack", [1, 34]], ["Deer_Die", "Death"]],
+    clips: [["Deer_Idle", "Idle"], ["Deer_Walk", "Walk"], ["Deer_Run", "Run"], ["Deer_Eat", "Attack", [1, 34]], ["Deer_Die", "Death"]],
     substitutes: { attack: "synthesised head butt" },
     synthAttack: { reach: 0.10, dip: 3, ms: 620 },
   },
   {
     id: "animal_coyote", rig: "Wolf_Rig.fbx", texture: "common_wolf_col2_unity.png",
     is: "coyote", tags: ["coyote", "wolf", "canine", "pack", "forest", "animal", "aggressive"],
-    clips: [["Wolf_IdleA", "Idle"], ["Wolf_Run", "Walk"], ["Wolf_Attack", "Attack"], ["Wolf_Die", "Death"]],
+    clips: [["Wolf_IdleA", "Idle"], ["Wolf_Walk", "Walk"], ["Wolf_Run", "Run"], ["Wolf_Attack", "Attack"], ["Wolf_Die", "Death"]],
     // Wolf_Attack is authored entirely in the head and jaw: rendered across six phases the body
     // does not move at all, so at any real distance the coyote appears to do nothing. The bite is
     // kept and a body lunge is layered onto it.
@@ -116,24 +129,24 @@ export const ANIMALS = [
   {
     id: "animal_viper", rig: "Viper_Rig.fbx", texture: "asp_viper_col6_unity.png",
     is: "viper", tags: ["viper", "adder", "snake", "serpent", "venom", "forest", "animal", "territorial"],
-    clips: [["Viper_Idle", "Idle"], ["Viper_FastGlide", "Walk"], ["Viper_Attack", "Attack"], ["Viper_Die", "Death"]],
+    clips: [["Viper_Idle", "Idle"], ["Viper_Glide", "Walk"], ["Viper_FastGlide", "Run"], ["Viper_Attack", "Attack"], ["Viper_Die", "Death"]],
   },
 
   // ---------------------------------------------------------------- rocky, Karrowmoor
   {
     id: "animal_bear", rig: "Bear_Rig.fbx", texture: "brown_bear_col_v2_unity.png",
     is: "bear", tags: ["bear", "bruin", "predator", "rocky", "cave", "animal", "aggressive"],
-    clips: [["Bear_Idle", "Idle"], ["Bear_Run", "Walk"], ["Bear_Attack", "Attack"], ["Bear_Die", "Death"]],
+    clips: [["Bear_Idle", "Idle"], ["Bear_Walk", "Walk"], ["Bear_Run", "Run"], ["Bear_Attack", "Attack"], ["Bear_Die", "Death"]],
   },
   {
     id: "animal_boar", rig: "WildBoar_Rig.fbx", texture: "wild_boar_col9_unity.png",
     is: "boar", tags: ["boar", "tusk", "swine", "rocky", "scree", "animal", "aggressive"],
-    clips: [["WildBoar_Idle", "Idle"], ["WildBoar_Run", "Walk"], ["WildBoar_Attack", "Attack"], ["WildBoar_Die", "Death"]],
+    clips: [["WildBoar_Idle", "Idle"], ["WildBoar_Walk", "Walk"], ["WildBoar_Run", "Run"], ["WildBoar_Attack", "Attack"], ["WildBoar_Die", "Death"]],
   },
   {
     id: "animal_ibex", rig: "Ibex_Rig.fbx", texture: "ibex_col16_unity.png",
     is: "ibex", tags: ["ibex", "goat", "horned", "ridge", "rocky", "animal", "territorial"],
-    clips: [["Ibex_Idle", "Idle"], ["Ibex_Run", "Walk"], ["Ibex_Attack", "Attack"], ["Ibex_Die", "Death"]],
+    clips: [["Ibex_Idle", "Idle"], ["Ibex_Walk", "Walk"], ["Ibex_Run", "Run"], ["Ibex_Attack", "Attack"], ["Ibex_Die", "Death"]],
   },
 
   // ---------------------------------------------------------------- dungeon, Gravelmaw
@@ -147,12 +160,12 @@ export const ANIMALS = [
   {
     id: "animal_scorpion", rig: "Scorpion_Rig.fbx", texture: "scorpion_col15_unity.png",
     is: "scorpion", tags: ["scorpion", "sting", "arachnid", "cave", "dungeon", "animal", "aggressive"],
-    clips: [["Scorpion_Idle", "Idle"], ["Scorpion_Run", "Walk"], ["Scorpion_Attack", "Attack"], ["Scorpion_Die", "Death"]],
+    clips: [["Scorpion_Idle", "Idle"], ["Scorpion_Walk", "Walk"], ["Scorpion_Run", "Run"], ["Scorpion_Attack", "Attack"], ["Scorpion_Die", "Death"]],
   },
   {
     id: "animal_crab", rig: "crab_rig.FBX", texture: "crab_col12_unity.png",
     is: "crab", tags: ["crab", "shell", "claw", "sump", "cave", "water", "animal", "territorial"],
-    clips: [["crab_walk_anim", "Idle"], ["crab_walk_anim", "Walk"], ["crab_run_anim", "Attack"], ["crab_die_anim", "Death"]],
+    clips: [["crab_walk_anim", "Idle"], ["crab_walk_anim", "Walk"], ["crab_run_anim", "Run"], ["crab_run_anim", "Attack"], ["crab_die_anim", "Death"]],
     // Unity records Crab_idle as frames 110-111, a single held pose, and a one-frame clip is
     // degenerate enough that optimization drops it outright - the crab shipped with no Idle at
     // all and fell back to scuttling in place. Widened to eight frames so it survives.

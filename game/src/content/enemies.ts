@@ -131,7 +131,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // Passive at 5 m, sitting on the Redsill shallows, so a player chooses this fight.
     maxHealth: 6, attackLevel: 2, defenceLevel: 1,
     accuracy: 0, armour: 0, magicArmour: 0,
-    maxHit: 2, attackSpeedMs: 2400, aggroRadius: 5, moveSpeedMps: 0.79, behaviour: "passive",
+    maxHit: 2, attackSpeedMs: 2400, aggroRadius: 5, moveSpeedMps: 0.79, walkSpeedMps: 0.17, behaviour: "passive",
     marks: marksFor(1),
     drops: [
       { itemId: "raw_game_meat", quantity: [1, 1], chance: 0.40 },
@@ -149,7 +149,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // character walks the March Road through the flock and fights only what they swing at.
     maxHealth: 4, attackLevel: 2, defenceLevel: 1,
     accuracy: 0, armour: 0, magicArmour: 0,
-    maxHit: 1, attackSpeedMs: 1200, aggroRadius: 3, moveSpeedMps: 1.0, behaviour: "passive",
+    maxHit: 1, attackSpeedMs: 1200, aggroRadius: 3, moveSpeedMps: 1.02, walkSpeedMps: 0.22, behaviour: "passive",
     marks: marksFor(1),
     drops: [
       { itemId: "hen_feather", quantity: [1, 3], chance: 0.55 },
@@ -166,7 +166,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // damage; in the full tier 1 kit (29 max health, armour 16) it is 25 s and 11 damage.
     maxHealth: 12, attackLevel: 4, defenceLevel: 3,
     accuracy: 4, armour: 4, magicArmour: 2,
-    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 2.05, behaviour: "aggressive",
+    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 2.06, walkSpeedMps: 0.52, behaviour: "aggressive",
     marks: marksFor(1),
     drops: [
       { itemId: "coarse_hide", quantity: [1, 2], chance: 0.55 },
@@ -186,7 +186,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // point of territorial is that it never starts.
     maxHealth: 16, attackLevel: 5, defenceLevel: 3,
     accuracy: 6, armour: 35, magicArmour: 0,
-    maxHit: 5, attackSpeedMs: 3600, aggroRadius: 5, moveSpeedMps: 2.6, behaviour: "territorial",
+    maxHit: 5, attackSpeedMs: 3600, aggroRadius: 5, moveSpeedMps: 2.64, walkSpeedMps: 0.51, behaviour: "territorial",
     marks: marksFor(1),
     drops: [
       { itemId: "coarse_hide", quantity: [1, 2], chance: 0.60 },
@@ -203,7 +203,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // Worth killing for the hide and the foot, not for the fight.
     maxHealth: 5, attackLevel: 2, defenceLevel: 4,
     accuracy: 0, armour: 0, magicArmour: 0,
-    maxHit: 1, attackSpeedMs: 1800, aggroRadius: 2, moveSpeedMps: 0.79, behaviour: "passive",
+    maxHit: 1, attackSpeedMs: 1800, aggroRadius: 2, moveSpeedMps: 0.81, walkSpeedMps: 0.41, behaviour: "passive",
     marks: marksFor(1),
     drops: [
       { itemId: "coarse_hide", quantity: [1, 1], chance: 0.50 },
@@ -219,7 +219,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // of the cow standing 240 m east, so the two tier 1 territorial blocks want opposite styles.
     maxHealth: 9, attackLevel: 7, defenceLevel: 2,
     accuracy: 10, armour: 0, magicArmour: 20,
-    maxHit: 5, attackSpeedMs: 3000, aggroRadius: 7, moveSpeedMps: 1.2, behaviour: "territorial",
+    maxHit: 5, attackSpeedMs: 3000, aggroRadius: 7, moveSpeedMps: 1.2, walkSpeedMps: 0.5, behaviour: "territorial",
     marks: marksFor(1),
     drops: [
       { itemId: "viper_skin", quantity: [1, 1], chance: 0.45 },
@@ -242,7 +242,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // of 8. Everything harder than this in Fallowmarch is territorial and can be walked past.
     maxHealth: 9, attackLevel: 6, defenceLevel: 4,
     accuracy: 6, armour: 10, magicArmour: 10,
-    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 14, behaviour: "aggressive",
+    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 2.1, walkSpeedMps: 0.9, behaviour: "aggressive",
     marks: purseMarksFor(1),
     drops: [
       { itemId: "coarse_hide", quantity: [1, 2], chance: 0.35 },
@@ -263,7 +263,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // enough health separates the fight from the ordinary road enemies.
     maxHealth: 80, attackLevel: 9, defenceLevel: 7,
     accuracy: 10, armour: 18, magicArmour: 24,
-    maxHit: 6, attackSpeedMs: 3000, aggroRadius: 20, moveSpeedMps: 2.1, behaviour: "territorial",
+    maxHit: 6, attackSpeedMs: 3000, aggroRadius: 20, moveSpeedMps: 2.11, walkSpeedMps: 1.32, behaviour: "territorial",
     marks: [80, 140],
     drops: [
       { itemId: "air_orb", quantity: [1, 1], chance: 1.00 },
@@ -282,7 +282,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // Territorial at 9 m: a rutting hart is the one deer that does not run.
     maxHealth: 26, attackLevel: 12, defenceLevel: 7,
     accuracy: 12, armour: 10, magicArmour: 18,
-    maxHit: 5, attackSpeedMs: 2400, aggroRadius: 9, moveSpeedMps: 1.85, behaviour: "territorial",
+    maxHit: 5, attackSpeedMs: 2400, aggroRadius: 9, moveSpeedMps: 1.85, walkSpeedMps: 0.62, behaviour: "territorial",
     marks: marksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 2], chance: 0.55 },
@@ -300,7 +300,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // one that crosses a clearing for you.
     maxHealth: 22, attackLevel: 10, defenceLevel: 6,
     accuracy: 8, armour: 18, magicArmour: 55,
-    maxHit: 4, attackSpeedMs: 2400, aggroRadius: 7, moveSpeedMps: 1.3, behaviour: "aggressive",
+    maxHit: 4, attackSpeedMs: 2400, aggroRadius: 7, moveSpeedMps: 0.93, walkSpeedMps: 0.29, behaviour: "aggressive",
     marks: marksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 2], chance: 0.50 },
@@ -316,7 +316,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // fight in the region after the Reaver: 27.6 s at Melee 7 with a Corven sword.
     maxHealth: 28, attackLevel: 13, defenceLevel: 8,
     accuracy: 10, armour: 14, magicArmour: 8,
-    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 2.75, behaviour: "aggressive",
+    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 2.79, walkSpeedMps: 0.68, behaviour: "aggressive",
     marks: marksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 2], chance: 0.55 },
@@ -331,7 +331,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // same passive 4 m, scaled to the region: 12 health and max hit 3 instead of 4 and 1.
     maxHealth: 12, attackLevel: 10, defenceLevel: 5,
     accuracy: 6, armour: 8, magicArmour: 8,
-    maxHit: 3, attackSpeedMs: 1200, aggroRadius: 4, moveSpeedMps: 0.79, behaviour: "passive",
+    maxHit: 3, attackSpeedMs: 1200, aggroRadius: 4, moveSpeedMps: 0.79, walkSpeedMps: 0.17, behaviour: "passive",
     marks: marksFor(5),
     drops: [
       { itemId: "marsh_gland", quantity: [1, 2], chance: 0.45 },
@@ -347,7 +347,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // meets in numbers, and it is still the cheapest thing in the region to kill.
     maxHealth: 10, attackLevel: 4, defenceLevel: 9,
     accuracy: 0, armour: 0, magicArmour: 0,
-    maxHit: 2, attackSpeedMs: 1800, aggroRadius: 2, moveSpeedMps: 0.79, behaviour: "passive",
+    maxHit: 2, attackSpeedMs: 1800, aggroRadius: 2, moveSpeedMps: 0.81, walkSpeedMps: 0.41, behaviour: "passive",
     marks: marksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 1], chance: 0.45 },
@@ -362,7 +362,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // quarter of a Corven-kitted player's health with it if the roll goes badly.
     maxHealth: 24, attackLevel: 16, defenceLevel: 6,
     accuracy: 16, armour: 6, magicArmour: 40,
-    maxHit: 8, attackSpeedMs: 3000, aggroRadius: 8, moveSpeedMps: 1.2, behaviour: "territorial",
+    maxHit: 8, attackSpeedMs: 3000, aggroRadius: 8, moveSpeedMps: 1.2, walkSpeedMps: 0.5, behaviour: "territorial",
     marks: marksFor(5),
     drops: [
       { itemId: "venom_gland", quantity: [1, 1], chance: 0.35 },
@@ -380,7 +380,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // because this one initiates from 14 m and the coyote does not. The purse pays 35-135 marks.
     maxHealth: 26, attackLevel: 14, defenceLevel: 9,
     accuracy: 14, armour: 26, magicArmour: 24,
-    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 14, behaviour: "aggressive",
+    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 2.1, walkSpeedMps: 0.9, behaviour: "aggressive",
     marks: purseMarksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 2], chance: 0.35 },
@@ -396,7 +396,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // player has earned that progression reward.
     maxHealth: 140, attackLevel: 18, defenceLevel: 14,
     accuracy: 16, armour: 48, magicArmour: 32,
-    maxHit: 9, attackSpeedMs: 3000, aggroRadius: 22, moveSpeedMps: 2.1, behaviour: "territorial",
+    maxHit: 9, attackSpeedMs: 3000, aggroRadius: 22, moveSpeedMps: 2.11, walkSpeedMps: 1.32, behaviour: "territorial",
     marks: [350, 550],
     drops: [
       { itemId: "earth_orb", quantity: [1, 1], chance: 1.00 },
@@ -416,7 +416,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // silhouette on the moor.
     maxHealth: 38, attackLevel: 18, defenceLevel: 11,
     accuracy: 16, armour: 55, magicArmour: 10,
-    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 3.05, behaviour: "aggressive",
+    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 3.06, walkSpeedMps: 0.74, behaviour: "aggressive",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 1], chance: 0.45 },
@@ -439,7 +439,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // A mud-caked bristle hide over stone dust is what that number reads as on an animal.
     maxHealth: 34, attackLevel: 16, defenceLevel: 11,
     accuracy: 14, armour: 30, magicArmour: 115,
-    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 1.5, behaviour: "aggressive",
+    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 1.5, walkSpeedMps: 0.67, behaviour: "aggressive",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 1], chance: 0.40 },
@@ -457,7 +457,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // the ibex is the one you simply have to out-fight. Territorial at 11 m on the ridge line.
     maxHealth: 44, attackLevel: 20, defenceLevel: 12,
     accuracy: 18, armour: 40, magicArmour: 30,
-    maxHit: 8, attackSpeedMs: 3000, aggroRadius: 11, moveSpeedMps: 2.25, behaviour: "territorial",
+    maxHit: 8, attackSpeedMs: 3000, aggroRadius: 11, moveSpeedMps: 2.26, walkSpeedMps: 0.6, behaviour: "territorial",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 2], chance: 0.50 },
@@ -475,7 +475,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // them walkable.
     maxHealth: 46, attackLevel: 20, defenceLevel: 13,
     accuracy: 14, armour: 78, magicArmour: 0,
-    maxHit: 11, attackSpeedMs: 3600, aggroRadius: 6, moveSpeedMps: 2.6, behaviour: "territorial",
+    maxHit: 11, attackSpeedMs: 3600, aggroRadius: 6, moveSpeedMps: 2.64, walkSpeedMps: 0.51, behaviour: "territorial",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 2], chance: 0.55 },
@@ -494,7 +494,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // sword, against the Cairnwight's 32.7 s and 27.9.
     maxHealth: 40, attackLevel: 22, defenceLevel: 13,
     accuracy: 18, armour: 42, magicArmour: 40,
-    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 14, behaviour: "aggressive",
+    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 2.75, walkSpeedMps: 0.9, behaviour: "aggressive",
     marks: purseMarksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 1], chance: 0.30 },
@@ -512,7 +512,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // 41 health, where the bear is 32.7 s and 27.9.
     maxHealth: 30, attackLevel: 21, defenceLevel: 12,
     accuracy: 18, armour: 20, magicArmour: 12,
-    maxHit: 7, attackSpeedMs: 1800, aggroRadius: 12, moveSpeedMps: 2.75, behaviour: "aggressive",
+    maxHit: 7, attackSpeedMs: 1800, aggroRadius: 12, moveSpeedMps: 2.79, walkSpeedMps: 0.68, behaviour: "aggressive",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 1], chance: 0.35 },
@@ -531,7 +531,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // is meant to be survivable while telling you the cadence down here is different.
     maxHealth: 26, attackLevel: 18, defenceLevel: 10,
     accuracy: 16, armour: 12, magicArmour: 12,
-    maxHit: 5, attackSpeedMs: 1800, aggroRadius: 10, moveSpeedMps: 1.5, behaviour: "aggressive",
+    maxHit: 5, attackSpeedMs: 1800, aggroRadius: 10, moveSpeedMps: 1.5, walkSpeedMps: 0.6, behaviour: "aggressive",
     marks: marksFor(10),
     drops: [
       { itemId: "rat_tail", quantity: [1, 3], chance: 0.55 },
@@ -548,7 +548,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // committed and cannot re-kit.
     maxHealth: 32, attackLevel: 17, defenceLevel: 11,
     accuracy: 14, armour: 45, magicArmour: 60,
-    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 1.2, behaviour: "aggressive",
+    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 1.2, walkSpeedMps: 0.5, behaviour: "aggressive",
     marks: marksFor(10),
     drops: [
       { itemId: "scorpion_stinger", quantity: [1, 2], chance: 0.40 },
@@ -564,7 +564,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // chamber this is the block that says "bring the staff you left in the bank".
     maxHealth: 42, attackLevel: 19, defenceLevel: 13,
     accuracy: 12, armour: 82, magicArmour: 0,
-    maxHit: 10, attackSpeedMs: 3600, aggroRadius: 6, moveSpeedMps: 1.3, behaviour: "territorial",
+    maxHit: 10, attackSpeedMs: 3600, aggroRadius: 6, moveSpeedMps: 1.3, walkSpeedMps: 0.5, behaviour: "territorial",
     marks: marksFor(10),
     drops: [
       { itemId: "crab_claw", quantity: [1, 1], chance: 0.45 },
@@ -583,7 +583,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // can lose, which PRD 2.4 says is the point.
     maxHealth: 200, attackLevel: 24, defenceLevel: 20,
     accuracy: 15, armour: 62, magicArmour: 18,
-    maxHit: 12, attackSpeedMs: 3000, aggroRadius: 24, moveSpeedMps: 2.1, behaviour: "territorial",
+    maxHit: 12, attackSpeedMs: 3000, aggroRadius: 24, moveSpeedMps: 2.11, walkSpeedMps: 1.32, behaviour: "territorial",
     marks: [900, 1400],
     drops: [
       { itemId: "water_orb", quantity: [1, 1], chance: 1.00 },

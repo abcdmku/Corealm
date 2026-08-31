@@ -108,6 +108,17 @@ export const ENEMY_RETURN_SPEED_MPS = 3.6;
  * walk cycle implies 0.75 m/s against the 3.1 it was travelling at. `render/entityViews.ts` reads
  * the same number to pick the clip's playback rate, so the two cannot drift.
  */
+/**
+ * How fast this creature potters, in metres per second.
+ *
+ * Falls back to a third of its pursuit speed when content gives no walk speed, which is roughly the
+ * walk-to-run ratio across the measured roster (the bear is 0.74 against 2.25, the goat 0.52
+ * against 1.84) — a defensible amble rather than a creature strolling at a sprint.
+ */
+function wanderSpeed(entity: SemanticEntity): number {
+  return entity.combat?.walkSpeedMps ?? pursuitSpeed(entity) / 3;
+}
+
 function pursuitSpeed(entity: SemanticEntity): number {
   return entity.combat?.moveSpeedMps ?? ENEMY_SPEED_MPS;
 }
@@ -457,13 +468,15 @@ export class EnemyAiSystem implements TickSystem {
   /**
    * Idle drift: short strolls near the spawn point, long pauses between them.
    *
-   * SPEED IS THE CREATURE'S OWN `moveSpeedMps`, not some slower amble, and that is deliberate.
-   * `render/entityViews.ts: motionTimeScale` sets the walk clip's playback rate from exactly that
-   * number, and it is captured onto the view record when the record is built — so a creature that
-   * moved at half speed here would play its cycle at twice the rate its feet were covering, which
-   * is the foot slide the whole `impliedWalkMps` mechanism exists to remove. What keeps this from
-   * reading as aimless jogging is the SHAPE rather than the speed: a couple of metres at a time,
-   * then five to fifteen seconds of standing still.
+   * SPEED IS THE CREATURE'S `walkSpeedMps`, which is the speed its WALK cycle depicts.
+   *
+   * CORRECTION. This used to use `moveSpeedMps`, the pursuit speed, on the reasoning that the
+   * renderer retimes one locomotion clip against that number and a second speed would desynchronise
+   * the feet. That was true only because every creature had one locomotion clip and it was the RUN
+   * cycle. It now has both, `render/entityViews.ts` picks between them by whether the creature is
+   * pursuing, and each is retimed against its own measured stride — so pottering on the walk cycle
+   * at the walk cycle's own speed is what keeps the feet planted, and pottering at a pursuit speed
+   * is what would not.
    *
    * The radius is small on purpose. `spawnPos` still anchors the leash, the respawn point and every
    * "walk home" in this file, so drifting far would quietly change all three; six metres is enough
@@ -483,7 +496,7 @@ export class EnemyAiSystem implements TickSystem {
 
     const target = record.wanderTarget;
     if (target) {
-      if (this.stepToward(entity, target, pursuitSpeed(entity), deltaMs, WANDER_ARRIVE_METRES)) {
+      if (this.stepToward(entity, target, wanderSpeed(entity), deltaMs, WANDER_ARRIVE_METRES)) {
         record.wanderTarget = null;
         record.wanderUntilMs = atMs + record.rng.int(WANDER_PAUSE_MIN_MS, WANDER_PAUSE_MAX_MS);
       }
