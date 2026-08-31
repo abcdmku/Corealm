@@ -6,12 +6,12 @@
  * code path, which is what makes agent parity a property of the architecture rather than a claim:
  * every tool below calls `GameApi`, the same object the human UI calls.
  *
- * Seventeen tools, consolidated from the brief's ~30 capability bullets. The consolidations that
+ * Twenty-one tools, consolidated from the brief's ~30 capability bullets. The consolidations that
  * did the work: `observe` absorbs known-location recall through a `scope` parameter, `interact`
  * absorbs gather/agility/loot/talk/door through the `InteractionId` it is given, and `events`
  * absorbs both draining and long-poll waiting through an optional timeout.
  *
- * The seventeenth is `corealm_spellbook`, added with the Magic 1-70 ladder. It is not a
+ * `corealm_spellbook` was added with the Magic 1-70 ladder. It is not a
  * consolidation failure: `corealm_attack` can already name any spell per cast, but with sixteen
  * spells an agent needs to be able to READ which ones it has and which one a bare "cast" resolves
  * to, and that read has no other home.
@@ -192,15 +192,13 @@ export function createTools(api: GameApi): ToolDef[] {
     },
     {
       name: "corealm_use_item",
-      description: "Use an inventory item: eat food, apply a seed to a plot, or combine two items.",
+      description: "Use a carried item: eat food, equip gear, or apply a matching seed to a farm plot.",
       inputSchema: obj({
         itemId: STR("Item to use"),
-        targetItemId: STR("Optional item to use it on"),
-        targetEntityId: STR("Optional entity to use it on"),
+        targetEntityId: STR("Optional farm plot entity to plant the seed in"),
       }, ["itemId"]),
       execute: (args) => {
         const itemId = asString(args.itemId);
-        if (typeof args.targetItemId === "string") return unwrap(api.useItem(itemId, { itemId: args.targetItemId }));
         if (typeof args.targetEntityId === "string") return unwrap(api.useItem(itemId, { entityId: args.targetEntityId }));
         return unwrap(api.useItem(itemId));
       },

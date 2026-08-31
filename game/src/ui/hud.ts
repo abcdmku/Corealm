@@ -59,6 +59,13 @@ export function eventChangesWeaponCharge(event: GameEvent): boolean {
   return event.type === "spell.launched" || event.type === "essence.recharged";
 }
 
+/** A deliberate stop is not a pathfinding failure and must not be presented as one. */
+export function describeNavigationFailure(data: GameEvent["data"]): { text: string; tone: NoticeTone } | null {
+  const reason = typeof data["reason"] === "string" ? data["reason"] : "";
+  if (reason === "cancelled" || reason === "movement-disabled") return null;
+  return { text: "There is no route to that place.", tone: "error" };
+}
+
 export type AutoOpen = "bank" | "shop" | null;
 
 export class Hud {
@@ -498,7 +505,7 @@ export class Hud {
         return name ? { text: `Discovered ${name}.`, tone: "info" } : null;
       }
       case "navigation.failed":
-        return { text: "There is no route to that place.", tone: "error" };
+        return describeNavigationFailure(data);
       case "essence.recharged":
         return { text: describeEssenceRecharge(data), tone: "success" };
       case "essence.altarAwakened": {

@@ -93,7 +93,7 @@ off the body is **not** a loss or a gain: it emits `item.equipped` or `item.uneq
 neither of the two item events fires for it. A swap emits one `item.equipped` carrying `replaced`
 with the id of the piece that went back into the pack.
 
-## The 20 tools
+## The 21 tools
 
 ### Reading state
 - `corealm_player` — position, region, health, dead, moving, activityKind, and two separate
@@ -169,9 +169,10 @@ with the id of the piece that went back into the pack.
 - `corealm_stop` — cancel navigation, activity, and combat
 - `corealm_interact` — mine, chop, fish, rake, plant, harvest, talk, open, climb, vault, loot, take,
   produce, recharge, bank, trade, inspect
-- `corealm_use_item` — eat food, apply a seed, combine two items
+- `corealm_use_item` — eat food, equip gear, or apply a matching seed to a farm plot
 - `corealm_equip` — equip an item or clear a slot
 - `corealm_produce` — smelt, smith, cook, craft, fletch
+- `corealm_build_campfire` — turn a carried log into a temporary cooking station
 - `corealm_attack` — attack with whatever is in the main hand. A one-handed wand casts every 2.2
   seconds. A stronger two-handed staff casts every 3.0 seconds. Both reach 15 m, so the character
   opens fire without closing. A blade or bare hands swing at 1.6 m and walk in first.
