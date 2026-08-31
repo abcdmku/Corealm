@@ -31,6 +31,19 @@ const ACTION_BUDGET_MS = 8_000;
 const REBUILD_BUDGET_MS = 8_000;
 const POLL_MS = 40;
 const SCREENSHOT_TIMEOUT_MS = 5_000;
+// Exercise the same player-facing quality controls as production. Low shadows keep ground contact
+// readable while the reduced render scale leaves CI CPU for input, animation, and PNG capture.
+const LAB_TEST_SETTINGS = {
+  renderScale: 0.7,
+  shadowQuality: "low",
+  drawDistance: "near",
+  damageNumbers: true,
+  invertCameraY: false,
+  uiScale: "normal",
+  music: 0,
+  ambient: 0,
+  sfx: 0,
+} as const;
 
 const PREFAB_SELECTION = {
   kind: "prefab",
@@ -196,6 +209,10 @@ let page: Page | null = null;
 let activeMode = "startup";
 let lastState: FeatureLabState | null = null;
 
+function logProgress(label: string): void {
+  console.error(`[feature-lab] ${label} (${Math.round(performance.now() - started)} ms)`);
+}
+
 try {
   await mkdir(screenshotDir, { recursive: true });
   server = await startGameServer({ logLevel: "error" });
@@ -203,14 +220,15 @@ try {
     headless: true,
     args: ["--enable-unsafe-swiftshader", "--mute-audio"],
   });
-  page = await browser.newPage({ viewport: { width: 900, height: 600 }, deviceScaleFactor: 1 });
-  await page.addInitScript(() => {
+  page = await browser.newPage({ viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 });
+  await page.addInitScript((settings) => {
+    globalThis.localStorage?.setItem("corealm.settings.v1", JSON.stringify(settings));
     Reflect.set(
       window,
       "__featureLabGateDocumentId",
       `${performance.timeOrigin}:${Math.random().toString(36).slice(2)}`,
     );
-  });
+  }, LAB_TEST_SETTINGS);
   page.on("console", (message) => {
     if (message.type() === "error") diagnostics.console.push(`[${activeMode}] ${message.text()}`);
   });
@@ -222,21 +240,25 @@ try {
   const legacy = await testLegacyRedirect(page, server.url, (state) => {
     lastState = state;
   });
+  logProgress("legacy redirect ready");
   lastState = legacy.state;
   const building = await testBuilding(page, server.url, screenshotDir, screenshots, (state) => {
     lastState = state;
   }, false);
+  logProgress("building proof complete");
   lastState = building.final;
 
   activeMode = "building-to-combat-navigation";
   const modeNavigation = await selectModeWithReload(page, "combat", building.final, (state) => {
     lastState = state;
   });
+  logProgress("combat navigation ready");
 
   activeMode = "combat";
   const combat = await testCombat(page, server.url, screenshotDir, screenshots, (state) => {
     lastState = state;
   }, false);
+  logProgress("combat proof complete");
   lastState = combat.final;
 
   const combatStructuresValid = structureIsValid(combat.ready.structure);
