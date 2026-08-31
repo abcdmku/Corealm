@@ -122,13 +122,17 @@ author local **+Z** as their approach, so for those the fitted view is the back 
 
 ## Browser gate and shared-state proof
 
-When focused behavior is ready, run the self-contained Chromium gate:
+When focused behavior is ready, run the self-contained Chromium gate. The default command keeps
+the combined local loop, while CI runs the two focused shards so a slower software renderer does not
+consume one shard's 60-second budget before the other starts:
 
 ```bash
 npm run lab:test
+npm run lab:test -- --shard building
+npm run lab:test -- --shard combat
 ```
 
-The command starts one Vite server and one Chromium session for the combat route, building route, and legacy redirect. It proves that both lab routes report `engine: "corealm-production"` and the same `fallowmarch-yard` identity. Combat coverage checks the production canvas and debug state, actor rigs and animation progress, a direct equipment change, pointer selection, melee damage and motion, and spell particles and damage. Building coverage boots a production prefab through the compatibility route, changes it to a wall run through the real authoring panel, checks collision output and revision changes, walks through real keyboard input, suppresses keyboard movement when walking is off, and orbits and fits the free camera without moving the player. Focused structure tests cover the full prefab, composition, kit, and wall-run catalogue.
+Each invocation starts one Vite server and one Chromium session. Together the shards cover the combat route, building route, and legacy redirect, and prove that both labs report `engine: "corealm-production"` and the same `fallowmarch-yard` identity. Combat coverage checks the production canvas and debug state, actor rigs and animation progress, a direct equipment change, pointer selection, melee damage and motion, and spell particles and damage. Building coverage boots a production prefab through the compatibility route, changes it to a wall run through the real authoring panel, checks collision output and revision changes, walks through real keyboard input, suppresses keyboard movement when walking is off, and orbits and fits the free camera without moving the player. Focused structure tests cover the full prefab, composition, kit, and wall-run catalogue.
 
 Workbench-switch coverage treats the mode selector as navigation, not an in-place state mutation. The gate records the current query and hash, switches from building to combat, waits for the document and `window.__featureLab` to load again, then checks the canonical destination `mode`, preserved URL fields, shared-yard identity, and fresh combat defaults. Both options use the same navigation path, while the building-route readiness check locks its defaults to player visible, walking off, and free camera off.
 
@@ -171,7 +175,9 @@ These are hard design targets for every testing loop:
 | Full-world smoke | at most 2 minutes |
 | Entire GitHub CI workflow | at most 5 minutes |
 
-`npm run lab:test` owns one 60-second end-to-end deadline, including server startup, both lab modes, screenshots, and compatibility routing.
+Every `npm run lab:test` invocation owns one 60-second end-to-end deadline, including server startup,
+its selected lab modes, screenshots, and compatibility routing. CI runs the building and combat shards
+as separate loops; it does not expand either deadline.
 
 If a loop exceeds its budget, split detailed coverage into focused tests or the labs instead of expanding a full-world matrix. Keep one persistent development server per loop and avoid repeated browser or world startup.
 

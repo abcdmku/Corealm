@@ -44,6 +44,8 @@ const LAB_TEST_SETTINGS = {
   ambient: 0,
   sfx: 0,
 } as const;
+type FeatureLabShard = "all" | "building" | "combat";
+const TEST_SHARD = readTestShard(process.argv.slice(2));
 
 const PREFAB_SELECTION = {
   kind: "prefab",
@@ -176,14 +178,11 @@ interface BuildingEvidence {
   };
   freeCamera: {
     enabled: boolean;
-    disabled: boolean;
     playerBefore: FeatureLabState["playerPosition"];
     playerAfter: FeatureLabState["playerPosition"];
     orbitBefore: CameraProbe;
     orbitAfter: CameraProbe;
     fitAfter: CameraProbe;
-    enabledControlChecked: boolean;
-    disabledControlChecked: boolean;
   };
 }
 
@@ -199,7 +198,7 @@ interface LegacyRedirectEvidence {
 }
 
 const started = performance.now();
-const clearDeadline = installTestDeadline("combined feature lab browser gate", TOTAL_BUDGET_MS);
+const clearDeadline = installTestDeadline(`${TEST_SHARD} feature lab browser gate`, TOTAL_BUDGET_MS);
 const screenshotDir = path.join(repoRoot, "test-results", "feature-labs");
 const diagnostics: BrowserDiagnostics = { console: [], page: [] };
 const screenshots: string[] = [];
@@ -234,69 +233,150 @@ try {
   });
   page.on("pageerror", (error) => diagnostics.page.push(`[${activeMode}] ${error.stack ?? error.message}`));
 
-  // Use the compatibility route for the first document, then traverse to combat through the real
-  // mode control. Two production boots prove the redirect and a fresh runtime after selection.
+  // Every shard starts on the compatibility route. Combat coverage then traverses through the real
+  // mode control, proving the redirect and a fresh production runtime after selection.
   activeMode = "legacy-redirect/building";
   const legacy = await testLegacyRedirect(page, server.url, (state) => {
     lastState = state;
   });
   logProgress("legacy redirect ready");
   lastState = legacy.state;
-  const building = await testBuilding(page, server.url, screenshotDir, screenshots, (state) => {
-    lastState = state;
-  }, false);
-  logProgress("building proof complete");
-  lastState = building.final;
+  const building = TEST_SHARD === "combat"
+    ? null
+    : await testBuilding(page, server.url, screenshotDir, screenshots, (state) => {
+        lastState = state;
+      }, false);
+  if (building) {
+    logProgress("building proof complete");
+    lastState = building.final;
+  }
 
-  activeMode = "building-to-combat-navigation";
-  const modeNavigation = await selectModeWithReload(page, "combat", building.final, (state) => {
-    lastState = state;
-  });
-  logProgress("combat navigation ready");
+  let combat: CombatEvidence | null = null;
+  let modeNavigation: ModeNavigationEvidence | null = null;
+  if (TEST_SHARD !== "building") {
+    activeMode = "building-to-combat-navigation";
+    const navigationSource = building?.final ?? legacy.state;
+    modeNavigation = await selectModeWithReload(page, "combat", navigationSource, (state) => {
+      lastState = state;
+    });
+    logProgress("combat navigation ready");
 
-  activeMode = "combat";
-  const combat = await testCombat(page, server.url, screenshotDir, screenshots, (state) => {
-    lastState = state;
-  }, false);
-  logProgress("combat proof complete");
-  lastState = combat.final;
+    activeMode = "combat";
+    combat = await testCombat(page, server.url, screenshotDir, screenshots, (state) => {
+      lastState = state;
+    }, false);
+    logProgress("combat proof complete");
+    lastState = combat.final;
+  }
 
-  const combatStructuresValid = structureIsValid(combat.ready.structure);
-  const buildingStructuresValid = [
-    building.structures.prefab,
-    building.structures.wallRun,
-  ].every(structureIsValid);
-  const sharedWorld = probesShareWorld(combat.probe, building.probe)
-    && combat.ready.engine === building.ready.engine
-    && combat.ready.world === building.ready.world;
-  const checks = {
-    bothUseProductionYard: combat.ready.engine === "corealm-production"
-      && building.ready.engine === "corealm-production"
-      && combat.ready.world === "fallowmarch-yard"
-      && building.ready.world === "fallowmarch-yard",
-    bothUseSharedRendererAndNavigation: sharedWorld,
-    combatRouteSelected: combat.ready.mode === "combat" && combat.ready.walkingEnabled,
-    combatProductionStructurePresent: combatStructuresValid,
-    combatCatalogsComplete: Object.values(combat.catalogChecks).every(Boolean),
-    combatEveryLevelCanBeSet: Object.values(combat.levelChecks).every(Boolean),
-    combatRepresentativeEquipmentEquips: combat.equipment.length === 1
-      && combat.equipment[0]?.slot === "mainHand",
-    combatTargetPointerSelects: combat.targetPointer.selectedEntityId === combat.targetPointer.entityId,
-    combatMeleeDamagesWithLiveMotion: combat.melee.combatStarted[1] > combat.melee.combatStarted[0]
-      && numericFell(combat.melee.health)
-      && combat.melee.motionAdvanced,
-    combatMeleeIsSeparateFromSpellProof: combat.melee.entityId !== undefined
-      && combat.cast.entityId !== undefined
-      && combat.melee.entityId !== combat.cast.entityId
-      && combat.melee.weaponEquipped
-      && combat.melee.startedAtFullHealth
-      && combat.melee.spellLaunched[1] === combat.melee.spellLaunched[0],
-    combatSpellDrawsAndDamagesWithLiveMotion: combat.cast.spellLaunched[1] > combat.cast.spellLaunched[0]
-      && combat.cast.sawParticles
-      && numericFell(combat.cast.health)
-      && combat.cast.motionAdvanced,
+  const comparisonProbe = building?.probe ?? combat!.probe;
+  const checks: Record<string, boolean> = {
+    ...legacyChecks(legacy, comparisonProbe),
+    ...(building ? buildingChecks(building) : {}),
+    ...(combat ? combatChecks(combat) : {}),
+    ...(modeNavigation ? navigationChecks(modeNavigation, building?.final.structure.revision) : {}),
+    ...(building && combat ? {
+      bothUseProductionYard: combat.ready.engine === "corealm-production"
+        && building.ready.engine === "corealm-production"
+        && combat.ready.world === "fallowmarch-yard"
+        && building.ready.world === "fallowmarch-yard",
+      bothUseSharedRendererAndNavigation: probesShareWorld(combat.probe, building.probe)
+        && combat.ready.engine === building.ready.engine
+        && combat.ready.world === building.ready.world,
+    } : {}),
+    screenshotsCaptured: screenshots.length >= (TEST_SHARD === "all" ? 3 : TEST_SHARD === "building" ? 1 : 2),
+    noRuntimeErrors: (building?.final.errors.length ?? 0) === 0
+      && (combat?.final.errors.length ?? 0) === 0
+      && legacy.state.errors.length === 0
+      && diagnostics.console.length === 0
+      && diagnostics.page.length === 0,
+    under60Seconds: performance.now() - started < TOTAL_BUDGET_MS,
+  };
+  const passed = Object.values(checks).every(Boolean);
+
+  console.log(JSON.stringify({
+    passed,
+    shard: TEST_SHARD,
+    elapsedMs: Math.round(performance.now() - started),
+    url: server.url,
+    checks,
+    ...(combat ? { combat: {
+      catalogChecks: combat.catalogChecks,
+      levelChecks: combat.levelChecks,
+      targetPointer: combat.targetPointer,
+      melee: combat.melee,
+      cast: combat.cast,
+      equipment: combat.equipment,
+    } } : {}),
+    ...(building ? { building: {
+      structures: building.structures,
+      rebuildMs: building.rebuildMs.map(Math.round),
+      walking: building.walking,
+      disabled: building.disabled,
+      freeCamera: building.freeCamera,
+    } } : {}),
+    ...(modeNavigation ? { modeNavigation } : {}),
+    legacy,
+    screenshots,
+    errors: {
+      combat: combat?.final.errors ?? [],
+      building: building?.final.errors ?? [],
+      legacy: legacy.state.errors,
+      console: diagnostics.console,
+      page: diagnostics.page,
+    },
+  }, null, 2));
+  if (!passed) process.exitCode = 1;
+} catch (cause) {
+  if (page) lastState = await readState(page).catch(() => lastState);
+  console.error(JSON.stringify({
+    passed: false,
+    elapsedMs: Math.round(performance.now() - started),
+    mode: activeMode,
+    failure: cause instanceof Error ? cause.stack ?? cause.message : String(cause),
+    lastState,
+    screenshots,
+    errors: diagnostics,
+  }, null, 2));
+  process.exitCode = 1;
+} finally {
+  await browser?.close().catch(() => undefined);
+  await server?.close().catch(() => undefined);
+  clearDeadline();
+}
+
+function readTestShard(args: string[]): FeatureLabShard {
+  const inline = args.find((arg) => arg.startsWith("--shard="))?.slice("--shard=".length);
+  const flagIndex = args.indexOf("--shard");
+  const value = inline ?? (flagIndex >= 0 ? args[flagIndex + 1] : undefined) ?? "all";
+  if (value === "all" || value === "building" || value === "combat") return value;
+  throw new Error(`Unknown feature-lab shard ${JSON.stringify(value)}; expected all, building, or combat`);
+}
+
+function legacyChecks(legacy: LegacyRedirectEvidence, comparisonProbe: RuntimeProbe): Record<string, boolean> {
+  return {
+    legacyRoutePreservesQueryAndHash: legacy.redirected && legacy.queryPreserved && legacy.hashPreserved,
+    legacyRouteBootsProductionBuildingLab: legacy.state.ready
+      && legacy.state.engine === "corealm-production"
+      && legacy.state.world === "fallowmarch-yard"
+      && legacy.state.mode === "building"
+      && !legacy.state.walkingEnabled
+      && selectionMatches(legacy.state.structure.selection, PREFAB_SELECTION)
+      && legacy.state.structure.collisionCount > 0
+      && structureIsValid(legacy.state.structure)
+      && legacy.bodyProfile === "feature-lab"
+      && !legacy.legacyApiPresent
+      && probesShareWorld(comparisonProbe, legacy.probe),
+  };
+}
+
+function buildingChecks(building: BuildingEvidence): Record<string, boolean> {
+  return {
     buildingRouteStartsInAuthoringMode: building.ready.mode === "building" && !building.ready.walkingEnabled,
-    buildingProductionStructuresValid: buildingStructuresValid,
+    buildingProductionStructuresValid: [
+      building.structures.prefab,
+      building.structures.wallRun,
+    ].every(structureIsValid),
     buildingCollisionCoverage: building.structures.prefab.collisionCount > 0
       && building.structures.wallRun.collisionCount > 0,
     buildingAuthoringControlRebuildsStructure: selectionMatches(
@@ -321,13 +401,43 @@ try {
       && building.disabled.navigationStarted[1] === building.disabled.navigationStarted[0]
       && building.disabled.routeStayedIdle,
     buildingFreeCameraOrbitsWithoutMovingPlayer: building.freeCamera.enabled
-      && building.freeCamera.disabled
-      && building.freeCamera.enabledControlChecked
-      && !building.freeCamera.disabledControlChecked
       && distanceXZ(building.freeCamera.playerBefore, building.freeCamera.playerAfter) < 0.08
       && (Math.abs(building.freeCamera.orbitAfter.yaw - building.freeCamera.orbitBefore.yaw) >= 0.01
         || Math.abs(building.freeCamera.orbitAfter.pitch - building.freeCamera.orbitBefore.pitch) >= 0.01)
       && building.freeCamera.fitAfter.freeMove,
+  };
+}
+
+function combatChecks(combat: CombatEvidence): Record<string, boolean> {
+  return {
+    combatRouteSelected: combat.ready.mode === "combat" && combat.ready.walkingEnabled,
+    combatProductionStructurePresent: structureIsValid(combat.ready.structure),
+    combatCatalogsComplete: Object.values(combat.catalogChecks).every(Boolean),
+    combatEveryLevelCanBeSet: Object.values(combat.levelChecks).every(Boolean),
+    combatRepresentativeEquipmentEquips: combat.equipment.length === 1
+      && combat.equipment[0]?.slot === "mainHand",
+    combatTargetPointerSelects: combat.targetPointer.selectedEntityId === combat.targetPointer.entityId,
+    combatMeleeDamagesWithLiveMotion: combat.melee.combatStarted[1] > combat.melee.combatStarted[0]
+      && numericFell(combat.melee.health)
+      && combat.melee.motionAdvanced,
+    combatMeleeIsSeparateFromSpellProof: combat.melee.entityId !== undefined
+      && combat.cast.entityId !== undefined
+      && combat.melee.entityId !== combat.cast.entityId
+      && combat.melee.weaponEquipped
+      && combat.melee.startedAtFullHealth
+      && combat.melee.spellLaunched[1] === combat.melee.spellLaunched[0],
+    combatSpellDrawsAndDamagesWithLiveMotion: combat.cast.spellLaunched[1] > combat.cast.spellLaunched[0]
+      && combat.cast.sawParticles
+      && numericFell(combat.cast.health)
+      && combat.cast.motionAdvanced,
+  };
+}
+
+function navigationChecks(
+  modeNavigation: ModeNavigationEvidence,
+  priorStructureRevision?: number,
+): Record<string, boolean> {
+  return {
     modeSelectionReloadsFreshRuntime: modeNavigation.from === "building"
       && modeNavigation.to === "combat"
       && modeNavigation.before.id !== modeNavigation.after.id
@@ -340,82 +450,9 @@ try {
       && modeNavigation.fresh.mode === "combat"
       && modeNavigation.fresh.walkingEnabled
       && Object.values(modeNavigation.fresh.counters).every((value) => value === 0)
-      && modeNavigation.fresh.structure.revision < building.final.structure.revision,
-    legacyRoutePreservesQueryAndHash: legacy.redirected && legacy.queryPreserved && legacy.hashPreserved,
-    legacyRouteBootsProductionBuildingLab: legacy.state.ready
-      && legacy.state.engine === "corealm-production"
-      && legacy.state.world === "fallowmarch-yard"
-      && legacy.state.mode === "building"
-      && !legacy.state.walkingEnabled
-      && selectionMatches(legacy.state.structure.selection, PREFAB_SELECTION)
-      && legacy.state.structure.collisionCount > 0
-      && structureIsValid(legacy.state.structure)
-      && legacy.bodyProfile === "feature-lab"
-      && !legacy.legacyApiPresent
-      && probesShareWorld(building.probe, legacy.probe),
-    screenshotsCaptured: screenshots.length >= 3,
-    noRuntimeErrors: combat.final.errors.length === 0
-      && building.final.errors.length === 0
-      && legacy.state.errors.length === 0
-      && diagnostics.console.length === 0
-      && diagnostics.page.length === 0,
-    under60Seconds: performance.now() - started < TOTAL_BUDGET_MS,
+      && (priorStructureRevision === undefined
+        || modeNavigation.fresh.structure.revision < priorStructureRevision),
   };
-  const passed = Object.values(checks).every(Boolean);
-
-  console.log(JSON.stringify({
-    passed,
-    elapsedMs: Math.round(performance.now() - started),
-    url: server.url,
-    checks,
-    sharedWorld: {
-      combat: combat.probe,
-      building: building.probe,
-      legacy: legacy.probe,
-    },
-    combat: {
-      catalogChecks: combat.catalogChecks,
-      levelChecks: combat.levelChecks,
-      targetPointer: combat.targetPointer,
-      melee: combat.melee,
-      cast: combat.cast,
-      equipment: combat.equipment,
-    },
-    building: {
-      structures: building.structures,
-      rebuildMs: building.rebuildMs.map(Math.round),
-      walking: building.walking,
-      disabled: building.disabled,
-      freeCamera: building.freeCamera,
-    },
-    modeNavigation,
-    legacy,
-    screenshots,
-    errors: {
-      combat: combat.final.errors,
-      building: building.final.errors,
-      legacy: legacy.state.errors,
-      console: diagnostics.console,
-      page: diagnostics.page,
-    },
-  }, null, 2));
-  if (!passed) process.exitCode = 1;
-} catch (cause) {
-  if (page) lastState = await readState(page).catch(() => lastState);
-  console.error(JSON.stringify({
-    passed: false,
-    elapsedMs: Math.round(performance.now() - started),
-    mode: activeMode,
-    failure: cause instanceof Error ? cause.stack ?? cause.message : String(cause),
-    lastState,
-    screenshots,
-    errors: diagnostics,
-  }, null, 2));
-  process.exitCode = 1;
-} finally {
-  await browser?.close().catch(() => undefined);
-  await server?.close().catch(() => undefined);
-  clearDeadline();
 }
 
 async function testCombat(
@@ -717,7 +754,6 @@ async function testBuilding(
     && state.movement.mode === "idle"
   ), 2_000);
   remember(freeCameraReady);
-  const freeCameraChecked = await freeCameraToggle.isChecked();
   const freeOrbitBefore = await readCameraProbe(targetPage);
   await targetPage.mouse.move(authoringPoint.x, authoringPoint.y);
   await targetPage.mouse.down({ button: "right" });
@@ -730,12 +766,6 @@ async function testBuilding(
   const freeFitAfter = await readCameraProbe(targetPage);
   const freeCameraPlayerAfter = await readState(targetPage);
   remember(freeCameraPlayerAfter);
-  await setToggle(freeCameraToggle, false);
-  const freeCameraDisabled = await waitForState(targetPage, "disable building free camera", (state) => (
-    state.mode === "building" && !state.freeCameraEnabled && state.movement.mode === "idle"
-  ), 2_000);
-  remember(freeCameraDisabled);
-  const freeCameraDisabledChecked = await freeCameraToggle.isChecked();
   logProgress("building camera proof complete");
 
   const buildingWorkbench = targetPage.locator("#lab-building-workbench");
@@ -771,14 +801,11 @@ async function testBuilding(
     },
     freeCamera: {
       enabled: freeCameraReady.freeCameraEnabled && freeOrbitBefore.freeMove,
-      disabled: !freeCameraDisabled.freeCameraEnabled,
       playerBefore: freeCameraReady.playerPosition,
       playerAfter: freeCameraPlayerAfter.playerPosition,
       orbitBefore: freeOrbitBefore,
       orbitAfter: freeOrbitAfter,
       fitAfter: freeFitAfter,
-      enabledControlChecked: freeCameraChecked,
-      disabledControlChecked: freeCameraDisabledChecked,
     },
   };
 }

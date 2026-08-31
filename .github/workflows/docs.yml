@@ -74,8 +74,10 @@ jobs:
         run: git diff --exit-code -- docs/game
       - name: Install Chromium
         run: npx --no-install playwright install --with-deps chromium
-      - name: Accept features in labs before final-world smoke
-        run: npm run lab:test
+      - name: Accept building features before final-world smoke
+        run: npm run lab:test -- --shard building
+      - name: Accept combat features and mode navigation before final-world smoke
+        run: npm run lab:test -- --shard combat
       - name: Browser smoke test
         run: npm run smoke -- --run runs/corealm
 
@@ -117,8 +119,10 @@ jobs:
         run: git diff --exit-code -- docs/game
       - name: Install Chromium
         run: npx --no-install playwright install --with-deps chromium
-      - name: Accept features in labs before final-world smoke
-        run: npm run lab:test
+      - name: Accept building features before final-world smoke
+        run: npm run lab:test -- --shard building
+      - name: Accept combat features and mode navigation before final-world smoke
+        run: npm run lab:test -- --shard combat
       - name: Browser smoke test
         run: npm run smoke -- --run runs/corealm
 
