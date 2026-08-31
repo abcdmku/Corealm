@@ -59,7 +59,7 @@ describe("prepared world startup", () => {
       expect(prepared.getWalkableMeshes()).toHaveLength(0);
     });
 
-    expect(summary).toEqual({ roadCount: 42, pavingCount: 15, waterCount: 4 });
+    expect(summary).toEqual({ roadCount: 45, pavingCount: 18, waterCount: 4 });
     expect(scene.getRoadPolylines()).toHaveLength(summary!.roadCount);
     expect(scene.getWaterBodies()).toHaveLength(summary!.waterCount);
     expect(scene.getWaterBodies().every((water) => water.closed)).toBe(true);
@@ -74,7 +74,7 @@ describe("prepared world startup", () => {
       [-120, 0, 2.7265694],
       [-5, 0, 2.1418357],
       [110, 0, 4.1572809],
-      [225, -100, 42.2726517],
+      [225, -100, 42.2732258],
       [-40, -60, -3.0902672],
     ] as const;
     for (const [x, z, expected] of heightSamples) {

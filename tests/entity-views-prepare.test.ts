@@ -28,6 +28,7 @@ describe("EntityViews.prepare", () => {
     });
     const assets = {
       entry: (id: string) => available.has(id) ? { id } : undefined,
+      isLoaded: () => false,
       load,
     } as unknown as AssetRegistry;
     const views = new EntityViews(
@@ -42,6 +43,9 @@ describe("EntityViews.prepare", () => {
     expect(missingBatch).toEqual({ loaded: 0, missing: ["missing-asset"] });
     expect(validBatch).toEqual({ loaded: 1, missing: [] });
     expect(load).toHaveBeenCalledTimes(1);
-    expect(load).toHaveBeenCalledWith("valid-asset");
+    expect(load).toHaveBeenCalledWith("valid-asset", {
+      priority: "visible-spawn",
+      primary: true,
+    });
   });
 });
