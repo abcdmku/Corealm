@@ -399,6 +399,8 @@ export interface CharacterRigOptions {
    * player from costing more draw calls than the sibling-attached version it replaces.
    */
   mergeParts?: boolean;
+  /** Warm every equippable visual after build. Default true; boot defers the player's set. */
+  preloadGear?: boolean;
 }
 
 /** What `poseFor` needs to know. `activitySkill` is what splits gathering three ways. */
@@ -538,7 +540,7 @@ export class CharacterRig {
       await this.rebuildLayers();
       this.ready = true;
       this.play("idle", true);
-      this.preloadGear();
+      if (options.preloadGear !== false) this.preloadGear();
       return true;
     } catch {
       return this.fail();
@@ -560,11 +562,11 @@ export class CharacterRig {
    * indistinguishable on screen from the render seam never having been wired at all. The second
    * request took 3 ms, so a warm cache is the entire fix.
    *
-   * Deliberately not awaited: `build` is on the boot path and a stall there is worse than a stall
-   * at the first equip. `AssetRegistry.load` deduplicates in-flight requests, so racing it against
-   * the layer rebuild costs nothing.
+   * Deliberately not awaited: callers may schedule this outside the critical boot path.
+   * `AssetRegistry.load` deduplicates in-flight requests, so racing it against a later equip costs
+   * no duplicate transfer.
    */
-  private preloadGear(): void {
+  preloadGear(): void {
     const ids = this.gear?.gearAssetIds?.(this.bodyAssetId.includes("female") ? "female" : "male");
     if (!ids || ids.length === 0) return;
     for (const assetId of ids) {

@@ -5,7 +5,13 @@ import {
   BOOT_TELEMETRY_SCHEMA_VERSION,
   createBootTelemetry,
 } from "../game/src/perf/bootTelemetry.js";
-import { clipLongTasksBeforePlay, inferBase, normalizeBase } from "../tools/boot-perf.js";
+import {
+  clipLongTasksBeforePlay,
+  countPreReadyActiveSpans,
+  inferBase,
+  normalizeBase,
+  relativeRequestStartMs,
+} from "../tools/boot-perf.js";
 
 /**
  * Wave 0 records these limits but does not enforce the product budgets yet.
@@ -58,6 +64,22 @@ describe("Wave 0 boot-performance budgets", () => {
     ], 35_000)).toEqual([
       { name: "self", startMs: 33_000, endMs: 35_000, durationMs: 2_000 },
     ]);
+  });
+
+  it("does not report intentionally post-ready streaming spans as unfinished boot work", () => {
+    const active = [
+      { name: "critical", startMs: 900 },
+      { name: "background", startMs: 1_001 },
+    ];
+    expect(countPreReadyActiveSpans(active, 1_000)).toBe(1);
+    expect(countPreReadyActiveSpans(active.slice(1), 1_000)).toBe(0);
+    expect(countPreReadyActiveSpans(active, null)).toBe(2);
+  });
+
+  it("rejects CDP's unresolved request timing sentinel instead of inventing a pre-ready request", () => {
+    expect(relativeRequestStartMs(-1, 1_000)).toBeNull();
+    expect(relativeRequestStartMs(999, 1_000)).toBeNull();
+    expect(relativeRequestStartMs(1_025.25, 1_000)).toBe(25.25);
   });
 
   it("keeps every final acceptance limit in one machine-readable object", () => {

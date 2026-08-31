@@ -449,13 +449,11 @@ async function measureColdBoot(
   const performanceMeasures = normalizeSpans(performanceMeasureValue(capture?.navigation));
   const milestones = spans.length > 0 ? spans : performanceMeasures;
   const marks = normalizeMarks(telemetryRecord?.["marks"]);
-  const activeSpanCount = Array.isArray(telemetryRecord?.["activeSpans"])
-    ? telemetryRecord["activeSpans"].length
-    : 0;
+  const activeSpanCount = countPreReadyActiveSpans(telemetryRecord?.["activeSpans"], firstPlayableMs);
 
   for (const request of requestRecords) {
-    request.startMs = request.startEpochMs !== null && capture
-      ? round(request.startEpochMs - capture.timeOrigin)
+    request.startMs = capture
+      ? relativeRequestStartMs(request.startEpochMs, capture.timeOrigin)
       : null;
     request.preReady = firstPlayableMs !== null && request.startMs !== null && request.startMs <= firstPlayableMs;
   }
@@ -684,6 +682,9 @@ function summarize(runs: BootRunReport[]): BootPerfReport["summary"] {
   const milestoneSamples = new Map<string, number[]>();
   for (const run of runs) {
     for (const milestone of run.milestones) {
+      // The capture window deliberately remains open after play to observe background work. Keep
+      // those spans in the per-run record, but do not present them as critical boot durations.
+      if (run.firstPlayableMs !== null && milestone.endMs > run.firstPlayableMs) continue;
       const values = milestoneSamples.get(milestone.name) ?? [];
       values.push(milestone.durationMs);
       milestoneSamples.set(milestone.name, values);
@@ -786,6 +787,24 @@ export function normalizeBase(value: string): string {
   const trimmed = value.trim();
   if (!trimmed || trimmed === "." || trimmed === "./" || trimmed === "/") return "/";
   return `/${trimmed.replace(/^\/+|\/+$/g, "")}/`;
+}
+
+/** Post-play streaming may still own spans; only unfinished critical-path work invalidates boot. */
+export function countPreReadyActiveSpans(value: unknown, firstPlayableMs: number | null): number {
+  if (!Array.isArray(value)) return 0;
+  if (firstPlayableMs === null) return value.length;
+  return value.filter((entry) => {
+    const record = asRecord(entry);
+    const startMs = numberAt(record, "startMs") ?? numberAt(record, "startTime");
+    return startMs === null || startMs < firstPlayableMs;
+  }).length;
+}
+
+/** CDP reports -1 for requests whose timing record is not ready; it is not an epoch timestamp. */
+export function relativeRequestStartMs(startEpochMs: number | null, timeOrigin: number): number | null {
+  if (startEpochMs === null || startEpochMs <= 0 || !Number.isFinite(timeOrigin)) return null;
+  const relative = startEpochMs - timeOrigin;
+  return Number.isFinite(relative) && relative >= 0 ? round(relative) : null;
 }
 
 function normalizeResources(value: unknown, firstPlayableMs: number | null): BootResourceRecord[] {

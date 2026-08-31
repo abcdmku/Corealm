@@ -155,10 +155,27 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   installBootPlaceholder();
   captureErrors(errors, atMs);
 
-  const setStatus = (message: string): void => {
+  let statusPhase = "waking the frontier…";
+  let statusAssets: AssetRegistry | null = null;
+  const refreshStatus = (): void => {
     const node = document.querySelector(".boot-status");
-    if (node) node.textContent = message;
+    if (!node) return;
+    const stats = statusAssets?.getLoadStats();
+    const assetProgress = stats && stats.total > 0
+      ? ` · assets ${stats.loaded}/${stats.requested} ready (${stats.total} catalogued${stats.failed > 0 ? `, ${stats.failed} failed` : ""})`
+      : "";
+    node.textContent = `${statusPhase}${assetProgress}`;
   };
+  const setStatus = (message: string): void => {
+    statusPhase = message;
+    refreshStatus();
+  };
+  const refreshStatusFrame = (): void => {
+    if (!document.getElementById("boot-screen")) return;
+    refreshStatus();
+    requestAnimationFrame(refreshStatusFrame);
+  };
+  requestAnimationFrame(refreshStatusFrame);
 
   // 2. Core services and save. The save must win before any seeded world work starts. Loading it
   // after buildWorld meant a custom-seed save resumed inside a world built from seed 1337.
@@ -221,11 +238,26 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     errors.push({ atMs: atMs(), source: "content.tables", message: problem });
   }
 
-  // 3 + 4. WASM libraries. Both must finish before any world building.
+  // 3 + 4. Start the manifest beside both WASM libraries. These requests are independent; making
+  // them serial put an entire network round trip on the critical path before any world work began.
+  const assets = new AssetRegistry();
+  statusAssets = assets;
+  registerProceduralGear(assets);
+  const assetBootstrap = bootTelemetry.measureAsync(BOOT_SPANS.MANIFEST_LOAD, () => assets.loadManifest())
+    .then(async () => {
+      bootTelemetry.milestone(BOOT_MILESTONES.MANIFEST_READY);
+      await bootTelemetry.measureAsync(BOOT_SPANS.ANIMATION_LOAD, () => assets.loadAnimationLibraries());
+      bootTelemetry.milestone(BOOT_MILESTONES.ANIMATIONS_READY);
+    })
+    .catch((cause: unknown) => {
+      errors.push({ atMs: atMs(), source: "assets", message: describeError(cause) });
+    });
+
   setStatus("starting the simulation…");
   await Promise.all([
     bootTelemetry.measureAsync(BOOT_SPANS.PHYSICS_WASM_INIT, () => Physics.initLibrary()),
     bootTelemetry.measureAsync(BOOT_SPANS.NAVIGATION_WASM_INIT, () => Navigation.initLibrary()),
+    assetBootstrap,
   ]);
   bootTelemetry.milestone(BOOT_MILESTONES.WASM_READY);
   const physics = new Physics();
@@ -240,15 +272,12 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   // 6. Assets. Animation libraries load once as a shared clip library; every rig plays from it.
   setStatus("loading assets…");
-  const assets = new AssetRegistry();
-  try {
-    await bootTelemetry.measureAsync(BOOT_SPANS.MANIFEST_LOAD, () => assets.loadManifest());
-    bootTelemetry.milestone(BOOT_MILESTONES.MANIFEST_READY);
-    await bootTelemetry.measureAsync(BOOT_SPANS.ANIMATION_LOAD, () => assets.loadAnimationLibraries());
-    bootTelemetry.milestone(BOOT_MILESTONES.ANIMATIONS_READY);
-  } catch (cause) {
-    errors.push({ atMs: atMs(), source: "assets", message: describeError(cause) });
-  }
+  // The staff meshes, built rather than loaded. There is no staff anywhere in the 213-asset library,
+  // so without this line all four staffs resolve to an asset id that `AssetRegistry.load` rejects,
+  // `characterRig.attachBoneSlot` swallows the rejection, and a mage holds empty air — which is
+  // exactly the state this wave set out to fix. Registered BEFORE the manifest loads and before the
+  // player rig is built, because `CharacterRig` warms gear through the same `load()` path.
+  // Manifest and startup clips were already requested beside the WASM libraries above.
 
   // Content references assets by id, so the ids can only be checked once the manifest exists.
   // This catches a prefab part or landmark composition naming a mesh that was never shipped.
@@ -295,8 +324,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // settlement stays as noisy as the moor around it — Coldbrace square measured a metre of tilt
   // across 33 m before this. worldSpec derives the pads from the authored settlement data.
   const terrainSpec = profile.terrain();
-  bootTelemetry.measureSync(BOOT_SPANS.TERRAIN_BUILD, () => {
-    scene.buildWorld(terrainSpec, profile.worldSurface
+  await bootTelemetry.measureAsync(BOOT_SPANS.TERRAIN_BUILD, async () => {
+    await scene.buildWorldYielding(terrainSpec, profile.worldSurface
       ? (preparedScene) => {
           // The telemetry name stays stable for baseline comparison, but this is now preparation
           // before the first chunk vertex is shaded.
@@ -618,6 +647,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     () => playerRig.build({
       bodyAssetId: "base_male",
       outfitAssetIds: ["outfit_male_peasant_chest", "outfit_male_peasant_legs", "outfit_male_peasant_boots"],
+      preloadGear: false,
     }),
   );
   if (rigged) {
@@ -632,6 +662,12 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   camera.update(initialPlayerPosition[0], initialPlayerPosition[1], initialPlayerPosition[2], true);
   bootTelemetry.milestone(BOOT_MILESTONES.PLAYER_READY);
 
+  if (rigged) {
+    await bootTelemetry.measureAsync(
+      "boot.player.equipment",
+      () => playerRig.applyEquipment(store.get().equipment),
+    );
+  }
   // 13. Region loops are selected only after the save decides the player's starting region.
   // Until this point gesture unlock has no desired loop to start, so the loading screen cannot
   // briefly play Fallowmarch over a character saved elsewhere.
@@ -2172,7 +2208,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     callTool: (name: string, args: unknown) => agent.call(name, (args ?? {}) as Record<string, unknown>),
   });
 
-  // Every shader the session will need, compiled now rather than the first time a pose reveals it.
+  // Compile spawn-visible variants now. Transparent and hidden-dungeon variants remain necessary,
+  // but are warmed in an idle window below so they do not delay the first playable frame.
   // Measured before this existed: the program count climbed 19 -> 20 mid-session and the frames
   // that paid for it were 1130 ms, 994 ms and 346 ms. The two extra passes are for variants three
   // skips by default — a material only compiles its transparent form when something is actually
@@ -2180,12 +2217,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // and the +3-point-light variant of every material in it.
   if (profile.fullWarmup) {
     setStatus("warming the shaders…");
-    bootTelemetry.measureSync(BOOT_SPANS.SHADER_COMPILE, () => {
-      renderer.warmup({
-        transparentVariants: [scene.root],
-        temporarilyVisible: dungeon ? [dungeon.group] : [],
-      });
-    });
+    bootTelemetry.measureSync(BOOT_SPANS.SHADER_COMPILE, () => renderer.warmup());
   }
   bootTelemetry.milestone(BOOT_MILESTONES.SHADERS_READY);
 
@@ -2203,22 +2235,37 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     requestAnimationFrame(() => {
       firstFrameSpan.end();
       bootTelemetry.milestone(BOOT_MILESTONES.FIRST_RENDERED_FRAME);
-      bootTelemetry.milestone(BOOT_MILESTONES.FIRST_PLAYABLE);
       bootTotalSpan.end();
       bootTelemetry.recordPerformanceResources();
+      // Publish readiness last so an attached runner cannot capture the timeline between the
+      // playable mark and the final critical span/resource bookkeeping above.
+      bootTelemetry.milestone(BOOT_MILESTONES.FIRST_PLAYABLE);
       window.setTimeout(() => {
         const expandEntityResidency = (): void => {
           entityViews.updateActiveRadius(ENTITY_ACTIVE_RADIUS);
         };
         window.requestIdleCallback(expandEntityResidency, { timeout: 1_000 });
-        if (profile.scatter) {
-          void scatterStreaming.streamRemaining().then(() => {
-            scatterResults = scatterStreaming.getStats();
-          }).catch((cause) => {
-            errors.push({ atMs: atMs(), source: "scatterStreaming", message: describeError(cause) });
-          });
+        if (profile.kind === "game") {
+          window.requestIdleCallback(() => playerRig.preloadGear(), { timeout: 1_000 });
+          if (profile.fullWarmup) {
+            window.requestIdleCallback(() => {
+              bootTelemetry.measureSync("boot.shaders.deferred", () => {
+                renderer.warmup({
+                  transparentVariants: [scene.root],
+                  temporarilyVisible: dungeon ? [dungeon.group] : [],
+                });
+              });
+            }, { timeout: 2_000 });
+          }
+          if (profile.scatter) {
+            void scatterStreaming.streamRemaining().then(() => {
+              scatterResults = scatterStreaming.getStats();
+            }).catch((cause) => {
+              errors.push({ atMs: atMs(), source: "scatterStreaming", message: describeError(cause) });
+            });
+          }
+          void preloadDeferredEntityAssets(assets, errors, atMs);
         }
-        void preloadDeferredEntityAssets(assets, errors, atMs);
       }, 0);
     });
   }

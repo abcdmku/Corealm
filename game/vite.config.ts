@@ -141,6 +141,15 @@ export function analyzeBundleBudget(bundle: Readonly<Record<string, BundleArtifa
   );
   const wasm = artifacts.filter((artifact) => artifact.kind === "wasm");
   const initialJs = artifacts.filter((artifact) => artifact.kind === "js" && artifact.initial);
+  const criticalJs = artifacts.filter((artifact) => {
+    if (artifact.kind !== "js") return false;
+    if (artifact.initial) return true;
+    const chunk = bundle[artifact.fileName];
+    const policy = chunk?.type === "chunk" ? chunkPolicyName(chunk) : undefined;
+    return policy !== undefined && DEDICATED_ENGINE_CHUNKS.includes(
+      policy as (typeof DEDICATED_ENGINE_CHUNKS)[number],
+    );
+  });
   const applicationInitialJs = initialJs.filter((artifact) => {
     const chunk = bundle[artifact.fileName];
     return chunk?.type === "chunk" && !chunkPolicyName(chunk);
@@ -156,7 +165,7 @@ export function analyzeBundleBudget(bundle: Readonly<Record<string, BundleArtifa
     initialChunks: [...initialChunks].sort(),
     applicationInitialJsGzipBytes: applicationInitialJs.reduce((total, artifact) => total + artifact.gzipBytes, 0),
     criticalInitialJsAndWasmGzipBytes:
-      initialJs.reduce((total, artifact) => total + artifact.gzipBytes, 0)
+      criticalJs.reduce((total, artifact) => total + artifact.gzipBytes, 0)
       + wasm.reduce((total, artifact) => total + artifact.gzipBytes, 0),
     wasmGzipBytes: wasm.reduce((total, artifact) => total + artifact.gzipBytes, 0),
     wasmFiles: wasm.map((artifact) => artifact.fileName),
@@ -264,7 +273,39 @@ export default defineConfig({
     reportCompressedSize: false,
     rollupOptions: {
       output: {
-        manualChunks: bundleChunkForModule,
+        // Rolldown groups only the package modules themselves. Recursively capturing dependencies
+        // made the dynamically imported Recast group absorb shared Three modules and become a
+        // static entry dependency again.
+        codeSplitting: {
+          groups: [
+            {
+              name: "rapier",
+              test: /node_modules[\/]@dimforge[\/]rapier3d/,
+              priority: 4,
+              // Rapier's generated entry and glue are mutually dependent; keep that package
+              // atomic so code splitting cannot turn the cycle into two runtime chunks.
+              includeDependenciesRecursively: true,
+            },
+            {
+              name: "recast",
+              test: /node_modules[\/](?:@recast-navigation|recast-navigation)[\/]/,
+              priority: 3,
+              includeDependenciesRecursively: false,
+            },
+            {
+              name: "three",
+              test: /node_modules[\/]three[\/]/,
+              priority: 2,
+              includeDependenciesRecursively: false,
+            },
+            {
+              name: "vendor",
+              test: /node_modules/,
+              priority: 1,
+              includeDependenciesRecursively: false,
+            },
+          ],
+        },
         entryFileNames: "assets/entry/[name]-[hash].js",
         chunkFileNames: "assets/chunks/[name]-[hash].js",
         assetFileNames: (asset) => {
