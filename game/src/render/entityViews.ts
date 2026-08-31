@@ -4641,6 +4641,18 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     const found: { entityId: EntityId; distance: number }[] = [];
     for (const record of this.records.values()) {
       if (!EXPANDED_PICK_ARCHETYPES.has(record.archetype)) continue;
+      // A dissolved corpse is NOT a click target.
+      //
+      // The capsule below is invisible by design — it exists so a coney is as easy to click as a
+      // bear — which means it does not disappear just because the mesh did. Both draw paths switch
+      // a corpse off at `fade >= 1` (`tickCorpseFade` hides the unique, `writeSlot` hides the
+      // instance), so the raycast half of `pickCandidates` stops finding it and this half kept
+      // reporting it: clicking bare grass selected an animal that was not there, and kept doing so
+      // for the rest of the 30 second respawn.
+      //
+      // A corpse still fading is deliberately left pickable. It is on screen, and inspecting the
+      // thing you just killed is a reasonable click.
+      if (record.fade >= 1) continue;
 
       const radius = Math.max(
         MIN_CHARACTER_PICK_RADIUS,

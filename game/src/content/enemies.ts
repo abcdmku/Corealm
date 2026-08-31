@@ -253,11 +253,17 @@ const BLOCKS: readonly EnemyDef[] = [
   },
   {
     id: "tempest_roc_t1", name: "Tempest Roc", family: "tempest_roc", tier: 1,
+    // 2.1 m/s, which is 1.6x the 1.32 m/s its own walk cycle implies — the same rule every animal
+    // in this table follows, and it has to be here rather than left to the shared default. Without
+    // it `render/entityViews.ts: motionTimeScale` has nothing to divide by, plays the cycle at its
+    // authored tempo under a body the AI moves at 3.1, and the walk probe measured 61% foot slide
+    // on the biggest, most-looked-at creature in the region. It also keeps the boss slower than the
+    // player's 4.2, so running is still the answer for a character who took the fight too early.
     // Fallowmarch's region boss. Its slow heavy cadence leaves room to eat or disengage, while
     // enough health separates the fight from the ordinary road enemies.
     maxHealth: 80, attackLevel: 9, defenceLevel: 7,
     accuracy: 10, armour: 18, magicArmour: 24,
-    maxHit: 6, attackSpeedMs: 3000, aggroRadius: 20, behaviour: "territorial",
+    maxHit: 6, attackSpeedMs: 3000, aggroRadius: 20, moveSpeedMps: 2.1, behaviour: "territorial",
     marks: [80, 140],
     drops: [
       { itemId: "air_orb", quantity: [1, 1], chance: 1.00 },
@@ -385,11 +391,12 @@ const BLOCKS: readonly EnemyDef[] = [
   },
   {
     id: "rootheart_t5", name: "The Rootheart", family: "rootheart", tier: 5,
+    // Same 2.1 m/s and the same reason as the Tempest Roc: one rig, one walk cycle, one honest gait.
     // Vellenwood's region boss. High physical armour favours the Earth Orb it guards once the
     // player has earned that progression reward.
     maxHealth: 140, attackLevel: 18, defenceLevel: 14,
     accuracy: 16, armour: 48, magicArmour: 32,
-    maxHit: 9, attackSpeedMs: 3000, aggroRadius: 22, behaviour: "territorial",
+    maxHit: 9, attackSpeedMs: 3000, aggroRadius: 22, moveSpeedMps: 2.1, behaviour: "territorial",
     marks: [350, 550],
     drops: [
       { itemId: "earth_orb", quantity: [1, 1], chance: 1.00 },
@@ -568,13 +575,15 @@ const BLOCKS: readonly EnemyDef[] = [
   },
   {
     id: "quarrykeeper_t10", name: "Ordrun the Quarrykeeper", family: "quarrykeeper", tier: 10,
+    // Same 2.1 m/s as the other two orb bosses. He is heavier than anything else on the floor and
+    // reads that way; the arena is 24 m across, so this is not a fight anyone outruns by accident.
     // 200 HP and magicArmour 18 are given. defenceLevel 20 / armour 62 are solved from the 45%
     // row; attackLevel 24 / accuracy 15 / maxHit 12 at 3.0 s are solved from "about 1.02 damage/s
     // through tier 10 armour". 165 s x 1.020 = 168 damage against a 75 health pool: a boss you
     // can lose, which PRD 2.4 says is the point.
     maxHealth: 200, attackLevel: 24, defenceLevel: 20,
     accuracy: 15, armour: 62, magicArmour: 18,
-    maxHit: 12, attackSpeedMs: 3000, aggroRadius: 24, behaviour: "territorial",
+    maxHit: 12, attackSpeedMs: 3000, aggroRadius: 24, moveSpeedMps: 2.1, behaviour: "territorial",
     marks: [900, 1400],
     drops: [
       { itemId: "water_orb", quantity: [1, 1], chance: 1.00 },

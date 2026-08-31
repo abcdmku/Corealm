@@ -133,6 +133,17 @@ interface BossEvidence {
   drawnMetres: number;
 }
 
+interface CorpsePickEvidence {
+  label: string;
+  entityId: string;
+  fadedOut: boolean;
+  fade: number | null;
+  clickedAt: readonly [number, number] | null;
+  selectedBeforeDeath: string | null;
+  selectedAfterFade: string | null;
+  stillSelectable: boolean;
+}
+
 interface RespawnEvidence {
   label: string;
   skippedSeconds: number;
@@ -231,8 +242,14 @@ try {
   // ------------------------------------------------------- 4. kill and respawn
   stage = "kill";
   await equipMainHand(page, weapon);
+  const canvasBox = await page.locator("#viewport").boundingBox();
+  if (!canvasBox) throw new Error("Production canvas has no visible bounds");
   const kill = await observeKill(page, CREATURES.passive);
   await capture(page, path.join(screenshotDir, "kill-corpse.png"));
+
+  stage = "corpse-pick";
+  const corpsePick = await observeCorpsePick(page, canvasBox);
+  await capture(page, path.join(screenshotDir, "corpse-faded.png"));
 
   stage = "respawn";
   const respawn = await observeRespawn(page, CREATURES.passive);
@@ -277,6 +294,8 @@ try {
 
     killLeavesACorpse: kill.entityState === "dead" && kill.aiState === "dead" && kill.health === 0,
     killPaysCombatXp: kill.xpGained > 0,
+    corpseStopsBeingClickableOnceItHasGone: corpsePick.fadedOut && !corpsePick.stillSelectable,
+
     killSchedulesTheAuthoredRespawn: kill.respawnScheduledMs !== null
       && kill.respawnScheduledMs > kill.expectedRespawnMs * 0.9
       && kill.respawnScheduledMs <= kill.expectedRespawnMs,
@@ -292,7 +311,7 @@ try {
     )),
     orbBossesAreVisiblyBigger: bosses.every((boss) => boss.drawnMetres > 3),
 
-    screenshotsCaptured: screenshots.length >= 8,
+    screenshotsCaptured: screenshots.length >= 9,
     noRuntimeErrors: final.errors.length === 0
       && consoleErrors.length === 0 && pageErrors.length === 0,
     withinBudget: performance.now() - started < TOTAL_BUDGET_MS,
@@ -309,6 +328,7 @@ try {
       attack,
       flee,
       kill,
+      corpsePick,
       respawn,
       bosses,
       bossCatalog,
@@ -571,6 +591,80 @@ async function observeBoss(
     // footprint in metres. A boss under 3 m across is not reading as a boss.
     drawnMetres: Math.round((ai?.bodyRadius ?? 0) * 200) / 100,
   };
+}
+
+/**
+ * Waits for the corpse to dissolve, then clicks exactly where it was.
+ *
+ * A dead creature is drawn for a couple of seconds and then gone, and "gone" has to mean gone from
+ * the pointer too. It did not: the expanded capsule in `render/entityViews.ts: expandedCharacterPicks`
+ * is invisible by design, so it kept answering the raycast for the whole 30 second respawn after
+ * both draw paths had switched the body off — clicking bare grass selected an animal that was not
+ * there. Reported from play, which is the only place it shows.
+ */
+async function observeCorpsePick(
+  targetPage: Page,
+  canvas: { x: number; y: number; width: number; height: number },
+): Promise<CorpsePickEvidence> {
+  const dead = await readState(targetPage);
+  const entityId = dead.target?.entityId ?? "";
+  const label = dead.target?.name ?? "";
+  const selectedBeforeDeath = dead.selectedEntityId;
+
+  // Poll the renderer's own fade rather than guessing a duration: `corpseLinger` is derived from
+  // the creature's death clip, so every animal dissolves on its own schedule.
+  const faded = await waitFor(targetPage, "corpse dissolves", async () => (
+    (await readDrawnFade(targetPage, entityId)) >= 1
+  ), ACTION_BUDGET_MS);
+  const fade = await readDrawnFade(targetPage, entityId);
+
+  // Where the body was, in screen space. `projectEntity` still resolves it: the entity is in the
+  // store with a position, it just is not drawn any more, which is precisely the trap.
+  const point = dead.target?.screen ?? null;
+  if (point) {
+    await targetPage.mouse.click(
+      Math.min(Math.max(point[0], canvas.x + 1), canvas.x + canvas.width - 1),
+      Math.min(Math.max(point[1], canvas.y + 1), canvas.y + canvas.height - 1),
+    );
+    // A click that selects something updates state on the next frame; give it several.
+    await targetPage.waitForTimeout(400);
+  }
+  const after = await readState(targetPage);
+
+  return {
+    label,
+    entityId,
+    fadedOut: faded,
+    fade,
+    clickedAt: point,
+    selectedBeforeDeath,
+    selectedAfterFade: after.selectedEntityId,
+    stillSelectable: after.selectedEntityId === entityId,
+  };
+}
+
+async function readDrawnFade(targetPage: Page, entityId: string): Promise<number> {
+  return targetPage.evaluate((id) => {
+    const debug = (window as unknown as {
+      __gameDebug?: { getDrawnBounds?: (value: string) => { fade?: number } | null };
+    }).__gameDebug;
+    return debug?.getDrawnBounds?.(id)?.fade ?? 0;
+  }, entityId);
+}
+
+/** Polls an async predicate. Returns whether it became true rather than throwing. */
+async function waitFor(
+  targetPage: Page,
+  _label: string,
+  predicate: () => Promise<boolean>,
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    if (await predicate()) return true;
+    await targetPage.waitForTimeout(POLL_MS);
+  }
+  return false;
 }
 
 // ------------------------------------------------------------------------------ browser helpers
