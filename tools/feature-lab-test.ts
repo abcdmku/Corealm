@@ -25,7 +25,15 @@ import { installTestDeadline } from "./lib/deadline.js";
 import { repoRoot } from "./lib/paths.js";
 import { startGameServer, type RunningGameServer } from "./lib/server.js";
 
-const TOTAL_BUDGET_MS = 60_000;
+/**
+ * The gate's hard wall-clock ceiling. 60 s is the contract: two production boots plus every proof
+ * below has to fit, and blowing it means the file has grown a shard that belongs in its own test.
+ *
+ * `FEATURE_LAB_BUDGET_MS` raises it for diagnosis ONLY — when the gate overruns, the useful next
+ * question is which stage got slower, and that answer needs the run to finish. It is not a way to
+ * make a slow gate pass; CI runs without it.
+ */
+const TOTAL_BUDGET_MS = Number(process.env["FEATURE_LAB_BUDGET_MS"] ?? 60_000);
 const READY_BUDGET_MS = 18_000;
 const ACTION_BUDGET_MS = 8_000;
 const REBUILD_BUDGET_MS = 8_000;
@@ -236,11 +244,18 @@ try {
   // Every shard starts on the compatibility route. Combat coverage then traverses through the real
   // mode control, proving the redirect and a fresh production runtime after selection.
   activeMode = "legacy-redirect/building";
+  const stageMs: Record<string, number> = {};
+  let stageStarted = performance.now();
+  const stage = (name: string): void => {
+    stageMs[name] = Math.round(performance.now() - stageStarted);
+    stageStarted = performance.now();
+  };
   const legacy = await testLegacyRedirect(page, server.url, (state) => {
     lastState = state;
   });
   logProgress("legacy redirect ready");
   lastState = legacy.state;
+  stage("legacyRedirect");
   const building = TEST_SHARD === "combat"
     ? null
     : await testBuilding(page, server.url, screenshotDir, screenshots, (state) => {
@@ -250,6 +265,7 @@ try {
     logProgress("building proof complete");
     lastState = building.final;
   }
+  stage("building");
 
   let combat: CombatEvidence | null = null;
   let modeNavigation: ModeNavigationEvidence | null = null;
@@ -261,12 +277,14 @@ try {
     });
     logProgress("combat navigation ready");
 
+    stage("modeNavigation");
     activeMode = "combat";
     combat = await testCombat(page, server.url, screenshotDir, screenshots, (state) => {
       lastState = state;
     }, false);
     logProgress("combat proof complete");
     lastState = combat.final;
+    stage("combat");
   }
 
   const comparisonProbe = building?.probe ?? combat!.probe;
@@ -298,6 +316,7 @@ try {
     passed,
     shard: TEST_SHARD,
     elapsedMs: Math.round(performance.now() - started),
+    stageMs,
     url: server.url,
     checks,
     ...(combat ? { combat: {
