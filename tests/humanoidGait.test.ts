@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ENEMY_BLOCKS } from "../game/src/content/enemies.js";
 import { ENEMY_RETURN_SPEED_MPS, ENEMY_SPEED_MPS } from "../game/src/systems/enemyAI.js";
-import { PLAYER_SPEED } from "../game/src/app/config.js";
+import { MOVEMENT, PLAYER_SPEED } from "../game/src/app/config.js";
 
 /**
  * Humanoids RUN — on the same Jog_Fwd_Loop the player runs on, only slightly slower.
@@ -26,19 +26,28 @@ describe("humanoid gait", () => {
     expect(HUMANOIDS.length).toBeGreaterThan(0);
   });
 
-  it("pursues and returns on the jog, in the band where a jog reads as running", () => {
+  it("pursues and returns on the jog, at the player's presentation cadence", () => {
+    // The jog plays at `characterRig.runPresentationScale` — cadence over planted feet, because
+    // exact planting reads as slow motion even at the player's own 4.2 (that rig's documented
+    // finding, twice re-confirmed from play against enemies). The player's steady run is 1.2x;
+    // a pursuing reaver must land close under it — visibly a run, visibly not quite the player.
     for (const block of HUMANOIDS) {
       const pursuit = block.moveSpeedMps ?? ENEMY_SPEED_MPS;
       for (const [gait, speed] of [["run", pursuit], ["return", pursuit * RETURN_RATIO]] as const) {
         // At or above the threshold the clip choice is Jog_Fwd_Loop...
         expect(speed, `${block.id} ${gait} must land on the jog`)
           .toBeGreaterThanOrEqual(HUMANOID_JOG_IMPLIED_MPS * HUMANOID_JOG_MIN_RATE);
-        // ...and the exact retime sits in the band the player's own 0.71 defines: fast enough to
-        // read as running, never above 1 (nothing outruns the clip's authored tempo).
-        const rate = speed / HUMANOID_JOG_IMPLIED_MPS;
-        expect(rate, `${block.id} ${gait} jog rate`).toBeGreaterThanOrEqual(HUMANOID_JOG_MIN_RATE);
-        expect(rate, `${block.id} ${gait} jog rate`).toBeLessThanOrEqual(1);
+        // ...played at the shared presentation formula, inside the player's own cadence band.
+        const rate = Math.min(
+          MOVEMENT.runPlaybackRate,
+          Math.max(MOVEMENT.runMinPlaybackRate, speed / MOVEMENT.runSpeed * MOVEMENT.runPlaybackRate),
+        );
+        expect(rate, `${block.id} ${gait} presentation rate`).toBeGreaterThanOrEqual(0.95);
+        expect(rate, `${block.id} ${gait} presentation rate`).toBeLessThanOrEqual(MOVEMENT.runPlaybackRate);
       }
+      // The pursuit specifically stays visibly under the player's full-tilt 1.2x.
+      expect(pursuit / MOVEMENT.runSpeed * MOVEMENT.runPlaybackRate, `${block.id} pursuit cadence`)
+        .toBeLessThan(MOVEMENT.runPlaybackRate);
     }
   });
 

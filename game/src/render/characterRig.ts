@@ -1324,8 +1324,15 @@ function walkStrideScale(metresPerSecond: number): number {
   return Math.min(MAX_WALK_TIME_SCALE, Math.max(MIN_WALK_TIME_SCALE, metresPerSecond / WALK_CLIP_SPEED));
 }
 
-/** Brisk visual cadence for either run clip, independent of the unchanged 4.2 m/s translation. */
-function runPresentationScale(metresPerSecond: number): number {
+/**
+ * Brisk visual cadence for either run clip, independent of the unchanged 4.2 m/s translation.
+ *
+ * Exported because `render/entityViews.ts` plays humanoid ENEMIES on the same Jog_Fwd_Loop: a
+ * reaver retimed by exact foot-planting ran in slow motion for exactly the reason the comment on
+ * `setLocomotionSpeed` gives for the player, and the fix is the same presentation policy from the
+ * same function, so the two can never drift apart again.
+ */
+export function runPresentationScale(metresPerSecond: number): number {
   const scaled = metresPerSecond / MOVEMENT.runSpeed * MOVEMENT.runPlaybackRate;
   return Math.min(MOVEMENT.runPlaybackRate, Math.max(MOVEMENT.runMinPlaybackRate, scaled));
 }

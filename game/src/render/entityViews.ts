@@ -93,6 +93,7 @@ import {
   paletteForTier,
   tierSilhouetteScale,
 } from "./materials.js";
+import { runPresentationScale } from "./characterRig.js";
 import {
   assembleDressedCharacter,
   headCapHeightFor,
@@ -504,28 +505,17 @@ const HUMANOID_JOG_IMPLIED_MPS = 5.92;
 const HUMANOID_WALK_IMPLIED_MPS = 1.15;
 
 /**
- * The slowest a jog cycle may be played before it stops reading as a jog.
+ * The ground speed below which a humanoid's locomotion prefers Walk_Loop over the jog, expressed
+ * as a fraction of the jog's implied 5.92 m/s (0.55 x 5.92 = 3.26 m/s).
  *
- * A jog has an airborne phase, and slowing it hangs the body in the air: retiming the 5.92 m/s
- * jog exactly to the old 2.1 m/s reaver pursuit asked for 0.35x and every humanoid ran in slow
- * motion. The direction from play is that humanoids should RUN like the player does, only
- * slightly slower — the player's own rig plays this same jog at 4.2 / 5.92 = 0.71, and the
- * reaver pursuit speeds are now authored at 3.4-3.9 (rates 0.57-0.66) to sit in the same band.
- * 0.55 is the edge of that band; below it (pottering at 0.9, and nothing else) the locomotion
- * prefers Walk_Loop sped up instead, and the jog keeps this floor only as the failure mode for
- * a rig with no walk at all.
+ * This threshold chooses the CLIP only; it no longer sets the jog's playback rate. Exact
+ * foot-planting on the jog was tried twice and looks like slow motion at every enemy speed —
+ * the same finding `characterRig.setLocomotionSpeed` documents for the player at 4.2 — so a
+ * humanoid jog now plays at the player's own `runPresentationScale`, cadence over planting.
+ * Below this speed even that reads wrong (a 0.9 m/s potter under a 0.9x jog is a moonwalk), and
+ * the walk cycle takes over, speed-matched exactly as `walkStrideScale` does for the player.
  */
 const HUMANOID_JOG_MIN_RATE = 0.55;
-
-/**
- * One deterministic tempo for the AI's narrow 3.1..3.6 m/s band.
- *
- * The semantic view contract does not publish velocity, so the renderer cannot distinguish the
- * pursuit and return speeds without reaching into systems/. Their midpoint leaves at most 8%
- * slide at either end, against 216% when Walk_Loop ran at its authored tempo. Player locomotion
- * has a real speed field and stays on CharacterRig's exact per-frame calculation.
- */
-const HUMANOID_AI_JOG_TIME_SCALE = ((3.1 + 3.6) / 2) / HUMANOID_JOG_IMPLIED_MPS;
 
 /** Motions that play once and hand back to the entity's resting motion. */
 const ONE_SHOT_MOTIONS: ReadonlySet<CharacterMotion> = new Set<CharacterMotion>(["attack", "hit"]);
@@ -4027,14 +4017,13 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     const entry = this.assets.entry(assetId);
     const own = entry?.animations ?? [];
     if ((motion === "walk" || motion === "run") && own.length === 0) {
-      // The shared humanoid library: each locomotion cycle retimed against its own measured
-      // stride, exactly as the animals are. The jog is floored at HUMANOID_JOG_MIN_RATE — the
-      // candidates already prefer Walk_Loop below it, so the floor only bites for a rig that
-      // genuinely lacks a walk, where a fast-ish jog beats a slow-motion one.
+      // The shared humanoid library, on the player's own policies: the walk speed-matched to the
+      // ground it covers, the jog at the player's presentation cadence — brisk over planted,
+      // because 0.71x exact planting already reads as slow motion at the PLAYER's 4.2 and only
+      // gets worse below it. A speed of 0 (a record never stepped) clamps to the same 0.9 floor
+      // the player's acceleration band uses.
       if (clip.name === "Jog_Fwd_Loop") {
-        return moveSpeedMps
-          ? Math.max(HUMANOID_JOG_MIN_RATE, moveSpeedMps / HUMANOID_JOG_IMPLIED_MPS)
-          : HUMANOID_AI_JOG_TIME_SCALE;
+        return runPresentationScale(moveSpeedMps ?? 0);
       }
       if (clip.name === "Walk_Loop" && moveSpeedMps) {
         const rate = Math.min(
