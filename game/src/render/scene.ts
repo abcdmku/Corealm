@@ -400,6 +400,13 @@ export interface GroundStamps {
   seed?: number;
 }
 
+/** Diagnostic counts for proving whether a terrain build needed a second vertex pass. */
+export interface TerrainBuildStats {
+  chunkBuildCount: number;
+  restampPassCount: number;
+  restampedVertexCount: number;
+}
+
 /** One instance in a `scatterInstanced` call. */
 export interface ScatterPlacement {
   position: Vec3;
@@ -566,6 +573,11 @@ export class WorldScene {
   private protectedPads: FlatSpot[] = [];
   /** Set once stamps have been supplied, which is what retires the road ribbon path. */
   private stampsProvided = false;
+  private terrainBuildStats: TerrainBuildStats = {
+    chunkBuildCount: 0,
+    restampPassCount: 0,
+    restampedVertexCount: 0,
+  };
 
   playerMesh: THREE.Object3D | null = null;
   private playerTarget = new THREE.Vector3();
@@ -592,7 +604,15 @@ export class WorldScene {
    * Returns the chunk meshes. They are already in the scene and already registered as walkable, so
    * the caller can hand them straight to `Navigation.build` and `Physics`.
    */
-  buildWorld(spec: WorldTerrainSpec = COREALM_WORLD): THREE.Mesh[] {
+  buildWorld(
+    spec: WorldTerrainSpec = COREALM_WORLD,
+    prepareSurface?: (scene: WorldScene) => void,
+  ): THREE.Mesh[] {
+    this.terrainBuildStats = {
+      chunkBuildCount: 0,
+      restampPassCount: 0,
+      restampedVertexCount: 0,
+    };
     this.world = spec;
     this.coastGrid = null;
     // Flats registered through `addFlatSpot` before the build are kept: settlement pads are
@@ -630,6 +650,11 @@ export class WorldScene {
     this.normaliseFlats();
     this.resolveBasins();
     this.buildLattice();
+
+    // Roads and paving need the resolved height field, while water needs the exact lattice to
+    // solve its shoreline. This is the one point where both are available and no chunk has been
+    // shaded yet. Preparing here lets buildChunk consume the final stamps on its first pass.
+    prepareSurface?.(this);
 
     const { bounds, chunkSize } = spec;
     const width = bounds.maxX - bounds.minX;
@@ -723,6 +748,7 @@ export class WorldScene {
     segmentsZ: number,
     material: THREE.Material,
   ): THREE.Mesh {
+    this.terrainBuildStats.chunkBuildCount += 1;
     const geometry = new THREE.PlaneGeometry(sizeX, sizeZ, segmentsX, segmentsZ);
     geometry.rotateX(-Math.PI / 2);
 
@@ -974,6 +1000,7 @@ export class WorldScene {
    * produces the same answer as stamping it once.
    */
   private restampArea(minX: number, minZ: number, maxX: number, maxZ: number): void {
+    this.terrainBuildStats.restampPassCount += 1;
     const surface: SurfaceSample = emptySurface();
     for (const chunk of this.chunks) {
       const halfX = chunk.sizeX / 2;
@@ -1006,6 +1033,7 @@ export class WorldScene {
         colours[i * 3 + 1] = surface.colour.g;
         colours[i * 3 + 2] = surface.colour.b;
         writeSplat(arrayA, arrayB, arrayExtra, arrayPaved, i, surface);
+        this.terrainBuildStats.restampedVertexCount += 1;
         touched = true;
       }
 
@@ -1911,7 +1939,9 @@ export class WorldScene {
 
   /**
    * A Rapier-ready heightfield of the whole world. Far cheaper than a 140k-triangle trimesh and it
-   * gives exact ground queries. Heights are column-major, as Rapier requires.
+   * gives exact ground queries. Heights come from the same lattice interpolation as the terrain
+   * meshes, rather than re-evaluating the analytic field. They are column-major, as Rapier
+   * requires.
    */
   heightfieldSamples(resolution = 2): HeightfieldSamples {
     const bounds = this.getWorldBounds();
@@ -1925,7 +1955,7 @@ export class WorldScene {
       const x = bounds.minX + (col / ncols) * width;
       for (let row = 0; row <= nrows; row += 1) {
         const z = bounds.minZ + (row / nrows) * depth;
-        heights[col * (nrows + 1) + row] = this.heightAtXZ(x, z);
+        heights[col * (nrows + 1) + row] = this.sampleLattice(x, z);
       }
     }
 
@@ -2019,6 +2049,11 @@ export class WorldScene {
     return this.sampleLattice(x, z);
   }
 
+  /** A defensive snapshot used by startup tests and boot diagnostics. */
+  getTerrainBuildStats(): TerrainBuildStats {
+    return { ...this.terrainBuildStats };
+  }
+
   /** Unit surface normal of the drawn ground. Central difference on the same 2 m lattice. */
   normalAt(x: number, z: number): Vec3 {
     const step = this.lattice?.step ?? 2;
@@ -2049,11 +2084,11 @@ export class WorldScene {
   /**
    * Hands the ground the things that change it rather than stand on it.
    *
-   * Call BEFORE `buildWorld` and the stamps are baked into the chunks as they are built. Call
-   * after and only the roads reach the ground, through `restampArea`. Supplying roads here also
-   * retires the ribbon path: `buildRoad` becomes a no-op, because the corridor is already in the
-   * terrain and drawing it twice is exactly the z-fighting the ribbon's polygon offset existed to
-   * paper over.
+   * Call from `buildWorld`'s surface-preparation callback and the stamps are baked into each chunk
+   * as it is built. A late call remains supported for legacy single-region callers and uses
+   * `restampArea`. Supplying roads here also retires the ribbon path: `buildRoad` becomes a no-op,
+   * because the corridor is already in the terrain and drawing it twice is exactly the z-fighting
+   * the ribbon's polygon offset existed to paper over.
    */
   setGroundStamps(stamps: GroundStamps): void {
     this.stampsProvided = true;
@@ -3000,6 +3035,11 @@ export class WorldScene {
     this.haulGrid.clear();
     this.carvedPads.clear();
     this.stampsProvided = false;
+    this.terrainBuildStats = {
+      chunkBuildCount: 0,
+      restampPassCount: 0,
+      restampedVertexCount: 0,
+    };
   }
 }
 

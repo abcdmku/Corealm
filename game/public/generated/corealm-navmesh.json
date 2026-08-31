@@ -1,0 +1,42 @@
+{
+  "categories": {
+    "dungeon": 3,
+    "other": 0,
+    "road": 0,
+    "solid-carve": 332,
+    "terrain": 28,
+    "water": 0
+  },
+  "fingerprint": "9cbd69a0ad40ca6a3448834535ebf85c409f531be5fffc5f03a3e009c01414d0",
+  "format": "corealm-navmesh",
+  "formatVersion": 1,
+  "navDataSha256": "cdc63515637ed00a160b40b96d9f6449a132d68eaf4282512eeae952bccc1822",
+  "polyCount": 4323,
+  "recastVersion": "0.43.1",
+  "settings": {
+    "ch": 0.2,
+    "cs": 0.45,
+    "minRegionArea": 4,
+    "strategy": "solo",
+    "tileSizeVoxels": null,
+    "walkableClimb": 2,
+    "walkableHeight": 9,
+    "walkableRadius": 1,
+    "walkableSlopeAngle": 48
+  },
+  "sourceMeshes": 363,
+  "sourceTriangles": 149412,
+  "tileCount": 1,
+  "path": "generated/corealm-navmesh.bin",
+  "bytes": 864919,
+  "worldSeed": "1337",
+  "authoredInputs": {
+    "terrainGeometry": "3fe788b6f7e6189fbd9c118a4945378b5ef37cb59ede901e81ee82d2f6c69535",
+    "roads": "b14e6a476cb76cb156a90bd3a6c0b433b35a97d95d047837f4a8b8cf64c2e0c6",
+    "water": "15a42311fd7aa8b92d89c096d29d606b02ff6e08357ba8e0b2fa6da135e60f6b",
+    "solidCarves": "66872f974c41a68a73db4af77bf5be1bde408e831f31da69fed4ef4400df2534",
+    "dungeonGeometry": "6a8698e110d8c809980f024ca57c83b168dd7c510e00e3208225fec9cf4610ce",
+    "seedDependentInputs": "1fc74ac51fab7a91ffa281d55005696d8734c631fefe2d7596df1ca19ba2ae91",
+    "navigationSettings": "bff353ca79611ba8c81e25720fbb4124583576c0dfe6494f1fe7dfa8c95dd922"
+  }
+}

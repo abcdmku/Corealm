@@ -25,7 +25,14 @@ export interface PreparedWorldSurface {
   waterCount: number;
 }
 
-/** Applies every terrain stamp and builds every authored water surface in canonical boot order. */
+/**
+ * Applies every terrain stamp and solves every authored water surface.
+ *
+ * Pass this from `WorldScene.buildWorld`'s surface-preparation callback. At that point the shared
+ * height lattice exists, so roads and organic shorelines resolve against their final ground, but
+ * no terrain chunk has been shaded. The chunks then consume these final stamps on their first and
+ * only vertex pass.
+ */
 export function prepareWorldSurface(
   scene: WorldScene,
   seed = DEFAULT_WORLD_SEED,

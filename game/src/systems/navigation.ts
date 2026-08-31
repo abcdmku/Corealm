@@ -26,11 +26,27 @@
  * walkable ground on the terrace risers and inflates the cross-world route by 30%.
  */
 import * as THREE from "three";
-import { init as initRecast, NavMeshQuery, type NavMesh } from "@recast-navigation/core";
+import RecastWasm from "@recast-navigation/wasm/wasm";
+import {
+  exportNavMesh,
+  importNavMesh,
+  init as initRecast,
+  NavMeshQuery,
+  type NavMesh,
+} from "@recast-navigation/core";
 import { threeToSoloNavMesh, threeToTiledNavMesh } from "@recast-navigation/three";
 import type { EntityId, RegionId, SolidVolume, Vec3 } from "../contracts.js";
 import { NAV_CONFIG, PLAYER_SPEED } from "../app/config.js";
 import { distance, distanceXZ, pathLength } from "../core/math.js";
+import { NAVMESH_AUTHORING_INPUTS } from "../generated/navmeshFingerprint.js";
+import {
+  decodeNavigationArtifact,
+  encodeNavigationArtifact,
+  fingerprintNavigationGeometry,
+  fingerprintNavigationInputs,
+  type NavigationArtifactSettings,
+  type NavigationAuthoredInputs,
+} from "./navigationArtifact.js";
 
 export type NavStatus = "uninitialized" | "building" | "ready" | "failed";
 
@@ -148,6 +164,30 @@ export interface NavConfigOverrides {
   tileSizeVoxels?: number;
 }
 
+export type NavArtifactStatus = "not-requested" | "imported" | "runtime-fallback";
+
+export interface NavArtifactDiagnostics {
+  status: NavArtifactStatus;
+  url: string | null;
+  fingerprint: string | null;
+  reason: string | null;
+  importMs: number;
+  bytes: number;
+}
+
+export interface NavArtifactOptions {
+  /** Saved-world seed. A binary from another seed must never be accepted. */
+  worldSeed: string | number;
+  /** Generated source revisions for authored inputs not fully represented by navigation triangles. */
+  authoredInputs?: NavigationAuthoredInputs;
+  /** Defaults to generated/corealm-navmesh.bin beneath the page's actual base URL. */
+  artifactUrl?: string;
+  /** Test and tool seam which avoids a network request. */
+  artifactBytes?: Uint8Array;
+  loadArtifact?: () => Promise<Uint8Array>;
+  signal?: AbortSignal;
+}
+
 export interface NavDiagnostics {
   status: NavStatus;
   strategy: NavStrategy | null;
@@ -161,6 +201,14 @@ export interface NavDiagnostics {
   sourceTriangles: number;
   bounds: { min: Vec3; max: Vec3 } | null;
   error: string | null;
+  artifact: NavArtifactDiagnostics;
+}
+
+declare global {
+  interface Window {
+    /** Used only by tools/build-navmesh.ts after a runtime fallback has built the canonical mesh. */
+    __corealmNavigationArtifact?: (worldSeed?: string | number) => Promise<string>;
+  }
 }
 
 /** A named place an agent or the UI can path to by id. */
@@ -252,6 +300,14 @@ export class Navigation {
   private sourceMeshes = 0;
   private sourceTriangles = 0;
   private bounds: { min: Vec3; max: Vec3 } | null = null;
+  private artifact: NavArtifactDiagnostics = {
+    status: "not-requested",
+    url: null,
+    fingerprint: null,
+    reason: null,
+    importMs: 0,
+    bytes: 0,
+  };
 
   private overrides: NavConfigOverrides = {};
 
@@ -259,7 +315,9 @@ export class Navigation {
   private routeEdges: RouteEdge[] = [];
 
   static async initLibrary(): Promise<void> {
-    await initRecast();
+    // The browser entry points straight at the package's external .wasm file. Node-based narrow
+    // tests retain the compatibility loader because Node cannot fetch a file: URL with fetch().
+    await initRecast(typeof window === "undefined" ? undefined : RecastWasm);
   }
 
   /**
@@ -274,6 +332,14 @@ export class Navigation {
     this.status = "building";
     this.error = null;
     this.fallbackFrom = null;
+    this.artifact = {
+      status: "not-requested",
+      url: null,
+      fingerprint: null,
+      reason: null,
+      importMs: 0,
+      bytes: 0,
+    };
     const startedAt = now();
 
     try {
@@ -304,6 +370,7 @@ export class Navigation {
       this.polyCount = this.countPolys();
       this.buildMs = Math.round(now() - startedAt);
       this.status = "ready";
+      this.installArtifactExportHook(walkable, { worldSeed: "runtime-unspecified" });
       return true;
     } catch (cause) {
       this.error = cause instanceof Error ? cause.message : String(cause);
@@ -316,8 +383,162 @@ export class Navigation {
     }
   }
 
+  /**
+   * Imports the prebaked mesh when every authored and geometric input matches. Any request,
+   * container, version, hash or Detour failure falls back to the existing runtime generator.
+   */
+  async buildOrImport(
+    walkable: THREE.Mesh[],
+    options: NavArtifactOptions,
+    strategy: NavStrategy = "auto",
+    overrides: NavConfigOverrides = {},
+  ): Promise<boolean> {
+    const startedAt = now();
+    this.status = "building";
+    this.error = null;
+    this.fallbackFrom = null;
+    this.overrides = overrides;
+    this.measureSource(walkable);
+
+    const chosen = strategy === "auto" ? this.autoStrategy() : strategy;
+    const artifactUrl = options.artifactUrl ?? defaultArtifactUrl();
+    let expectedFingerprint: string | null = null;
+    let bytes = 0;
+    let importMs = 0;
+    let failureReason: string | null = null;
+
+    try {
+      if (walkable.length === 0) throw new Error("No walkable meshes supplied");
+      // Fetch while WebCrypto digests the Recast input. These two operations are independent, and
+      // doing them serially makes cache validation itself part of the boot bottleneck.
+      const [fingerprintInput, artifactBytes] = await Promise.all([
+        this.artifactFingerprintInput(walkable, options, chosen),
+        loadArtifactBytes(artifactUrl, options),
+      ]);
+      expectedFingerprint = await fingerprintNavigationInputs(fingerprintInput);
+
+      bytes = artifactBytes.byteLength;
+      const artifact = await decodeNavigationArtifact(artifactBytes);
+      if (artifact.metadata.fingerprint !== expectedFingerprint) {
+        throw new Error("fingerprint mismatch");
+      }
+      if (artifact.metadata.settings.strategy !== chosen) {
+        throw new Error("generator strategy mismatch");
+      }
+
+      const imported = importNavMesh(artifact.navData);
+      this.navMesh = imported.navMesh;
+      this.query = new NavMeshQuery(imported.navMesh);
+      this.strategy = artifact.metadata.settings.strategy;
+      this.polyCount = this.countPolys();
+      if (this.polyCount <= 0) throw new Error("imported navmesh has no polygons");
+
+      // Includes geometry hashing, request, container validation and Detour import. Reporting only
+      // the final importNavMesh call would hide the main-thread work this path is meant to remove.
+      importMs = Math.round((now() - startedAt) * 10) / 10;
+      this.buildMs = Math.round(now() - startedAt);
+      this.status = "ready";
+      this.artifact = {
+        status: "imported",
+        url: artifactUrl,
+        fingerprint: expectedFingerprint,
+        reason: null,
+        importMs,
+        bytes,
+      };
+      this.installArtifactExportHook(walkable, options);
+      return true;
+    } catch (cause) {
+      failureReason = cause instanceof Error ? cause.message : String(cause);
+      importMs = Math.round((now() - startedAt) * 10) / 10;
+      this.navMesh = null;
+      this.query = null;
+    }
+
+    const generated = this.build(walkable, strategy, overrides);
+    this.buildMs = Math.round(now() - startedAt);
+    this.artifact = {
+      status: "runtime-fallback",
+      url: artifactUrl,
+      fingerprint: expectedFingerprint,
+      reason: failureReason,
+      importMs,
+      bytes,
+    };
+    if (generated) this.installArtifactExportHook(walkable, options);
+    return generated;
+  }
+
+  /** Serializes the live Detour mesh with the fingerprint used by buildOrImport(). */
+  async exportArtifact(
+    walkable: THREE.Mesh[],
+    options: Pick<NavArtifactOptions, "worldSeed" | "authoredInputs">,
+  ): Promise<Uint8Array> {
+    if (!this.navMesh || !this.query || !this.strategy || this.status !== "ready") {
+      throw new Error("Cannot export navigation before a mesh is ready");
+    }
+
+    this.measureSource(walkable);
+    const resolvedStrategy = this.strategy === "auto" ? this.autoStrategy() : this.strategy;
+    const fingerprintInput = await this.artifactFingerprintInput(walkable, options, resolvedStrategy);
+    const fingerprint = await fingerprintNavigationInputs(fingerprintInput);
+    return encodeNavigationArtifact({
+      fingerprint,
+      settings: fingerprintInput.settings,
+      sourceMeshes: fingerprintInput.sourceMeshes,
+      sourceTriangles: fingerprintInput.sourceTriangles,
+      categories: fingerprintInput.categories,
+      polyCount: this.polyCount,
+      tileCount: this.tileCount,
+    }, exportNavMesh(this.navMesh));
+  }
+
+  private async artifactFingerprintInput(
+    walkable: readonly THREE.Mesh[],
+    options: Pick<NavArtifactOptions, "worldSeed" | "authoredInputs">,
+    strategy: Exclude<NavStrategy, "auto">,
+  ) {
+    const geometry = await fingerprintNavigationGeometry(walkable);
+    return {
+      worldSeed: String(options.worldSeed),
+      authored: options.authoredInputs ?? NAVMESH_AUTHORING_INPUTS,
+      settings: this.artifactSettings(strategy),
+      geometryDigest: geometry.digest,
+      sourceMeshes: this.sourceMeshes,
+      sourceTriangles: this.sourceTriangles,
+      categories: geometry.categories,
+    };
+  }
+
+  private artifactSettings(strategy: Exclude<NavStrategy, "auto">): NavigationArtifactSettings {
+    return {
+      strategy,
+      cs: this.worldCellSize(),
+      ch: this.overrides.ch ?? NAV_CONFIG.ch,
+      walkableRadius: NAV_CONFIG.walkableRadius,
+      walkableClimb: NAV_CONFIG.walkableClimb,
+      walkableHeight: NAV_CONFIG.walkableHeight,
+      walkableSlopeAngle: this.overrides.walkableSlopeAngle ?? NAV_CONFIG.walkableSlopeAngle,
+      minRegionArea: NAV_CONFIG.minRegionArea,
+      tileSizeVoxels: strategy === "tiled"
+        ? (this.overrides.tileSizeVoxels ?? TILE_SIZE_VOXELS)
+        : null,
+    };
+  }
+
+  private installArtifactExportHook(
+    walkable: THREE.Mesh[],
+    options: Pick<NavArtifactOptions, "worldSeed" | "authoredInputs">,
+  ): void {
+    if (typeof window === "undefined") return;
+    window.__corealmNavigationArtifact = async (worldSeed) => bytesToBase64(await this.exportArtifact(
+      walkable,
+      { ...options, worldSeed: worldSeed ?? options.worldSeed },
+    ));
+  }
+
   /** Measured on the real world: solo wins. Tiled remains the fallback if solo ever fails. */
-  private autoStrategy(): NavStrategy {
+  private autoStrategy(): Exclude<NavStrategy, "auto"> {
     return "solo";
   }
 
@@ -873,6 +1094,7 @@ export class Navigation {
       sourceTriangles: this.sourceTriangles,
       bounds: this.bounds,
       error: this.error,
+      artifact: { ...this.artifact },
     };
   }
 
@@ -883,6 +1105,30 @@ export class Navigation {
 
 function now(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+function defaultArtifactUrl(): string {
+  if (typeof document !== "undefined") {
+    return new URL("generated/corealm-navmesh.bin", document.baseURI).toString();
+  }
+  return "/generated/corealm-navmesh.bin";
+}
+
+async function loadArtifactBytes(url: string, options: NavArtifactOptions): Promise<Uint8Array> {
+  if (options.artifactBytes) return options.artifactBytes;
+  if (options.loadArtifact) return options.loadArtifact();
+  const response = await fetch(url, { signal: options.signal });
+  if (!response.ok) throw new Error(`artifact request failed with HTTP ${response.status}`);
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
 }
 
 // ------------------------------------------------------------- nav carving
