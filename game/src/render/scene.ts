@@ -32,6 +32,7 @@ import { MaterialLibrary, REGION_PALETTES, surfaceColour } from "./materials.js"
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from "../app/config.js";
 import { Rng } from "../core/rng.js";
 import { clamp } from "../core/math.js";
+import { yieldToMainThread } from "../core/yield.js";
 import type { WaterBasinSpec } from "../world/waterBodies.js";
 import {
   organicDistance,
@@ -608,54 +609,39 @@ export class WorldScene {
     spec: WorldTerrainSpec = COREALM_WORLD,
     prepareSurface?: (scene: WorldScene) => void,
   ): THREE.Mesh[] {
-    this.terrainBuildStats = {
-      chunkBuildCount: 0,
-      restampPassCount: 0,
-      restampedVertexCount: 0,
-    };
-    this.world = spec;
-    this.coastGrid = null;
-    // Flats registered through `addFlatSpot` before the build are kept: settlement pads are
-    // registered by whoever knows where the settlement is, which is not this file.
-    this.flats = [...this.flats, ...(spec.flats ?? [])].map((flat) => ({ ...flat }));
-    this.basinSpecs = (spec.basins ?? []).map((basin) => ({ ...basin }));
-    this.basins = [];
-    this.builtWaterBodies = [];
-    const coastPadding = Number.isFinite(spec.coast?.collar)
-      ? Math.max(0, spec.coast?.collar ?? 0)
-      : 0;
-    const visualLandBounds: Rect = {
-      minX: spec.bounds.minX - coastPadding,
-      maxX: spec.bounds.maxX + coastPadding,
-      minZ: spec.bounds.minZ - coastPadding,
-      maxZ: spec.bounds.maxZ + coastPadding,
-    };
-    this.fields = spec.regions.map((region) => {
-      const height = makeRegionField(region);
-      const range = sweepFieldRange(visualLandBounds, height);
-      return {
-        spec: region,
-        height,
-        palette: REGION_PALETTES[region.regionId],
-        hMin: range.min,
-        hMax: range.max,
-      };
-    });
+    const created: THREE.Mesh[] = [];
+    for (const step of this.worldBuildSteps(spec, prepareSurface, created)) step();
+    return created;
+  }
 
-    // Its own stream, drawn once, so adding it shifts nothing else in the world's rng order.
-    this.surfaceNoise = createValueNoise((spec.regions[0]?.seed ?? 0x5b0a11) ^ 0x51_7f_ac_e1);
+  /**
+   * The production boot variant of `buildWorld`.
+   *
+   * It executes the exact same ordered build steps and writes the exact same geometry, but yields
+   * between authored field solves and terrain chunks. That keeps input and the loading UI moving
+   * instead of presenting the browser with one multi-second task. The supplied scheduler is a test
+   * seam; production uses a MessageChannel task yield.
+   */
+  async buildWorldYielding(
+    spec: WorldTerrainSpec = COREALM_WORLD,
+    prepareSurface?: (scene: WorldScene) => void,
+    yieldToMain: () => Promise<void> = yieldToMainThread,
+  ): Promise<THREE.Mesh[]> {
+    const created: THREE.Mesh[] = [];
+    const steps = this.worldBuildSteps(spec, prepareSurface, created);
+    for (let index = 0; index < steps.length; index += 1) {
+      steps[index]!();
+      if (index + 1 < steps.length) await yieldToMain();
+    }
+    return created;
+  }
 
-    this.resolveFlatTargets();
-    this.buildHaulRoads();
-    this.normaliseFlats();
-    this.resolveBasins();
-    this.buildLattice();
-
-    // Roads and paving need the resolved height field, while water needs the exact lattice to
-    // solve its shoreline. This is the one point where both are available and no chunk has been
-    // shaded yet. Preparing here lets buildChunk consume the final stamps on its first pass.
-    prepareSurface?.(this);
-
+  /** One canonical step list backs both the synchronous tools path and cooperative browser boot. */
+  private worldBuildSteps(
+    spec: WorldTerrainSpec,
+    prepareSurface: ((scene: WorldScene) => void) | undefined,
+    created: THREE.Mesh[],
+  ): Array<() => void> {
     const { bounds, chunkSize } = spec;
     const width = bounds.maxX - bounds.minX;
     const depth = bounds.maxZ - bounds.minZ;
@@ -665,25 +651,79 @@ export class WorldScene {
     const chunkZ = depth / rows;
     const segmentsX = Math.max(1, Math.round(chunkX / spec.metresPerQuad));
     const segmentsZ = Math.max(1, Math.round(chunkZ / spec.metresPerQuad));
-
+    const coastPadding = Number.isFinite(spec.coast?.collar)
+      ? Math.max(0, spec.coast?.collar ?? 0)
+      : 0;
+    const visualLandBounds: Rect = {
+      minX: bounds.minX - coastPadding,
+      maxX: bounds.maxX + coastPadding,
+      minZ: bounds.minZ - coastPadding,
+      maxZ: bounds.maxZ + coastPadding,
+    };
     const material = this.materials.ground();
-    const created: THREE.Mesh[] = [];
+    const steps: Array<() => void> = [() => {
+      this.terrainBuildStats = {
+        chunkBuildCount: 0,
+        restampPassCount: 0,
+        restampedVertexCount: 0,
+      };
+      this.world = spec;
+      this.coastGrid = null;
+      // Flats registered through `addFlatSpot` before the build are kept: settlement pads are
+      // registered by whoever knows where the settlement is, which is not this file.
+      this.flats = [...this.flats, ...(spec.flats ?? [])].map((flat) => ({ ...flat }));
+      this.basinSpecs = (spec.basins ?? []).map((basin) => ({ ...basin }));
+      this.basins = [];
+      this.builtWaterBodies = [];
+      this.fields = [];
+    }];
+
+    for (const region of spec.regions) {
+      steps.push(() => {
+        const height = makeRegionField(region);
+        const range = sweepFieldRange(visualLandBounds, height);
+        this.fields.push({
+          spec: region,
+          height,
+          palette: REGION_PALETTES[region.regionId],
+          hMin: range.min,
+          hMax: range.max,
+        });
+      });
+    }
+
+    steps.push(
+      () => {
+        // Its own stream, drawn once, so adding it shifts nothing else in the world's rng order.
+        this.surfaceNoise = createValueNoise((spec.regions[0]?.seed ?? 0x5b0a11) ^ 0x51_7f_ac_e1);
+        this.resolveFlatTargets();
+      },
+      () => this.buildHaulRoads(),
+      () => this.normaliseFlats(),
+      () => this.resolveBasins(),
+      () => this.buildLattice(),
+      // Roads and paving need the resolved height field, while water needs the exact lattice to
+      // solve its shoreline. No chunk has been shaded at this point.
+      () => { prepareSurface?.(this); },
+    );
 
     for (let cz = 0; cz < rows; cz += 1) {
       for (let cx = 0; cx < cols; cx += 1) {
-        const originX = bounds.minX + cx * chunkX;
-        const originZ = bounds.minZ + cz * chunkZ;
-        const mesh = this.buildChunk(originX, originZ, chunkX, chunkZ, segmentsX, segmentsZ, material);
-        mesh.name = `terrain-chunk-${cx}-${cz}`;
-        mesh.userData.walkable = true;
-        mesh.userData.regionId = this.regionAt(originX + chunkX / 2, originZ + chunkZ / 2);
-        this.terrainGroup.add(mesh);
-        this.walkable.push(mesh);
-        created.push(mesh);
+        steps.push(() => {
+          const originX = bounds.minX + cx * chunkX;
+          const originZ = bounds.minZ + cz * chunkZ;
+          const mesh = this.buildChunk(originX, originZ, chunkX, chunkZ, segmentsX, segmentsZ, material);
+          mesh.name = `terrain-chunk-${cx}-${cz}`;
+          mesh.userData.walkable = true;
+          mesh.userData.regionId = this.regionAt(originX + chunkX / 2, originZ + chunkZ / 2);
+          this.terrainGroup.add(mesh);
+          this.walkable.push(mesh);
+          created.push(mesh);
+        });
       }
     }
-    if (spec.coast) this.buildCoast(spec.coast);
-    return created;
+    if (spec.coast) steps.push(...this.coastBuildSteps(spec.coast));
+    return steps;
   }
 
   /**
@@ -809,9 +849,9 @@ export class WorldScene {
    * Neither mesh is walkable or raycast as terrain: content, nav, physics, and the map keep their
    * existing bounds while the camera sees a shoreline instead of the end of a rectangular slab.
    */
-  private buildCoast(spec: CoastSpec): void {
+  private coastBuildSteps(spec: CoastSpec): Array<() => void> {
     const bounds = this.world?.bounds;
-    if (!bounds || spec.gridStep <= 0 || spec.oceanSize <= 0) return;
+    if (!bounds || spec.gridStep <= 0 || spec.oceanSize <= 0) return [];
 
     const minimumReach = Math.max(0.001, Math.min(spec.shoreline[0], spec.shoreline[1]));
     const maximumReach = Math.max(minimumReach, Math.max(spec.shoreline[0], spec.shoreline[1]));
@@ -858,57 +898,64 @@ export class WorldScene {
     const paved = new Uint8Array(vertexCount);
     const referenced = new Uint8Array(vertexCount);
     const indices: number[] = [];
+    const steps: Array<() => void> = [];
 
     // Height first. The material pass below needs the complete drawn coast for its slope,
     // curvature, and horizon samples; using the playable lattice there would clamp all three to
     // the old rectangular edge.
     for (let row = 0; row <= rows; row += 1) {
-      const z = minZ + row * stepZ;
-      for (let col = 0; col <= cols; col += 1) {
-        const x = minX + col * stepX;
-        const vertex = row * vertexCols + col;
-        const strictInterior = x > bounds.minX && x < bounds.maxX
-          && z > bounds.minZ && z < bounds.maxZ;
-        if (strictInterior) {
-          heights[vertex] = this.sampleLattice(x, z);
-          descents[vertex] = 0;
-        } else {
-          const profile = this.coastProfileAt(x, z, spec);
-          heights[vertex] = profile.landHeight;
-          descents[vertex] = profile.descent;
+      steps.push(() => {
+        const z = minZ + row * stepZ;
+        for (let col = 0; col <= cols; col += 1) {
+          const x = minX + col * stepX;
+          const vertex = row * vertexCols + col;
+          const strictInterior = x > bounds.minX && x < bounds.maxX
+            && z > bounds.minZ && z < bounds.maxZ;
+          if (strictInterior) {
+            heights[vertex] = this.sampleLattice(x, z);
+            descents[vertex] = 0;
+          } else {
+            const profile = this.coastProfileAt(x, z, spec);
+            heights[vertex] = profile.landHeight;
+            descents[vertex] = profile.descent;
+          }
+          positions[vertex * 3] = x;
+          positions[vertex * 3 + 1] = heights[vertex]!;
+          positions[vertex * 3 + 2] = z;
         }
-        positions[vertex * 3] = x;
-        positions[vertex * 3 + 1] = heights[vertex]!;
-        positions[vertex * 3 + 2] = z;
-      }
+      });
     }
-    this.coastGrid = {
-      heights,
-      cols: vertexCols,
-      rows: vertexRows,
-      minX,
-      minZ,
-      stepX,
-      stepZ,
-    };
+    steps.push(() => {
+      this.coastGrid = {
+        heights,
+        cols: vertexCols,
+        rows: vertexRows,
+        minX,
+        minZ,
+        stepX,
+        stepZ,
+      };
+    });
 
     for (let row = 0; row < rows; row += 1) {
-      const centreZ = minZ + (row + 0.5) * stepZ;
-      for (let col = 0; col < cols; col += 1) {
-        const centreX = minX + (col + 0.5) * stepX;
-        const inside = centreX >= bounds.minX && centreX <= bounds.maxX
-          && centreZ >= bounds.minZ && centreZ <= bounds.maxZ;
-        if (inside) continue;
-        const a = row * vertexCols + col;
-        const b = a + 1;
-        const c = a + vertexCols;
-        const d = c + 1;
-        indices.push(a, c, b, b, c, d);
-        referenced[a] = 1;
-        referenced[b] = 1;
-        referenced[c] = 1;
-        referenced[d] = 1;
-      }
+      steps.push(() => {
+        const centreZ = minZ + (row + 0.5) * stepZ;
+        for (let col = 0; col < cols; col += 1) {
+          const centreX = minX + (col + 0.5) * stepX;
+          const inside = centreX >= bounds.minX && centreX <= bounds.maxX
+            && centreZ >= bounds.minZ && centreZ <= bounds.maxZ;
+          if (inside) continue;
+          const a = row * vertexCols + col;
+          const b = a + 1;
+          const c = a + vertexCols;
+          const d = c + 1;
+          indices.push(a, c, b, b, c, d);
+          referenced[a] = 1;
+          referenced[b] = 1;
+          referenced[c] = 1;
+          referenced[d] = 1;
+        }
+      });
     }
 
     const coastHeightAt = (x: number, z: number): number => (
@@ -918,76 +965,91 @@ export class WorldScene {
     const seabed = new THREE.Color(0x31473f);
     const colour = new THREE.Color();
     for (let row = 0; row <= rows; row += 1) {
-      const z = minZ + row * stepZ;
-      for (let col = 0; col <= cols; col += 1) {
-        const vertex = row * vertexCols + col;
-        if (referenced[vertex] === 0) continue;
-        const x = minX + col * stepX;
-        const playable = x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
-        this.sampleSurface(x, z, heights[vertex]!, surface, true, playable ? undefined : coastHeightAt);
-        writeSplat(splatA, splatB, ground, paved, vertex, surface);
-        colour.copy(surface.colour).lerp(seabed, descents[vertex]!);
-        colours[vertex * 3] = colour.r;
-        colours[vertex * 3 + 1] = colour.g;
-        colours[vertex * 3 + 2] = colour.b;
-      }
+      steps.push(() => {
+        const z = minZ + row * stepZ;
+        for (let col = 0; col <= cols; col += 1) {
+          const vertex = row * vertexCols + col;
+          if (referenced[vertex] === 0) continue;
+          const x = minX + col * stepX;
+          const playable = x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
+          this.sampleSurface(x, z, heights[vertex]!, surface, true, playable ? undefined : coastHeightAt);
+          writeSplat(splatA, splatB, ground, paved, vertex, surface);
+          colour.copy(surface.colour).lerp(seabed, descents[vertex]!);
+          colours[vertex * 3] = colour.r;
+          colours[vertex * 3 + 1] = colour.g;
+          colours[vertex * 3 + 2] = colour.b;
+        }
+      });
     }
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
-    geometry.setAttribute("aSplatA", new THREE.BufferAttribute(splatA, 4, true));
-    geometry.setAttribute("aSplatB", new THREE.BufferAttribute(splatB, 4, true));
-    geometry.setAttribute("aGround", new THREE.BufferAttribute(ground, 4, true));
-    geometry.setAttribute("aPaved", new THREE.BufferAttribute(paved, 1, true));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    const normalAttribute = geometry.getAttribute("normal") as THREE.BufferAttribute;
-    for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
-      if (referenced[vertex] === 0) continue;
-      const x = positions[vertex * 3]!;
-      const z = positions[vertex * 3 + 2]!;
-      const coastSample = sampleOrganicCoast(x, z, bounds, spec);
-      const seamWidth = Math.min(COAST_EDGE_PIN_METRES, coastSample.shelfWidth);
-      if (coastSample.outsideDistance > seamWidth) continue;
-      const terrainNormal = this.normalAt(coastSample.boundaryX, coastSample.boundaryZ);
-      const skirtWeight = smoothstep01(
-        coastSample.outsideDistance / Math.max(0.000_001, seamWidth),
-      );
-      const normalX = terrainNormal[0]
-        + (normalAttribute.getX(vertex) - terrainNormal[0]) * skirtWeight;
-      const normalY = terrainNormal[1]
-        + (normalAttribute.getY(vertex) - terrainNormal[1]) * skirtWeight;
-      const normalZ = terrainNormal[2]
-        + (normalAttribute.getZ(vertex) - terrainNormal[2]) * skirtWeight;
-      const normalLength = Math.hypot(normalX, normalY, normalZ) || 1;
-      normalAttribute.setXYZ(
-        vertex,
-        normalX / normalLength,
-        normalY / normalLength,
-        normalZ / normalLength,
-      );
+    let geometry!: THREE.BufferGeometry;
+    let normalAttribute!: THREE.BufferAttribute;
+    steps.push(() => {
+      geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+      geometry.setAttribute("aSplatA", new THREE.BufferAttribute(splatA, 4, true));
+      geometry.setAttribute("aSplatB", new THREE.BufferAttribute(splatB, 4, true));
+      geometry.setAttribute("aGround", new THREE.BufferAttribute(ground, 4, true));
+      geometry.setAttribute("aPaved", new THREE.BufferAttribute(paved, 1, true));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      normalAttribute = geometry.getAttribute("normal") as THREE.BufferAttribute;
+    });
+    for (let row = 0; row <= rows; row += 1) {
+      steps.push(() => {
+        const start = row * vertexCols;
+        const end = Math.min(positions.length / 3, start + vertexCols);
+        for (let vertex = start; vertex < end; vertex += 1) {
+          if (referenced[vertex] === 0) continue;
+          const x = positions[vertex * 3]!;
+          const z = positions[vertex * 3 + 2]!;
+          const coastSample = sampleOrganicCoast(x, z, bounds, spec);
+          const seamWidth = Math.min(COAST_EDGE_PIN_METRES, coastSample.shelfWidth);
+          if (coastSample.outsideDistance > seamWidth) continue;
+          const terrainNormal = this.normalAt(coastSample.boundaryX, coastSample.boundaryZ);
+          const skirtWeight = smoothstep01(
+            coastSample.outsideDistance / Math.max(0.000_001, seamWidth),
+          );
+          const normalX = terrainNormal[0]
+            + (normalAttribute.getX(vertex) - terrainNormal[0]) * skirtWeight;
+          const normalY = terrainNormal[1]
+            + (normalAttribute.getY(vertex) - terrainNormal[1]) * skirtWeight;
+          const normalZ = terrainNormal[2]
+            + (normalAttribute.getZ(vertex) - terrainNormal[2]) * skirtWeight;
+          const normalLength = Math.hypot(normalX, normalY, normalZ) || 1;
+          normalAttribute.setXYZ(
+            vertex,
+            normalX / normalLength,
+            normalY / normalLength,
+            normalZ / normalLength,
+          );
+        }
+      });
     }
-    normalAttribute.needsUpdate = true;
-    geometry.computeBoundingSphere();
-    const coast = new THREE.Mesh(geometry, this.materials.ground());
-    coast.name = "coastal-skirt";
-    coast.castShadow = false;
-    coast.receiveShadow = true;
-    this.scatterGroup.add(coast);
+    steps.push(() => {
+      normalAttribute.needsUpdate = true;
+      geometry.computeBoundingSphere();
+      const coast = new THREE.Mesh(geometry, this.materials.ground());
+      coast.name = "coastal-skirt";
+      coast.castShadow = false;
+      coast.receiveShadow = true;
+      this.scatterGroup.add(coast);
 
-    const oceanGeometry = new THREE.PlaneGeometry(spec.oceanSize, spec.oceanSize);
-    oceanGeometry.rotateX(-Math.PI / 2);
-    const oceanDepth = new Float32Array(oceanGeometry.getAttribute("position").count);
-    oceanDepth.fill(Math.max(1.2, spec.floorDepth));
-    oceanGeometry.setAttribute("aWaterDepth", new THREE.BufferAttribute(oceanDepth, 1));
-    const ocean = new THREE.Mesh(oceanGeometry, this.materials.water("fallowmarch"));
-    ocean.name = "infinite-ocean";
-    ocean.position.set((bounds.minX + bounds.maxX) / 2, spec.seaLevel, (bounds.minZ + bounds.maxZ) / 2);
-    ocean.renderOrder = 0;
-    ocean.castShadow = false;
-    ocean.receiveShadow = false;
-    this.scatterGroup.add(ocean);
+      const oceanGeometry = new THREE.PlaneGeometry(spec.oceanSize, spec.oceanSize);
+      oceanGeometry.rotateX(-Math.PI / 2);
+      const oceanDepth = new Float32Array(oceanGeometry.getAttribute("position").count);
+      oceanDepth.fill(Math.max(1.2, spec.floorDepth));
+      oceanGeometry.setAttribute("aWaterDepth", new THREE.BufferAttribute(oceanDepth, 1));
+      const ocean = new THREE.Mesh(oceanGeometry, this.materials.water("fallowmarch"));
+      ocean.name = "infinite-ocean";
+      ocean.position.set((bounds.minX + bounds.maxX) / 2, spec.seaLevel, (bounds.minZ + bounds.maxZ) / 2);
+      ocean.renderOrder = 0;
+      ocean.castShadow = false;
+      ocean.receiveShadow = false;
+      this.scatterGroup.add(ocean);
+    });
+    return steps;
   }
 
   /**

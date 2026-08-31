@@ -1,4 +1,5 @@
 import type { RegionId } from "../contracts.js";
+import { yieldToMainThread } from "../core/yield.js";
 import type { AssetPriority, AssetRegistry } from "../render/assets.js";
 import type { WorldScene } from "../render/scene.js";
 import {
@@ -30,7 +31,7 @@ export interface ScatterStreamingOptions {
 }
 
 function defaultYieldToMain(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return yieldToMainThread();
 }
 
 /**
@@ -106,8 +107,11 @@ export class ScatterStreamingController {
       const tile = typeof request === "string" ? this.tilesById.get(request) : this.tilesById.get(request.id);
       if (tile) wanted.set(tile.id, tile);
     }
-    for (const tile of this.sortByActiveDistance([...wanted.values()])) {
+    const ordered = this.sortByActiveDistance([...wanted.values()]);
+    for (let index = 0; index < ordered.length; index += 1) {
+      const tile = ordered[index]!;
       await this.ensureTile(tile, priority, primary);
+      if (index + 1 < ordered.length) await this.yieldToMain();
     }
     return this.getStats();
   }
@@ -176,6 +180,7 @@ export class ScatterStreamingController {
         // Spawn-visible work stays unscoped so an organic biome lobe crossing a semantic border
         // cannot be demoted. Deferred work follows the tile's semantic owner.
         regionId: priority === "visible-spawn" ? undefined : this.semanticRegionForTile(tile),
+        yieldToMain: this.yieldToMain,
       },
     )
       .then((results) => {

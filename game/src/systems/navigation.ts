@@ -26,15 +26,7 @@
  * walkable ground on the terrace risers and inflates the cross-world route by 30%.
  */
 import * as THREE from "three";
-import RecastWasm from "@recast-navigation/wasm/wasm";
-import {
-  exportNavMesh,
-  importNavMesh,
-  init as initRecast,
-  NavMeshQuery,
-  type NavMesh,
-} from "@recast-navigation/core";
-import { threeToSoloNavMesh, threeToTiledNavMesh } from "@recast-navigation/three";
+import type { NavMesh, NavMeshQuery } from "@recast-navigation/core";
 import type { EntityId, RegionId, SolidVolume, Vec3 } from "../contracts.js";
 import { NAV_CONFIG, PLAYER_SPEED } from "../app/config.js";
 import { distance, distanceXZ, pathLength } from "../core/math.js";
@@ -47,6 +39,17 @@ import {
   type NavigationArtifactSettings,
   type NavigationAuthoredInputs,
 } from "./navigationArtifact.js";
+
+type RecastCoreModule = typeof import("@recast-navigation/core");
+type RecastThreeModule = typeof import("@recast-navigation/three");
+
+let recastRuntime: { core: RecastCoreModule; three: RecastThreeModule } | null = null;
+let recastInitialization: Promise<void> | null = null;
+
+function requireRecast(): { core: RecastCoreModule; three: RecastThreeModule } {
+  if (!recastRuntime) throw new Error("Recast is not initialized. Await Navigation.initLibrary() first.");
+  return recastRuntime;
+}
 
 export type NavStatus = "uninitialized" | "building" | "ready" | "failed";
 
@@ -315,9 +318,23 @@ export class Navigation {
   private routeEdges: RouteEdge[] = [];
 
   static async initLibrary(): Promise<void> {
-    // The browser entry points straight at the package's external .wasm file. Node-based narrow
-    // tests retain the compatibility loader because Node cannot fetch a file: URL with fetch().
-    await initRecast(typeof window === "undefined" ? undefined : RecastWasm);
+    if (recastRuntime) return;
+    recastInitialization ??= Promise.all([
+      import("@recast-navigation/core"),
+      import("@recast-navigation/three"),
+      typeof window === "undefined"
+        ? Promise.resolve(null)
+        : import("@recast-navigation/wasm/wasm"),
+    ]).then(async ([core, three, wasm]) => {
+      // The dynamic boundary separates the Emscripten module evaluation from the application
+      // entry task. Browser boot still starts it immediately and still uses the external WASM.
+      await core.init(wasm?.default);
+      recastRuntime = { core, three };
+    }).catch((error: unknown) => {
+      recastInitialization = null;
+      throw error;
+    });
+    await recastInitialization;
   }
 
   /**
@@ -366,7 +383,7 @@ export class Navigation {
       if (!navMesh) throw new Error(this.error ?? "Navmesh generation returned no mesh");
 
       this.navMesh = navMesh;
-      this.query = new NavMeshQuery(this.navMesh);
+      this.query = new (requireRecast().core.NavMeshQuery)(this.navMesh);
       this.polyCount = this.countPolys();
       this.buildMs = Math.round(now() - startedAt);
       this.status = "ready";
@@ -426,9 +443,10 @@ export class Navigation {
         throw new Error("generator strategy mismatch");
       }
 
-      const imported = importNavMesh(artifact.navData);
+      const { core } = requireRecast();
+      const imported = core.importNavMesh(artifact.navData);
       this.navMesh = imported.navMesh;
-      this.query = new NavMeshQuery(imported.navMesh);
+      this.query = new core.NavMeshQuery(imported.navMesh);
       this.strategy = artifact.metadata.settings.strategy;
       this.polyCount = this.countPolys();
       if (this.polyCount <= 0) throw new Error("imported navmesh has no polygons");
@@ -490,7 +508,7 @@ export class Navigation {
       categories: fingerprintInput.categories,
       polyCount: this.polyCount,
       tileCount: this.tileCount,
-    }, exportNavMesh(this.navMesh));
+    }, requireRecast().core.exportNavMesh(this.navMesh));
   }
 
   private async artifactFingerprintInput(
@@ -560,6 +578,7 @@ export class Navigation {
   }
 
   private generate(walkable: THREE.Mesh[], strategy: NavStrategy): NavMesh | null {
+    const { three } = requireRecast();
     const config = {
       cs: this.worldCellSize(),
       ch: this.overrides.ch ?? NAV_CONFIG.ch,
@@ -573,7 +592,7 @@ export class Navigation {
     try {
       if (strategy === "tiled") {
         const tileSize = this.overrides.tileSizeVoxels ?? TILE_SIZE_VOXELS;
-        const result = threeToTiledNavMesh(walkable, { ...config, tileSize });
+        const result = three.threeToTiledNavMesh(walkable, { ...config, tileSize });
         if (!result.success || !result.navMesh) {
           this.error = result.success ? "Tiled navmesh returned no mesh" : result.error;
           return null;
@@ -581,7 +600,7 @@ export class Navigation {
         return result.navMesh;
       }
 
-      const result = threeToSoloNavMesh(walkable, config);
+      const result = three.threeToSoloNavMesh(walkable, config);
       if (!result.success || !result.navMesh) {
         this.error = result.success ? "Solo navmesh returned no mesh" : result.error;
         return null;

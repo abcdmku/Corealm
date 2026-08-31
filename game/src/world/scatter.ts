@@ -525,6 +525,8 @@ export interface ScatterTileLoadOptions {
   primary?: boolean;
   /** Semantic tile owner for travel/background request reprioritization. */
   regionId?: RegionId;
+  /** Cooperative browser scheduler used between authored layers; it never participates in seeds. */
+  yieldToMain?: () => Promise<void>;
 }
 
 function scatterTileFromCell(col: number, row: number): ScatterTile {
@@ -797,7 +799,14 @@ export function mergeScatterResults(
  *
  * `hardCap` only exists so a mis-authored spacing cannot hang the boot; it is not a density dial.
  */
-function poissonDisc(rect: Rect, minDistance: number, rng: Rng, hardCap = 60000): [number, number][] {
+type ScatterPoint = [number, number];
+
+function* poissonDiscSteps(
+  rect: Rect,
+  minDistance: number,
+  rng: Rng,
+  hardCap = 60000,
+): Generator<void, ScatterPoint[], void> {
   const width = rect.maxX - rect.minX;
   const depth = rect.maxZ - rect.minZ;
   if (width <= 0 || depth <= 0 || minDistance <= 0) return [];
@@ -809,7 +818,7 @@ function poissonDisc(rect: Rect, minDistance: number, rng: Rng, hardCap = 60000)
   if (cols * rows > 4_000_000) return [];
   const grid = new Int32Array(cols * rows).fill(-1);
 
-  const points: [number, number][] = [];
+  const points: ScatterPoint[] = [];
   const active: number[] = [];
 
   const insert = (x: number, z: number): void => {
@@ -841,6 +850,7 @@ function poissonDisc(rect: Rect, minDistance: number, rng: Rng, hardCap = 60000)
   insert(rect.minX + rng.next() * width, rect.minZ + rng.next() * depth);
 
   const attempts = 18;
+  let iterations = 0;
   while (active.length > 0 && points.length < hardCap) {
     const pick = Math.floor(rng.next() * active.length);
     const seedIndex = active[pick]!;
@@ -862,8 +872,34 @@ function poissonDisc(rect: Rect, minDistance: number, rng: Rng, hardCap = 60000)
       active[pick] = active[active.length - 1]!;
       active.pop();
     }
+    iterations += 1;
+    if (iterations % 64 === 0) yield;
   }
   return points;
+}
+
+function poissonDisc(rect: Rect, minDistance: number, rng: Rng, hardCap = 60000): ScatterPoint[] {
+  const steps = poissonDiscSteps(rect, minDistance, rng, hardCap);
+  let result = steps.next();
+  while (!result.done) result = steps.next();
+  return result.value;
+}
+
+async function poissonDiscYielding(
+  rect: Rect,
+  minDistance: number,
+  rng: Rng,
+  hardCap: number,
+  yieldToMain?: () => Promise<void>,
+): Promise<ScatterPoint[]> {
+  if (!yieldToMain) return poissonDisc(rect, minDistance, rng, hardCap);
+  const steps = poissonDiscSteps(rect, minDistance, rng, hardCap);
+  let result = steps.next();
+  while (!result.done) {
+    await yieldToMain();
+    result = steps.next();
+  }
+  return result.value;
 }
 
 /** Members of one cluster: Poisson over the bounding square, kept inside the disc. */
@@ -873,6 +909,22 @@ function poissonDisc2(centreX: number, centreZ: number, radius: number, minDista
     minZ: centreZ - radius, maxZ: centreZ + radius,
   };
   const points = poissonDisc(rect, minDistance, rng, 4000);
+  return points.filter(([x, z]) => Math.hypot(x - centreX, z - centreZ) <= radius);
+}
+
+async function poissonDisc2Yielding(
+  centreX: number,
+  centreZ: number,
+  radius: number,
+  minDistance: number,
+  rng: Rng,
+  yieldToMain?: () => Promise<void>,
+): Promise<ScatterPoint[]> {
+  const rect: Rect = {
+    minX: centreX - radius, maxX: centreX + radius,
+    minZ: centreZ - radius, maxZ: centreZ + radius,
+  };
+  const points = await poissonDiscYielding(rect, minDistance, rng, 4000, yieldToMain);
   return points.filter(([x, z]) => Math.hypot(x - centreX, z - centreZ) <= radius);
 }
 
@@ -1446,8 +1498,10 @@ async function scatterRegionTile(
       detail: { regionId, layerId: layer.id, tileId: tile.id },
     });
     try {
-      collectField(layer, ctx, species, rng, mask, candidates, result);
+      await collectField(layer, ctx, species, rng, mask, candidates, result, loadOptions.yieldToMain);
+      await loadOptions.yieldToMain?.();
       collectRoad(layer, ctx, species, rng, candidates, result);
+      await loadOptions.yieldToMain?.();
       collectShore(layer, ctx, species, rng, candidates, result);
       candidateSpan.end({ regionId, layerId: layer.id, tileId: tile.id, candidates: candidates.length });
     } catch (error) {
@@ -1506,6 +1560,10 @@ async function scatterRegionTile(
       result.byLayer[layer.id] = (result.byLayer[layer.id] ?? 0) + 1;
       result.bySource[candidate.source] = (result.bySource[candidate.source] ?? 0) + 1;
     }
+
+    // A dense organic layer can be meaningful work even though it owns only one deterministic
+    // recipe. Yield after the complete layer so no RNG stream or bucket is split across tasks.
+    await loadOptions.yieldToMain?.();
   }
 
   const meshSpan = bootTelemetry.startSpan(BOOT_SPANS.SCATTER_MESHES, {
@@ -1597,7 +1655,7 @@ export async function scatterRegion(
 }
 
 /** Region-wide placement: two-level clusters, or lone props when no `cluster` is authored. */
-function collectField(
+async function collectField(
   layer: ScatterLayerSpec,
   ctx: LayerContext,
   species: ResolvedSpecies[],
@@ -1605,7 +1663,8 @@ function collectField(
   mask: (x: number, z: number) => number,
   out: Candidate[],
   result: ScatterResult,
-): void {
+  yieldToMain?: () => Promise<void>,
+): Promise<void> {
   // Biomes own visual land, not semantic rectangles. The field domain still spans the organic
   // island, then this pass intersects it with the generation tile before Poisson sampling starts.
   const fieldBounds = layerFieldBounds(ctx, layer);
@@ -1630,16 +1689,18 @@ function collectField(
     const candidateCeiling = grassOnly ? 18_000 : 12_000;
     const candidateCap = Math.min(candidateCeiling, Math.max(64, Math.ceil(fieldLimit * 2.5)));
     const points = shuffleByHash(
-      poissonDisc(sampleRect, layer.spacing ?? 6, rng, candidateCap),
+      await poissonDiscYielding(sampleRect, layer.spacing ?? 6, rng, candidateCap, yieldToMain),
       deriveScatterTileSeed(0x5eed01, ctx.regionId, layer.id, ctx.tile.id),
     );
-    for (const [x, z] of points) {
+    for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
+      const [x, z] = points[pointIndex]!;
       if (out.length >= fieldLimit) break;
       const factor = siteFactor(layer, ctx, x, z, "field", true) * maskAt(x, z);
       if (factor <= 0 || rng.next() > factor) { result.rejected += 1; continue; }
       const entry = pickSpecies(species, "field", rng);
       if (!entry) break;
       out.push({ x, z, source: "field", species: entry });
+      if ((pointIndex + 1) % 128 === 0) await yieldToMain?.();
     }
     return;
   }
@@ -1647,7 +1708,7 @@ function collectField(
   const falloff = cluster.falloff ?? 0.75;
   const dominance = cluster.dominance ?? 0.7;
   const centres = shuffleByHash(
-    poissonDisc(sampleRect, cluster.spacing, rng),
+    await poissonDiscYielding(sampleRect, cluster.spacing, rng, 60_000, yieldToMain),
     deriveScatterTileSeed(0x5eed02, ctx.regionId, layer.id, ctx.tile.id),
   );
   for (const [cx, cz] of centres) {
@@ -1668,7 +1729,7 @@ function collectField(
     if (!dominant) break;
     result.clusters += 1;
 
-    for (const [x, z] of poissonDisc2(cx, cz, radius, memberSpacing, rng)) {
+    for (const [x, z] of await poissonDisc2Yielding(cx, cz, radius, memberSpacing, rng, yieldToMain)) {
       const reach = radius > 0 ? Math.hypot(x - cx, z - cz) / radius : 0;
       if (rng.next() > 1 - falloff * reach * reach) { result.rejected += 1; continue; }
       const site = siteFactor(layer, ctx, x, z, "field", false);
@@ -1677,6 +1738,7 @@ function collectField(
       if (!entry) continue;
       out.push({ x, z, source: "field", species: entry });
     }
+    await yieldToMain?.();
   }
 }
 
