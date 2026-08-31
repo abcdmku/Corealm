@@ -59,6 +59,7 @@ jobs:
             docs/game
             docs-site
             game
+            skills
             tests
             tools
       - uses: actions/setup-node@v5
@@ -99,6 +100,7 @@ jobs:
             docs/game
             docs-site
             game
+            skills
             tests
             tools
       # Pages must be enabled once in repository settings with "GitHub Actions" as its source.

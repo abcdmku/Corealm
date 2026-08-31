@@ -50,4 +50,15 @@ describe("lab-first agent workflow", () => {
     expect(labOffsets[0]!).toBeLessThan(smokeOffsets[0]!);
     expect(labOffsets[1]!).toBeLessThan(smokeOffsets[1]!);
   });
+
+  it("checks out the workflow policy files in both CI jobs", () => {
+    const workflow = read(".github/workflows/docs.yml");
+    const sparseCheckouts = [...workflow.matchAll(/sparse-checkout:\s*\|\r?\n((?:\s{12}.+\r?\n)+)/g)]
+      .map((match) => match[1]!);
+
+    expect(sparseCheckouts).toHaveLength(2);
+    for (const paths of sparseCheckouts) {
+      expect(paths).toMatch(/^\s+skills\s*$/m);
+    }
+  });
 });
