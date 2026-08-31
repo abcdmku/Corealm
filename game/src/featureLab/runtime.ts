@@ -5,6 +5,7 @@ import {
   type EntityId,
   type EquipSlot,
   type FeatureLabApi,
+  type FeatureLabCreatureAi,
   type FeatureLabMode,
   type FeatureLabMotionView,
   type FeatureLabPreset,
@@ -14,6 +15,7 @@ import {
   type FeatureLabTargetKind,
   type ItemId,
   type RegionId,
+  type SemanticEntity,
   type SkillId,
   type SpellId,
   type Vec3,
@@ -25,16 +27,28 @@ import type { AssetRegistry } from "../render/assets.js";
 import type { CharacterRig } from "../render/characterRig.js";
 import type { EntityViews } from "../render/entityViews.js";
 import { SPELLS } from "../content/spells.js";
-import type { Store } from "../state/store.js";
+import { enemyBlockFor } from "../content/enemies.js";
+import { distanceXZ } from "../core/math.js";
+import type { GameState, Store } from "../state/store.js";
 import { setSkillLevel } from "../state/store.js";
 import type { CombatSystem } from "../systems/combat.js";
 import type { EquipmentSystem } from "../systems/equipment.js";
 import type { InventorySystem } from "../systems/inventory.js";
 import { ESSENCE_BY_ELEMENT, type EssenceSystem } from "../systems/essence.js";
 import type { EntityStore } from "../world/entities.js";
-import { FEATURE_LAB_CATALOG, createFeatureLabEntity } from "./catalog.js";
+import { FEATURE_LAB_CATALOG, createFeatureLabEntity, featureLabTargetOffset } from "./catalog.js";
 
 const TARGET_DISTANCE = 10;
+/**
+ * How far out `spawnTarget` will place an actor.
+ *
+ * The low end has to be inside melee reach and the high end outside the widest authored aggro
+ * radius (22 m, the Rootheart), or the lab could not set up either side of an aggro check.
+ */
+const MIN_TARGET_DISTANCE = 2;
+const MAX_TARGET_DISTANCE = 40;
+/** How far `perform("flee")` sends the player. Past the 28 m leash from any sane spawn. */
+const FLEE_DISTANCE = 45;
 const TARGET_LATERAL_OFFSET = 3;
 const LAB_ITEM_QUANTITY = 100_000;
 
@@ -207,8 +221,9 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
       });
     },
 
-    async spawnTarget(kind, presetId) {
+    async spawnTarget(kind, presetId, options) {
       const requestedModeRevision = modeRevision;
+      const distance = normalDistance(options?.distance);
       const task = targetQueue
         .catch(() => undefined)
         .then(async () => {
@@ -218,7 +233,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
         const entityId = `feature-lab:${kind}:${nextSequence}`;
         // Keep the actor off the camera/player centreline so melee contact and spell silhouettes
         // remain readable in the normal production camera instead of stacking into one shape.
-        const [x, z] = targetGroundPoint();
+        const [x, z] = targetGroundPoint(distance);
         const ground: Vec3 = [x, deps.groundHeightAt(x, z), z];
         const entity = createFeatureLabEntity(preset, {
           entityId,
@@ -318,6 +333,9 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
 
     async perform(action) {
       return guardAsync(async () => {
+        if (action !== "attack" && action !== "cast" && action !== "flee" && action !== "reset-player") {
+          throw new Error(`Unknown feature-lab action: ${String(action)}`);
+        }
         if (action === "reset-player") {
           deps.api.stop();
           deps.combat.resetOnDeath(deps.clock.elapsedMs);
@@ -333,6 +351,25 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
           return getState();
         }
         const live = requireCreatureTarget();
+        if (action === "flee") {
+          // Straight away from the creature, through the ordinary movement system, so the run is
+          // subject to the same speed and the same navmesh a player's would be.
+          const entity = deps.entityStore.get(live.entityId);
+          if (!entity) throw new Error("The creature target is no longer in the world");
+          const player = deps.store.get().player.position;
+          const dx = player[0] - entity.position[0];
+          const dz = player[2] - entity.position[2];
+          const length = Math.hypot(dx, dz);
+          // Degenerate only if the two are exactly stacked; any fixed heading is as good as another.
+          const [ux, uz] = length < 1e-3 ? [0, 1] : [dx / length, dz / length];
+          const x = player[0] + ux * FLEE_DISTANCE;
+          const z = player[2] + uz * FLEE_DISTANCE;
+          requireOk(
+            deps.api.moveTo({ position: [x, deps.groundHeightAt(x, z), z] }),
+            `flee from ${live.preset.label}`,
+          );
+          return getState();
+        }
         if (action === "attack") {
           requireOk(deps.api.attack(live.entityId), `attack ${live.preset.label}`);
         } else {
@@ -414,6 +451,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
           time: entityMotion.time,
           liveRig: entityMotion.liveRig,
         } : null,
+        ai: creatureAi(entity, state),
       } : null,
       equipment: worn,
       equipmentTotals: { ...equipment.totals },
@@ -422,6 +460,37 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
       liveSpellParticles: deps.liveSpellParticles(),
       counters: { ...counters },
       errors: [...deps.engineErrors(), ...runtimeErrors],
+    };
+  }
+
+  /**
+   * The live AI runtime for a spawned creature, as `systems/enemyAI.ts` sees it.
+   *
+   * Null for anything that is not an enemy, and null before the first tick has registered the
+   * creature in `state.world.enemies` — a caller that polls will see it appear rather than get a
+   * fabricated "idle" for something the AI has not met yet.
+   */
+  function creatureAi(entity: SemanticEntity, state: GameState): FeatureLabCreatureAi | null {
+    if (entity.archetype !== "enemy" && entity.archetype !== "boss") return null;
+    const runtime = state.world.enemies[entity.id];
+    if (!runtime) return null;
+    const family = typeof entity.meta?.["family"] === "string" ? entity.meta["family"] : "";
+    const groupId = typeof entity.meta?.["groupId"] === "string" ? entity.meta["groupId"] : entity.id;
+    const block = enemyBlockFor(groupId, family, entity.tier);
+    const behaviour = typeof entity.meta?.["behaviour"] === "string"
+      ? entity.meta["behaviour"] as FeatureLabCreatureAi["behaviour"]
+      : block?.behaviour ?? "passive";
+    return {
+      state: runtime.state,
+      behaviour,
+      aggroRadius: entity.combat?.aggroRadius ?? block?.aggroRadius ?? 0,
+      moveSpeedMps: entity.combat?.moveSpeedMps ?? block?.moveSpeedMps ?? null,
+      spawnPosition: [...runtime.spawnPos] as Vec3,
+      distanceFromSpawn: round2(distanceXZ(entity.position, runtime.spawnPos)),
+      distanceFromPlayer: round2(distanceXZ(entity.position, state.player.position)),
+      respawnInMs: runtime.respawnAtMs === null
+        ? null
+        : Math.max(0, Math.round(runtime.respawnAtMs - deps.clock.elapsedMs)),
     };
   }
 
@@ -466,15 +535,23 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
     target = null;
   }
 
-  function targetGroundPoint(): readonly [number, number] {
-    let x = deps.spawn[0] + TARGET_LATERAL_OFFSET;
-    const z = deps.spawn[2] + TARGET_DISTANCE;
+  /**
+   * Where to stand the actor, `distance` metres from the player in a straight line.
+   *
+   * A structure in the way moves the actor sideways to clear it, and the forward leg is then
+   * re-solved against the new offset so the distance survives the dodge.
+   */
+  function targetGroundPoint(distance: number): readonly [number, number] {
+    const straight = featureLabTargetOffset(distance, TARGET_LATERAL_OFFSET);
+    let x = deps.spawn[0] + straight.lateral;
+    let z = deps.spawn[2] + straight.forward;
     const bounds = structure.bounds;
     if (bounds && x >= bounds.min[0] - 1 && x <= bounds.max[0] + 1
       && z >= bounds.min[2] - 1 && z <= bounds.max[2] + 1) {
       const left = bounds.min[0] - 3;
       const right = bounds.max[0] + 3;
       x = Math.abs(left - deps.spawn[0]) < Math.abs(right - deps.spawn[0]) ? left : right;
+      z = deps.spawn[2] + featureLabTargetOffset(distance, x - deps.spawn[0]).forward;
     }
     return [x, z];
   }
@@ -500,6 +577,16 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
       throw cause;
     }
   }
+}
+
+/** Clamps a caller-supplied spawn distance, and falls back to the default when it is not a number. */
+function normalDistance(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return TARGET_DISTANCE;
+  return Math.max(MIN_TARGET_DISTANCE, Math.min(MAX_TARGET_DISTANCE, value));
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function toPlayerMotion(snapshot: ReturnType<CharacterRig["motionSnapshot"]>): FeatureLabMotionView {

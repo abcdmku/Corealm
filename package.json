@@ -32,6 +32,7 @@
     "lab:preview": "vite game --host 127.0.0.1 --port 4174 --strictPort --open /index.html?mode=combat",
     "lab:building:preview": "vite game --host 127.0.0.1 --port 4174 --strictPort --open /index.html?mode=building",
     "lab:test": "tsx tools/feature-lab-test.ts",
+    "lab:creatures": "tsx tools/creature-lab-test.ts",
     "structure:preview": "vite game --host 127.0.0.1 --port 4174 --strictPort --open /structure-preview.html?mode=structures",
     "structure:contracts": "vitest run tests/structures.test.ts",
     "structure:contracts:watch": "vitest tests/structures.test.ts",

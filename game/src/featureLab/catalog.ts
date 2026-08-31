@@ -124,6 +124,28 @@ export const FEATURE_LAB_CATALOG = {
   structures: FEATURE_LAB_STRUCTURE_CATALOG,
 } satisfies FeatureLabCatalog;
 
+/**
+ * Where to stand an actor `distance` metres from the player, offset off the camera centreline.
+ *
+ * `distance` is RADIAL. The lateral offset keeps melee contact and spell silhouettes readable
+ * instead of stacking the actor into the player's own shape, and the forward leg is then solved so
+ * the straight-line distance is the one that was asked for. That matters because the only reason a
+ * caller picks a distance is to sit inside or outside an authored aggro radius, and an offset that
+ * quietly added a metre would decide those tests instead of the content doing it.
+ *
+ * Lives here rather than in `runtime.ts` because it is arithmetic with no engine in it.
+ */
+export function featureLabTargetOffset(
+  distance: number,
+  lateral: number,
+): { lateral: number; forward: number } {
+  const squared = distance * distance - lateral * lateral;
+  // A distance shorter than the offset cannot be reached off the centreline. Standing the actor
+  // straight ahead is the closest honest answer, and it is still exactly the requested distance.
+  if (squared <= 0) return { lateral: 0, forward: distance };
+  return { lateral, forward: Math.sqrt(squared) };
+}
+
 /** Placement inputs owned by the empty flat session, not by authored world content. */
 export interface FeatureLabEntityPlacement {
   /** The caller owns uniqueness so repeated spawns never collide in the entity table. */

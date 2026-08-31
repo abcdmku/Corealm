@@ -851,6 +851,15 @@ export interface FeatureLabState {
     health: number | null;
     maxHealth: number | null;
     motion: FeatureLabMotionView | null;
+    /**
+     * Live AI readback for the spawned creature, or null for an NPC.
+     *
+     * Health alone cannot tell a test whether a creature aggroed, chased, gave up, or came back:
+     * all four leave the health bar exactly where it was. `systems/enemyAI.ts` already tracks the
+     * answer in `state.world.enemies[id]`, and this publishes it rather than making the harness
+     * guess from positions.
+     */
+    ai: FeatureLabCreatureAi | null;
   } | null;
   equipment: Record<EquipSlot, ItemId | null>;
   equipmentTotals: EquipmentBonuses;
@@ -867,6 +876,23 @@ export interface FeatureLabState {
 }
 
 /** Browser/control surface for setup only; ordinary play still goes through real pointer input. */
+/** What `systems/enemyAI.ts` currently thinks the spawned creature is doing. */
+export interface FeatureLabCreatureAi {
+  /** The runtime mode: idle, aggro (pursuing or fighting), returning to spawn, or dead. */
+  state: "idle" | "aggro" | "dead" | "returning";
+  /** Behaviour from the content stat block: what it takes to make this creature fight. */
+  behaviour: "passive" | "aggressive" | "territorial";
+  aggroRadius: number;
+  /** Pursuit speed, or null when the creature uses the shared default in `systems/enemyAI.ts`. */
+  moveSpeedMps: number | null;
+  spawnPosition: Vec3;
+  /** Metres from its spawn point. Compare against `LEASH_METRES` to reason about leashing. */
+  distanceFromSpawn: number;
+  distanceFromPlayer: number;
+  /** Milliseconds of sim time until it respawns, or null when it is not dead. */
+  respawnInMs: number | null;
+}
+
 export interface FeatureLabApi {
   getState(): FeatureLabState;
   getCatalog(): FeatureLabCatalog;
@@ -876,11 +902,29 @@ export interface FeatureLabApi {
   setFreeCameraEnabled(enabled: boolean): FeatureLabState;
   setStructure(patch: Partial<FeatureLabStructureSelection>): Promise<FeatureLabState>;
   fitStructure(): FeatureLabState;
-  spawnTarget(kind: FeatureLabTargetKind, presetId: string): Promise<FeatureLabState>;
+  /**
+   * Spawns one actor in front of the player, replacing whatever was there.
+   *
+   * `options.distance` places it that many metres out instead of the default 10. Aggro radius is
+   * authored per family from 3 m to 22 m, so a fixed distance can only ever exercise one side of
+   * it: a passive hen at 3 m and a Rootheart at 22 m need the spawn to move, not the creature.
+   */
+  spawnTarget(
+    kind: FeatureLabTargetKind,
+    presetId: string,
+    options?: { distance?: number },
+  ): Promise<FeatureLabState>;
   setLevel(skillId: SkillId, level: number): FeatureLabState;
   equipPlayer(slot: EquipSlot, itemId: ItemId | null): Promise<FeatureLabState>;
   setSpell(spellId: SpellId): FeatureLabState;
-  perform(action: "attack" | "cast" | "reset-player" | "awaken-altar"): Promise<FeatureLabState>;
+  /**
+   * Runs one production action.
+   *
+   * `flee` walks the player directly away from the target through the real movement system, which
+   * is the only way to test disengaging: the player moves at 4.2 m/s and pursuit at about 3.1, and
+   * enemies leash 28 m from their own spawn. A teleport would prove none of that.
+   */
+  perform(action: "attack" | "cast" | "flee" | "reset-player" | "awaken-altar"): Promise<FeatureLabState>;
 }
 
 declare global {
