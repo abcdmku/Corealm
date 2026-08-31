@@ -5,11 +5,11 @@
  * heightfield, while water asks the render scene to solve its exact shoreline.
  */
 import type { Vec3 } from "../contracts.js";
-import { REGIONS } from "../content/regions.js";
+import { REGIONS, type PavingAssetId } from "../content/regions.js";
 import { resourceDef } from "../content/resources.js";
 import {
   WorldScene, pavingStampFromRect,
-  type PavingStamp, type RoadStamp, type WaterStamp,
+  type PavingStamp, type PavingSurface, type RoadStamp, type WaterStamp,
 } from "../render/scene.js";
 import { WATER_FILL_DEPTH, waterBasinForCluster } from "../world/waterBodies.js";
 
@@ -103,11 +103,28 @@ export function collectRoadStamps(scene: WorldScene): RoadStamp[] {
   return stamps;
 }
 
+/**
+ * What each paving asset means as a stamped surface.
+ *
+ * The authored vocabulary is still an asset id, because that is also what `audio/surface.ts` reads
+ * for footsteps and what a settlement author is choosing between. The ground draws the courses
+ * itself now, so the id only has to say which of the three figures it is.
+ */
+const PAVING_SURFACES: Record<PavingAssetId, PavingSurface> = {
+  floor_cobble: "stone",
+  floor_brick: "brick",
+  floor_wood: "plank",
+  floor_wood_light: "plank",
+};
+
 export function collectPavingStamps(): PavingStamp[] {
   const stamps: PavingStamp[] = [];
   for (const region of REGIONS) {
     for (const paving of region.settlement?.paving ?? []) {
-      stamps.push(pavingStampFromRect(paving.rect));
+      stamps.push(pavingStampFromRect(paving.rect, {
+        surface: PAVING_SURFACES[paving.assetId],
+        kerb: paving.kerb,
+      }));
     }
   }
   return stamps;

@@ -1743,9 +1743,9 @@ function validateQuestObjectives(itemIds: ReadonlySet<string>): string[] {
 /**
  * Paved ground, from whatever the settlements author.
  *
- * Empty until a settlement carries a `paving` array. The tiles themselves are instanced scenery
- * emitted by `world/regionBuilder.ts`; this is the ground UNDER them, which has to read as cobble
- * rather than as grass showing through a 2 cm gap between 2 m tiles.
+ * Empty until a settlement carries a `paving` array. This IS the pavement - the ground's own
+ * colour, splat weight and course pattern - not a bed under one. The only geometry a paved rect
+ * still emits is the kerb around a kerbed one.
  */
 /**
  * Where water meets land, so the bank gets mud and wet stone instead of dry grass to the waterline.

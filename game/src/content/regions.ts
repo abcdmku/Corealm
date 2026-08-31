@@ -315,12 +315,12 @@ export interface WallRunDef {
 }
 
 /**
- * The tile assets that pave a settlement. Constrained to a union rather than left as a bare string
- * because these four are the only meshes in the manifest that tile the module grid exactly:
- * `floor_cobble`, `floor_brick`, `floor_wood` and `floor_wood_light` all measure 2.00 x 0.02 x
- * 2.00 m, so a paving rect needs no authoring beyond its corners. Anything else here would need a
- * bespoke tiling rule, and the union is what makes that a compile error instead of a gap in a
- * pavement.
+ * What a settlement paves in. Held as an asset id, and a union of the four floor meshes, because
+ * two other systems read the choice: `audio/surface.ts` picks the footstep off it, and a settlement
+ * author is genuinely choosing between cobble, brick and plank rather than between three numbers.
+ *
+ * No instance of these meshes is laid for paving any more. `app/worldSurface.ts` maps the id onto a
+ * `PavingSurface` and the ground draws its own courses; see `PavingDef`.
  */
 export type PavingAssetId = "floor_cobble" | "floor_brick" | "floor_wood" | "floor_wood_light";
 
@@ -341,10 +341,12 @@ export interface PavingRect {
  * boot.ts forbids a single blade of grass, pebble or flower inside it, so the middle of every town
  * is a plain grey-green field with a bank chest standing alone in it.
  *
- * Tiling is free of authoring: snap the rect to the 2 m module grid and lay one instance per
- * module at ground + 0.02, which is one `InstancedMesh` and therefore one draw call for a whole
- * square (a 20 x 16 m square is 80 instances). Measured budget headroom at the time of writing:
- * 276 draw calls of a 400 cap.
+ * The rect is STAMPED, not tiled. It used to lay one 2 x 2 m slab per module at ground + 0.02, and
+ * a flat slab on ground that is never quite flat floats at one corner, buries itself at the other,
+ * and shows a mortar-width of terrain at every seam - which a player called out as tiles thrown on
+ * a lawn. The paved surface is now the terrain's own vertex colour, splat weight and course
+ * pattern, the same mechanism roads and waterlines use, so it follows the ground exactly, cannot
+ * z-fight it, and costs no draw call at all.
  *
  * `kerb` rings the rect with `kerb_straight` (2.00 x 0.134 x 0.70 m, one per module edge, long
  * axis along the edge) and `kerb_corner` (0.70 x 0.13 x 0.70 m, one at each of the four corners).
@@ -354,8 +356,8 @@ export interface PavingRect {
  * There is deliberately NO separate `square` field. The ground/terrain diagnosis asked for
  * `square?: { centre, radius, kind }` to stamp a cobble weight into the terrain splat; a union of
  * paving rects expresses that strictly better (it follows the streets, not just the plaza) and
- * `assetId` already carries the `kind`, so the splat stamp should be driven off `paving` and a
- * second overlapping field would only be able to disagree with it.
+ * `assetId` already carries the `kind`, so the splat stamp is driven off `paving` and a second
+ * overlapping field would only be able to disagree with it.
  */
 export interface PavingDef {
   id: string;
@@ -1644,7 +1646,7 @@ function distanceToFootprint(point: Spot, building: BuildingDef): number {
  *
  * It also checks the settlement dressing vocabulary, because every one of those is silent too: a
  * wall run whose gate opening falls off the end of the run leaves the wall solid where the gate
- * should be, a degenerate paving rect lays no tiles at all, a prop naming a missing asset draws
+ * should be, a degenerate paving rect paves nothing at all, a prop naming a missing asset draws
  * nothing, and a station `attachedTo` a building 6 m away is the "anvil standing in a field"
  * failure the field was added to catch.
  *
@@ -1800,7 +1802,7 @@ export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
       }
     }
 
-    // Paving. A rect with min >= max lays no tiles and reports nothing, so the square is silently
+    // Paving. A rect with min >= max stamps nothing and reports nothing, so the square is silently
     // still bare grass.
     for (const paving of settlement.paving ?? []) {
       if (seenIds.has(paving.id)) problems.push(`duplicate paving id ${paving.id}`);

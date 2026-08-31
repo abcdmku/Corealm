@@ -191,9 +191,9 @@ export const ROOTFALL: SettlementDef = {
   ],
 
   /**
-   * Plank decking, because this is a town that mills timber and has no stone. `floor_wood` is
-   * 2.00 x 0.02 x 2.00 and tiles the module grid with no authoring; the six rects below are 125
-   * tiles in one instanced group. Every gate path continues four metres outside the palisade.
+   * Plank decking, because this is a town that mills timber and has no stone. `floor_wood` tells
+   * the ground stamp to run 2.4 m sawmill lengths across the six rects below, staggered at random
+   * the way a sawyer lays them. Every gate path continues four metres outside the palisade.
    *
    * The green is the only rect with a kerb: a kerb along a working cart road is a thing to trip
    * over, and it would read as a pavement in a place that has none.

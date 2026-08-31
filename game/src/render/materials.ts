@@ -324,7 +324,7 @@ export function roadColour(regionId: RegionId): number {
  */
 export function surfaceColour(
   regionId: RegionId,
-  kind: "gravel" | "dirt" | "mud" | "cobble" | "wet",
+  kind: "gravel" | "dirt" | "mud" | "cobble" | "brick" | "plank" | "wet",
 ): number {
   const palette = REGION_PALETTES[regionId];
   switch (kind) {
@@ -353,6 +353,15 @@ export function surfaceColour(
     // architecture stone the tiles take, dragged a quarter toward the region's soil and darkened,
     // so a gap in the paving reads as the earth the stones are bedded into.
     case "cobble": return mixHex(ARCHITECTURE_PALETTES[regionId].stone, palette.soil, 0.26, 0.9);
+    // Dressed block, the quarry town's own stone. The same masonry as `cobble` but cut and laid
+    // rather than gathered: less earth dragged through it and a half-step lighter, so a brick yard
+    // reads as paid-for beside a cobbled square without leaving the region's stone family.
+    case "brick": return mixHex(ARCHITECTURE_PALETTES[regionId].stone, palette.soil, 0.14, 1.02);
+    // Sawn plank. The architecture timber is the beam colour, which is the shaded underside of a
+    // building; a deck lies face up in the weather, so it goes toward soil and lifts hard. Under
+    // Vellenwood's canopy this is the one man-made surface that has to hold its own against
+    // 0x33452c ground, and a deck darker than the forest floor reads as a hole in the clearing.
+    case "plank": return mixHex(ARCHITECTURE_PALETTES[regionId].timber, palette.soil, 0.4, 1.9);
     // Saturated ground just above the waterline.
     default: return mixHex(palette.soil, palette.water, 0.55, 0.85);
   }
@@ -504,8 +513,13 @@ const WIND_VERTEX_BODY = /* glsl */ `
 //
 //   aGround.x  signed distance to the nearest road centreline, remapped -3.5..3.5 m onto 0..1
 //   aGround.y  1 where a road is within reach, so wheel ruts exist only on roads
-//   aGround.z  spare
-//   aGround.w  spare
+//   aGround.z  how worn the track is, 0 at the shoulder to 1 on the centreline
+//   aGround.w  the macro-variation field, 0.5 at its mean
+//
+// plus `aPaved`, one byte: WHICH of the three paved surfaces the cobble weight above is made of,
+// 0 laid stone / 0.5 dressed block / 1 sawn plank (`PAVING_SURFACE_CODE` in render/scene.ts). A
+// settlement is paved by stamping the ground, not by laying 2 m slabs on it, so the course pattern
+// has to be drawn here.
 //
 // The ruts are computed in the FRAGMENT shader from the interpolated perpendicular distance, not
 // from a vertex weight, because the terrain lattice is 2 m and a rut band is 0.2 m wide: at vertex
@@ -515,16 +529,19 @@ const GROUND_VERTEX_HEADER = /* glsl */ `
 attribute vec4 aSplatA;
 attribute vec4 aSplatB;
 attribute vec4 aGround;
+attribute float aPaved;
 varying vec4 vSplatA;
 varying vec4 vSplatB;
 varying vec4 vGroundExtra;
 varying vec3 vGroundWorld;
+varying float vPaved;
 `;
 
 const GROUND_VERTEX_BODY = /* glsl */ `
 vSplatA = aSplatA;
 vSplatB = aSplatB;
 vGroundExtra = aGround;
+vPaved = aPaved;
 vGroundWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
 `;
 
@@ -538,8 +555,15 @@ varying vec4 vSplatA;
 varying vec4 vSplatB;
 varying vec4 vGroundExtra;
 varying vec3 vGroundWorld;
+varying float vPaved;
 float gMacroShade;
 vec2 gGroundBump;
+
+// One hash per unit laid, off the unit's own cell index, so a stone keeps its tone across a chunk
+// seam and adding a paving rect cannot re-roll the one next to it.
+float gPavedHash( vec2 cell ) {
+  return fract( sin( dot( cell, vec2( 127.1, 311.7 ) ) ) * 43758.5453 );
+}
 `;
 
 const GROUND_FRAGMENT_BODY = /* glsl */ `
@@ -645,6 +669,76 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
             + channel.y * TINT_SOIL
             + channel.z * TINT_ROCK
             + channel.w * TINT_GRAVEL;
+
+  // LAID GROUND.
+  //
+  // A settlement is paved by stamping the terrain, so the courses have to be drawn rather than
+  // modelled. All three surfaces are the same figure - a grid of units, offset row by row, with a
+  // dark joint between them and a tone per unit - so they cost one code path and the weights below
+  // simply pick its numbers. Drawn in world XZ, so a course is a fixed size in METRES: it runs
+  // unbroken across a chunk seam, it does not stretch on a slope, and it costs no texture fetch.
+  //
+  // Joint width is the authored width PLUS the texel footprint, and it is not clamped, so as the
+  // surface recedes the joints widen into the unit tone instead of aliasing into a moire the way a
+  // 2 m slab mesh did. Past about 35 m only the vertex swatch is left, which is what should be.
+  float paved = vSplatB.z;
+  if ( paved > 0.004 ) {
+    // Three weights summing to 1 across the 0 / 0.5 / 1 codes. Two rects of different surfaces
+    // never touch in the authored settlements, so in practice one of these is 1 and two are 0.
+    float wStone = max( 0.0, 1.0 - vPaved * 2.0 );
+    float wPlank = max( 0.0, vPaved * 2.0 - 1.0 );
+    float wBrick = 1.0 - wStone - wPlank;
+
+    // Unit size in metres. Gathered stone is nearly square and hand sized; a dressed block is a
+    // long shallow course; a plank is 2.4 m of sawmill run, 30 cm wide.
+    vec2 unit = vec2( 0.62, 0.52 ) * wStone + vec2( 0.68, 0.30 ) * wBrick + vec2( 2.40, 0.30 ) * wPlank;
+    float jointW = 0.045 * wStone + 0.026 * wBrick + 0.020 * wPlank;
+    float toneVar = 0.30 * wStone + 0.15 * wBrick + 0.22 * wPlank;
+    float jointDark = 0.52 * wStone + 0.60 * wBrick + 0.66 * wPlank;
+
+    // Laid stone is set by eye, so its courses bow; a block course and a deck are laid to a line.
+    // Each sine is PHASE MODULATED by the other axis. A plain sin(x), sin(z) pair warps the grid
+    // into a wave whose own period is legible from three metres up - the square reads as scales -
+    // and one more sine per axis is enough that the eye stops finding the rhythm.
+    vec2 p = vGroundWorld.xz;
+    vec2 q = p + wStone * 0.10 * vec2(
+      sin( p.y * 3.1 + sin( p.x * 1.7 ) * 1.6 ),
+      sin( p.x * 2.7 + sin( p.y * 1.3 ) * 1.9 )
+    );
+
+    // Bond. A block wall is a running bond, half a unit per course; stone and plank are staggered
+    // at random, because a random stagger is what a mason and a sawyer both actually produce.
+    float row = floor( q.y / unit.y );
+    float bond = mix( gPavedHash( vec2( row, 7.3 ) ), fract( row * 0.5 ), wBrick );
+    float colf = q.x / unit.x + bond;
+    vec2 cell = vec2( floor( colf ), row );
+
+    // Metres to the nearest joint, along whichever axis is closer.
+    float border = min(
+      ( 0.5 - abs( fract( colf ) - 0.5 ) ) * unit.x,
+      ( 0.5 - abs( fract( q.y / unit.y ) - 0.5 ) ) * unit.y
+    );
+    float tone = gPavedHash( cell + 0.5 );
+    // Joint width varies per unit, which is most of what separates stone bedded by hand from a
+    // printed grid.
+    float footprint = fwidth( p.x ) + fwidth( p.y );
+    float face = smoothstep( 0.0, jointW * ( 0.55 + 0.9 * tone ) + footprint, border );
+    // Grain along the plank, which is the one thing that says sawn timber rather than long stone.
+    float grain = 1.0 + wPlank * 0.085 * sin( q.x * 23.0 + tone * 40.0 );
+    // The detail atlas still runs underneath at a quarter strength: the surface keeps its grit
+    // without the gravel channel deciding what a paved square looks like.
+    float bed = mix( 1.0, detail.w, 0.25 );
+
+    float pavedShade = ( 1.0 - toneVar * 0.5 + toneVar * tone )
+      * mix( jointDark, 1.0, face ) * grain * bed;
+    shade = mix( shade, clamp( pavedShade * macroShade, 0.42, 1.46 ), paved );
+    // Joints as relief, through the screen-space bump the macro reads already drive. It fades out
+    // with the joint, so the grooves are there underfoot and gone by the time they would shimmer.
+    gMacroShade = mix( gMacroShade, macroShade * mix( 0.78, 1.0, face ), paved );
+    // The gravel channel's warm tint is the bed a slab was set in. The paving IS the ground now,
+    // and its hue is the swatch the vertex already carries.
+    tint = mix( tint, vec3( 1.0 ), paved );
+  }
 
   diffuseColor.rgb *= shade * tint;
 }
@@ -836,7 +930,7 @@ export class MaterialLibrary {
       // Held so a hot reload cannot orphan the atlas while a compiled program still references it.
       this.groundUniforms = uniforms;
 
-      material.customProgramCacheKey = () => "corealm-ground-splat-v6";
+      material.customProgramCacheKey = () => "corealm-ground-splat-v7";
       material.onBeforeCompile = (shader) => {
         shader.uniforms.uDetail = uniforms.uDetail;
         shader.uniforms.uMacro = uniforms.uMacro;

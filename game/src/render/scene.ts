@@ -341,11 +341,28 @@ export interface RoadStamp {
   width?: number;
 }
 
+/**
+ * What a settlement paves in. Chooses the ground swatch AND the course pattern the ground shader
+ * draws, which is the whole reason a paved area no longer needs slabs laid on it.
+ */
+export type PavingSurface = "stone" | "brick" | "plank";
+
 export interface PavingStamp {
   centre: readonly [number, number];
   halfExtents: readonly [number, number];
   rotationY?: number;
+  /** Defaults to laid stone. */
+  surface?: PavingSurface;
+  /** A kerbed rect is held to the line its kerb stands on. An unkerbed one frays into the ground. */
+  kerb?: boolean;
 }
+
+/** The 0..1 code `aPaved` carries. Matched by the ground shader's three pattern weights. */
+export const PAVING_SURFACE_CODE: Record<PavingSurface, number> = {
+  stone: 0,
+  brick: 0.5,
+  plank: 1,
+};
 
 export interface WaterStamp {
   centre: readonly [number, number];
@@ -717,6 +734,8 @@ export class WorldScene {
     const splatA = new Uint8Array(position.count * 4);
     const splatB = new Uint8Array(position.count * 4);
     const extra = new Uint8Array(position.count * 4);
+    // One more byte per vertex: which of the three surfaces this is paved in. PAVING_SURFACE_CODE.
+    const paved = new Uint8Array(position.count);
     const centreX = originX + sizeX / 2;
     const centreZ = originZ + sizeZ / 2;
     const surface: SurfaceSample = emptySurface();
@@ -738,7 +757,7 @@ export class WorldScene {
       colours[i * 3] = surface.colour.r;
       colours[i * 3 + 1] = surface.colour.g;
       colours[i * 3 + 2] = surface.colour.b;
-      writeSplat(splatA, splatB, extra, i, surface);
+      writeSplat(splatA, splatB, extra, paved, i, surface);
     }
     position.needsUpdate = true;
     geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
@@ -746,6 +765,7 @@ export class WorldScene {
     geometry.setAttribute("aSplatA", new THREE.BufferAttribute(splatA, 4, true));
     geometry.setAttribute("aSplatB", new THREE.BufferAttribute(splatB, 4, true));
     geometry.setAttribute("aGround", new THREE.BufferAttribute(extra, 4, true));
+    geometry.setAttribute("aPaved", new THREE.BufferAttribute(paved, 1, true));
     geometry.computeBoundingSphere();
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -809,6 +829,7 @@ export class WorldScene {
     const splatA = new Uint8Array(vertexCount * 4);
     const splatB = new Uint8Array(vertexCount * 4);
     const ground = new Uint8Array(vertexCount * 4);
+    const paved = new Uint8Array(vertexCount);
     const referenced = new Uint8Array(vertexCount);
     const indices: number[] = [];
 
@@ -878,7 +899,7 @@ export class WorldScene {
         const x = minX + col * stepX;
         const playable = x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ;
         this.sampleSurface(x, z, heights[vertex]!, surface, true, playable ? undefined : coastHeightAt);
-        writeSplat(splatA, splatB, ground, vertex, surface);
+        writeSplat(splatA, splatB, ground, paved, vertex, surface);
         colour.copy(surface.colour).lerp(seabed, descents[vertex]!);
         colours[vertex * 3] = colour.r;
         colours[vertex * 3 + 1] = colour.g;
@@ -892,6 +913,7 @@ export class WorldScene {
     geometry.setAttribute("aSplatA", new THREE.BufferAttribute(splatA, 4, true));
     geometry.setAttribute("aSplatB", new THREE.BufferAttribute(splatB, 4, true));
     geometry.setAttribute("aGround", new THREE.BufferAttribute(ground, 4, true));
+    geometry.setAttribute("aPaved", new THREE.BufferAttribute(paved, 1, true));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     const normalAttribute = geometry.getAttribute("normal") as THREE.BufferAttribute;
@@ -965,12 +987,14 @@ export class WorldScene {
       const splatA = geometry.getAttribute("aSplatA") as THREE.BufferAttribute;
       const splatB = geometry.getAttribute("aSplatB") as THREE.BufferAttribute;
       const extra = geometry.getAttribute("aGround") as THREE.BufferAttribute;
-      if (!colour || !splatA || !splatB || !extra) continue;
+      const paved = geometry.getAttribute("aPaved") as THREE.BufferAttribute;
+      if (!colour || !splatA || !splatB || !extra || !paved) continue;
 
       const colours = colour.array as Float32Array;
       const arrayA = splatA.array as Uint8Array;
       const arrayB = splatB.array as Uint8Array;
       const arrayExtra = extra.array as Uint8Array;
+      const arrayPaved = paved.array as Uint8Array;
       let touched = false;
 
       for (let i = 0; i < position.count; i += 1) {
@@ -981,7 +1005,7 @@ export class WorldScene {
         colours[i * 3] = surface.colour.r;
         colours[i * 3 + 1] = surface.colour.g;
         colours[i * 3 + 2] = surface.colour.b;
-        writeSplat(arrayA, arrayB, arrayExtra, i, surface);
+        writeSplat(arrayA, arrayB, arrayExtra, arrayPaved, i, surface);
         touched = true;
       }
 
@@ -990,6 +1014,7 @@ export class WorldScene {
       splatA.needsUpdate = true;
       splatB.needsUpdate = true;
       extra.needsUpdate = true;
+      paved.needsUpdate = true;
     }
   }
 
@@ -2184,6 +2209,8 @@ export class WorldScene {
     let dirtR = 0; let dirtG = 0; let dirtB = 0;
     let mudR = 0; let mudG = 0; let mudB = 0;
     let cobbleR = 0; let cobbleG = 0; let cobbleB = 0;
+    let brickR = 0; let brickG = 0; let brickB = 0;
+    let plankR = 0; let plankG = 0; let plankB = 0;
     let wetR = 0; let wetG = 0; let wetB = 0;
 
     const biomeWeights = this.biomeWeightsAt(x, z);
@@ -2200,6 +2227,8 @@ export class WorldScene {
       dirtR += swatches.dirt.r * weight; dirtG += swatches.dirt.g * weight; dirtB += swatches.dirt.b * weight;
       mudR += swatches.mud.r * weight; mudG += swatches.mud.g * weight; mudB += swatches.mud.b * weight;
       cobbleR += swatches.cobble.r * weight; cobbleG += swatches.cobble.g * weight; cobbleB += swatches.cobble.b * weight;
+      brickR += swatches.brick.r * weight; brickG += swatches.brick.g * weight; brickB += swatches.brick.b * weight;
+      plankR += swatches.plank.r * weight; plankG += swatches.plank.g * weight; plankB += swatches.plank.b * weight;
       wetR += swatches.wet.r * weight; wetG += swatches.wet.g * weight; wetB += swatches.wet.b * weight;
       weightSum += weight;
     }
@@ -2209,6 +2238,7 @@ export class WorldScene {
       out.colour.copy(fallback.high);
       out.grass = 1; out.dry = 0; out.rock = 0; out.gravel = 0;
       out.dirt = 0; out.mud = 0; out.cobble = 0; out.wet = 0;
+      out.pavedKind = 0;
       out.roadPerpendicular = 0.5;
       out.roadPresence = 0;
       out.roadWear = 0;
@@ -2275,20 +2305,34 @@ export class WorldScene {
     // wobble so the boundary is not a straight line, and ramped across the edge rather than from
     // it. `pavedEdge` is kept so the gravel shoulder below can sit outside whatever the wobble did.
     let cobble = 0;
+    let pavedKind = 0;
     let pavedEdge = Number.POSITIVE_INFINITY;
+    let edgeKerbed = false;
     const pavingWobble = noise
       ? (noise(x / 7.3, z / 7.3) * 0.7 + noise((x - 233) / 2.6, (z + 91) / 2.6) * 0.3)
         * PAVING_EDGE_WOBBLE
       : 0;
     for (const pad of this.paving) {
+      // A kerbed rect does NOT wobble. The kerb is real geometry standing on the authored line, so
+      // an edge that wanders 0.9 m across it puts grass inside the square and cobble outside it.
+      const kerbed = pad.kerb === true;
+      const feather = kerbed ? PAVING_KERB_FEATHER : PAVING_FEATHER;
       const distance = rectDistance(x, z, pad.centre, pad.halfExtents, pad.rotationY ?? 0)
-        + pavingWobble;
-      if (distance < pavedEdge) pavedEdge = distance;
-      cobble = Math.max(cobble, 1 - smoothstep01((distance + PAVING_FEATHER * 0.4) / PAVING_FEATHER));
+        + (kerbed ? 0 : pavingWobble);
+      if (distance < pavedEdge) {
+        pavedEdge = distance;
+        edgeKerbed = kerbed;
+      }
+      const weight = 1 - smoothstep01((distance + feather * 0.4) / feather);
+      if (weight > cobble) {
+        cobble = weight;
+        pavedKind = PAVING_SURFACE_CODE[pad.surface ?? "stone"];
+      }
     }
     // Grit and broken stone where the paving gives out, which is the same shoulder a worn road
-    // gets and the reason a town square stops looking like a rug thrown on a lawn.
-    if (pavedEdge < PAVING_FEATHER + PAVING_VERGE_METRES) {
+    // gets and the reason a town square stops looking like a rug thrown on a lawn. A kerb IS that
+    // shoulder, in stone, so a kerbed rect does not get a second one in gravel.
+    if (!edgeKerbed && pavedEdge < PAVING_FEATHER + PAVING_VERGE_METRES) {
       const shoulder = (1 - cobble)
         * (1 - smoothstep01((pavedEdge - PAVING_FEATHER * 0.6) / PAVING_VERGE_METRES));
       verge = Math.max(verge, clamp(shoulder, 0, 1));
@@ -2323,7 +2367,17 @@ export class WorldScene {
     out.dry = remaining * dryness;
     out.grass = remaining * (1 - dryness);
     out.cobble = cobble;
+    out.pavedKind = pavedKind;
     out.dirt = dirt;
+
+    // The paved swatch follows what the settlement paves IN. One "cobble" tone for all three would
+    // put Rootfall's plank green and Highcairn's dressed brick under Coldbrace's river stone, and
+    // the ground IS the paving now rather than the bed a slab sits on.
+    if (pavedKind >= 0.75) {
+      cobbleR = plankR; cobbleG = plankG; cobbleB = plankB;
+    } else if (pavedKind >= 0.25) {
+      cobbleR = brickR; cobbleG = brickG; cobbleB = brickB;
+    }
     out.wet = wet;
     out.mud = mud;
     out.roadPerpendicular = roadPerpendicular;
@@ -3306,6 +3360,15 @@ const ROAD_CELL = 8;
 const PAVING_FEATHER = 2.4;
 
 /**
+ * The same band for a KERBED rect, in metres.
+ *
+ * A kerb is a laid boundary and the pavement runs right up to it, so this is a mortar joint rather
+ * than a transition: wide enough that the 2 m terrain lattice can still resolve it, narrow enough
+ * that the paving reaches the kerb instead of stopping a metre inside it.
+ */
+const PAVING_KERB_FEATHER = 0.7;
+
+/**
  * How far the paved edge wanders off the authored rectangle, in metres.
  *
  * Two octaves of the surface noise: 7.3 m sets which stretch of the edge has crept out into the
@@ -3554,6 +3617,8 @@ interface SurfaceSample {
   mud: number;
   cobble: number;
   wet: number;
+  /** What the paving under this vertex is made of, as `PAVING_SURFACE_CODE`. */
+  pavedKind: number;
   /** Signed perpendicular distance to the nearest road, remapped onto 0..1. 0.5 is no road. */
   roadPerpendicular: number;
   /** 1 where a road is close enough for wheel ruts to exist. */
@@ -3568,7 +3633,7 @@ function emptySurface(): SurfaceSample {
   return {
     colour: new THREE.Color(),
     grass: 1, dry: 0, rock: 0, gravel: 0,
-    dirt: 0, mud: 0, cobble: 0, wet: 0,
+    dirt: 0, mud: 0, cobble: 0, wet: 0, pavedKind: 0,
     roadPerpendicular: 0.5, roadPresence: 0, roadWear: 0, macro: 0.5,
   };
 }
@@ -3582,6 +3647,7 @@ function writeSplat(
   splatA: Uint8Array,
   splatB: Uint8Array,
   extra: Uint8Array,
+  paved: Uint8Array,
   index: number,
   surface: SurfaceSample,
 ): void {
@@ -3597,6 +3663,7 @@ function writeSplat(
   extra[index * 4 + 1] = toByte(surface.roadPresence);
   extra[index * 4 + 2] = toByte(surface.roadWear);
   extra[index * 4 + 3] = toByte(surface.macro);
+  paved[index] = toByte(surface.pavedKind);
 }
 
 interface GroundSwatches {
@@ -3607,6 +3674,8 @@ interface GroundSwatches {
   dirt: THREE.Color;
   mud: THREE.Color;
   cobble: THREE.Color;
+  brick: THREE.Color;
+  plank: THREE.Color;
   wet: THREE.Color;
 }
 
@@ -3631,6 +3700,8 @@ function swatchesFor(regionId: RegionId): GroundSwatches {
     dirt: new THREE.Color(surfaceColour(regionId, "dirt")),
     mud: new THREE.Color(surfaceColour(regionId, "mud")),
     cobble: new THREE.Color(surfaceColour(regionId, "cobble")),
+    brick: new THREE.Color(surfaceColour(regionId, "brick")),
+    plank: new THREE.Color(surfaceColour(regionId, "plank")),
     wet: new THREE.Color(surfaceColour(regionId, "wet")),
   };
   SWATCH_CACHE.set(regionId, swatches);
@@ -3753,15 +3824,15 @@ function cellKey(cx: number, cz: number): number {
  * layer authors paving as an axis-aligned min/max rect and the stamp works in centre-plus-extent,
  * and a sign error there would put a cobbled square in the wrong half of a settlement.
  */
-export function pavingStampFromRect(rect: {
-  minX: number;
-  minZ: number;
-  maxX: number;
-  maxZ: number;
-}): PavingStamp {
+export function pavingStampFromRect(
+  rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+  options: { surface?: PavingSurface; kerb?: boolean } = {},
+): PavingStamp {
   return {
     centre: [(rect.minX + rect.maxX) / 2, (rect.minZ + rect.maxZ) / 2],
     halfExtents: [Math.abs(rect.maxX - rect.minX) / 2, Math.abs(rect.maxZ - rect.minZ) / 2],
+    surface: options.surface ?? "stone",
+    kerb: options.kerb === true,
   };
 }
 

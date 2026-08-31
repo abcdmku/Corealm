@@ -40,9 +40,9 @@
  *    (local -Z), so world door facing is `rotationY + PI` and the leaf lands at
  *    `position + rot(0.55, -(depth / 2 + 0.02))`.
  *  - The middle of the town was a 25.0 x 23.0 m rectangle (575 m2) holding a 1.28 m bank chest, a
- *    1.08 m anvil and a cooking pot and nothing else. It is 208 tiles of `floor_cobble` in five
- *    rects - one instanced group - plus 40 kerb pieces in two more, carrying a kerbed square, a
- *    well, three benches, a market arcade, a bank counter and a forge yard.
+ *    1.08 m anvil and a cooking pot and nothing else. It is five rects of stamped cobble plus 40
+ *    kerb pieces, carrying a kerbed square, a well, three benches, a market arcade, a bank counter
+ *    and a forge yard.
  *  - Every station stood loose on grass, and the Forge Shed's only door faced away from the anvil
  *    and furnace it served. The anvil and furnace are inside an open-fronted `forge` whose mouth is
  *    the square's east kerb; the crafting and fletching benches are under an `arcade` on the vault
@@ -191,12 +191,12 @@ export const COLDBRACE: SettlementDef = {
     { id: "coldbrace_wall_w", name: "West Wall", from: [-186, -56], to: [-186, -108], openings: [{ at: 16, width: 8 }] },
   ],
 
-  // 238 tiles of `floor_cobble`. Cobble because Coldbrace is the oldest and plainest of the three
-  // and lays what the river plain gives it; the quarry town pays for brick and the logging town
-  // decks in plank. Every bound is an even metre, so the tiles - whose centres sit on the
-  // half-module lattice anchored at the world origin - meet across rect boundaries with no half
-  // tile and no seam. Only the square is kerbed: kerbs ring the OUTSIDE of a rect, so kerbing two
-  // rects that share an edge lays a kerb down the middle of a continuous pavement.
+  // Cobble because Coldbrace is the oldest and plainest of the three and lays what the river plain
+  // gives it; the quarry town pays for dressed block and the logging town decks in plank. The
+  // surface is stamped into the ground rather than laid on it, so two rects that share an edge are
+  // one continuous pavement and no bound has to land on any particular metre. Only the square is
+  // kerbed: kerbs ring the OUTSIDE of a rect, so kerbing both halves of a continuous pavement would
+  // lay a kerb down the middle of it.
   paving: [
     // The square, 22 x 14 around `town_center` (-160,-80). 77 tiles.
     { id: "coldbrace_pave_square", rect: { minX: -170, minZ: -86, maxX: -148, maxZ: -72 }, assetId: "floor_cobble", kerb: true },

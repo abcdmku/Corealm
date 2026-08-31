@@ -29,8 +29,8 @@
  *    loose 4 m apart with no structure at all. The chest is now under a `porch` at its unchanged
  *    coordinate and both smithing stations are inside a `forge`, and each one names what it is
  *    part of through `attachedTo`, which `validateRegions` asserts to within 3 m.
- *  - A 315 m2 void in the middle with nothing in it. There are now 97 floor_brick tiles, 59 props
- *    and 116 m of wall in it.
+ *  - A 315 m2 void in the middle with nothing in it. There are now 388 m2 of stamped brick, 59
+ *    props and 116 m of wall in it.
  *
  * THE BANK STAYS AT (150,-70). It is one end of both legs of the route-optimisation flip (187.9 m
  * by road against 45.9 m over Sunder Ledge). See the DISTANCE LEDGER at the top of `regions.ts`
@@ -167,8 +167,8 @@ export const HIGHCAIRN: SettlementDef = {
     { id: "highcairn_postern", name: "Quarry Postern", prefab: "gatehouse", position: [122, -58], rotationY: -Math.PI / 2, footprint: [8, 4] },
   ],
 
-  // floor_brick, because the quarry town paves in its own stone, and because the farm plot beds
-  // already emit floor_brick at this tier — the whole yard is therefore zero new instanced groups.
+  // floor_brick, because the quarry town paves in its own stone: the ground stamp reads this as a
+  // dressed block course, laid to a line, against Coldbrace's gathered river cobble.
   // No `kerb`: `emitPaving` rings the entire rect, and every edge of this yard is either a hut
   // doorstep at z = -54.02, the forge mouth at z = -68.0, or a gate road. A 13 cm lip across any of
   // those is a snag and reads as a mistake, so the yard's edge is drawn by what stands on it.
