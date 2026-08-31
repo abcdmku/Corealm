@@ -116,6 +116,7 @@ import {
   assembleFeatureLabStructure,
   type FeatureLabStructureAssembly,
 } from "../featureLab/structures.js";
+import { BOOT_MILESTONES, BOOT_SPANS, bootTelemetry } from "../perf/bootTelemetry.js";
 
 export interface BootResult {
   loop: GameLoop;
@@ -129,6 +130,16 @@ export interface BootOptions {
 
 export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {}): Promise<BootResult> {
   const profile = options.profile ?? GAME_BOOT_PROFILE;
+  const bootTotalSpan = bootTelemetry.startSpan(BOOT_SPANS.TOTAL, { startMs: 0 });
+  const bootEntryMs = bootTelemetry.elapsedMs();
+  const navigationTiming = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+  bootTelemetry.recordSpan({
+    name: BOOT_SPANS.JS_EVALUATION,
+    startMs: Math.max(0, navigationTiming?.responseEnd ?? 0),
+    endMs: bootEntryMs,
+  });
+  bootTelemetry.milestone(BOOT_MILESTONES.JS_EVALUATED);
+
   const errors: RecordedError[] = [];
   const worldMapCapture = new URLSearchParams(window.location.search).get("world-map-capture") === "1";
   const startedAt = performance.now();
@@ -206,7 +217,11 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   // 3 + 4. WASM libraries. Both must finish before any world building.
   setStatus("starting the simulation…");
-  await Promise.all([Physics.initLibrary(), Navigation.initLibrary()]);
+  await Promise.all([
+    bootTelemetry.measureAsync(BOOT_SPANS.PHYSICS_WASM_INIT, () => Physics.initLibrary()),
+    bootTelemetry.measureAsync(BOOT_SPANS.NAVIGATION_WASM_INIT, () => Navigation.initLibrary()),
+  ]);
+  bootTelemetry.milestone(BOOT_MILESTONES.WASM_READY);
   const physics = new Physics();
   physics.create();
   const nav = new Navigation();
@@ -221,8 +236,10 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   setStatus("loading assets…");
   const assets = new AssetRegistry();
   try {
-    await assets.loadManifest();
-    await assets.loadAnimationLibraries();
+    await bootTelemetry.measureAsync(BOOT_SPANS.MANIFEST_LOAD, () => assets.loadManifest());
+    bootTelemetry.milestone(BOOT_MILESTONES.MANIFEST_READY);
+    await bootTelemetry.measureAsync(BOOT_SPANS.ANIMATION_LOAD, () => assets.loadAnimationLibraries());
+    bootTelemetry.milestone(BOOT_MILESTONES.ANIMATIONS_READY);
   } catch (cause) {
     errors.push({ atMs: atMs(), source: "assets", message: describeError(cause) });
   }
@@ -272,10 +289,12 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // settlement stays as noisy as the moor around it — Coldbrace square measured a metre of tilt
   // across 33 m before this. worldSpec derives the pads from the authored settlement data.
   const terrainSpec = profile.terrain();
-  scene.buildWorld(terrainSpec);
-  // One heightfield collider rather than 28 terrain trimeshes: same ground answers, 24 ms instead
-  // of a per-chunk trimesh build, and a single collider for the ray queries to walk.
-  physics.addHeightfield(scene.heightfieldSamples());
+  bootTelemetry.measureSync(BOOT_SPANS.TERRAIN_BUILD, () => {
+    scene.buildWorld(terrainSpec);
+    // One heightfield collider rather than 28 terrain trimeshes: same ground answers, 24 ms instead
+    // of a per-chunk trimesh build, and a single collider for the ray queries to walk.
+    physics.addHeightfield(scene.heightfieldSamples());
+  });
 
   const heightAt = (regionId: RegionId, x: number, z: number): number => scene.heightAt(regionId, x, z);
 
@@ -292,7 +311,12 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   //     already exists, and the water level has to be sampled off the finished terrain. Supplying
   //     roads here also retires the ribbon path — `scene.buildRoad` returns null once stamps are
   //     provided — so there is exactly one road in the world rather than two that disagree.
-  if (profile.worldSurface) prepareWorldSurface(scene, store.get().meta.seed);
+  if (profile.worldSurface) {
+    bootTelemetry.measureSync(BOOT_SPANS.TERRAIN_RESTAMP, () => {
+      prepareWorldSurface(scene, store.get().meta.seed);
+    });
+  }
+  bootTelemetry.milestone(BOOT_MILESTONES.TERRAIN_READY);
 
   // 7c. Water. Fishing spots were authored as interaction markers with a note that the water itself
   //     is the render layer's job — and nothing was building it, so every fishing spot sat on dry
@@ -457,15 +481,18 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   // 9. Navmesh over the walkable terrain, then the route graph above it.
   setStatus("mapping walkable ground…");
-  if (!nav.build([
+  const navigationBuilt = bootTelemetry.measureSync(BOOT_SPANS.NAVIGATION_BUILD, () => nav.build([
     ...scene.getWalkableMeshes(),
     ...(dungeon?.walkable ?? []),
     ...(dungeon?.blockers ?? []),
     ...structureNavigation.meshes,
     ...navCarves,
-  ])) {
+  ]));
+  if (!navigationBuilt) {
     const failure = nav.snapshot(null, null, 0).error ?? "unknown";
     errors.push({ atMs: atMs(), source: "navigation", message: `Navmesh build failed: ${failure}` });
+  } else {
+    bootTelemetry.milestone(BOOT_MILESTONES.NAVIGATION_READY);
   }
   nav.setRouteGraph(built.routeNodes, built.routeEdges);
 
@@ -479,7 +506,14 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   if (profile.scatter) {
     registerExclusions(scene);
     try {
-      scatterResults = await scatterWorld(scene, assets, store.get().meta.seed);
+      scatterResults = await bootTelemetry.measureAsync(
+        "boot.scatter.total",
+        () => scatterWorld(scene, assets, store.get().meta.seed),
+      );
+      bootTelemetry.milestone(BOOT_MILESTONES.SCATTER_SPAWN_READY, {
+        regions: scatterResults.length,
+        layers: scatterResults.reduce((total, result) => total + Object.keys(result.byLayer).length, 0),
+      });
     } catch (cause) {
       errors.push({ atMs: atMs(), source: "scatter", message: describeError(cause) });
     }
@@ -499,15 +533,22 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     maxUniqueDrawCalls: 96,
     maxUniqueViews: 16,
   });
-  await preloadEntityAssets(assets, entityStore, errors, atMs);
+  await bootTelemetry.measureAsync(
+    BOOT_SPANS.ENTITY_PRELOAD,
+    () => preloadEntityAssets(assets, entityStore, errors, atMs),
+  );
   try {
-    entityViews.sync(entityStore.all());
+    bootTelemetry.measureSync(BOOT_SPANS.FIRST_ENTITY_SYNC, () => entityViews.sync(entityStore.all()));
   } catch (cause) {
     errors.push({ atMs: atMs(), source: "entityViews", message: describeError(cause) });
   }
   for (const missing of entityViews.stats().missingAssets) {
     errors.push({ atMs: atMs(), source: "entityViews", message: `Missing asset "${missing}"` });
   }
+  bootTelemetry.milestone(BOOT_MILESTONES.ENTITIES_READY, {
+    semanticEntities: entityStore.all().length,
+    missingAssets: entityViews.stats().missingAssets.length,
+  });
 
   // The camera pulls in when terrain or a building blocks the view of the player. The probe starts
   // at head height rather than at the feet, so the player's own capsule is never the first hit —
@@ -538,10 +579,13 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // reason the capsule stays as the fallback, because a missing player is unrecoverable and an
   // ugly player is not.
   const playerRig = new CharacterRig(assets);
-  const rigged = await playerRig.build({
-    bodyAssetId: "base_male",
-    outfitAssetIds: ["outfit_male_peasant_chest", "outfit_male_peasant_legs", "outfit_male_peasant_boots"],
-  });
+  const rigged = await bootTelemetry.measureAsync(
+    BOOT_SPANS.PLAYER_CONSTRUCTION,
+    () => playerRig.build({
+      bodyAssetId: "base_male",
+      outfitAssetIds: ["outfit_male_peasant_chest", "outfit_male_peasant_legs", "outfit_male_peasant_boots"],
+    }),
+  );
   if (rigged) {
     scene.entityGroup.add(playerRig.root);
     playerRig.setPosition(initialPlayerPosition, initialPlayerFacing);
@@ -552,6 +596,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   scene.syncPlayer(initialPlayerPosition, initialPlayerFacing, true);
   camera.setPose(initialPlayerFacing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
   camera.update(initialPlayerPosition[0], initialPlayerPosition[1], initialPlayerPosition[2], true);
+  bootTelemetry.milestone(BOOT_MILESTONES.PLAYER_READY);
 
   // 13. Region loops are selected only after the save decides the player's starting region.
   // Until this point gesture unlock has no desired loop to start, so the loading screen cannot
@@ -1423,6 +1468,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // The agent surface. Always installed at window.corealm.agent, and mirrored onto whichever
   // model-context container the browser provides. One implementation, three ways in.
   // The human UI. Everything it does goes through GameApi, the same object the agent tools call.
+  const uiConstructionSpan = bootTelemetry.startSpan(BOOT_SPANS.UI_CONSTRUCTION);
   const ui = createUi(api, {
     settings: clientSettings,
     mapTerrain: {
@@ -1448,6 +1494,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   api.subscribePendingResult(({ result }) => {
     if (!result.ok) ui.notify(result.error.message, "error");
   });
+  uiConstructionSpan.end();
+  bootTelemetry.milestone(BOOT_MILESTONES.UI_READY);
 
   // UI sound follows semantic activation, so pointer clicks and keyboard-generated clicks share
   // one path. Canvas clicks are excluded: world actions have their own material-specific cues.
@@ -2051,19 +2099,33 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // and the +3-point-light variant of every material in it.
   if (profile.fullWarmup) {
     setStatus("warming the shaders…");
-    renderer.warmup({
-      transparentVariants: [scene.root],
-      temporarilyVisible: dungeon ? [dungeon.group] : [],
+    bootTelemetry.measureSync(BOOT_SPANS.SHADER_COMPILE, () => {
+      renderer.warmup({
+        transparentVariants: [scene.root],
+        temporarilyVisible: dungeon ? [dungeon.group] : [],
+      });
     });
   }
+  bootTelemetry.milestone(BOOT_MILESTONES.SHADERS_READY);
 
-  document.getElementById("boot-screen")?.remove();
+  bootTelemetry.measureSync(BOOT_SPANS.BOOT_SCREEN_REMOVAL, () => {
+    document.getElementById("boot-screen")?.remove();
+  });
+  bootTelemetry.milestone(BOOT_MILESTONES.BOOT_SCREEN_REMOVED);
   if (worldMapCapture) {
     // Build-time capture is deterministic: no animation/motion frame may land between two tiles.
     scene.updateTime(0);
     scene.updateStreaming(0, 0, Infinity);
   } else {
+    const firstFrameSpan = bootTelemetry.startSpan(BOOT_SPANS.FIRST_RENDERED_FRAME);
     loop.start();
+    requestAnimationFrame(() => {
+      firstFrameSpan.end();
+      bootTelemetry.milestone(BOOT_MILESTONES.FIRST_RENDERED_FRAME);
+      bootTelemetry.milestone(BOOT_MILESTONES.FIRST_PLAYABLE);
+      bootTotalSpan.end();
+      bootTelemetry.recordPerformanceResources();
+    });
   }
   return { loop, api, ...(featureLab ? { featureLab } : {}) };
 }
