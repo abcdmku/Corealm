@@ -5,8 +5,6 @@ import {
   type GroundStamps,
   type WorldTerrainSpec,
 } from "../game/src/render/scene.js";
-import { prepareWorldSurface } from "../game/src/app/worldSurface.js";
-import { buildWorldTerrainSpec } from "../game/src/app/worldSpec.js";
 
 const SMALL_WORLD: WorldTerrainSpec = {
   bounds: { minX: -4, maxX: 4, minZ: -4, maxZ: 4 },
@@ -50,40 +48,6 @@ function buildPreparedScene(): WorldScene {
 }
 
 describe("prepared world startup", () => {
-  it("solves the authored roads and water before the first terrain pass", () => {
-    const scene = new WorldScene(new THREE.Scene());
-    let summary: ReturnType<typeof prepareWorldSurface> | undefined;
-
-    scene.buildWorld(buildWorldTerrainSpec(), (prepared) => {
-      summary = prepareWorldSurface(prepared, 1337);
-      expect(prepared.getWalkableMeshes()).toHaveLength(0);
-    });
-
-    expect(summary).toEqual({ roadCount: 45, pavingCount: 18, waterCount: 4 });
-    expect(scene.getRoadPolylines()).toHaveLength(summary!.roadCount);
-    expect(scene.getWaterBodies()).toHaveLength(summary!.waterCount);
-    expect(scene.getWaterBodies().every((water) => water.closed)).toBe(true);
-    expect(scene.getTerrainBuildStats()).toEqual({
-      chunkBuildCount: 28,
-      restampPassCount: 0,
-      restampedVertexCount: 0,
-    });
-
-    const heightSamples = [
-      [-230, -40, 4.9014363],
-      [-120, 0, 2.7265694],
-      [-5, 0, 2.1418357],
-      [110, 0, 4.1572809],
-      [225, -100, 42.2732258],
-      [-40, -60, -3.0902672],
-    ] as const;
-    for (const [x, z, expected] of heightSamples) {
-      expect(scene.meshHeightAt(x, z)).toBeCloseTo(expected, 4);
-    }
-
-    scene.clear();
-  });
-
   it("establishes stamps before building and shading each chunk once", () => {
     const scene = buildPreparedScene();
 

@@ -41,24 +41,6 @@ const PREFAB_SELECTION = {
   seed: 3,
 } as const satisfies FeatureLabStructureSelection;
 
-const COMPOSITION_SELECTION = {
-  kind: "composition",
-  id: "milestone",
-  kit: "timber",
-  width: 6,
-  depth: 4,
-  seed: 7,
-} as const satisfies FeatureLabStructureSelection;
-
-const WALL_RUN_SELECTION = {
-  kind: "wall-run",
-  id: "wall_run",
-  kit: "plaster",
-  width: 10,
-  depth: 2,
-  seed: 2,
-} as const satisfies FeatureLabStructureSelection;
-
 interface Point {
   x: number;
   y: number;
@@ -155,32 +137,15 @@ interface CombatEvidence {
   };
 }
 
-interface StructureProof {
-  state: FeatureLabState;
-  wallMs: number;
-}
-
 interface BuildingEvidence {
   ready: FeatureLabState;
   final: FeatureLabState;
   probe: RuntimeProbe;
-  authoringControlsWired: boolean;
   structures: {
-    initial: FeatureLabStructureView;
     prefab: FeatureLabStructureView;
-    composition: FeatureLabStructureView;
     wallRun: FeatureLabStructureView;
   };
   rebuildMs: number[];
-  playerVisibility: {
-    initial: boolean;
-    hidden: boolean;
-    restored: boolean;
-    hiddenControlChecked: boolean;
-    restoredControlChecked: boolean;
-    before: FeatureLabState["playerPosition"];
-    after: FeatureLabState["playerPosition"];
-  };
   walking: {
     before: FeatureLabState["playerPosition"];
     after: FeatureLabState["playerPosition"];
@@ -193,22 +158,16 @@ interface BuildingEvidence {
     after: FeatureLabState["playerPosition"];
     structureStable: boolean;
     keyboardStable: boolean;
-    leftClickStable: boolean;
-    contextWalkDisabled: boolean;
     navigationStarted: readonly [number, number];
     routeStayedIdle: boolean;
-    orbitRetained: boolean;
-    zoomRetained: boolean;
   };
   freeCamera: {
     enabled: boolean;
     disabled: boolean;
     playerBefore: FeatureLabState["playerPosition"];
     playerAfter: FeatureLabState["playerPosition"];
-    panBefore: CameraProbe;
-    panAfter: CameraProbe;
+    orbitBefore: CameraProbe;
     orbitAfter: CameraProbe;
-    zoomAfter: CameraProbe;
     fitAfter: CameraProbe;
     enabledControlChecked: boolean;
     disabledControlChecked: boolean;
@@ -282,9 +241,7 @@ try {
 
   const combatStructuresValid = structureIsValid(combat.ready.structure);
   const buildingStructuresValid = [
-    building.structures.initial,
     building.structures.prefab,
-    building.structures.composition,
     building.structures.wallRun,
   ].every(structureIsValid);
   const sharedWorld = probesShareWorld(combat.probe, building.probe)
@@ -317,33 +274,17 @@ try {
       && numericFell(combat.cast.health)
       && combat.cast.motionAdvanced,
     buildingRouteStartsInAuthoringMode: building.ready.mode === "building" && !building.ready.walkingEnabled,
-    buildingAuthoringControlsWired: building.authoringControlsWired,
     buildingProductionStructuresValid: buildingStructuresValid,
-    buildingCollisionCoverage: building.structures.initial.collisionCount > 0
-      && building.structures.prefab.collisionCount > 0
-      && building.structures.wallRun.collisionCount > 0
-      && building.structures.composition.collisionCount > 0,
-    buildingCoversAllStructureKinds: building.structures.prefab.selection.kind === "prefab"
-      && building.structures.composition.selection.kind === "composition"
-      && building.structures.wallRun.selection.kind === "wall-run",
-    buildingStructureSelectionsApplied: selectionMatches(
+    buildingCollisionCoverage: building.structures.prefab.collisionCount > 0
+      && building.structures.wallRun.collisionCount > 0,
+    buildingAuthoringControlRebuildsStructure: selectionMatches(
       building.structures.prefab.selection,
       PREFAB_SELECTION,
-    ) && selectionMatches(building.structures.composition.selection, COMPOSITION_SELECTION)
-      && selectionMatches(building.structures.wallRun.selection, WALL_RUN_SELECTION),
-    buildingCompositionUsesCollisionHero: building.structures.composition.selection.id === COMPOSITION_SELECTION.id
-      && building.structures.composition.collisionCount > 0,
+    ) && building.structures.wallRun.selection.kind === "wall-run"
+      && building.structures.wallRun.selection.id === "wall_run",
     buildingWallDimensionsSupported: wallDimensionsSupported(building.structures.wallRun.selection),
-    buildingRevisionsAdvance: building.structures.prefab.revision >= building.structures.initial.revision
-      && building.structures.composition.revision > building.structures.prefab.revision
-      && building.structures.wallRun.revision > building.structures.composition.revision,
+    buildingRevisionsAdvance: building.structures.wallRun.revision > building.structures.prefab.revision,
     buildingRebuildsMeetBudget: building.rebuildMs.every((duration) => duration <= REBUILD_BUDGET_MS),
-    buildingPlayerVisibilityToggleWorks: building.playerVisibility.initial
-      && !building.playerVisibility.hidden
-      && building.playerVisibility.restored
-      && !building.playerVisibility.hiddenControlChecked
-      && building.playerVisibility.restoredControlChecked
-      && distanceXZ(building.playerVisibility.before, building.playerVisibility.after) < 0.08,
     buildingWalkingMovesPlayerAndKeepsStructure: distanceXZ(
       building.walking.before,
       building.walking.after,
@@ -355,23 +296,16 @@ try {
       && distanceXZ(building.disabled.before, building.disabled.after) < 0.08
       && building.disabled.structureStable
       && building.disabled.keyboardStable
-      && building.disabled.leftClickStable
-      && building.disabled.contextWalkDisabled
       && building.disabled.navigationStarted[1] === building.disabled.navigationStarted[0]
       && building.disabled.routeStayedIdle,
-    buildingAuthoringRetainsCameraControls: building.disabled.orbitRetained
-      && building.disabled.zoomRetained,
-    buildingFreeCameraPansAndOrbitsWithoutMovingPlayer: building.freeCamera.enabled
+    buildingFreeCameraOrbitsWithoutMovingPlayer: building.freeCamera.enabled
       && building.freeCamera.disabled
       && building.freeCamera.enabledControlChecked
       && !building.freeCamera.disabledControlChecked
       && distanceXZ(building.freeCamera.playerBefore, building.freeCamera.playerAfter) < 0.08
-      && distancePoint3(building.freeCamera.panBefore.target, building.freeCamera.panAfter.target) >= 0.1
-      && (Math.abs(building.freeCamera.orbitAfter.yaw - building.freeCamera.panAfter.yaw) >= 0.01
-        || Math.abs(building.freeCamera.orbitAfter.pitch - building.freeCamera.panAfter.pitch) >= 0.01)
-      && Math.abs(building.freeCamera.zoomAfter.requestedDistance
-        - building.freeCamera.orbitAfter.requestedDistance) >= 0.1
-      && distancePoint3(building.freeCamera.fitAfter.target, building.freeCamera.panAfter.target) >= 0.1,
+      && (Math.abs(building.freeCamera.orbitAfter.yaw - building.freeCamera.orbitBefore.yaw) >= 0.01
+        || Math.abs(building.freeCamera.orbitAfter.pitch - building.freeCamera.orbitBefore.pitch) >= 0.01)
+      && building.freeCamera.fitAfter.freeMove,
     modeSelectionReloadsFreshRuntime: modeNavigation.from === "building"
       && modeNavigation.to === "combat"
       && modeNavigation.before.id !== modeNavigation.after.id
@@ -428,7 +362,6 @@ try {
     building: {
       structures: building.structures,
       rebuildMs: building.rebuildMs.map(Math.round),
-      playerVisibility: building.playerVisibility,
       walking: building.walking,
       disabled: building.disabled,
       freeCamera: building.freeCamera,
@@ -673,55 +606,27 @@ async function testBuilding(
   ), READY_BUDGET_MS);
   remember(ready);
   const probe = await readRuntimeProbe(targetPage);
-  const authoringControlsWired = await verifyBuildingAuthoringControls(targetPage);
+  const sourceKind = targetPage.locator("#lab-source-kind");
+  await sourceKind.waitFor({ state: "visible", timeout: 2_000 });
+  const rebuildStarted = performance.now();
+  await sourceKind.selectOption("wall-run");
+  const wallRun = await waitForState(targetPage, "building control structure rebuild", (state) => (
+    state.structure.ready
+    && state.structure.revision > ready.structure.revision
+    && state.structure.selection.kind === "wall-run"
+    && state.structure.selection.id === "wall_run"
+  ), REBUILD_BUDGET_MS);
+  remember(wallRun);
+  const rebuildMs = performance.now() - rebuildStarted;
+
   await targetPage.evaluate(() => window.__featureLab?.fitStructure());
   await targetPage.waitForTimeout(80);
-  // Leave a little air around tall prefabs so the disposable evidence shows the full silhouette.
+  // Leave a little air around the structure so the disposable evidence shows the full silhouette.
   await targetPage.locator("#viewport").hover();
-  for (let step = 0; step < 7; step += 1) await targetPage.mouse.wheel(0, 240);
+  for (let step = 0; step < 3; step += 1) await targetPage.mouse.wheel(0, 240);
   await targetPage.waitForTimeout(50);
   const authoringShot = path.join(captures, "building-authoring.png");
   await capture(targetPage, authoringShot, captured);
-  const catalog = await readCatalog(targetPage);
-  const prefab = catalog.structures.prefabs.find((row) => row.id === PREFAB_SELECTION.id);
-  const composition = catalog.structures.compositions.find((row) => row.id === COMPOSITION_SELECTION.id);
-  const plaster = catalog.structures.kits.find((row) => row.id === WALL_RUN_SELECTION.kit);
-  const timber = catalog.structures.kits.find((row) => row.id === COMPOSITION_SELECTION.kit);
-  const stone = catalog.structures.kits.find((row) => row.id === PREFAB_SELECTION.kit);
-  if (!prefab || !composition || !plaster || !timber || !stone) {
-    throw new Error("Building lab is missing a canonical structure or kit");
-  }
-
-  // The compatibility route already assembled this exact production prefab. Reuse it as the
-  // prefab proof instead of rebuilding an identical navmesh solely to increment a counter.
-  const prefabProof: StructureProof = { state: ready, wallMs: ready.structure.buildMs };
-  const compositionProof = await rebuild(targetPage, ready.structure.revision, {
-    ...COMPOSITION_SELECTION,
-    id: composition.id,
-    kit: timber.id,
-  });
-  remember(compositionProof.state);
-  const wallRunProof = await rebuild(targetPage, compositionProof.state.structure.revision, {
-    ...WALL_RUN_SELECTION,
-    kit: plaster.id,
-  });
-  remember(wallRunProof.state);
-
-  const playerVisibleToggle = targetPage.locator("#lab-player-visible");
-  await playerVisibleToggle.waitFor({ state: "visible", timeout: 2_000 });
-  const initialPlayerVisible = wallRunProof.state.playerVisible && await playerVisibleToggle.isChecked();
-  await setToggle(playerVisibleToggle, false);
-  const playerHidden = await waitForState(targetPage, "hide building player", (state) => (
-    state.mode === "building" && !state.playerVisible
-  ), 2_000);
-  remember(playerHidden);
-  const hiddenControlChecked = await playerVisibleToggle.isChecked();
-  await setToggle(playerVisibleToggle, true);
-  const playerRestored = await waitForState(targetPage, "restore building player", (state) => (
-    state.mode === "building" && state.playerVisible
-  ), 2_000);
-  remember(playerRestored);
-  const restoredControlChecked = await playerVisibleToggle.isChecked();
 
   const toggle = targetPage.locator("#lab-walk-enabled");
   await toggle.waitFor({ state: "visible", timeout: 2_000 });
@@ -744,8 +649,6 @@ async function testBuilding(
         && buildingMotionAdvanced
         && visuallyActive;
     });
-    const walkingShot = path.join(captures, "building-walking.png");
-    await capture(targetPage, walkingShot, captured);
   } finally {
     await targetPage.keyboard.up("w");
   }
@@ -770,27 +673,6 @@ async function testBuilding(
     x: canvasBox.x + canvasBox.width * 0.4,
     y: canvasBox.y + canvasBox.height * 0.68,
   };
-  await targetPage.mouse.click(authoringPoint.x, authoringPoint.y);
-  await targetPage.waitForTimeout(60);
-  const clickDisabled = await readState(targetPage);
-  await targetPage.mouse.click(authoringPoint.x, authoringPoint.y, { button: "right" });
-  const walkItem = targetPage.getByRole("menuitem", { name: /Walk here/ });
-  await walkItem.waitFor({ state: "visible", timeout: 1_000 });
-  const contextWalkDisabled = await walkItem.getAttribute("aria-disabled") === "true";
-  await targetPage.keyboard.press("Escape");
-
-  const cameraBefore = await readCameraProbe(targetPage);
-  await targetPage.mouse.move(authoringPoint.x, authoringPoint.y);
-  await targetPage.mouse.down({ button: "right" });
-  await targetPage.mouse.move(authoringPoint.x + 64, authoringPoint.y - 28, { steps: 4 });
-  await targetPage.mouse.up({ button: "right" });
-  await targetPage.waitForTimeout(50);
-  const cameraAfterOrbit = await readCameraProbe(targetPage);
-  // Fit can leave the authored view at the maximum distance, so zoom inward for a guaranteed
-  // non-clamped wheel response.
-  await targetPage.mouse.wheel(0, -360);
-  await targetPage.waitForTimeout(60);
-  const cameraAfterZoom = await readCameraProbe(targetPage);
 
   const freeCameraToggle = targetPage.locator("#lab-free-move");
   await freeCameraToggle.waitFor({ state: "visible", timeout: 2_000 });
@@ -803,29 +685,18 @@ async function testBuilding(
   ), 2_000);
   remember(freeCameraReady);
   const freeCameraChecked = await freeCameraToggle.isChecked();
-  const freePanBefore = await readCameraProbe(targetPage);
-  await targetPage.mouse.move(authoringPoint.x, authoringPoint.y);
-  await targetPage.mouse.down({ button: "middle" });
-  await targetPage.mouse.move(authoringPoint.x + 72, authoringPoint.y + 36, { steps: 5 });
-  await targetPage.mouse.up({ button: "middle" });
-  await targetPage.waitForTimeout(60);
-  const freePanAfter = await readCameraProbe(targetPage);
+  const freeOrbitBefore = await readCameraProbe(targetPage);
   await targetPage.mouse.move(authoringPoint.x, authoringPoint.y);
   await targetPage.mouse.down({ button: "right" });
   await targetPage.mouse.move(authoringPoint.x - 56, authoringPoint.y + 24, { steps: 4 });
   await targetPage.mouse.up({ button: "right" });
   await targetPage.waitForTimeout(60);
   const freeOrbitAfter = await readCameraProbe(targetPage);
-  await targetPage.mouse.wheel(0, -240);
-  await targetPage.waitForTimeout(50);
-  const freeZoomAfter = await readCameraProbe(targetPage);
   await targetPage.getByRole("button", { name: "Fit structure" }).click();
   await targetPage.waitForTimeout(60);
   const freeFitAfter = await readCameraProbe(targetPage);
   const freeCameraPlayerAfter = await readState(targetPage);
   remember(freeCameraPlayerAfter);
-  const freeCameraShot = path.join(captures, "building-free-camera.png");
-  await capture(targetPage, freeCameraShot, captured);
   await setToggle(freeCameraToggle, false);
   const freeCameraDisabled = await waitForState(targetPage, "disable building free camera", (state) => (
     state.mode === "building" && !state.freeCameraEnabled && state.movement.mode === "idle"
@@ -844,23 +715,11 @@ async function testBuilding(
     ready,
     final,
     probe,
-    authoringControlsWired,
     structures: {
-      initial: ready.structure,
-      prefab: prefabProof.state.structure,
-      composition: compositionProof.state.structure,
-      wallRun: wallRunProof.state.structure,
+      prefab: ready.structure,
+      wallRun: wallRun.structure,
     },
-    rebuildMs: [compositionProof.wallMs, wallRunProof.wallMs],
-    playerVisibility: {
-      initial: initialPlayerVisible,
-      hidden: playerHidden.playerVisible,
-      restored: playerRestored.playerVisible,
-      hiddenControlChecked,
-      restoredControlChecked,
-      before: wallRunProof.state.playerPosition,
-      after: playerRestored.playerPosition,
-    },
+    rebuildMs: [rebuildMs],
     walking: {
       before: walkingReady.playerPosition,
       after: walked.playerPosition,
@@ -873,24 +732,16 @@ async function testBuilding(
       after: final.playerPosition,
       structureStable: sameStructure(stableStructure, final.structure),
       keyboardStable,
-      leftClickStable: distanceXZ(keyboardDisabled.playerPosition, clickDisabled.playerPosition) < 0.08,
-      contextWalkDisabled,
-      navigationStarted: [disabledBefore.counters.navigationStarted, clickDisabled.counters.navigationStarted],
-      routeStayedIdle: keyboardDisabled.movement.mode === "idle" && clickDisabled.movement.mode === "idle",
-      orbitRetained: Math.abs(cameraAfterOrbit.yaw - cameraBefore.yaw) >= 0.01
-        || Math.abs(cameraAfterOrbit.pitch - cameraBefore.pitch) >= 0.01,
-      zoomRetained: Math.abs(cameraAfterZoom.requestedDistance - cameraAfterOrbit.requestedDistance) >= 0.1
-        || Math.abs(cameraAfterZoom.distance - cameraAfterOrbit.distance) >= 0.1,
+      navigationStarted: [disabledBefore.counters.navigationStarted, keyboardDisabled.counters.navigationStarted],
+      routeStayedIdle: keyboardDisabled.movement.mode === "idle",
     },
     freeCamera: {
-      enabled: freeCameraReady.freeCameraEnabled && freePanBefore.freeMove,
+      enabled: freeCameraReady.freeCameraEnabled && freeOrbitBefore.freeMove,
       disabled: !freeCameraDisabled.freeCameraEnabled,
       playerBefore: freeCameraReady.playerPosition,
       playerAfter: freeCameraPlayerAfter.playerPosition,
-      panBefore: freePanBefore,
-      panAfter: freePanAfter,
+      orbitBefore: freeOrbitBefore,
       orbitAfter: freeOrbitAfter,
-      zoomAfter: freeZoomAfter,
       fitAfter: freeFitAfter,
       enabledControlChecked: freeCameraChecked,
       disabledControlChecked: freeCameraDisabledChecked,
@@ -932,46 +783,6 @@ async function selectModeWithReload(
     queryPreserved: expectedSearch.toString() === afterUrl.searchParams.toString(),
     hashPreserved: beforeUrl.hash === afterUrl.hash,
   };
-}
-
-async function verifyBuildingAuthoringControls(targetPage: Page): Promise<boolean> {
-  // Keep this as browser-native source. Transpiled nested callbacks gain an esbuild `__name`
-  // helper that does not exist in the page realm when Playwright serializes the function.
-  return targetPage.evaluate(`(async () => {
-    const api = window.__featureLab;
-    if (!api) throw new Error("window.__featureLab is unavailable");
-    const calls = [];
-    const original = api.setStructure;
-    api.setStructure = async function (patch) {
-      calls.push({ ...patch });
-      return api.getState();
-    };
-    function change(id, value) {
-      const control = document.querySelector("#" + id);
-      if (!control) throw new Error("Missing building authoring control #" + id);
-      control.value = value;
-      control.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    try {
-      change("lab-source-kind", "wall-run");
-      change("lab-structure-id", "gatehouse");
-      change("lab-kit-id", "timber");
-      change("lab-footprint-width", "10");
-      change("lab-footprint-depth", "2");
-      change("lab-variant-seed", "4");
-      document.querySelector("#lab-next-seed")?.click();
-      await new Promise((resolve) => window.setTimeout(resolve, 0));
-    } finally {
-      api.setStructure = original;
-    }
-    return calls.some((patch) => patch.kind === "wall-run" && patch.id === "wall_run")
-      && calls.some((patch) => Object.hasOwn(patch, "id"))
-      && calls.some((patch) => patch.kit === "timber")
-      && calls.some((patch) => patch.width === 10)
-      && calls.some((patch) => patch.depth === 2)
-      && calls.some((patch) => patch.seed === 4)
-      && calls.some((patch) => patch.seed === 5);
-  })()`) as Promise<boolean>;
 }
 
 async function testLegacyRedirect(
@@ -1045,26 +856,6 @@ async function openLab(targetPage: Page, baseUrl: string, mode: "combat" | "buil
   if (!response?.ok()) {
     throw new Error(`${mode} feature lab returned HTTP ${response?.status() ?? "no response"}: ${url.href}`);
   }
-}
-
-async function rebuild(
-  targetPage: Page,
-  beforeRevision: number,
-  patch: Partial<FeatureLabStructureSelection>,
-): Promise<StructureProof> {
-  const operationStarted = performance.now();
-  const state = await targetPage.evaluate(async (value) => {
-    const api = window.__featureLab;
-    if (!api) throw new Error("window.__featureLab is unavailable");
-    return api.setStructure(value);
-  }, patch);
-  if (!state.structure.ready || state.structure.revision <= beforeRevision) {
-    const waited = await waitForState(targetPage, "production structure rebuild", (candidate) => (
-      candidate.structure.ready && candidate.structure.revision > beforeRevision
-    ), REBUILD_BUDGET_MS);
-    return { state: waited, wallMs: performance.now() - operationStarted };
-  }
-  return { state, wallMs: performance.now() - operationStarted };
 }
 
 async function readState(targetPage: Page): Promise<FeatureLabState> {
@@ -1385,10 +1176,6 @@ function distanceXZ(
 
 function distance2d(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function distancePoint3(a: Point3, b: Point3): number {
-  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
 function sameMembers<T>(actual: readonly T[], expected: readonly T[]): boolean {

@@ -128,7 +128,7 @@ When focused behavior is ready, run the self-contained Chromium gate:
 npm run lab:test
 ```
 
-The command starts one Vite server and one Chromium session for the combat route, building route, and legacy redirect. It proves that both lab routes report `engine: "corealm-production"` and the same `fallowmarch-yard` identity. Combat coverage checks the production canvas and debug state, actor rigs and animation progress, direct equipment changes, pointer selection, melee damage and motion, and spell particles and damage. Building coverage checks representative prefab, composition, and wall-run rebuilds; non-empty collision output; revision changes; the three independent view controls; opt-in movement through real keyboard input; suppressed movement when walking is off; player visibility without a position change; and free-camera orbit, pan, zoom, and fit without player relocation.
+The command starts one Vite server and one Chromium session for the combat route, building route, and legacy redirect. It proves that both lab routes report `engine: "corealm-production"` and the same `fallowmarch-yard` identity. Combat coverage checks the production canvas and debug state, actor rigs and animation progress, a direct equipment change, pointer selection, melee damage and motion, and spell particles and damage. Building coverage boots a production prefab through the compatibility route, changes it to a wall run through the real authoring panel, checks collision output and revision changes, walks through real keyboard input, suppresses keyboard movement when walking is off, and orbits and fits the free camera without moving the player. Focused structure tests cover the full prefab, composition, kit, and wall-run catalogue.
 
 Workbench-switch coverage treats the mode selector as navigation, not an in-place state mutation. The gate records the current query and hash, switches from building to combat, waits for the document and `window.__featureLab` to load again, then checks the canonical destination `mode`, preserved URL fields, shared-yard identity, and fresh combat defaults. Both options use the same navigation path, while the building-route readiness check locks its defaults to player visible, walking off, and free camera off.
 
@@ -154,7 +154,7 @@ The current labs intentionally omit expensive world systems. Add deterministic f
 - final progression, equipment eligibility, inventory acquisition, economy, persistence, or simulation integration;
 - interactions that depend on several full-world systems at once.
 
-Building-lab walking and free camera are presentation and local input checks. The gate proves that real keyboard input moves the player only when walking is enabled, and that camera pan, orbit, zoom, and fit can change framing without moving the player. It also checks that the selected structure remains stable and each representative structure emits non-empty collision metadata. It does not walk the player into a wall, through an opening, or around every recipe. It does not prove replacement navmesh carving, collision blocking, final-world navigation, physics, terrain placement, or collision behavior. Test those systems in their focused source tests and with a small number of representative final-world scenarios.
+Building-lab walking and free camera are presentation and local input checks. The gate proves that real keyboard input moves the player only when walking is enabled, and that free-camera orbit and fit can change framing without moving the player. It also checks that the selected structure remains stable and the prefab and wall run emit non-empty collision metadata. It does not walk the player into a wall, through an opening, or around every recipe. It does not prove replacement navmesh carving, collision blocking, final-world navigation, physics, terrain placement, or collision behavior. Test those systems in their focused source tests and with a small number of representative final-world scenarios.
 
 Use lab fixtures to prove the local logic, UI, and interactions for progression, inventory, equipment, quests, economy, persistence, and simulation work. The final world must still prove that real authored data and cross-system flows connect correctly. A feature is accepted only when its lab proof and relevant integration proof both pass.
 
@@ -177,15 +177,13 @@ If a loop exceeds its budget, split detailed coverage into focused tests or the 
 
 ## Evidence and generated files
 
-The combined gate overwrites five ignored screenshots under `test-results/feature-labs/`:
+The combined gate overwrites three ignored screenshots under `test-results/feature-labs/`:
 
 - `combat-melee.png`
 - `combat-spell.png`
 - `building-authoring.png`
-- `building-walking.png`
-- `building-free-camera.png`
 
-All five capture calls must succeed, but the gate does not decide whether the scene is readable. State and camera probes can show that visibility or framing controls changed, but they do not prove that the player, structure, or camera composition looks correct. The current capture set has no dedicated image for every player-visibility combination. The gate does not clean the directory, so these fixed names are overwritten while unrelated stale files remain. The gate prints its JSON result to stdout and does not write a durable report, trace, or pixel baseline. The legacy redirect step does not capture a separate screenshot.
+All three capture calls must succeed, but the gate does not decide whether the scene is readable. State and camera probes can show that framing changed, but they do not prove that the player, structure, or camera composition looks correct. The gate does not clean the directory, so these fixed names are overwritten while unrelated stale files remain. The gate prints its JSON result to stdout and does not write a durable report, trace, or pixel baseline. The legacy redirect step does not capture a separate screenshot.
 
 Lab screenshots, browser reports, traces, and other generated evidence are disposable by default. Keep routine output under ignored test-result locations and overwrite it between runs. Inspect visual output during development, but do not update Markdown, commit screenshots, or create report diffs on every pass.
 
