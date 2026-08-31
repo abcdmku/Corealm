@@ -25,6 +25,7 @@ import type { GameState, Store } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
 import type { TickSystem } from "../app/loop.js";
 import { distanceXZ } from "../core/math.js";
+import { Rng } from "../core/rng.js";
 import type { BossPhase } from "../content/enemies.js";
 import { ORDRUN_PHASES } from "../content/enemies.js";
 import type { CombatEntityPort, CombatSystem } from "./combat.js";
@@ -112,12 +113,63 @@ function pursuitSpeed(entity: SemanticEntity): number {
 }
 
 /** Returning is the same gait, hurried by the ratio the shared constants already establish. */
+/**
+ * Picks a point to amble to, somewhere in the ring around a creature's spawn.
+ *
+ * A RING rather than a disc: `WANDER_MIN_METRES` is a floor as well as a radius, because a
+ * destination the creature is already standing on produces a one-step shuffle and a creature that
+ * appears to twitch rather than walk. Y is copied from the spawn rather than computed; the caller
+ * snaps the result to the navmesh, which is what actually decides the height.
+ *
+ * Pure, and takes its `Rng` rather than making one, so the caller's per-creature stream stays the
+ * thing that keeps a flock out of lockstep.
+ */
+export function wanderDestination(spawn: Vec3, rng: Rng): Vec3 {
+  const angle = rng.float(0, Math.PI * 2);
+  const radius = rng.float(WANDER_MIN_METRES, WANDER_RADIUS_METRES);
+  return [spawn[0] + Math.cos(angle) * radius, spawn[1], spawn[2] + Math.sin(angle) * radius];
+}
+
+/** Stable per-entity seed, so one creature's wander is its own and survives a reload. */
+export function hashId(entityId: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < entityId.length; index += 1) {
+    hash ^= entityId.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 function returnSpeed(entity: SemanticEntity): number {
   return pursuitSpeed(entity) * (ENEMY_RETURN_SPEED_MPS / ENEMY_SPEED_MPS);
 }
 
 /** Where an enemy stops closing. Just inside `ENEMY_ATTACK_RANGE` so it can actually swing. */
 export const ENEMY_STANDOFF_METRES = 1.35;
+
+/**
+ * Idle drift, so a field of animals is not a field of statues.
+ *
+ * Metres from the SPAWN point, not from wherever the creature currently is, so a flock cannot
+ * random-walk across the map over ten minutes. The floor stops a creature from picking a
+ * destination it is already standing on and playing a one-step shuffle.
+ */
+export const WANDER_RADIUS_METRES = 6;
+export const WANDER_MIN_METRES = 1.5;
+/** Close enough to have arrived. Matches the tolerance `stepToward` uses for walking home. */
+const WANDER_ARRIVE_METRES = 0.6;
+/**
+ * How long a creature stands still between strolls.
+ *
+ * Long, and randomised per creature. The read wanted here is "that hen just moved", not "the
+ * scenery is drifting", so the pause has to dominate the stroll rather than merely match it: the
+ * slowest creature in the game walks 1.2 m/s, which crosses the full 6 m radius in five seconds, so
+ * a five-second floor would leave it moving half the time. At eight to eighteen it moves between 13
+ * and 28 percent of the time depending on its gait, which puts a couple of any flock in motion at
+ * once and the rest standing — what a field of animals actually looks like.
+ */
+export const WANDER_PAUSE_MIN_MS = 8_000;
+export const WANDER_PAUSE_MAX_MS = 18_000;
 
 /** A provoked enemy stays interested this long after it last saw or was hit by the player. */
 export const PROVOKE_MEMORY_MS = 12_000;
@@ -205,6 +257,12 @@ interface AiRecord {
   provokedUntilMs: number;
   nextSlamAtMs: number;
   telegraph: BossTelegraph | null;
+  /** Where this creature is currently ambling, or null while it is standing still. */
+  wanderTarget: Vec3 | null;
+  /** Sim time the current pause ends. Only read while `wanderTarget` is null. */
+  wanderUntilMs: number;
+  /** Seeded from the entity id, so a flock does not move in lockstep and a replay is a replay. */
+  rng: Rng;
 }
 
 // ------------------------------------------------------------------- system
@@ -278,6 +336,13 @@ export class EnemyAiSystem implements TickSystem {
         const initiates = def.behaviour === "aggressive" && inAggro;
         if (provoked || initiates) this.engage(state, entity, record, runtime, atMs);
       }
+
+      // 3b. potter about.
+      //
+      // Still idle after the acquire check above, so nothing has noticed the player. Standing a
+      // flock of hens perfectly still is what makes a field read as a diorama; a few of them
+      // shuffling a couple of metres every ten seconds is what makes it read as a field.
+      if (record.mode === "idle") this.wander(entity, record, runtime, atMs, deltaMs);
 
       // 4. chase and hold.
       if (record.mode === "aggro") {
@@ -379,6 +444,9 @@ export class EnemyAiSystem implements TickSystem {
   ): void {
     if (!runtime) return;
     record.mode = "aggro";
+    // Whatever it was strolling toward stops mattering the moment it has a player to deal with,
+    // and a stale target would otherwise resume the instant the fight ended.
+    record.wanderTarget = null;
     record.provokedUntilMs = Math.max(record.provokedUntilMs, atMs + PROVOKE_MEMORY_MS);
     runtime.state = "aggro";
     this.setEntityState(entity, "aggro");
@@ -386,10 +454,66 @@ export class EnemyAiSystem implements TickSystem {
     this.deps.store.markDirty();
   }
 
+  /**
+   * Idle drift: short strolls near the spawn point, long pauses between them.
+   *
+   * SPEED IS THE CREATURE'S OWN `moveSpeedMps`, not some slower amble, and that is deliberate.
+   * `render/entityViews.ts: motionTimeScale` sets the walk clip's playback rate from exactly that
+   * number, and it is captured onto the view record when the record is built — so a creature that
+   * moved at half speed here would play its cycle at twice the rate its feet were covering, which
+   * is the foot slide the whole `impliedWalkMps` mechanism exists to remove. What keeps this from
+   * reading as aimless jogging is the SHAPE rather than the speed: a couple of metres at a time,
+   * then five to fifteen seconds of standing still.
+   *
+   * The radius is small on purpose. `spawnPos` still anchors the leash, the respawn point and every
+   * "walk home" in this file, so drifting far would quietly change all three; six metres is enough
+   * for a flock to look alive and nowhere near the 28 m leash.
+   *
+   * Bosses never wander. Each of them guards one thing in one place, and a boss found wandering off
+   * its arena is a boss the quest pointing at it cannot promise is there.
+   */
+  private wander(
+    entity: SemanticEntity,
+    record: AiRecord,
+    runtime: { spawnPos: Vec3 },
+    atMs: number,
+    deltaMs: number,
+  ): void {
+    if (entity.archetype === "boss") return;
+
+    const target = record.wanderTarget;
+    if (target) {
+      if (this.stepToward(entity, target, pursuitSpeed(entity), deltaMs, WANDER_ARRIVE_METRES)) {
+        record.wanderTarget = null;
+        record.wanderUntilMs = atMs + record.rng.int(WANDER_PAUSE_MIN_MS, WANDER_PAUSE_MAX_MS);
+      }
+      return;
+    }
+
+    if (atMs < record.wanderUntilMs) return;
+    // First tick of this creature's life lands here with `wanderUntilMs` still 0, which would send
+    // every creature in the world walking on the same tick. Stagger the first pause instead.
+    if (record.wanderUntilMs === 0) {
+      record.wanderUntilMs = atMs + record.rng.int(0, WANDER_PAUSE_MAX_MS);
+      return;
+    }
+
+    const wanted = wanderDestination(runtime.spawnPos, record.rng);
+    // Off the navmesh means there is nowhere to walk; wait and roll again rather than shuffling
+    // into a wall for the next few seconds.
+    const landed = this.snapStep(wanted);
+    if (!landed || distanceXZ(entity.position, landed) < WANDER_MIN_METRES) {
+      record.wanderUntilMs = atMs + record.rng.int(WANDER_PAUSE_MIN_MS, WANDER_PAUSE_MAX_MS);
+      return;
+    }
+    record.wanderTarget = landed;
+  }
+
   private leash(state: GameState, entity: SemanticEntity, record: AiRecord, atMs: number): void {
     record.mode = "returning";
     record.provokedUntilMs = 0;
     record.telegraph = null;
+    record.wanderTarget = null;
     const runtime = state.world.enemies[entity.id];
     if (runtime) runtime.state = "returning";
     this.setEntityState(entity, "returning");
@@ -429,6 +553,9 @@ export class EnemyAiSystem implements TickSystem {
       record.provokedUntilMs = 0;
       record.telegraph = null;
       record.nextSlamAtMs = 0;
+      // A respawned creature stands on its spawn point for a beat before it starts pottering again.
+      record.wanderTarget = null;
+      record.wanderUntilMs = atMs + record.rng.int(WANDER_PAUSE_MIN_MS, WANDER_PAUSE_MAX_MS);
       this.deps.combat.setEnemyOverride(entityId, null);
       this.deps.store.markDirty();
     }
@@ -603,7 +730,10 @@ export class EnemyAiSystem implements TickSystem {
   private recordFor(entityId: EntityId): AiRecord {
     const existing = this.records.get(entityId);
     if (existing) return existing;
-    const created: AiRecord = { mode: "idle", provokedUntilMs: 0, nextSlamAtMs: 0, telegraph: null };
+    const created: AiRecord = {
+      mode: "idle", provokedUntilMs: 0, nextSlamAtMs: 0, telegraph: null,
+      wanderTarget: null, wanderUntilMs: 0, rng: new Rng(hashId(entityId)),
+    };
     this.records.set(entityId, created);
     return created;
   }
