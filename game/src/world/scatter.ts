@@ -83,7 +83,8 @@
 import type { RegionId, Vec3 } from "../contracts.js";
 import { REGIONS } from "../content/regions.js";
 import { Rng } from "../core/rng.js";
-import type { AssetRegistry } from "../render/assets.js";
+import { BOOT_SPANS, bootTelemetry } from "../perf/bootTelemetry.js";
+import type { AssetPriority, AssetRegistry } from "../render/assets.js";
 import {
   createValueNoise,
   type GrassSpritePlacement,
@@ -504,6 +505,66 @@ export const worldExclusions = new ExclusionZones();
 /** The accepted dry island is about 1.95 times the authored gameplay area. */
 const FULL_ISLAND_FIELD_SCALE = 1.95;
 
+/**
+ * Generation tile size. Candidate generation starts inside these tiles, before assets or meshes
+ * are created. It matches the shadow footprint already used for scatter mesh culling.
+ */
+export const SCATTER_STREAM_TILE_METRES = SHADOW_TILE_METRES;
+
+export interface ScatterTile {
+  /** Stable coordinate id. It is an authoring input to the tile seed. */
+  id: string;
+  col: number;
+  row: number;
+  bounds: Rect;
+}
+
+export interface ScatterTileLoadOptions {
+  priority?: AssetPriority;
+  /** Spawn-visible assets use the registry's primary retry callbacks. */
+  primary?: boolean;
+  /** Semantic tile owner for travel/background request reprioritization. */
+  regionId?: RegionId;
+}
+
+function scatterTileFromCell(col: number, row: number): ScatterTile {
+  const minX = col * SCATTER_STREAM_TILE_METRES;
+  const minZ = row * SCATTER_STREAM_TILE_METRES;
+  return {
+    id: `${col}:${row}`,
+    col,
+    row,
+    bounds: {
+      minX,
+      maxX: minX + SCATTER_STREAM_TILE_METRES,
+      minZ,
+      maxZ: minZ + SCATTER_STREAM_TILE_METRES,
+    },
+  };
+}
+
+/** The canonical generation tile containing a world position. */
+export function scatterTileAt(x: number, z: number): ScatterTile {
+  return scatterTileFromCell(
+    Math.floor(x / SCATTER_STREAM_TILE_METRES),
+    Math.floor(z / SCATTER_STREAM_TILE_METRES),
+  );
+}
+
+/** Canonical row-major tile list for a non-empty world rectangle. */
+export function scatterTilesForBounds(bounds: Rect): ScatterTile[] {
+  if (bounds.maxX <= bounds.minX || bounds.maxZ <= bounds.minZ) return [];
+  const minCol = Math.floor(bounds.minX / SCATTER_STREAM_TILE_METRES);
+  const maxCol = Math.ceil(bounds.maxX / SCATTER_STREAM_TILE_METRES) - 1;
+  const minRow = Math.floor(bounds.minZ / SCATTER_STREAM_TILE_METRES);
+  const maxRow = Math.ceil(bounds.maxZ / SCATTER_STREAM_TILE_METRES) - 1;
+  const tiles: ScatterTile[] = [];
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) tiles.push(scatterTileFromCell(col, row));
+  }
+  return tiles;
+}
+
 // ------------------------------------------------------------------ specs
 
 /** Where a layer's candidate points come from. A layer may use more than one. */
@@ -669,6 +730,61 @@ export interface ScatterResult {
   missingAssets: string[];
 }
 
+function createScatterResult(regionId: RegionId, spec?: RegionScatterSpec): ScatterResult {
+  return {
+    regionId,
+    placed: 0,
+    rejected: 0,
+    clusters: 0,
+    instancedMeshes: 0,
+    estimatedDrawCalls: 0,
+    estimatedTriangles: 0,
+    tiles: 0,
+    byLayer: Object.fromEntries((spec?.layers ?? []).map((layer) => [layer.id, 0])),
+    bySource: {},
+    missingAssets: [],
+  };
+}
+
+function addScatterResult(target: ScatterResult, source: ScatterResult): void {
+  target.placed += source.placed;
+  target.rejected += source.rejected;
+  target.clusters += source.clusters;
+  target.instancedMeshes += source.instancedMeshes;
+  target.estimatedDrawCalls += source.estimatedDrawCalls;
+  target.estimatedTriangles += source.estimatedTriangles;
+  target.tiles += source.tiles;
+  for (const [layerId, count] of Object.entries(source.byLayer)) {
+    target.byLayer[layerId] = (target.byLayer[layerId] ?? 0) + count;
+  }
+  for (const [sourceId, count] of Object.entries(source.bySource)) {
+    target.bySource[sourceId] = (target.bySource[sourceId] ?? 0) + count;
+  }
+  for (const missing of source.missingAssets) {
+    if (!target.missingAssets.includes(missing)) target.missingAssets.push(missing);
+  }
+}
+
+/**
+ * Folds any set of resident tile results into the stable debug shape. Authored layers stay present
+ * with a zero count before their first tile becomes resident.
+ */
+export function mergeScatterResults(
+  results: readonly ScatterResult[],
+  specs: Partial<Record<RegionId, RegionScatterSpec>> = DEFAULT_SCATTER,
+): ScatterResult[] {
+  const merged = new Map<RegionId, ScatterResult>();
+  for (const spec of Object.values(specs)) {
+    if (spec) merged.set(spec.regionId, createScatterResult(spec.regionId, spec));
+  }
+  for (const result of results) {
+    const target = merged.get(result.regionId) ?? createScatterResult(result.regionId, specs[result.regionId]);
+    addScatterResult(target, result);
+    merged.set(result.regionId, target);
+  }
+  return [...merged.values()];
+}
+
 // ------------------------------------------------------------- sampling
 
 /**
@@ -822,10 +938,16 @@ interface WaterBody {
   perimeter: number;
   /** Shoreline radius per renderer-provided contour point, starting at +x. */
   shoreline: number[];
+  /** Closed renderer-provided contour. It is the authority for tile-local shore stations. */
+  contour: [number, number][];
 }
 
+const waterBodyCache = new WeakMap<WorldScene, WaterBody[]>();
+
 function waterBodies(scene: WorldScene): WaterBody[] {
-  return scene.getWaterBodies()
+  const cached = waterBodyCache.get(scene);
+  if (cached) return cached;
+  const bodies = scene.getWaterBodies()
     .filter((body) => body.closed && body.contour.length >= 3)
     .map((body) => {
       const [x, z] = body.centre;
@@ -836,8 +958,18 @@ function waterBodies(scene: WorldScene): WaterBody[] {
         const next = body.contour[(index + 1) % body.contour.length]!;
         perimeter += Math.hypot(next[0] - current[0], next[1] - current[1]);
       }
-      return { x, z, level: body.level, maxRadius: Math.max(...shoreline), perimeter, shoreline };
+      return {
+        x,
+        z,
+        level: body.level,
+        maxRadius: Math.max(...shoreline),
+        perimeter,
+        shoreline,
+        contour: body.contour.map((point): [number, number] => [point[0], point[1]]),
+      };
     });
+  waterBodyCache.set(scene, bodies);
+  return bodies;
 }
 
 /** Shoreline radius toward a point, linearly interpolated between azimuth samples. */
@@ -869,7 +1001,10 @@ const WATER_MARGIN_METRES = 1.2;
  * Everything here is read from `content/regions.ts`, so a settlement that gains a wall or a paved
  * square in a later pass pushes the planting back on its own.
  */
+let authoredZoneCache: ExclusionZones | null = null;
+
 function authoredZones(): ExclusionZones {
+  if (authoredZoneCache) return authoredZoneCache;
   const zones = new ExclusionZones();
   for (const region of REGIONS) {
     const settlement = region.settlement;
@@ -907,6 +1042,7 @@ function authoredZones(): ExclusionZones {
     for (const prop of settlement.props ?? []) zones.addCircle(prop.position[0], prop.position[1], 1.4, "custom", prop.id);
     for (const npc of settlement.npcs) zones.addCircle(npc.position[0], npc.position[1], 1.2, "custom", npc.id);
   }
+  authoredZoneCache = zones;
   return zones;
 }
 
@@ -923,7 +1059,13 @@ function regionAltitude(regionId: RegionId): { base: number; amplitude: number }
  * endpoints. Road dressing, exclusion corridors, and the rendered map all consume this same line,
  * so a broad bend never leaves foliage sitting on the worn track.
  */
-function roadStations(scene: WorldScene): { x: number; z: number; nx: number; nz: number }[] {
+type RoadStation = { x: number; z: number; nx: number; nz: number };
+
+const roadStationCache = new WeakMap<WorldScene, RoadStation[]>();
+
+function roadStations(scene: WorldScene): RoadStation[] {
+  const cached = roadStationCache.get(scene);
+  if (cached) return cached;
   const stations: { x: number; z: number; nx: number; nz: number }[] = [];
   for (const line of scene.getRoadPolylines()) {
     for (let i = 0; i < line.length - 1; i += 1) {
@@ -944,6 +1086,7 @@ function roadStations(scene: WorldScene): { x: number; z: number; nx: number; nz
       }
     }
   }
+  roadStationCache.set(scene, stations);
   return stations;
 }
 
@@ -956,6 +1099,7 @@ interface LayerContext {
   scene: WorldScene;
   regionId: RegionId;
   rect: Rect;
+  tile: ScatterTile;
   exclusions: ExclusionZones;
   waters: WaterBody[];
   authored: ExclusionZones;
@@ -1032,6 +1176,20 @@ function layerSeed(seed: number, regionId: RegionId, layerId: string): number {
     }
   }
   return hash >>> 0;
+}
+
+/** Stable world + recipe + layer + generation-tile stream. */
+export function deriveScatterTileSeed(
+  worldSeed: number,
+  regionId: RegionId,
+  layerId: string,
+  tileId: string,
+): number {
+  let hash = layerSeed(worldSeed, regionId, layerId);
+  for (let index = 0; index < tileId.length; index += 1) {
+    hash = Math.imul(hash ^ tileId.charCodeAt(index), 0x01000193) >>> 0;
+  }
+  return hash32(hash, tileId.length);
 }
 
 /**
@@ -1145,40 +1303,119 @@ function layerProfile(layer: ScatterLayerSpec, source: ScatterSource): Exclusion
   };
 }
 
+function intersectRect(left: Rect, right: Rect): Rect | null {
+  const intersection = {
+    minX: Math.max(left.minX, right.minX),
+    maxX: Math.min(left.maxX, right.maxX),
+    minZ: Math.max(left.minZ, right.minZ),
+    maxZ: Math.min(left.maxZ, right.maxZ),
+  };
+  return intersection.maxX > intersection.minX && intersection.maxZ > intersection.minZ
+    ? intersection
+    : null;
+}
+
+function rectArea(rect: Rect): number {
+  return Math.max(0, rect.maxX - rect.minX) * Math.max(0, rect.maxZ - rect.minZ);
+}
+
+function layerFieldBounds(ctx: LayerContext, layer: ScatterLayerSpec): Rect {
+  const islandBounds = ctx.scene.getScatterBounds(Infinity);
+  if (layer.bleed === undefined) return islandBounds;
+  return {
+    minX: Math.max(islandBounds.minX, ctx.rect.minX - layer.bleed),
+    maxX: Math.min(islandBounds.maxX, ctx.rect.maxX + layer.bleed),
+    minZ: Math.max(islandBounds.minZ, ctx.rect.minZ - layer.bleed),
+    maxZ: Math.min(islandBounds.maxZ, ctx.rect.maxZ + layer.bleed),
+  };
+}
+
+interface TileFieldWeights {
+  total: number;
+  byTile: Map<string, number>;
+}
+
+const tileFieldWeightCache = new WeakMap<WorldScene, Map<string, TileFieldWeights>>();
+
+function fieldWeights(ctx: LayerContext, bounds: Rect): TileFieldWeights {
+  let sceneCache = tileFieldWeightCache.get(ctx.scene);
+  if (!sceneCache) {
+    sceneCache = new Map();
+    tileFieldWeightCache.set(ctx.scene, sceneCache);
+  }
+  const key = `${ctx.regionId}:${bounds.minX}:${bounds.maxX}:${bounds.minZ}:${bounds.maxZ}`;
+  const cached = sceneCache.get(key);
+  if (cached) return cached;
+
+  const byTile = new Map<string, number>();
+  let total = 0;
+  for (const tile of scatterTilesForBounds(bounds)) {
+    const overlap = intersectRect(bounds, tile.bounds);
+    if (!overlap) continue;
+    const width = overlap.maxX - overlap.minX;
+    const depth = overlap.maxZ - overlap.minZ;
+    const cols = Math.max(1, Math.ceil(width / 16));
+    const rows = Math.max(1, Math.ceil(depth / 16));
+    let samples = 0;
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        const x = overlap.minX + ((col + 0.5) / cols) * width;
+        const z = overlap.minZ + ((row + 0.5) / rows) * depth;
+        const surface = ctx.scene.scatterSurfaceAt(x, z);
+        if (!surface) continue;
+        samples += surface.density * ctx.scene.regionWeightAt(ctx.regionId, x, z);
+      }
+    }
+    const weight = samples * rectArea(overlap) / (cols * rows);
+    byTile.set(tile.id, weight);
+    total += weight;
+  }
+  const weights = { total, byTile };
+  sceneCache.set(key, weights);
+  return weights;
+}
+
 /**
- * Places one region's dressing and returns what it cost.
- *
- * Everything is awaited up front (the GLBs a layer needs), then placement is synchronous and pure,
- * which is what makes the layout reproducible: no interleaved network timing can reorder the RNG.
+ * Gives each tile its deterministic share of a whole-layer cap. The shared biome and dry-land
+ * fields supply the weights, so ocean tiles do not consume the budget and ecotones may cross
+ * semantic rectangles. Cumulative allocation avoids one rounded instance per sparse tile.
  */
-export async function scatterRegion(
+function fieldBudgetForTile(total: number, bounds: Rect, ctx: LayerContext): number {
+  const weights = fieldWeights(ctx, bounds);
+  if (total <= 0 || weights.total <= 0) return 0;
+  let weightBefore = 0;
+  for (const candidate of scatterTilesForBounds(bounds)) {
+    const weight = weights.byTile.get(candidate.id) ?? 0;
+    if (candidate.id === ctx.tile.id) {
+      const before = Math.floor((weightBefore / weights.total) * total);
+      const after = Math.floor(((weightBefore + weight) / weights.total) * total);
+      return Math.max(0, after - before);
+    }
+    weightBefore += weight;
+  }
+  return 0;
+}
+
+/** Places one generation tile of one visual-biome recipe. */
+async function scatterRegionTile(
   scene: WorldScene,
   assets: AssetRegistry,
   regionId: RegionId,
   spec: RegionScatterSpec,
   seed: number,
+  tile: ScatterTile,
+  loadOptions: ScatterTileLoadOptions,
 ): Promise<ScatterResult> {
   const rect = spec.rect ?? scene.getRegionRect(regionId);
   const exclusions = spec.exclusions ?? worldExclusions;
-  const result: ScatterResult = {
-    regionId,
-    placed: 0,
-    rejected: 0,
-    clusters: 0,
-    instancedMeshes: 0,
-    estimatedDrawCalls: 0,
-    estimatedTriangles: 0,
-    tiles: 0,
-    byLayer: {},
-    bySource: {},
-    missingAssets: [],
-  };
+  const result = createScatterResult(regionId, spec);
   if (!rect) return result;
 
   const ctx: LayerContext = {
     scene,
     regionId,
     rect,
+    tile,
     exclusions,
     waters: waterBodies(scene),
     authored: authoredZones(),
@@ -1201,22 +1438,42 @@ export async function scatterRegion(
       continue;
     }
 
-    try {
-      // Grass uses a generated cutout and measured manifest dimensions. Its opaque source GLBs
-      // are no longer render inputs, so loading them would spend boot time and memory for nothing.
-      await assets.loadMany(species.filter((entry) => !isGrassSprite(entry.assetId)).map((entry) => entry.assetId));
-    } catch {
-      result.missingAssets.push(layer.id);
-      continue;
-    }
-
-    const rng = new Rng(layerSeed(seed, regionId, layer.id));
+    const rng = new Rng(deriveScatterTileSeed(seed, regionId, layer.id, tile.id));
     const mask = createFbm(layerSeed(seed, regionId, `${layer.id}-mask`));
     const candidates: Candidate[] = [];
 
-    collectField(layer, ctx, species, rng, mask, candidates, result);
-    collectRoad(layer, ctx, species, rng, candidates, result);
-    collectShore(layer, ctx, species, rng, candidates, result);
+    const candidateSpan = bootTelemetry.startSpan(BOOT_SPANS.SCATTER_CANDIDATES, {
+      detail: { regionId, layerId: layer.id, tileId: tile.id },
+    });
+    try {
+      collectField(layer, ctx, species, rng, mask, candidates, result);
+      collectRoad(layer, ctx, species, rng, candidates, result);
+      collectShore(layer, ctx, species, rng, candidates, result);
+      candidateSpan.end({ regionId, layerId: layer.id, tileId: tile.id, candidates: candidates.length });
+    } catch (error) {
+      candidateSpan.fail(error, { regionId, layerId: layer.id, tileId: tile.id });
+      throw error;
+    }
+
+    try {
+      // Candidate generation comes first so a spawn tile requests only assets it actually uses.
+      // Grass uses generated cards and never requests its source GLB.
+      const requested = [...new Set(candidates
+        .map((candidate) => candidate.species.assetId)
+        .filter((assetId) => !isGrassSprite(assetId)))];
+      if (requested.length > 0) {
+        await assets.loadMany(requested, {
+          priority: loadOptions.priority ?? "background",
+          regionId: loadOptions.regionId,
+          primary: loadOptions.primary,
+        });
+      }
+    } catch (error) {
+      result.missingAssets.push(layer.id);
+      // Do not mark a tile resident after a transient load failure. The streaming controller can
+      // retry it when the registry's primary-asset retry path becomes ready.
+      throw error;
+    }
 
     const castShadow = layer.castShadow ?? false;
     for (const candidate of candidates) {
@@ -1251,13 +1508,16 @@ export async function scatterRegion(
     }
   }
 
+  const meshSpan = bootTelemetry.startSpan(BOOT_SPANS.SCATTER_MESHES, {
+    detail: { regionId, tileId: tile.id },
+  });
   for (const bucket of buckets.values()) {
     if (bucket.kind === "grass") {
       for (const shard of shardByTile(bucket)) {
         result.tiles += 1;
         const meshes = scene.scatterGrassSprites(
           shard.placements,
-          `scatter-${regionId}-grass-sprite-t${shard.tile >>> 0}`,
+          `scatter-${regionId}-grass-sprite-g${tile.id}-t${shard.tile >>> 0}`,
           { regionId },
         );
         result.instancedMeshes += meshes.length;
@@ -1276,7 +1536,7 @@ export async function scatterRegion(
       const meshes = scene.scatterInstanced(
         assets.instance(bucket.assetId),
         shard.placements,
-        `scatter-${regionId}-${bucket.assetId}-t${shard.tile >>> 0}`,
+        `scatter-${regionId}-${bucket.assetId}-g${tile.id}-t${shard.tile >>> 0}`,
         { regionId, castShadow: bucket.castShadow, windStrength: windStrengthForAsset(bucket.assetId) },
       );
       result.instancedMeshes += meshes.length;
@@ -1289,8 +1549,51 @@ export async function scatterRegion(
       }
     }
   }
+  meshSpan.end({
+    regionId,
+    tileId: tile.id,
+    meshes: result.instancedMeshes,
+    tiles: result.tiles,
+    triangles: result.estimatedTriangles,
+  });
 
   return result;
+}
+
+/** Generates one spatial tile across every authored visual-biome recipe. */
+export async function scatterWorldTile(
+  scene: WorldScene,
+  assets: AssetRegistry,
+  seed: number,
+  tile: ScatterTile,
+  specs: Partial<Record<RegionId, RegionScatterSpec>> = DEFAULT_SCATTER,
+  loadOptions: ScatterTileLoadOptions = {},
+): Promise<ScatterResult[]> {
+  const results: ScatterResult[] = [];
+  for (const layout of scene.describeRegions()) {
+    const spec = specs[layout.regionId];
+    if (!spec) continue;
+    results.push(await scatterRegionTile(scene, assets, layout.regionId, spec, seed, tile, loadOptions));
+  }
+  return results;
+}
+
+/**
+ * Compatibility entry point for callers that ask for one recipe. It still partitions before
+ * candidate generation and folds the tile costs into one result.
+ */
+export async function scatterRegion(
+  scene: WorldScene,
+  assets: AssetRegistry,
+  regionId: RegionId,
+  spec: RegionScatterSpec,
+  seed: number,
+): Promise<ScatterResult> {
+  const partials: ScatterResult[] = [];
+  for (const tile of scatterTilesForBounds(scene.getScatterBounds(Infinity))) {
+    partials.push(await scatterRegionTile(scene, assets, regionId, spec, seed, tile, {}));
+  }
+  return mergeScatterResults(partials, { [regionId]: spec })[0] ?? createScatterResult(regionId, spec);
 }
 
 /** Region-wide placement: two-level clusters, or lone props when no `cluster` is authored. */
@@ -1303,20 +1606,14 @@ function collectField(
   out: Candidate[],
   result: ScatterResult,
 ): void {
-  const islandBounds = ctx.scene.getScatterBounds(Infinity);
-  // Biomes own visual land, not the semantic region rectangles. Default recipes cover the whole
-  // render collar and let scatterSurfaceAt reject ocean. A layer with an explicit bleed remains a
-  // local authoring tool whose domain starts at its semantic rect.
-  const sampleRect: Rect = layer.bleed === undefined
-    ? islandBounds
-    : {
-        minX: Math.max(islandBounds.minX, ctx.rect.minX - layer.bleed),
-        maxX: Math.min(islandBounds.maxX, ctx.rect.maxX + layer.bleed),
-        minZ: Math.max(islandBounds.minZ, ctx.rect.minZ - layer.bleed),
-        maxZ: Math.min(islandBounds.maxZ, ctx.rect.maxZ + layer.bleed),
-      };
+  // Biomes own visual land, not semantic rectangles. The field domain still spans the organic
+  // island, then this pass intersects it with the generation tile before Poisson sampling starts.
+  const fieldBounds = layerFieldBounds(ctx, layer);
+  const sampleRect = intersectRect(fieldBounds, ctx.tile.bounds);
+  if (!sampleRect) return;
   const fieldScale = layer.bleed === undefined ? FULL_ISLAND_FIELD_SCALE : 1;
-  const fieldLimit = Math.ceil(layer.maxCount * fieldScale);
+  const fieldLimit = fieldBudgetForTile(Math.ceil(layer.maxCount * fieldScale), fieldBounds, ctx);
+  if (fieldLimit <= 0) return;
 
   const maskAt = (x: number, z: number): number => {
     if (!layer.mask || layer.mask.strength <= 0) return 1;
@@ -1328,13 +1625,14 @@ function collectField(
 
   const cluster = layer.cluster;
   if (!cluster) {
-    // Grass fields normally use clusters. Keep a moderate ceiling here for custom unclustered
-    // grass layers so a small spacing cannot turn boot into a several-hundred-thousand point job.
+    // Stop a tiny authored spacing from turning one tile into a several-hundred-thousand point job.
     const grassOnly = species.every((entry) => isGrassSprite(entry.assetId));
-    const candidateCeiling = Math.ceil((grassOnly ? 100000 : 120000) * fieldScale);
-    const candidateFloor = Math.ceil((grassOnly ? 40000 : 60000) * fieldScale);
-    const candidateCap = Math.min(candidateCeiling, Math.max(candidateFloor, Math.ceil(fieldLimit * 1.4)));
-    const points = shuffleByHash(poissonDisc(sampleRect, layer.spacing ?? 6, rng, candidateCap), 0x5eed01);
+    const candidateCeiling = grassOnly ? 18_000 : 12_000;
+    const candidateCap = Math.min(candidateCeiling, Math.max(64, Math.ceil(fieldLimit * 2.5)));
+    const points = shuffleByHash(
+      poissonDisc(sampleRect, layer.spacing ?? 6, rng, candidateCap),
+      deriveScatterTileSeed(0x5eed01, ctx.regionId, layer.id, ctx.tile.id),
+    );
     for (const [x, z] of points) {
       if (out.length >= fieldLimit) break;
       const factor = siteFactor(layer, ctx, x, z, "field", true) * maskAt(x, z);
@@ -1348,7 +1646,10 @@ function collectField(
 
   const falloff = cluster.falloff ?? 0.75;
   const dominance = cluster.dominance ?? 0.7;
-  const centres = shuffleByHash(poissonDisc(sampleRect, cluster.spacing, rng), 0x5eed02);
+  const centres = shuffleByHash(
+    poissonDisc(sampleRect, cluster.spacing, rng),
+    deriveScatterTileSeed(0x5eed02, ctx.regionId, layer.id, ctx.tile.id),
+  );
   for (const [cx, cz] of centres) {
     if (out.length >= fieldLimit) break;
     const factor = siteFactor(layer, ctx, cx, cz, "field", true) * maskAt(cx, cz) * cluster.accept;
@@ -1391,11 +1692,11 @@ function collectRoad(
   const spec = layer.road;
   if (!spec || ctx.roads.length === 0) return;
   const [near, far] = spec.band;
-  let credit = 0;
   for (const station of ctx.roads) {
-    credit += spec.perMetre;
-    while (credit >= 1) {
-      credit -= 1;
+    if (!pointInTile(station.x, station.z, ctx.tile)) continue;
+    const whole = Math.floor(spec.perMetre);
+    const wanted = whole + (rng.next() < spec.perMetre - whole ? 1 : 0);
+    for (let index = 0; index < wanted; index += 1) {
       const side = rng.next() < 0.5 ? -1 : 1;
       const offset = (near + rng.next() * (far - near)) * side;
       const jitterX = rng.float(-0.4, 0.4);
@@ -1411,7 +1712,12 @@ function collectRoad(
   }
 }
 
-/** Reeds and moisture-loving cover on the measured waterline. */
+function pointInTile(x: number, z: number, tile: ScatterTile): boolean {
+  return x >= tile.bounds.minX && x < tile.bounds.maxX
+    && z >= tile.bounds.minZ && z < tile.bounds.maxZ;
+}
+
+/** Reeds and moisture-loving cover along the renderer's solved water contour. */
 function collectShore(
   layer: ScatterLayerSpec,
   ctx: LayerContext,
@@ -1423,21 +1729,38 @@ function collectShore(
   const spec = layer.shore;
   if (!spec) return;
   for (const body of ctx.waters) {
-    const wanted = Math.round(body.perimeter * spec.perMetre);
-    for (let i = 0; i < wanted; i += 1) {
-      const angle = rng.next() * Math.PI * 2;
-      const dx = Math.cos(angle);
-      const dz = Math.sin(angle);
-      const shore = shorelineToward(body, body.x + dx, body.z + dz);
-      if (shore <= 0) continue;
-      const radius = shore + spec.band[0] + rng.next() * (spec.band[1] - spec.band[0]);
-      const x = body.x + dx * radius;
-      const z = body.z + dz * radius;
-      const site = siteFactor(layer, ctx, x, z, "shore", true);
-      if (site <= 0 || rng.next() > site) { result.rejected += 1; continue; }
-      const entry = pickSpecies(species, "shore", rng);
-      if (!entry) return;
-      out.push({ x, z, source: "shore", species: entry });
+    for (let segment = 0; segment < body.contour.length; segment += 1) {
+      const from = body.contour[segment]!;
+      const to = body.contour[(segment + 1) % body.contour.length]!;
+      const dx = to[0] - from[0];
+      const dz = to[1] - from[1];
+      const length = Math.hypot(dx, dz);
+      const steps = Math.max(1, Math.ceil(length));
+      for (let step = 0; step < steps; step += 1) {
+        const along = (step + 0.5) / steps;
+        const shoreX = from[0] + dx * along;
+        const shoreZ = from[1] + dz * along;
+        if (!pointInTile(shoreX, shoreZ, ctx.tile)) continue;
+
+        const stationLength = length / steps;
+        const credit = stationLength * spec.perMetre;
+        const whole = Math.floor(credit);
+        const wanted = whole + (rng.next() < credit - whole ? 1 : 0);
+        for (let index = 0; index < wanted; index += 1) {
+          const outwardX = shoreX - body.x;
+          const outwardZ = shoreZ - body.z;
+          const outwardLength = Math.hypot(outwardX, outwardZ);
+          if (outwardLength <= 1e-4) continue;
+          const offset = spec.band[0] + rng.next() * (spec.band[1] - spec.band[0]);
+          const x = shoreX + (outwardX / outwardLength) * offset;
+          const z = shoreZ + (outwardZ / outwardLength) * offset;
+          const site = siteFactor(layer, ctx, x, z, "shore", true);
+          if (site <= 0 || rng.next() > site) { result.rejected += 1; continue; }
+          const entry = pickSpecies(species, "shore", rng);
+          if (!entry) return;
+          out.push({ x, z, source: "shore", species: entry });
+        }
+      }
     }
   }
 }
@@ -1546,13 +1869,11 @@ export async function scatterWorld(
   seed: number,
   specs: Partial<Record<RegionId, RegionScatterSpec>> = DEFAULT_SCATTER,
 ): Promise<ScatterResult[]> {
-  const results: ScatterResult[] = [];
-  for (const layout of scene.describeRegions()) {
-    const spec = specs[layout.regionId];
-    if (!spec) continue;
-    results.push(await scatterRegion(scene, assets, layout.regionId, spec, seed));
+  const tileResults: ScatterResult[] = [];
+  for (const tile of scatterTilesForBounds(scene.getScatterBounds(Infinity))) {
+    tileResults.push(...await scatterWorldTile(scene, assets, seed, tile, specs));
   }
-  return results;
+  return mergeScatterResults(tileResults, specs);
 }
 
 // --------------------------------------------------- exclusion profiles
