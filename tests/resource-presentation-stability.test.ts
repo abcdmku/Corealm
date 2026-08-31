@@ -82,8 +82,11 @@ describe("resource presentation stability", () => {
   // group, stayed byte-identical. Node ids and the node count (85) are the invariant here; when
   // this hash moves, check those first, and only rebaseline once they have not.
   it("keeps the authored placement and yield stream aligned", () => {
+    // Rebaselined at the rebase onto main: the merged world carries BOTH the animal roster (this
+    // branch) and the essence altar rites (main), and either alone already moves the stream. The
+    // node-id and node-count invariants below were checked first, per the rule above.
     expect(placementAndYieldFingerprint(buildWorld(SEED, FLAT_GROUND))).toBe(
-      "301a811e983e9723fe3876ea1a3ff4bdb26b59518757476b134d58f94ea543ff",
+      "0529240d1e0490a46ad9f4a9b976d2a8c142588689e01040d27489c2262d723f",
     );
   });
 });

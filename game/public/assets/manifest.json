@@ -103,13 +103,6 @@
       "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
     },
     {
-      "id": "animal-pack-deluxe",
-      "name": "Animal pack deluxe",
-      "author": "janpec",
-      "source": "https://assetstore.unity.com/?q=Animal%20pack%20deluxe",
-      "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
-    },
-    {
       "id": "fantasy-rhino",
       "name": "Fantasy Rhino",
       "author": "Maksim Bugrimov",
@@ -166,8 +159,7 @@
         "Sword_Attack",
         "Walk_Loop"
       ],
-      "materials": [],
-      "walkClipSeconds": 1.333
+      "materials": []
     },
     {
       "id": "animation_library_2",
@@ -209,8 +201,7 @@
         "Sword_Regular_A",
         "TreeChopping_Loop"
       ],
-      "materials": [],
-      "walkClipSeconds": 2
+      "materials": []
     },
     {
       "id": "balcony_corner",
@@ -1506,125 +1497,6 @@
       ]
     },
     {
-      "id": "boss_rhino_air",
-      "file": "models/boss/boss_rhino_air.glb",
-      "pack": "fantasy-rhino",
-      "category": "character",
-      "is": "roc",
-      "tags": [
-        "boss",
-        "roc",
-        "tempest",
-        "air",
-        "wind",
-        "elemental",
-        "monster",
-        "territorial"
-      ],
-      "bytes": 564840,
-      "size": {
-        "x": 1.047,
-        "y": 1.707,
-        "z": 2.633
-      },
-      "base": {
-        "x": -0.524,
-        "y": 0,
-        "z": -1.001
-      },
-      "animations": [
-        "Idle",
-        "Walk",
-        "Attack",
-        "Death"
-      ],
-      "materials": [
-        "boss_rhino_air_mat"
-      ],
-      "sha256": "995F78406231278AB6033CBB9096F6FD3F317C8615F42E2645A1DC85A60A1456",
-      "impliedWalkMps": 1.32,
-      "walkClipSeconds": 0.667
-    },
-    {
-      "id": "boss_rhino_earth",
-      "file": "models/boss/boss_rhino_earth.glb",
-      "pack": "fantasy-rhino",
-      "category": "character",
-      "is": "rootheart",
-      "tags": [
-        "boss",
-        "rootheart",
-        "earth",
-        "stone",
-        "elemental",
-        "monster",
-        "territorial"
-      ],
-      "bytes": 561768,
-      "size": {
-        "x": 1.047,
-        "y": 1.707,
-        "z": 2.633
-      },
-      "base": {
-        "x": -0.524,
-        "y": 0,
-        "z": -1.001
-      },
-      "animations": [
-        "Idle",
-        "Walk",
-        "Attack",
-        "Death"
-      ],
-      "materials": [
-        "boss_rhino_earth_mat"
-      ],
-      "sha256": "A4D6EA9A853598415374A4F658DBD50655FF1E22D3A989DFE7424901C857DFA3",
-      "impliedWalkMps": 1.32,
-      "walkClipSeconds": 0.667
-    },
-    {
-      "id": "boss_rhino_water",
-      "file": "models/boss/boss_rhino_water.glb",
-      "pack": "fantasy-rhino",
-      "category": "character",
-      "is": "quarrykeeper",
-      "tags": [
-        "boss",
-        "quarrykeeper",
-        "ordrun",
-        "water",
-        "ice",
-        "elemental",
-        "monster",
-        "territorial"
-      ],
-      "bytes": 543456,
-      "size": {
-        "x": 1.047,
-        "y": 1.707,
-        "z": 2.633
-      },
-      "base": {
-        "x": -0.524,
-        "y": 0,
-        "z": -1.001
-      },
-      "animations": [
-        "Idle",
-        "Walk",
-        "Attack",
-        "Death"
-      ],
-      "materials": [
-        "boss_rhino_water_mat"
-      ],
-      "sha256": "4F7DA2AE14DD58BCCE40EDF6F49A94A4768A0295A6DDC1483897B48A913DFB92",
-      "impliedWalkMps": 1.32,
-      "walkClipSeconds": 0.667
-    },
-    {
       "id": "enemy_bee",
       "file": "models/character/enemy_bee.glb",
       "pack": "ultimate-platformer-pack",
@@ -1708,8 +1580,7 @@
         "Horns",
         "Tongue",
         "Teeth"
-      ],
-      "walkClipSeconds": 0.542
+      ]
     },
     {
       "id": "enemy_crab",
@@ -1753,8 +1624,7 @@
         "Black",
         "Main_Dark",
         "White"
-      ],
-      "walkClipSeconds": 0.542
+      ]
     },
     {
       "id": "enemy_skull",
@@ -1799,8 +1669,7 @@
       "materials": [
         "Main",
         "Main_Light"
-      ],
-      "walkClipSeconds": 0.542
+      ]
     },
     {
       "id": "eyebrows",
@@ -6736,70 +6605,6 @@
       ]
     },
     {
-      "id": "rocks_free_essence_cache",
-      "file": "models/magic/rocks_free_essence_cache.glb",
-      "pack": "dexsoft-rocks-free",
-      "category": "rock",
-      "is": "essence-cache",
-      "tags": [
-        "rock",
-        "essence",
-        "cache",
-        "minable",
-        "large",
-        "lod0",
-        "emissive-overlay-target"
-      ],
-      "bytes": 1866916,
-      "size": {
-        "x": 30.604338,
-        "y": 10.672737,
-        "z": 17.552934
-      },
-      "base": {
-        "x": -15.516834,
-        "y": -1.861926,
-        "z": -9.417816
-      },
-      "animations": [],
-      "materials": [
-        "rocks_free_essence_cache_material"
-      ],
-      "sha256": "AC63B7F26CD8E7A489223275193409507521DCF27234CC74A225766ECD4EEEC9"
-    },
-    {
-      "id": "rocks_free_essence_node",
-      "file": "models/magic/rocks_free_essence_node.glb",
-      "pack": "dexsoft-rocks-free",
-      "category": "rock",
-      "is": "essence-node",
-      "tags": [
-        "rock",
-        "essence",
-        "node",
-        "minable",
-        "satellite",
-        "lod0",
-        "emissive-overlay-target"
-      ],
-      "bytes": 1979224,
-      "size": {
-        "x": 5.283702,
-        "y": 5.158862,
-        "z": 5.287107
-      },
-      "base": {
-        "x": -2.462837,
-        "y": -2.50891,
-        "z": -2.477444
-      },
-      "animations": [],
-      "materials": [
-        "rocks_free_essence_node_material"
-      ],
-      "sha256": "C1C3C2AF9EAED4027D80C84ED64422C9FB261EABC8BC275334A6A834FB541A1D"
-    },
-    {
       "id": "axe",
       "file": "models/weapon/axe.glb",
       "pack": "fantasy-props-megakit",
@@ -6852,6 +6657,65 @@
         "x": -0.41,
         "y": -0.494,
         "z": -0.068
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Props_Vertex"
+      ]
+    },
+    {
+      "id": "shield",
+      "file": "models/weapon/shield.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "weapon",
+      "is": "shield",
+      "tags": [
+        "shield",
+        "offhand",
+        "defence",
+        "equip"
+      ],
+      "bytes": 167980,
+      "size": {
+        "x": 0.615,
+        "y": 0.621,
+        "z": 0.179
+      },
+      "base": {
+        "x": -0.307,
+        "y": -0.31,
+        "z": -0.001
+      },
+      "animations": [],
+      "materials": [
+        "MI_Trim_Furniture",
+        "MI_Trim_Metal_Vertex",
+        "MI_Trim_Props"
+      ]
+    },
+    {
+      "id": "sword",
+      "file": "models/weapon/sword.glb",
+      "pack": "fantasy-props-megakit",
+      "category": "weapon",
+      "is": "sword",
+      "tags": [
+        "sword",
+        "melee",
+        "blade",
+        "equip",
+        "recolour"
+      ],
+      "bytes": 100976,
+      "size": {
+        "x": 0.267,
+        "y": 1.132,
+        "z": 0.065
+      },
+      "base": {
+        "x": -0.133,
+        "y": -0.208,
+        "z": -0.033
       },
       "animations": [],
       "materials": [
@@ -6923,63 +6787,68 @@
       "sha256": "BBC7BC761773E658C4A0C8CCF30F175ADE391A11A87D85CC8E4866056328B929"
     },
     {
-      "id": "shield",
-      "file": "models/weapon/shield.glb",
-      "pack": "fantasy-props-megakit",
-      "category": "weapon",
-      "is": "shield",
+      "id": "rocks_free_essence_cache",
+      "file": "models/magic/rocks_free_essence_cache.glb",
+      "pack": "dexsoft-rocks-free",
+      "category": "rock",
+      "is": "essence-cache",
       "tags": [
-        "shield",
-        "offhand",
-        "defence",
-        "equip"
+        "rock",
+        "essence",
+        "cache",
+        "minable",
+        "large",
+        "lod0",
+        "emissive-overlay-target"
       ],
-      "bytes": 167980,
+      "bytes": 1866916,
       "size": {
-        "x": 0.615,
-        "y": 0.621,
-        "z": 0.179
+        "x": 30.604338,
+        "y": 10.672737,
+        "z": 17.552934
       },
       "base": {
-        "x": -0.307,
-        "y": -0.31,
-        "z": -0.001
+        "x": -15.516834,
+        "y": -1.861926,
+        "z": -9.417816
       },
       "animations": [],
       "materials": [
-        "MI_Trim_Furniture",
-        "MI_Trim_Metal_Vertex",
-        "MI_Trim_Props"
-      ]
+        "rocks_free_essence_cache_material"
+      ],
+      "sha256": "AC63B7F26CD8E7A489223275193409507521DCF27234CC74A225766ECD4EEEC9"
     },
     {
-      "id": "sword",
-      "file": "models/weapon/sword.glb",
-      "pack": "fantasy-props-megakit",
-      "category": "weapon",
-      "is": "sword",
+      "id": "rocks_free_essence_node",
+      "file": "models/magic/rocks_free_essence_node.glb",
+      "pack": "dexsoft-rocks-free",
+      "category": "rock",
+      "is": "essence-node",
       "tags": [
-        "sword",
-        "melee",
-        "blade",
-        "equip",
-        "recolour"
+        "rock",
+        "essence",
+        "node",
+        "minable",
+        "satellite",
+        "lod0",
+        "emissive-overlay-target"
       ],
-      "bytes": 100976,
+      "bytes": 1979224,
       "size": {
-        "x": 0.267,
-        "y": 1.132,
-        "z": 0.065
+        "x": 5.283702,
+        "y": 5.158862,
+        "z": 5.287107
       },
       "base": {
-        "x": -0.133,
-        "y": -0.208,
-        "z": -0.033
+        "x": -2.462837,
+        "y": -2.50891,
+        "z": -2.477444
       },
       "animations": [],
       "materials": [
-        "MI_Trim_Props_Vertex"
-      ]
+        "rocks_free_essence_node_material"
+      ],
+      "sha256": "C1C3C2AF9EAED4027D80C84ED64422C9FB261EABC8BC275334A6A834FB541A1D"
     },
     {
       "id": "altar_ruins_altar",
@@ -7105,6 +6974,1010 @@
         "Trim"
       ],
       "sha256": "63BB98E1C5ED8714E5AEF1F282BBAD7DFC2B6642C978B891041DB38E71C288BA"
+    },
+    {
+      "id": "boss_rhino_air",
+      "file": "models/boss/boss_rhino_air.glb",
+      "pack": "fantasy-rhino",
+      "category": "character",
+      "is": "roc",
+      "tags": [
+        "boss",
+        "roc",
+        "tempest",
+        "air",
+        "wind",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 564840,
+      "size": {
+        "x": 1.047,
+        "y": 1.707,
+        "z": 2.633
+      },
+      "base": {
+        "x": -0.524,
+        "y": 0,
+        "z": -1.001
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Attack",
+        "Death"
+      ],
+      "materials": [
+        "boss_rhino_air_mat"
+      ],
+      "sha256": "995F78406231278AB6033CBB9096F6FD3F317C8615F42E2645A1DC85A60A1456",
+      "impliedWalkMps": 1.32,
+      "walkClipSeconds": 0.667
+    },
+    {
+      "id": "boss_rhino_earth",
+      "file": "models/boss/boss_rhino_earth.glb",
+      "pack": "fantasy-rhino",
+      "category": "character",
+      "is": "rootheart",
+      "tags": [
+        "boss",
+        "rootheart",
+        "earth",
+        "stone",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 561768,
+      "size": {
+        "x": 1.047,
+        "y": 1.707,
+        "z": 2.633
+      },
+      "base": {
+        "x": -0.524,
+        "y": 0,
+        "z": -1.001
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Attack",
+        "Death"
+      ],
+      "materials": [
+        "boss_rhino_earth_mat"
+      ],
+      "sha256": "A4D6EA9A853598415374A4F658DBD50655FF1E22D3A989DFE7424901C857DFA3",
+      "impliedWalkMps": 1.32,
+      "walkClipSeconds": 0.667
+    },
+    {
+      "id": "boss_rhino_water",
+      "file": "models/boss/boss_rhino_water.glb",
+      "pack": "fantasy-rhino",
+      "category": "character",
+      "is": "quarrykeeper",
+      "tags": [
+        "boss",
+        "quarrykeeper",
+        "ordrun",
+        "water",
+        "ice",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 543456,
+      "size": {
+        "x": 1.047,
+        "y": 1.707,
+        "z": 2.633
+      },
+      "base": {
+        "x": -0.524,
+        "y": 0,
+        "z": -1.001
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Attack",
+        "Death"
+      ],
+      "materials": [
+        "boss_rhino_water_mat"
+      ],
+      "sha256": "4F7DA2AE14DD58BCCE40EDF6F49A94A4768A0295A6DDC1483897B48A913DFB92",
+      "impliedWalkMps": 1.32,
+      "walkClipSeconds": 0.667
+    },
+    {
+      "id": "animal_chicken",
+      "file": "models/animal/animal_chicken.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "chicken",
+      "tags": [
+        "chicken",
+        "hen",
+        "fowl",
+        "bird",
+        "farm",
+        "plains",
+        "animal",
+        "passive"
+      ],
+      "bytes": 364532,
+      "size": {
+        "x": 0.245,
+        "y": 0.613,
+        "z": 0.556
+      },
+      "base": {
+        "x": -0.123,
+        "y": -0.001,
+        "z": -0.268
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.033,
+      "materials": [
+        "animal_chicken_mat"
+      ],
+      "impliedWalkMps": 0.22,
+      "impliedRunMps": 0.75,
+      "runClipSeconds": 0.567
+    },
+    {
+      "id": "animal_chicken_speckled",
+      "file": "models/animal/animal_chicken_speckled.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "chicken",
+      "tags": [
+        "chicken",
+        "hen",
+        "fowl",
+        "bird",
+        "farm",
+        "plains",
+        "animal",
+        "variant"
+      ],
+      "bytes": 397108,
+      "size": {
+        "x": 0.245,
+        "y": 0.613,
+        "z": 0.556
+      },
+      "base": {
+        "x": -0.123,
+        "y": -0.001,
+        "z": -0.268
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.033,
+      "materials": [
+        "animal_chicken_speckled_mat"
+      ],
+      "impliedWalkMps": 0.22,
+      "impliedRunMps": 0.75,
+      "runClipSeconds": 0.567
+    },
+    {
+      "id": "animal_cattle",
+      "file": "models/animal/animal_cattle.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "cow",
+      "tags": [
+        "cow",
+        "cattle",
+        "ox",
+        "bovine",
+        "farm",
+        "plains",
+        "animal",
+        "territorial"
+      ],
+      "bytes": 567280,
+      "size": {
+        "x": 0.643,
+        "y": 1.57,
+        "z": 2.533
+      },
+      "base": {
+        "x": -0.322,
+        "y": -0.005,
+        "z": -1.006
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.133,
+      "materials": [
+        "animal_cattle_mat"
+      ],
+      "impliedWalkMps": 0.51,
+      "impliedRunMps": 1.65,
+      "runClipSeconds": 0.667
+    },
+    {
+      "id": "animal_aurochs",
+      "file": "models/animal/animal_aurochs.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "aurochs",
+      "tags": [
+        "aurochs",
+        "cattle",
+        "bull",
+        "bovine",
+        "highland",
+        "animal",
+        "variant"
+      ],
+      "bytes": 553360,
+      "size": {
+        "x": 0.643,
+        "y": 1.57,
+        "z": 2.533
+      },
+      "base": {
+        "x": -0.322,
+        "y": -0.005,
+        "z": -1.006
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.133,
+      "materials": [
+        "animal_aurochs_mat"
+      ],
+      "impliedWalkMps": 0.51,
+      "impliedRunMps": 1.65,
+      "runClipSeconds": 0.667
+    },
+    {
+      "id": "animal_goat",
+      "file": "models/animal/animal_goat.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "goat",
+      "tags": [
+        "goat",
+        "billy",
+        "horned",
+        "farm",
+        "plains",
+        "animal",
+        "aggressive"
+      ],
+      "bytes": 499264,
+      "size": {
+        "x": 0.434,
+        "y": 1.289,
+        "z": 1.514
+      },
+      "base": {
+        "x": -0.217,
+        "y": -0.002,
+        "z": -0.601
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.1,
+      "materials": [
+        "animal_goat_mat"
+      ],
+      "impliedWalkMps": 0.52,
+      "impliedRunMps": 1.84,
+      "runClipSeconds": 0.467
+    },
+    {
+      "id": "animal_rabbit",
+      "file": "models/animal/animal_rabbit.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "rabbit",
+      "tags": [
+        "rabbit",
+        "bunny",
+        "hare",
+        "coney",
+        "plains",
+        "forest",
+        "animal",
+        "passive"
+      ],
+      "bytes": 470120,
+      "size": {
+        "x": 0.291,
+        "y": 0.44,
+        "z": 0.677
+      },
+      "base": {
+        "x": -0.145,
+        "y": -0.006,
+        "z": -0.268
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 0.633,
+      "materials": [
+        "animal_rabbit_mat"
+      ],
+      "impliedWalkMps": 0.41,
+      "impliedRunMps": 0.78,
+      "runClipSeconds": 0.433
+    },
+    {
+      "id": "animal_rabbit_dark",
+      "file": "models/animal/animal_rabbit_dark.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "rabbit",
+      "tags": [
+        "rabbit",
+        "bunny",
+        "hare",
+        "coney",
+        "forest",
+        "animal",
+        "variant"
+      ],
+      "bytes": 472980,
+      "size": {
+        "x": 0.291,
+        "y": 0.44,
+        "z": 0.677
+      },
+      "base": {
+        "x": -0.145,
+        "y": -0.006,
+        "z": -0.268
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 0.633,
+      "materials": [
+        "animal_rabbit_dark_mat"
+      ],
+      "impliedWalkMps": 0.41,
+      "impliedRunMps": 0.78,
+      "runClipSeconds": 0.433
+    },
+    {
+      "id": "animal_frog",
+      "file": "models/animal/animal_frog.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "frog",
+      "tags": [
+        "frog",
+        "toad",
+        "amphibian",
+        "water",
+        "marsh",
+        "pond",
+        "animal",
+        "passive"
+      ],
+      "bytes": 338868,
+      "size": {
+        "x": 0.318,
+        "y": 0.123,
+        "z": 0.291
+      },
+      "base": {
+        "x": -0.159,
+        "y": -0.001,
+        "z": -0.157
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.367,
+      "materials": [
+        "animal_frog_mat"
+      ],
+      "impliedWalkMps": 0.17,
+      "impliedRunMps": 0.52,
+      "runClipSeconds": 0.633
+    },
+    {
+      "id": "animal_frog_green",
+      "file": "models/animal/animal_frog_green.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "frog",
+      "tags": [
+        "frog",
+        "toad",
+        "amphibian",
+        "water",
+        "marsh",
+        "pool",
+        "animal",
+        "variant"
+      ],
+      "bytes": 335424,
+      "size": {
+        "x": 0.318,
+        "y": 0.123,
+        "z": 0.291
+      },
+      "base": {
+        "x": -0.159,
+        "y": -0.001,
+        "z": -0.157
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.367,
+      "materials": [
+        "animal_frog_green_mat"
+      ],
+      "impliedWalkMps": 0.17,
+      "impliedRunMps": 0.52,
+      "runClipSeconds": 0.633
+    },
+    {
+      "id": "animal_deer",
+      "file": "models/animal/animal_deer.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "deer",
+      "tags": [
+        "deer",
+        "stag",
+        "hart",
+        "doe",
+        "antler",
+        "forest",
+        "animal",
+        "territorial"
+      ],
+      "bytes": 457748,
+      "size": {
+        "x": 0.438,
+        "y": 1.874,
+        "z": 1.709
+      },
+      "base": {
+        "x": -0.219,
+        "y": -0.007,
+        "z": -0.643
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 0.967,
+      "materials": [
+        "animal_deer_mat"
+      ],
+      "impliedWalkMps": 0.62,
+      "impliedRunMps": 1.22,
+      "runClipSeconds": 0.633
+    },
+    {
+      "id": "animal_coyote",
+      "file": "models/animal/animal_coyote.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "coyote",
+      "tags": [
+        "coyote",
+        "wolf",
+        "canine",
+        "pack",
+        "forest",
+        "animal",
+        "aggressive"
+      ],
+      "bytes": 661932,
+      "size": {
+        "x": 0.364,
+        "y": 1.062,
+        "z": 1.568
+      },
+      "base": {
+        "x": -0.182,
+        "y": -0.003,
+        "z": -0.601
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 0.967,
+      "materials": [
+        "animal_coyote_mat"
+      ],
+      "impliedWalkMps": 0.68,
+      "impliedRunMps": 2.05,
+      "runClipSeconds": 0.567
+    },
+    {
+      "id": "animal_hog",
+      "file": "models/animal/animal_hog.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "hog",
+      "tags": [
+        "hog",
+        "pig",
+        "swine",
+        "forest",
+        "bramble",
+        "animal",
+        "aggressive"
+      ],
+      "bytes": 377780,
+      "size": {
+        "x": 0.463,
+        "y": 0.929,
+        "z": 1.811
+      },
+      "base": {
+        "x": -0.231,
+        "y": -0.004,
+        "z": -0.759
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.333,
+      "materials": [
+        "animal_hog_mat"
+      ],
+      "impliedWalkMps": 0.29
+    },
+    {
+      "id": "animal_viper",
+      "file": "models/animal/animal_viper.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "viper",
+      "tags": [
+        "viper",
+        "adder",
+        "snake",
+        "serpent",
+        "venom",
+        "forest",
+        "animal",
+        "territorial"
+      ],
+      "bytes": 399996,
+      "size": {
+        "x": 0.074,
+        "y": 0.07,
+        "z": 1.508
+      },
+      "base": {
+        "x": -0.037,
+        "y": -0.01,
+        "z": -0.732
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.533,
+      "materials": [
+        "animal_viper_mat"
+      ],
+      "impliedRunMps": 0.02,
+      "runClipSeconds": 1.067
+    },
+    {
+      "id": "animal_bear",
+      "file": "models/animal/animal_bear.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "bear",
+      "tags": [
+        "bear",
+        "bruin",
+        "predator",
+        "rocky",
+        "cave",
+        "animal",
+        "aggressive"
+      ],
+      "bytes": 526752,
+      "size": {
+        "x": 0.707,
+        "y": 1.408,
+        "z": 2.458
+      },
+      "base": {
+        "x": -0.353,
+        "y": -0.006,
+        "z": -0.955
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.1,
+      "materials": [
+        "animal_bear_mat"
+      ],
+      "impliedWalkMps": 0.74,
+      "impliedRunMps": 2.25,
+      "runClipSeconds": 0.567
+    },
+    {
+      "id": "animal_boar",
+      "file": "models/animal/animal_boar.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "boar",
+      "tags": [
+        "boar",
+        "tusk",
+        "swine",
+        "rocky",
+        "scree",
+        "animal",
+        "aggressive"
+      ],
+      "bytes": 455684,
+      "size": {
+        "x": 0.474,
+        "y": 0.963,
+        "z": 1.718
+      },
+      "base": {
+        "x": -0.237,
+        "y": -0.001,
+        "z": -0.719
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 0.967,
+      "materials": [
+        "animal_boar_mat"
+      ],
+      "impliedWalkMps": 0.67,
+      "impliedRunMps": 1.25,
+      "runClipSeconds": 0.5
+    },
+    {
+      "id": "animal_ibex",
+      "file": "models/animal/animal_ibex.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "ibex",
+      "tags": [
+        "ibex",
+        "goat",
+        "horned",
+        "ridge",
+        "rocky",
+        "animal",
+        "territorial"
+      ],
+      "bytes": 463708,
+      "size": {
+        "x": 0.43,
+        "y": 1.447,
+        "z": 1.622
+      },
+      "base": {
+        "x": -0.212,
+        "y": -0.003,
+        "z": -0.639
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 0.967,
+      "materials": [
+        "animal_ibex_mat"
+      ],
+      "impliedWalkMps": 0.6,
+      "impliedRunMps": 2.02,
+      "runClipSeconds": 0.467
+    },
+    {
+      "id": "animal_rat",
+      "file": "models/animal/animal_rat.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "rat",
+      "tags": [
+        "rat",
+        "rodent",
+        "vermin",
+        "cave",
+        "dungeon",
+        "animal",
+        "aggressive"
+      ],
+      "bytes": 343840,
+      "size": {
+        "x": 0.135,
+        "y": 0.139,
+        "z": 0.6
+      },
+      "base": {
+        "x": -0.068,
+        "y": -0.001,
+        "z": -0.36
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.4,
+      "materials": [
+        "animal_rat_mat"
+      ],
+      "impliedWalkMps": 0.06
+    },
+    {
+      "id": "animal_scorpion",
+      "file": "models/animal/animal_scorpion.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "scorpion",
+      "tags": [
+        "scorpion",
+        "sting",
+        "arachnid",
+        "cave",
+        "dungeon",
+        "animal",
+        "aggressive"
+      ],
+      "bytes": 469660,
+      "size": {
+        "x": 0.316,
+        "y": 0.24,
+        "z": 0.428
+      },
+      "base": {
+        "x": -0.158,
+        "y": -0.002,
+        "z": -0.215
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1,
+      "materials": [
+        "animal_scorpion_mat"
+      ],
+      "impliedWalkMps": 0.08,
+      "impliedRunMps": 0.12,
+      "runClipSeconds": 0.633
+    },
+    {
+      "id": "animal_crab",
+      "file": "models/animal/animal_crab.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "crab",
+      "tags": [
+        "crab",
+        "shell",
+        "claw",
+        "sump",
+        "cave",
+        "water",
+        "animal",
+        "territorial"
+      ],
+      "bytes": 359084,
+      "size": {
+        "x": 0.323,
+        "y": 0.082,
+        "z": 0.251
+      },
+      "base": {
+        "x": -0.162,
+        "y": -0.002,
+        "z": -0.109
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Death"
+      ],
+      "walkClipSeconds": 1.067,
+      "materials": [
+        "animal_crab_mat"
+      ],
+      "impliedRunMps": 0.03,
+      "runClipSeconds": 0.467
+    },
+    {
+      "id": "animal_perch",
+      "file": "models/animal/animal_perch.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "fish",
+      "tags": [
+        "fish",
+        "perch",
+        "shoal",
+        "school",
+        "water",
+        "fishing",
+        "animal"
+      ],
+      "bytes": 187072,
+      "size": {
+        "x": 0.174,
+        "y": 0.283,
+        "z": 0.547
+      },
+      "base": {
+        "x": -0.087,
+        "y": -0.152,
+        "z": -0.328
+      },
+      "animations": [
+        "Idle",
+        "Walk"
+      ],
+      "walkClipSeconds": 0.833,
+      "materials": [
+        "animal_perch_mat"
+      ]
+    },
+    {
+      "id": "animal_pike",
+      "file": "models/animal/animal_pike.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "fish",
+      "tags": [
+        "fish",
+        "pike",
+        "shoal",
+        "school",
+        "water",
+        "fishing",
+        "animal"
+      ],
+      "bytes": 203800,
+      "size": {
+        "x": 0.091,
+        "y": 0.224,
+        "z": 0.781
+      },
+      "base": {
+        "x": -0.046,
+        "y": -0.112,
+        "z": -0.439
+      },
+      "animations": [
+        "Idle",
+        "Walk"
+      ],
+      "walkClipSeconds": 0.833,
+      "materials": [
+        "animal_pike_mat"
+      ]
+    },
+    {
+      "id": "animal_salmon",
+      "file": "models/animal/animal_salmon.glb",
+      "pack": "animal-pack-deluxe",
+      "category": "character",
+      "is": "fish",
+      "tags": [
+        "fish",
+        "salmon",
+        "shoal",
+        "school",
+        "water",
+        "fishing",
+        "animal"
+      ],
+      "bytes": 132532,
+      "size": {
+        "x": 0.157,
+        "y": 0.181,
+        "z": 0.64
+      },
+      "base": {
+        "x": -0.079,
+        "y": -0.074,
+        "z": -0.396
+      },
+      "animations": [
+        "Idle",
+        "Walk"
+      ],
+      "walkClipSeconds": 0.833,
+      "materials": [
+        "animal_salmon_mat"
+      ]
     }
   ]
 }

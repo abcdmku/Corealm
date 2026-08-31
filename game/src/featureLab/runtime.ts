@@ -334,7 +334,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
 
     async perform(action) {
       return guardAsync(async () => {
-        if (action !== "attack" && action !== "cast" && action !== "flee" && action !== "reset-player") {
+        if (action !== "attack" && action !== "cast" && action !== "flee" && action !== "reset-player" && action !== "awaken-altar") {
           throw new Error(`Unknown feature-lab action: ${String(action)}`);
         }
         if (action === "reset-player") {
