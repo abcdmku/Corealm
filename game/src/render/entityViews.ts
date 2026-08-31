@@ -81,8 +81,10 @@ import * as THREE from "three";
 import { clone as cloneRigged } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Archetype, EntityId, RegionId, SemanticEntity, Vec3 } from "../contracts.js";
-import type { AssetRegistry } from "./assets.js";
+import type { AssetLoadOptions, AssetRegistry } from "./assets.js";
+import type { WorldScene } from "./scene.js";
 import type { PaletteSwatch } from "./materials.js";
+import { EntityActiveSet } from "./entityActiveSet.js";
 import { Rng } from "../core/rng.js";
 import {
   architectureMaterialRole,
@@ -680,6 +682,7 @@ const FISH_LOOP_RADIANS_PER_SECOND = 0.62;
 const SUBMERGED_FISH_RENDER_ORDER = 3;
 const FISH_MARKER_RENDER_ORDER = 4;
 const SUBMERGED_FISH_OPACITY = 0.64;
+const SOURCE_RETRY_DELAY_MS = 1_000;
 
 /**
  * Starter fish are intentionally small, but their interaction ripple cannot shrink in the same
@@ -1114,6 +1117,37 @@ export interface EntityViewStats {
   movingViews: number;
   triangles: number;
   missingAssets: string[];
+  residency: EntityResidencyStats;
+}
+
+/** JSON-safe visual residency state. The semantic store remains outside this class. */
+export interface EntityResidencyStats {
+  tracked: number;
+  eligible: number;
+  selected: number;
+  resident: number;
+  pending: number;
+  missing: number;
+  failed: number;
+  radius: number;
+  fullResidency: boolean;
+  residentIds: EntityId[];
+  pendingIds: EntityId[];
+  missingIds: EntityId[];
+  failedIds: EntityId[];
+  pendingAssets: string[];
+  failedAssets: string[];
+  missingAssets: string[];
+}
+
+export interface EntityRegionPreloadResult {
+  regionId: RegionId;
+  entities: number;
+  assets: number;
+  loaded: number;
+  failedAssets: string[];
+  missingAssets: string[];
+  residency: EntityResidencyStats;
 }
 
 export type EntityMotionPath = "live-rig" | "unique-static" | "baked" | "instanced-static";
@@ -1175,6 +1209,7 @@ export interface EntityViewOptions {
 }
 
 export class EntityViews {
+  private readonly activeSet = new EntityActiveSet();
   private readonly groups = new Map<string, InstanceGroup>();
   private readonly records = new Map<EntityId, ViewRecord>();
   /** Non-null only while the documentation pipeline renders one semantic entity in isolation. */
@@ -1201,6 +1236,8 @@ export class EntityViews {
    */
   private readonly sources = new Map<string, THREE.Object3D>();
   private readonly sourceRequests = new Set<string>();
+  private readonly sourceLoads = new Map<string, Promise<THREE.Object3D | null>>();
+  private readonly failedSources = new Map<string, { attempts: number; retryAtMs: number }>();
   private sourcesChanged = false;
 
   private readonly riggedAssets = new Map<string, boolean>();
@@ -1301,52 +1338,20 @@ export class EntityViews {
 
   /**
    * Loads every GLB the given entities reference. Call once after the world layer has built its
-   * entities and before the first `sync`; `sync` silently skips anything not loaded, so a missing
-   * asset costs one invisible entity rather than a boot failure.
+   * entities and before the first `sync`. Without it, `sync` queues missing assets and leaves those
+   * visual rows pending until the requests finish.
    *
    * Calling this is OPTIONAL — `sync` requests any source it is missing and upgrades the affected
    * entities on the next pass — but calling it means characters are rigged on their very first
    * frame instead of a quarter of a second later.
    */
   async prepare(entities: readonly SemanticEntity[]): Promise<{ loaded: number; missing: string[] }> {
-    const wanted = new Set<string>();
-    const missing = new Set<string>();
-    for (const entity of entities) {
-      if (!entity.view) continue;
-      wanted.add(entity.view.assetId);
-      if (entity.view.depletedAssetId) wanted.add(entity.view.depletedAssetId);
-      // A dressed character needs its body, every outfit part and its hair before the first sync,
-      // or it is built from whatever HAS landed and re-acquired later — which is a visible pop.
-      const character = characterSpecFor(
-        entity.id, entity.archetype, entity.view.assetId, entity.view.partAssetIds);
-      if (!character) continue;
-      wanted.add(character.bodyAssetId);
-      for (const partId of character.partAssetIds) wanted.add(partId);
-    }
-
-    const ids = [...wanted].filter((id) => {
-      if (this.assets.entry(id)) return true;
-      this.missing.add(id);
-      missing.add(id);
-      return false;
-    });
-
-    const results = await Promise.allSettled(ids.map((id) => this.assets.load(id)));
-    let loaded = 0;
-    for (const [index, result] of results.entries()) {
-      const id = ids[index]!;
-      if (result.status === "fulfilled") {
-        loaded += 1;
-        this.sources.set(id, result.value);
-      } else {
-        this.missing.add(id);
-        missing.add(id);
-      }
-    }
-    // `this.missing` is session diagnostics. Callers deciding whether this particular prepared
-    // batch is usable must only see failures from this batch; otherwise one transient typo poisons
-    // every later valid realtime feature-lab swap until a full reload.
-    return { loaded, missing: [...missing] };
+    const ids = this.assetIdsFor(entities);
+    await this.hydrateAssets(ids, true, { priority: "visible-spawn", primary: true });
+    return {
+      loaded: ids.filter((id) => this.sources.has(id) || this.assets.isLoaded(id)).length,
+      missing: ids.filter((id) => this.missing.has(id) || this.failedSources.has(id)),
+    };
   }
 
   /**
@@ -1357,18 +1362,113 @@ export class EntityViews {
   private sourceOf(id: string): THREE.Object3D | null {
     const cached = this.sources.get(id);
     if (cached) return cached;
-    if (!this.assets.isLoaded(id) || this.sourceRequests.has(id)) return null;
-    this.sourceRequests.add(id);
-    void this.assets
-      .load(id)
-      .then((group) => {
-        this.sources.set(id, group);
-        this.sourcesChanged = true;
-      })
-      .catch(() => {
-        this.missing.add(id);
-      });
-    return null;
+    return this.requestSource(id);
+  }
+
+  /** Moves and resizes the visual working set without changing the semantic store. */
+  updateActiveArea(position: Vec3 | THREE.Vector3, radius: number): EntityResidencyStats {
+    this.activeSet.setArea(vec3Of(position), radius);
+    this.reconcileActiveSet();
+    return this.residencyStats();
+  }
+
+  /** Moves the visual working set while keeping its current radius. */
+  updateActivePosition(position: Vec3 | THREE.Vector3): EntityResidencyStats {
+    this.activeSet.setPosition(vec3Of(position));
+    this.reconcileActiveSet();
+    return this.residencyStats();
+  }
+
+  /** Changes the visual working radius around its current position. */
+  updateActiveRadius(radius: number): EntityResidencyStats {
+    this.activeSet.setRadius(radius);
+    this.reconcileActiveSet();
+    return this.residencyStats();
+  }
+
+  /**
+   * Loads a semantic region's visual assets without selecting its entities or allocating meshes.
+   * Region rectangles remain gameplay ownership only; normal residency is still an XZ radius.
+   */
+  async preloadRegion(regionId: RegionId): Promise<EntityRegionPreloadResult> {
+    const entities = this.activeSet.forRegion(regionId);
+    const ids = this.assetIdsFor(entities);
+    await this.hydrateAssets(ids, true, { priority: "travel-prefetch", regionId });
+    this.reconcileActiveSet();
+    return {
+      regionId,
+      entities: entities.length,
+      assets: ids.length,
+      loaded: ids.filter((id) => this.sources.has(id) || this.assets.isLoaded(id)).length,
+      failedAssets: ids.filter((id) => this.failedSources.has(id)),
+      missingAssets: ids.filter((id) => this.missing.has(id)),
+      residency: this.residencyStats(),
+    };
+  }
+
+  /** Full-island residency for deterministic map capture. Passing false restores the active area. */
+  async forceFullResidency(enabled = true): Promise<EntityResidencyStats> {
+    this.activeSet.setFullResidency(enabled);
+    if (enabled) {
+      await this.hydrateAssets(
+        this.assetIdsFor(this.activeSet.selected()),
+        true,
+        { priority: "background" },
+      );
+    }
+    this.reconcileActiveSet();
+    return this.residencyStats();
+  }
+
+  /** Retries every selected asset that has not loaded, then reconciles records before resolving. */
+  async retryHydration(): Promise<EntityResidencyStats> {
+    await this.hydrateAssets(
+      this.assetIdsFor(this.activeSet.selected()),
+      true,
+      { priority: "visible-spawn", primary: true },
+    );
+    this.reconcileActiveSet();
+    return this.residencyStats();
+  }
+
+  residencyStats(): EntityResidencyStats {
+    const activeStats = this.activeSet.stats();
+    const selected = this.activeSet.selected();
+    const residentIds: EntityId[] = [];
+    const pendingIds: EntityId[] = [];
+    const missingIds: EntityId[] = [];
+    const failedIds: EntityId[] = [];
+
+    for (const entity of selected) {
+      if (this.records.has(entity.id)) {
+        residentIds.push(entity.id);
+        continue;
+      }
+      const ids = this.assetIdsForEntity(entity);
+      if (this.missing.has(entity.view!.assetId)) missingIds.push(entity.id);
+      else pendingIds.push(entity.id);
+      if (ids.some((id) => this.failedSources.has(id))) failedIds.push(entity.id);
+    }
+
+    const assets = this.assetIdsFor(selected);
+    return {
+      tracked: activeStats.tracked,
+      eligible: activeStats.eligible,
+      selected: activeStats.selected,
+      resident: residentIds.length,
+      pending: pendingIds.length,
+      missing: missingIds.length,
+      failed: failedIds.length,
+      radius: activeStats.radius,
+      fullResidency: activeStats.fullResidency,
+      residentIds,
+      pendingIds,
+      missingIds,
+      failedIds,
+      pendingAssets: assets.filter((id) => !this.assets.isLoaded(id) && !this.missing.has(id)),
+      failedAssets: assets.filter((id) => this.failedSources.has(id)),
+      missingAssets: assets.filter((id) => this.missing.has(id)),
+    };
   }
 
   // ---------------------------------------------------------------- sync
@@ -1380,6 +1480,11 @@ export class EntityViews {
    * comparison. Entities that vanished from the list release their slot; new ones take one.
    */
   sync(entities: readonly SemanticEntity[]): void {
+    this.activeSet.replace(entities);
+    this.reconcileActiveSet();
+  }
+
+  private reconcileActiveSet(): void {
     if (this.sourcesChanged) {
       this.sourcesChanged = false;
       this.dropUnposed();
@@ -1387,8 +1492,7 @@ export class EntityViews {
 
     const seen = new Set<EntityId>();
 
-    for (const entity of entities) {
-      if (!entity.view) continue;
+    for (const entity of this.activeSet.selected()) {
       seen.add(entity.id);
       this.syncOne(entity);
     }
@@ -1526,6 +1630,8 @@ export class EntityViews {
     if (this.captureSubjectId === entityId) return;
     const previous = this.captureSubjectId;
     this.captureSubjectId = entityId;
+    this.activeSet.pin(entityId);
+    this.reconcileActiveSet();
     this.highlightGroup.visible = entityId === null;
 
     // Once isolation is active, the whole world is already hidden. Swapping portraits should
@@ -1562,7 +1668,27 @@ export class EntityViews {
 
   private syncOne(entity: SemanticEntity): void {
     const view = entity.view!;
-    if (this.missing.has(view.assetId) || !this.assets.isLoaded(view.assetId)) return;
+    let assetsReady = true;
+    for (const assetId of this.assetIdsForEntity(entity)) {
+      if (this.missing.has(assetId)) continue;
+      if (!this.assets.isLoaded(assetId)) assetsReady = false;
+      this.requestSource(assetId, false, {
+        priority: "visible-spawn",
+        regionId: entity.regionId,
+        primary: assetId === view.assetId,
+      });
+    }
+    if (this.missing.has(view.assetId) || !assetsReady) {
+      // A semantic view may change asset while its replacement is in flight. Keeping the old record
+      // would turn a transient fallback into a stale mesh that can survive until the next state edit.
+      const stale = this.records.get(entity.id);
+      if (stale) {
+        this.release(stale);
+        this.records.delete(entity.id);
+        this.clearHighlight(entity.id);
+      }
+      return;
+    }
 
     const tier = view.materialTier ?? entity.tier;
     const clip = view.clipFraction ?? 0;
@@ -2429,33 +2555,87 @@ export class EntityViews {
    * needs is unloaded at first sync. Without this, `characterReady` is false forever and every NPC
    * in the world renders as a naked base body. Measured: 12 of 12, `meshes: 3`, no clothes.
    *
-   * Bounded by construction: only character parts reach here, at most six per NPC across four
-   * outfits, and `sourceRequests` makes each id one request. Setting `sourcesChanged` is what makes
-   * `sync` rebuild the affected groups once the clothes land.
+   * `sourceRequests` deduplicates one attempt. A failed attempt leaves the row pending and clears
+   * that marker, which lets explicit hydration or a later sync retry it. Setting `sourcesChanged`
+   * makes `sync` rebuild the affected groups once the clothes land.
    */
-  private requestSource(id: string): THREE.Object3D | null {
+  private requestSource(
+    id: string,
+    forceRetry = false,
+    options: AssetLoadOptions = {},
+  ): THREE.Object3D | null {
     const cached = this.sources.get(id);
     if (cached) return cached;
     if (this.missing.has(id)) return null;
-    if (!this.assets.entry(id)) {
+    // Procedurally built assets live in the registry cache without a manifest row.
+    if (!this.assets.entry(id) && !this.assets.isLoaded(id)) {
       this.missing.add(id);
+      this.failedSources.delete(id);
       return null;
     }
-    if (this.assets.isLoaded(id) || this.sourceRequests.has(id)) return this.sourceOf(id);
+    if (this.sourceRequests.has(id)) return null;
+
+    const previousFailure = this.failedSources.get(id);
+    if (!forceRetry && previousFailure && Date.now() < previousFailure.retryAtMs) return null;
+
     this.sourceRequests.add(id);
-    void this.assets
-      .load(id)
+    const load = this.assets
+      .load(id, options)
       .then((group) => {
         this.sources.set(id, group);
+        this.failedSources.delete(id);
         this.sourcesChanged = true;
+        return group;
       })
       .catch(() => {
-        this.missing.add(id);
-        // Flip it on failure too, or a character waiting on a part that will never arrive is never
-        // rebuilt without it and stays naked for the session.
+        this.failedSources.set(id, {
+          attempts: (previousFailure?.attempts ?? 0) + 1,
+          retryAtMs: Date.now() + SOURCE_RETRY_DELAY_MS,
+        });
         this.sourcesChanged = true;
+        return null;
+      })
+      .finally(() => {
+        this.sourceRequests.delete(id);
+        this.sourceLoads.delete(id);
       });
+    this.sourceLoads.set(id, load);
     return null;
+  }
+
+  private async hydrateAssets(
+    ids: readonly string[],
+    forceRetry: boolean,
+    options: AssetLoadOptions,
+  ): Promise<void> {
+    for (const id of ids) this.requestSource(id, forceRetry, options);
+    const loads = ids
+      .map((id) => this.sourceLoads.get(id))
+      .filter((load): load is Promise<THREE.Object3D | null> => Boolean(load));
+    await Promise.all(loads);
+  }
+
+  private assetIdsFor(entities: readonly SemanticEntity[]): string[] {
+    const ids = new Set<string>();
+    for (const entity of entities) {
+      for (const id of this.assetIdsForEntity(entity)) ids.add(id);
+    }
+    return [...ids].sort();
+  }
+
+  private assetIdsForEntity(entity: SemanticEntity): string[] {
+    const view = entity.view;
+    if (!view) return [];
+    const ids = new Set<string>([view.assetId]);
+    if (view.depletedAssetId) ids.add(view.depletedAssetId);
+    const character = characterSpecFor(
+      entity.id, entity.archetype, view.assetId, view.partAssetIds,
+    );
+    if (character) {
+      ids.add(character.bodyAssetId);
+      for (const partId of character.partAssetIds) ids.add(partId);
+    }
+    return [...ids].sort();
   }
 
   /**
@@ -4329,11 +4509,13 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
       distinctLooks: looks.size,
       movingViews,
       triangles: Math.round(triangles + uniqueTriangles),
-      missingAssets: [...this.missing],
+      missingAssets: [...this.missing].sort(),
+      residency: this.residencyStats(),
     };
   }
 
   dispose(): void {
+    this.activeSet.replace([]);
     this.clearAllHighlights();
     for (const record of this.records.values()) this.release(record);
     for (const batch of this.batches.values()) {
@@ -4391,6 +4573,11 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     this.bakedGeometries.length = 0;
     this.sources.clear();
     this.sourceRequests.clear();
+    this.sourceLoads.clear();
+    this.failedSources.clear();
+    this.missing.clear();
+    this.sourcesChanged = false;
+    this.captureSubjectId = null;
     this.riggedAssets.clear();
     this.tierKeyed.clear();
     this.architectureAssets.clear();
@@ -4490,6 +4677,12 @@ function loadEssenceAltarLinesMask(): THREE.Texture {
 
 function round(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function vec3Of(position: Vec3 | THREE.Vector3): Vec3 {
+  if (Array.isArray(position)) return [position[0], position[1], position[2]];
+  const vector = position as THREE.Vector3;
+  return [vector.x, vector.y, vector.z];
 }
 
 /** Everything a player could use to tell one drawn character or creature from another. */
