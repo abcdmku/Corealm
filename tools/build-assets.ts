@@ -320,6 +320,8 @@ interface Pick {
   tags: string[];
   /** Animation clip libraries keep their animations and lose their mesh. */
   animationLibrary?: boolean;
+  /** Runtime-reachable clips to retain when this pick is an animation library. */
+  animationClips?: readonly string[];
   /** Max texture edge; defaults to 512. */
   textureLimit?: number;
 }
@@ -758,6 +760,21 @@ CATALOG.push(
     category: "animation",
     tags: ["animation", "clips", "humanoid", "locomotion", "combat", "library", "in-place"],
     animationLibrary: true,
+    animationClips: [
+      "Death01",
+      "Fixing_Kneeling",
+      "Hit_Chest",
+      "Idle_Loop",
+      "Idle_Talking_Loop",
+      "Interact",
+      "Jog_Fwd_Loop",
+      "Punch_Jab",
+      "Spell_Simple_Idle_Loop",
+      "Spell_Simple_Shoot",
+      "Sprint_Loop",
+      "Sword_Attack",
+      "Walk_Loop",
+    ],
   },
   {
     id: "animation_library_2",
@@ -766,6 +783,20 @@ CATALOG.push(
     category: "animation",
     tags: ["animation", "clips", "humanoid", "gathering", "crafting", "library", "in-place"],
     animationLibrary: true,
+    animationClips: [
+      "Chest_Open",
+      "ClimbUp_1m",
+      "Consume",
+      "Farm_Harvest",
+      "Farm_PlantSeed",
+      "Hit_Knockback",
+      "Idle_FoldArms_Loop",
+      "Idle_No_Loop",
+      "Idle_Rail_Loop",
+      "NinjaJump_Start",
+      "Sword_Regular_A",
+      "TreeChopping_Loop",
+    ],
   },
 );
 
@@ -840,6 +871,10 @@ interface BuildRecord {
 // ---------------------------------------------------------------------------
 
 const CACHE_DIR = path.join(repoRoot, ".asset-cache");
+/** Worktrees can reuse the main clone's ignored source archives without sharing build state. */
+const SOURCE_CACHE_DIR = process.env.COREALM_ASSET_SOURCE_CACHE
+  ? path.resolve(process.env.COREALM_ASSET_SOURCE_CACHE)
+  : CACHE_DIR;
 const OUT_DIR = path.join(gameRoot, "public", "assets");
 const MODELS_DIR = path.join(OUT_DIR, "models");
 const MANIFEST_FILE = path.join(OUT_DIR, "manifest.json");
@@ -854,6 +889,8 @@ const REQUIRED_UNITY_ASSET_IDS = new Set([
 
 /** Bump when the transform pipeline changes so cached outputs are invalidated. */
 const PIPELINE_VERSION = "1.3.0";
+/** Versioned separately so an animation-only transform does not invalidate every mesh asset. */
+const ANIMATION_PIPELINE_VERSION = "2.0.1";
 const TEXTURE_LIMIT = 512;
 /** Categories the "no GLB over ~400 KB" budget applies to. */
 const ENVIRONMENT_CATEGORIES = new Set<Category>(["nature", "rock", "building", "prop", "farm", "dungeon", "weapon"]);
@@ -950,7 +987,7 @@ async function archive(packId: string): Promise<ZipArchive> {
   if (!pack) throw new Error(`Unknown pack: ${packId}`);
   let existing = archives.get(packId);
   if (!existing) {
-    const file = path.join(CACHE_DIR, pack.zip);
+    const file = path.join(SOURCE_CACHE_DIR, pack.zip);
     const actualSha256 = await sha256File(file);
     if (actualSha256 !== pack.archiveSha256) {
       throw new Error(
@@ -1554,16 +1591,40 @@ async function palettizePNGs(document: Document): Promise<void> {
 }
 
 /**
- * Animation libraries keep every clip. The mannequin mesh and its materials are
- * dead weight for a clip library, so they are removed and the result is checked
- * against the original clip/channel counts before it is accepted.
+ * Animation libraries keep only clips named by runtime pose tables. The mannequin mesh and its
+ * materials are dead weight for a clip library, so they are removed too. The retained clips are
+ * checked against their original channel counts after every transform.
  */
-async function optimizeAnimationLibrary(document: Document): Promise<{ ok: boolean }> {
+async function optimizeAnimationLibrary(
+  document: Document,
+  retainedNames: readonly string[],
+): Promise<{ retained: number; removed: number }> {
   const root = document.getRoot();
-  const before = root.listAnimations().map((animation) => ({
+  const source = root.listAnimations();
+  const sourceNames = new Set<string>();
+  for (const animation of source) {
+    const name = animation.getName();
+    if (sourceNames.has(name)) throw new Error(`Animation library contains duplicate clip: ${name}`);
+    sourceNames.add(name);
+  }
+
+  const requested = new Set(retainedNames);
+  if (requested.size !== retainedNames.length) throw new Error("Animation allowlist contains duplicate clips");
+  const missing = retainedNames.filter((name) => !sourceNames.has(name));
+  if (missing.length > 0) throw new Error(`Animation allowlist clip(s) missing from source: ${missing.join(", ")}`);
+
+  const before = source.filter((animation) => requested.has(animation.getName())).map((animation) => ({
     name: animation.getName(),
     channels: animation.listChannels().length,
   }));
+  for (const animation of source) {
+    if (requested.has(animation.getName())) continue;
+    // Animation.dispose() does not cascade through its channel and sampler properties. Leaving
+    // those children alive keeps their accessors in the output even though no animation uses them.
+    for (const channel of animation.listChannels()) channel.dispose();
+    for (const sampler of animation.listSamplers()) sampler.dispose();
+    animation.dispose();
+  }
 
   for (const mesh of root.listMeshes()) mesh.dispose();
   for (const material of root.listMaterials()) material.dispose();
@@ -1578,10 +1639,16 @@ async function optimizeAnimationLibrary(document: Document): Promise<{ ok: boole
     name: animation.getName(),
     channels: animation.listChannels().length,
   }));
-  const ok =
-    after.length === before.length &&
+  const intact =
+    after.length === retainedNames.length &&
+    before.length === retainedNames.length &&
     before.every((entry, index) => after[index]?.name === entry.name && after[index]?.channels === entry.channels);
-  return { ok };
+  if (!intact) {
+    throw new Error(
+      `Animation clip/channel check failed: expected ${before.length} retained clips, got ${after.length}`,
+    );
+  }
+  return { retained: after.length, removed: source.length - after.length };
 }
 
 function readableSize(bytes: number): string {
@@ -1598,6 +1665,29 @@ async function loadState(): Promise<Record<string, BuildRecord>> {
   }
 }
 
+/**
+ * Keeps manifest output reproducible. A caller may pin a build date with SOURCE_DATE_EPOCH; an
+ * incremental rebuild otherwise preserves the manifest's existing date instead of recording the
+ * wall clock and changing an unrelated line on every run.
+ */
+async function manifestGeneratedAt(): Promise<string> {
+  const sourceDateEpoch = process.env.SOURCE_DATE_EPOCH;
+  if (sourceDateEpoch !== undefined) {
+    const seconds = Number(sourceDateEpoch);
+    if (!Number.isFinite(seconds) || seconds < 0) throw new Error(`Invalid SOURCE_DATE_EPOCH: ${sourceDateEpoch}`);
+    return new Date(seconds * 1_000).toISOString();
+  }
+  try {
+    const previous = JSON.parse(await readFile(path.join(OUT_DIR, "manifest.json"), "utf8")) as Partial<Manifest>;
+    if (typeof previous.generatedAt === "string" && Number.isFinite(Date.parse(previous.generatedAt))) {
+      return previous.generatedAt;
+    }
+  } catch {
+    // A first build has no date to preserve. The Unix epoch is stable and explicitly synthetic.
+  }
+  return new Date(0).toISOString();
+}
+
 async function buildOne(
   pick: Pick,
   state: Record<string, BuildRecord>,
@@ -1608,9 +1698,10 @@ async function buildOne(
   const outFile = path.join(outputRoot, relative);
   const limit = pick.textureLimit ?? TEXTURE_LIMIT;
   const optionsHash = sha1(
-    PIPELINE_VERSION,
+    pick.animationLibrary ? ANIMATION_PIPELINE_VERSION : PIPELINE_VERSION,
     String(limit),
     pick.animationLibrary ? "anim" : "mesh",
+    ...(pick.animationClips ?? []),
     relative,
     pick.tags.join(","),
     pick.category,
@@ -1649,18 +1740,9 @@ async function buildOne(
   let note: string | undefined;
 
   if (pick.animationLibrary) {
-    const { ok } = await optimizeAnimationLibrary(document);
-    if (!ok) {
-      // Stripping cost us a clip or a channel, so ship the source untouched.
-      note = "clip check failed, passed through unmodified";
-      const original = await materialize(zip, plan);
-      const glb = await io.writeBinary(original.document);
-      await mkdir(path.dirname(outFile), { recursive: true });
-      await writeFile(outFile, glb);
-      const asset = describe(pick, relative, glb.byteLength, original.document, metrics);
-      state[pick.id] = { inputHash, optionsHash, sourceBytes, asset };
-      return { asset, sourceBytes, reused: false, note };
-    }
+    if (!pick.animationClips?.length) throw new Error(`Animation library has no runtime clip allowlist: ${pick.id}`);
+    const result = await optimizeAnimationLibrary(document, pick.animationClips);
+    note = `retained ${result.retained} clips, pruned ${result.removed}`;
   } else {
     await optimizeMesh(document, limit);
   }
@@ -1807,7 +1889,7 @@ async function metrics(write: boolean): Promise<number> {
 
 async function probe(zipKey: string, needle: string): Promise<void> {
   const pack = PACKS.find((entry) => entry.id === zipKey);
-  const file = pack ? path.join(CACHE_DIR, pack.zip) : path.join(CACHE_DIR, zipKey);
+  const file = pack ? path.join(SOURCE_CACHE_DIR, pack.zip) : path.join(SOURCE_CACHE_DIR, zipKey);
   const zip = await ZipArchive.open(file);
   const matches = [...zip.entries.keys()].filter((name) => name.toLowerCase().includes(needle.toLowerCase()));
   for (const name of matches.slice(0, 40)) {
@@ -1957,7 +2039,7 @@ async function main(): Promise<void> {
 
   const usedPacks = new Set(assets.map((asset) => asset.pack));
   const manifest: Manifest = {
-    generatedAt: new Date().toISOString(),
+    generatedAt: await manifestGeneratedAt(),
     packs: [
       ...PACKS.filter((pack) => usedPacks.has(pack.id)).map(({ id, name, author, source, license, archiveSha256 }) => ({
         id,
