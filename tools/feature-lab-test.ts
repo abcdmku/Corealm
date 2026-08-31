@@ -607,7 +607,8 @@ async function testBuilding(
   remember(ready);
   const probe = await readRuntimeProbe(targetPage);
   const sourceKind = targetPage.locator("#lab-source-kind");
-  await sourceKind.waitFor({ state: "visible", timeout: 2_000 });
+  // The lab panel is a deferred UI chunk. Runtime readiness can arrive before that chunk mounts.
+  await sourceKind.waitFor({ state: "visible", timeout: READY_BUDGET_MS });
   const rebuildStarted = performance.now();
   await sourceKind.selectOption("wall-run");
   const wallRun = await waitForState(targetPage, "building control structure rebuild", (state) => (
