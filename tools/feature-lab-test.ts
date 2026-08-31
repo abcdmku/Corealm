@@ -220,7 +220,7 @@ try {
     headless: true,
     args: ["--enable-unsafe-swiftshader", "--mute-audio"],
   });
-  page = await browser.newPage({ viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 });
+  page = await browser.newPage({ viewport: { width: 800, height: 600 }, deviceScaleFactor: 0.75 });
   await page.addInitScript((settings) => {
     globalThis.localStorage?.setItem("corealm.settings.v1", JSON.stringify(settings));
     Reflect.set(
@@ -631,6 +631,7 @@ async function testBuilding(
   const sourceKind = targetPage.locator("#lab-source-kind");
   // The lab panel is a deferred UI chunk. Runtime readiness can arrive before that chunk mounts.
   await sourceKind.waitFor({ state: "visible", timeout: READY_BUDGET_MS });
+  logProgress("building controls ready");
   const rebuildStarted = performance.now();
   await sourceKind.selectOption("wall-run");
   const wallRun = await waitForState(targetPage, "building control structure rebuild", (state) => (
@@ -641,6 +642,7 @@ async function testBuilding(
   ), REBUILD_BUDGET_MS);
   remember(wallRun);
   const rebuildMs = performance.now() - rebuildStarted;
+  logProgress("building rebuild complete");
 
   await targetPage.evaluate(() => window.__featureLab?.fitStructure());
   await targetPage.waitForTimeout(80);
@@ -655,6 +657,7 @@ async function testBuilding(
   await targetPage.waitForTimeout(50);
   const authoringShot = path.join(captures, "building-authoring.png");
   await capture(targetPage, authoringShot, captured);
+  logProgress("building screenshot captured");
 
   const toggle = targetPage.locator("#lab-walk-enabled");
   await toggle.waitFor({ state: "visible", timeout: 2_000 });
@@ -682,6 +685,7 @@ async function testBuilding(
   }
   remember(walked);
   const walkingStructureStable = sameStructure(stableStructure, walked.structure);
+  logProgress("building walking complete");
 
   await setToggle(toggle, false);
   const disabledBefore = await waitForState(targetPage, "disable building walking", (state) => (
@@ -694,6 +698,7 @@ async function testBuilding(
   await targetPage.waitForTimeout(50);
   const keyboardDisabled = await readState(targetPage);
   const keyboardStable = distanceXZ(disabledBefore.playerPosition, keyboardDisabled.playerPosition) < 0.08;
+  logProgress("building disabled-input proof complete");
   const canvas = targetPage.locator("#viewport");
   const canvasBox = await canvas.boundingBox();
   if (!canvasBox) throw new Error("Production canvas has no visible bounds in building mode");
@@ -716,7 +721,7 @@ async function testBuilding(
   const freeOrbitBefore = await readCameraProbe(targetPage);
   await targetPage.mouse.move(authoringPoint.x, authoringPoint.y);
   await targetPage.mouse.down({ button: "right" });
-  await targetPage.mouse.move(authoringPoint.x - 56, authoringPoint.y + 24, { steps: 4 });
+  await targetPage.mouse.move(authoringPoint.x - 56, authoringPoint.y + 24);
   await targetPage.mouse.up({ button: "right" });
   await targetPage.waitForTimeout(60);
   const freeOrbitAfter = await readCameraProbe(targetPage);
@@ -731,6 +736,7 @@ async function testBuilding(
   ), 2_000);
   remember(freeCameraDisabled);
   const freeCameraDisabledChecked = await freeCameraToggle.isChecked();
+  logProgress("building camera proof complete");
 
   const buildingWorkbench = targetPage.locator("#lab-building-workbench");
   if (!(await buildingWorkbench.isVisible())) {
