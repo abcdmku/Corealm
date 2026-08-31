@@ -63,7 +63,7 @@ describe("production bundle policy", () => {
       "assets/world-map-detail-4800.webp",
     ];
     expect(resolveCriticalPreloads("assets/entry/index.js", dependencies, { hostId: "index.html", hostType: "html" }))
-      .toEqual(dependencies.slice(0, 4));
+      .toEqual(dependencies);
     expect(resolveCriticalPreloads("assets/chunks/panels.js", dependencies, { hostId: "boot.js", hostType: "js" }))
       .toEqual(dependencies);
   });

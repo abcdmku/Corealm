@@ -6,7 +6,6 @@ const APPLICATION_INITIAL_JS_GZIP_BUDGET = 1_000_000;
 const CRITICAL_JS_AND_WASM_GZIP_BUDGET = 1_500_000;
 const DEDICATED_ENGINE_CHUNKS = ["three", "rapier", "recast"] as const;
 const VENDOR_CHUNKS = new Set<string>([...DEDICATED_ENGINE_CHUNKS, "vendor"]);
-const CRITICAL_PRELOAD = /^assets\/chunks\/(?:three|rapier|recast|vendor)-[^/]+\.js$/;
 
 export const BUNDLE_BUDGETS = Object.freeze({
   applicationInitialJsGzipBytes: APPLICATION_INITIAL_JS_GZIP_BUDGET,
@@ -66,17 +65,15 @@ export function bundleChunkForModule(moduleId: string): string | undefined {
 }
 
 /**
- * Vite already loads the entry module and stylesheet from the document. Only synchronous engine
- * dependencies get an HTML modulepreload hint. Dependencies of a later dynamic import are left
- * intact, but Vite requests them only when that import runs.
+ * Vite passes only the entry's synchronous dependency graph for an HTML host. Preserve that graph
+ * so every module needed to evaluate boot is discovered with the entry instead of one import at a
+ * time. Dependencies of later dynamic imports are attached to their JS host and remain deferred.
  */
 export const resolveCriticalPreloads: ResolveModulePreloadDependenciesFn = (
   _filename,
   dependencies,
-  context,
-) => context.hostType === "html"
-  ? dependencies.filter((dependency) => CRITICAL_PRELOAD.test(dependency))
-  : dependencies;
+  _context,
+) => dependencies;
 
 function bytesOf(artifact: BundleArtifact): string | Uint8Array {
   return artifact.type === "chunk" ? artifact.code : artifact.source;

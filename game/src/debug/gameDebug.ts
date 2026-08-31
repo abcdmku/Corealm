@@ -52,6 +52,8 @@ export interface DebugDeps {
   camera: OrbitCamera;
   assets: AssetRegistry;
   errors: RecordedError[];
+  /** True only after the first playable frame has rendered and the boot overlay is gone. */
+  isReady(): boolean;
   /**
    * Live particle count in the spell effect layer, when one is wired.
    *
@@ -176,7 +178,7 @@ export function installGameDebug(deps: DebugDeps): void {
       const state = store.get();
       const stats = renderer.getStats();
       return {
-        ready: true,
+        ready: deps.isReady(),
         version: deps.version,
         regionId: state.player.regionId,
         seed: state.meta.seed,

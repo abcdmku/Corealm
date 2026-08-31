@@ -181,6 +181,9 @@ describe("generated world-map payloads", () => {
       setTransform: vi.fn(),
       clearRect: vi.fn(),
       fillRect: vi.fn(),
+      fillText: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
       fillStyle: "",
     };
     const canvas = {
@@ -236,6 +239,9 @@ describe("generated world-map payloads", () => {
       setTransform: vi.fn(),
       clearRect: vi.fn(),
       fillRect: vi.fn(),
+      fillText: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
       fillStyle: "",
     };
     const canvas = {

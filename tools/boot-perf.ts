@@ -136,6 +136,7 @@ export interface BootSpanRecord {
   startMs: number;
   endMs: number;
   durationMs: number;
+  attributed?: boolean;
   detail?: unknown;
 }
 
@@ -618,7 +619,7 @@ async function capturePage(page: Page): Promise<PageCapture> {
   });
 }
 
-function timelineAttribution(
+export function timelineAttribution(
   spans: BootSpanRecord[],
   firstPlayableMs: number | null,
   telemetryAvailable: boolean,
@@ -630,6 +631,7 @@ function timelineAttribution(
   const intervals = end === null
     ? []
     : spans
+      .filter((span) => span.attributed !== false)
       .map((span) => ({ startMs: Math.max(0, span.startMs), endMs: Math.min(end, span.endMs) }))
       .filter((span) => span.endMs > span.startMs)
       .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
@@ -854,6 +856,7 @@ function normalizeSpans(value: unknown): BootSpanRecord[] {
       startMs: round(startMs),
       endMs: round(endMs),
       durationMs: round(durationMs ?? Math.max(0, endMs - startMs)),
+      ...(typeof record["attributed"] === "boolean" ? { attributed: record["attributed"] } : {}),
       ...(record["detail"] !== undefined ? { detail: record["detail"] } : {}),
     });
   }

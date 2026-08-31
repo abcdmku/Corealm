@@ -11,6 +11,7 @@ import {
   inferBase,
   normalizeBase,
   relativeRequestStartMs,
+  timelineAttribution,
 } from "../tools/boot-perf.js";
 
 /**
@@ -74,6 +75,20 @@ describe("Wave 0 boot-performance budgets", () => {
     expect(countPreReadyActiveSpans(active, 1_000)).toBe(1);
     expect(countPreReadyActiveSpans(active.slice(1), 1_000)).toBe(0);
     expect(countPreReadyActiveSpans(active, null)).toBe(2);
+  });
+
+  it("does not let the boot.total umbrella hide unattributed time", () => {
+    const attribution = timelineAttribution([
+      { name: BOOT_SPANS.TOTAL, startMs: 0, endMs: 1_000, durationMs: 1_000, attributed: false },
+      { name: "boot.actual-work", startMs: 100, endMs: 250, durationMs: 150, attributed: true },
+    ], 1_000, true, 0, 0, true);
+
+    expect(attribution.coveredMs).toBe(150);
+    expect(attribution.unattributedMs).toBe(850);
+    expect(attribution.gaps).toEqual([
+      { startMs: 0, endMs: 100, durationMs: 100 },
+      { startMs: 250, endMs: 1_000, durationMs: 750 },
+    ]);
   });
 
   it("rejects CDP's unresolved request timing sentinel instead of inventing a pre-ready request", () => {

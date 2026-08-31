@@ -304,5 +304,12 @@
 }
 
 @media (max-width: 760px) {
+  #panel-map {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px);
+    min-width: 0;
+    min-height: 0;
+    resize: none;
+  }
   .map__figure { height: clamp(300px, 52vh, 430px); }
 }

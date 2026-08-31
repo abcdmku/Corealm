@@ -149,6 +149,7 @@ export class WorldMapCanvas {
       context.restore();
     } else {
       this.paintFallback(context);
+      this.paintLoadStatus(context);
     }
 
   }
@@ -423,5 +424,24 @@ export class WorldMapCanvas {
     const bottomRight = this.toScreen(bounds.maxU, bounds.maxV);
     context.fillStyle = "#33372b";
     context.fillRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+  }
+
+  private paintLoadStatus(context: CanvasRenderingContext2D): void {
+    const states = [...this.terrainStates.values()];
+    const exhausted = states.length > 0 && states.every((state) =>
+      !state.level
+      && !state.loading
+      && state.retryTimer === null
+      && state.failures > LOAD_RETRY_DELAYS_MS.length
+    );
+    context.save();
+    context.fillStyle = "rgba(8, 10, 8, 0.82)";
+    context.fillRect(0, 0, this.width, this.height);
+    context.fillStyle = exhausted ? "#f2b8a8" : "#e8ddbf";
+    context.font = "600 15px system-ui, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(exhausted ? "Detailed map unavailable" : "Loading detailed map…", this.width / 2, this.height / 2);
+    context.restore();
   }
 }

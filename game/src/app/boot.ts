@@ -137,6 +137,7 @@ export interface BootOptions {
 export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {}): Promise<BootResult> {
   const profile = options.profile ?? GAME_BOOT_PROFILE;
   const bootTotalSpan = bootTelemetry.startSpan(BOOT_SPANS.TOTAL, { startMs: 0 });
+  let debugReady = false;
   const bootEntryMs = bootTelemetry.elapsedMs();
   const navigationTiming = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
   bootTelemetry.recordSpan({
@@ -668,10 +669,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       () => playerRig.applyEquipment(store.get().equipment),
     );
   }
-  // 13. Region loops are selected only after the save decides the player's starting region.
-  // Until this point gesture unlock has no desired loop to start, so the loading screen cannot
-  // briefly play Fallowmarch over a character saved elsewhere.
-  audioDirector.setRegion(store.get().player.regionId);
+  // Region audio is selected after play. Requesting multi-megabyte music while the renderer is
+  // still building made audio compete with the first frame even though browsers cannot play it
+  // before a gesture unlocks the AudioContext.
 
   // 14. API and hooks. Everything a human or an agent does goes through here.
   const movement = new Movement(nav, events);
@@ -1874,6 +1874,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   installGameDebug({
     store, events, clock, nav, movement, api, renderer, camera, assets, errors,
+    isReady: () => debugReady,
     version,
     // Direct evidence that a cast drew something, for `tools/verify-magic.ts`. Reading `drawCalls`
     // instead conflates a spell with anything else that streamed in that frame.
@@ -2221,26 +2222,38 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   }
   bootTelemetry.milestone(BOOT_MILESTONES.SHADERS_READY);
 
-  bootTelemetry.measureSync(BOOT_SPANS.BOOT_SCREEN_REMOVAL, () => {
-    document.getElementById("boot-screen")?.remove();
-  });
-  bootTelemetry.milestone(BOOT_MILESTONES.BOOT_SCREEN_REMOVED);
   if (worldMapCapture) {
     // Build-time capture is deterministic: no animation/motion frame may land between two tiles.
     scene.updateTime(0);
     scene.updateStreaming(0, 0, Infinity);
+    bootTelemetry.measureSync(BOOT_SPANS.BOOT_SCREEN_REMOVAL, () => {
+      document.getElementById("boot-screen")?.remove();
+    });
+    bootTelemetry.milestone(BOOT_MILESTONES.BOOT_SCREEN_REMOVED);
+    bootTotalSpan.end();
+    bootTelemetry.recordPerformanceResources();
+    bootTelemetry.milestone(BOOT_MILESTONES.FIRST_PLAYABLE);
+    debugReady = true;
   } else {
     const firstFrameSpan = bootTelemetry.startSpan(BOOT_SPANS.FIRST_RENDERED_FRAME);
     loop.start();
     requestAnimationFrame(() => {
       firstFrameSpan.end();
       bootTelemetry.milestone(BOOT_MILESTONES.FIRST_RENDERED_FRAME);
+      // Keep the overlay over the canvas until the frame loop has actually painted once. Removing
+      // it before loop.start() exposed shader compilation and an empty canvas as apparent gameplay.
+      bootTelemetry.measureSync(BOOT_SPANS.BOOT_SCREEN_REMOVAL, () => {
+        document.getElementById("boot-screen")?.remove();
+      });
+      bootTelemetry.milestone(BOOT_MILESTONES.BOOT_SCREEN_REMOVED);
       bootTotalSpan.end();
       bootTelemetry.recordPerformanceResources();
       // Publish readiness last so an attached runner cannot capture the timeline between the
       // playable mark and the final critical span/resource bookkeeping above.
       bootTelemetry.milestone(BOOT_MILESTONES.FIRST_PLAYABLE);
+      debugReady = true;
       window.setTimeout(() => {
+        audioDirector.setRegion(store.get().player.regionId);
         const expandEntityResidency = (): void => {
           entityViews.updateActiveRadius(ENTITY_ACTIVE_RADIUS);
         };
