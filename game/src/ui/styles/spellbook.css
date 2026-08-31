@@ -30,61 +30,10 @@
   min-width: 0;
 }
 
-/* ------------------------------------------------------------------- the banner */
-
-/*
- * What is being cast, and whose decision that was. It carries the brass left edge the controls
- * panel uses for "this is the live one", because a player who never opens this panel still has a
- * spell being picked for them and this sentence is the only place the game admits it.
- */
-.spellbook__status {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: rgba(212, 175, 78, 0.07);
-  border: var(--border);
-  border-left: 2px solid var(--accent);
-  border-radius: var(--radius);
-}
-
-.spellbook__status-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.spellbook__casting {
-  font-family: var(--font-display);
-  font-size: var(--size-lg);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--highlight);
-  text-shadow: var(--shadow-text);
-}
-
-.spellbook__note {
-  margin: 0;
-  font-size: var(--size-xs);
-  line-height: 1.45;
-  color: var(--ink-dim);
-}
-
-.spellbook__auto { flex: 0 0 auto; }
-
-/* The escape hatch out of a standing choice, and the only one a player can find by reading rather
- * than by guessing that clicking the lit cell again undoes it. Brass while it has something to
- * undo; `.btn[disabled]` takes it back down to 45% when the game is already choosing. */
-.spellbook__auto:not(:disabled) { color: var(--accent); }
-
 /* ----------------------------------------------------------------- the swatches */
 
 /*
- * A lit orb rather than a flat chip: hot centre, cooler rim, and a bloom in the rim colour. That
- * is the same two-colour recipe the VFX layer uses for a projectile (core inside, edge particles
- * outside), so the legend and the effect read as the same object at a glance.
+ * A hot centre and cooler rim use the same two-colour recipe as the spell projectile.
  */
 .spellbook__swatch {
   width: 22px;
@@ -110,67 +59,6 @@
     inset 0 0 0 1px rgba(0, 0, 0, 0.55);
 }
 
-/* Nothing is castable, so the orb is out. Desaturated rather than hidden: the slot stays, which
- * keeps the banner from reflowing every time the last shard is spent. */
-.spellbook__swatch.is-dead {
-  background: radial-gradient(circle at 34% 30%, #3a352c 0%, #1a1712 78%);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
-}
-
-/* ------------------------------------------------------------------ cost strip */
-
-.spellbook__cost {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 2px var(--space-2);
-  background: rgba(0, 0, 0, 0.22);
-  border: var(--border);
-  border-left: 2px solid var(--panel-edge);
-  border-radius: var(--radius);
-  font-size: var(--size-xs);
-  line-height: 1.5;
-  color: var(--ink-dim);
-}
-
-/*
- * Zero shards. The API still lets every row be chosen and the panel still shows every number, so
- * this is a warning and not a lock — a caster restocking at a general store needs to be able to
- * set the spell they are coming back for. Danger tone only on the rail and the ink; a red fill
- * across the strip reads as an error the player caused.
- */
-.spellbook__cost.is-empty {
-  border-left-color: var(--danger);
-  background: rgba(126, 53, 39, 0.16);
-  color: #f3c3b8;
-}
-
-/*
- * `createItemIcon` returns a wrapper whose sizing rules in styles.css are all scoped to
- * `.slot__glyph`, so outside an inventory slot it has none and the raster inside it is 48 px.
- * These four rules are the whole of dressing it for a text line.
- */
-.spellbook__cost-icon {
-  position: relative;
-  display: block;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-}
-
-.spellbook__cost-icon .icon,
-.spellbook__cost-icon .item-icon__raster {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.spellbook__cost-icon .icon { fill: #e8dfcb; }
-
-.spellbook__cost-icon.is-raster-ready .icon { visibility: hidden; }
-
 /* -------------------------------------------------------------------- the grid */
 
 /*
@@ -181,8 +69,8 @@
  */
 .spellbook__grid {
   display: grid;
-  grid-template-columns: 54px repeat(4, minmax(0, 1fr));
-  gap: var(--space-1);
+  grid-template-columns: 32px repeat(4, minmax(0, 1fr));
+  gap: 2px;
   align-items: stretch;
 }
 
@@ -219,6 +107,23 @@
   font-size: var(--size-xs);
   color: var(--ink-faint);
   white-space: nowrap;
+}
+
+.spellbook__head.is-unreleased .spellbook__head-name,
+.spellbook__head.is-unreleased .spellbook__head-blurb {
+  color: #d9a294;
+}
+
+.spellbook__head.is-unreleased .spellbook__head-blurb {
+  font-size: 8px;
+  line-height: 1.1;
+  text-align: center;
+  white-space: normal;
+}
+
+.spellbook__head.is-unreleased .spellbook__swatch {
+  filter: saturate(0.28);
+  opacity: 0.72;
 }
 
 /* The ladder's own axis, right-aligned into the cells so the eye reads label-then-row. */
@@ -357,6 +262,10 @@
 .spellbook__cell.is-locked .spellbook__cell-req { color: #d9a294; }
 .spellbook__cell.is-locked:hover { opacity: 1; filter: none; }
 
+.spellbook__cell.is-blocked:not(.is-locked, .is-preferred) {
+  filter: saturate(0.62);
+}
+
 /* Only reachable if content ever stops being a full 4x4; see buildCell's note. */
 .spellbook__cell.is-absent {
   cursor: default;
@@ -369,7 +278,7 @@
 /*
  * The tokens in title.css do most of this on their own — type and spacing shrink under
  * `#ui-root.is-compact` and every rule above reads them through var(). What is left is the fixed
- * geometry: the rung gutter, the orbs, and the panel width itself. `max-width` is used rather than
+ * geometry: the rung gutter, the glyphs, and the panel width itself. `max-width` is used rather than
  * `width` because the width is an inline style from `PanelPlacement` and only `max-width` outranks
  * it without `!important`; the panel is centred by transform, so clamping it keeps it centred.
  */
@@ -411,4 +320,13 @@
   .spellbook__corner { display: none; }
   .spellbook__status { grid-template-columns: auto minmax(0, 1fr); }
   .spellbook__auto { grid-column: 2; justify-self: start; }
+}
+
+/* Fire's release state must survive density and viewport rules that hide ordinary blurbs. */
+#ui-root.is-compact .spellbook__head.is-unreleased .spellbook__head-blurb {
+  display: block;
+}
+
+@media (max-height: 800px), (max-width: 780px) {
+  .spellbook__head.is-unreleased .spellbook__head-blurb { display: block; }
 }

@@ -3,16 +3,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import type { EquipmentBonuses, ItemDef, ItemId } from "../game/src/contracts.js";
-import { EQUIPMENT, KITS } from "../game/src/content/equipment.js";
+import { EQUIPMENT, KITS, MAGIC_ORBS } from "../game/src/content/equipment.js";
 import { computeMaxHealth, createInitialState, setSkillLevel } from "../game/src/state/store.js";
 import {
   GEAR_APPEARANCE_IDS, GEAR_ASSET_GAPS, VISIBLE_EQUIP_SLOTS,
-  applyGearAppearance, gearAppearance, gearAppearanceParts, weaponAttachment, weaponSocket,
+  applyGearAppearance, gearAppearance, gearAppearanceParts, gearAppearancePartsWithFocus,
+  weaponAttachment, weaponSocket,
 } from "../game/src/render/equipmentVisuals.js";
-import {
-  PROCEDURAL_GEAR_ASSETS, PROCEDURAL_WAND_ASSETS, STAFF_LOOKS, WAND_LOOKS,
-  buildStaff, buildWand, isProceduralGearAsset,
-} from "../game/src/render/proceduralGear.js";
 import { iconShapeFor } from "../game/src/ui/itemIcons.js";
 
 /**
@@ -20,7 +17,7 @@ import { iconShapeFor } from "../game/src/ui/itemIcons.js";
  *
  * `KITS` (content/equipment.ts) was exported with a comment saying it existed "so a test can
  * re-check the totals in the header comment without re-deriving them by hand", and then went
- * unimported for the whole of Phase 1: the 57-row gear table that PRD 2.3's health column and PRD
+ * unimported for the whole of Phase 1: the equipment table that PRD 2.3's health column and PRD
  * 2.4's damage column are solved from had zero test coverage. A live sweep found the numbers
  * correct; nothing in CI would have caught them moving.
  *
@@ -31,6 +28,7 @@ import { iconShapeFor } from "../game/src/ui/itemIcons.js";
  */
 
 const BY_ID = new Map<ItemId, ItemDef>(EQUIPMENT.map((def) => [def.id, def]));
+const ALL_BY_ID = new Map<ItemId, ItemDef>([...MAGIC_ORBS, ...EQUIPMENT].map((def) => [def.id, def]));
 
 function kitTotals(kit: keyof typeof KITS): EquipmentBonuses {
   const totals: EquipmentBonuses = {
@@ -51,13 +49,53 @@ function kitTotals(kit: keyof typeof KITS): EquipmentBonuses {
 }
 
 describe("the gear ladder", () => {
-  it("has 62 rows, one per id, all of them equippable", () => {
-    // The three functioning wands extend the earlier 59-row ladder.
-    expect(EQUIPMENT).toHaveLength(62);
-    expect(BY_ID.size).toBe(62);
+  it("has 66 equippable rows with unique ids", () => {
+    expect(EQUIPMENT).toHaveLength(66);
+    expect(BY_ID.size).toBe(66);
     for (const def of EQUIPMENT) {
       expect(def.equip, `${def.id} has no equip block`).toBeDefined();
       expect(def.category).toBe("equipment");
+    }
+  });
+
+  it("authors the complete wand and staff ladders with their hand use and cadence", () => {
+    const expected = [
+      ["basic_wooden_wand", "wand", 1, 2200],
+      ["basic_wooden_staff", "staff", 2, 3000],
+      ["palewood_wand", "wand", 1, 2200],
+      ["palewood_staff", "staff", 2, 3000],
+      ["duskoak_wand", "wand", 1, 2200],
+      ["duskoak_staff", "staff", 2, 3000],
+      ["cairnpine_wand", "wand", 1, 2200],
+      ["cairnpine_staff", "staff", 2, 3000],
+      ["air_wand", "wand", 1, 2200],
+      ["air_staff", "staff", 2, 3000],
+      ["earth_wand", "wand", 1, 2200],
+      ["earth_staff", "staff", 2, 3000],
+      ["water_wand", "wand", 1, 2200],
+      ["water_staff", "staff", 2, 3000],
+    ] as const;
+    expect(EQUIPMENT.filter((def) => def.magicWeapon)).toHaveLength(expected.length);
+    for (const [id, kind, hands, cadence] of expected) {
+      const def = BY_ID.get(id);
+      expect(def?.magicWeapon, id).toMatchObject({ kind, hands });
+      expect(def?.equip?.slot, id).toBe("mainHand");
+      expect(def?.equip?.attackSpeedMs, id).toBe(cadence);
+    }
+  });
+
+  it("authors released Orbs as non-equipment crafting components", () => {
+    const expected = [
+      ["air_orb", "wind", true],
+      ["earth_orb", "earth", true],
+      ["water_orb", "water", true],
+    ] as const;
+    expect(MAGIC_ORBS).toHaveLength(expected.length);
+    for (const [id, element, released] of expected) {
+      const def = ALL_BY_ID.get(id);
+      expect(def?.equip, id).toBeUndefined();
+      expect(def?.category, id).toBe("component");
+      expect(def?.orb, id).toEqual({ element, released });
     }
   });
 
@@ -65,8 +103,9 @@ describe("the gear ladder", () => {
     for (const kit of Object.keys(KITS)) {
       const ids = KITS[kit] ?? [];
       const slots = ids.map((id) => BY_ID.get(id)?.equip?.slot);
-      expect(ids, kit).toHaveLength(9);
-      expect(new Set(slots).size, `${kit} wears two items in one slot`).toBe(9);
+      const expectedLength = kit.startsWith("magic_") ? 8 : 9;
+      expect(ids, kit).toHaveLength(expectedLength);
+      expect(new Set(slots).size, `${kit} wears two items in one slot`).toBe(expectedLength);
     }
   });
 
@@ -85,10 +124,10 @@ describe("the gear ladder", () => {
       accuracy: 42, power: 26, armour: 58, magicAccuracy: 2, magicPower: 0, magicArmour: 19, vitality: 16,
     });
     expect(kitTotals("magic_t1")).toEqual({
-      accuracy: 0, power: 0, armour: 3, magicAccuracy: 12, magicPower: 6, magicArmour: 13, vitality: 4,
+      accuracy: 0, power: 0, armour: 3, magicAccuracy: 12, magicPower: 9, magicArmour: 13, vitality: 4,
     });
     expect(kitTotals("magic_t5")).toEqual({
-      accuracy: 0, power: 2, armour: 4, magicAccuracy: 24, magicPower: 14, magicArmour: 28, vitality: 10,
+      accuracy: 0, power: 2, armour: 4, magicAccuracy: 24, magicPower: 16, magicArmour: 28, vitality: 10,
     });
     expect(kitTotals("magic_t10")).toEqual({
       accuracy: 0, power: 4, armour: 8, magicAccuracy: 47, magicPower: 32, magicArmour: 50, vitality: 12,
@@ -148,73 +187,39 @@ describe("gear appearance", () => {
     // publishes it into the same cache `load()` reads, so it will never appear in a manifest that
     // `tools/build-assets.ts` derives from files on disk. Excusing it by prefix would let any typo
     // starting "proc_" through, so it is checked against the real registration list instead.
-    const built = new Set(
-      [...PROCEDURAL_GEAR_ASSETS, ...PROCEDURAL_WAND_ASSETS].map((asset) => asset.assetId),
-    );
+    // Every worn part is now file-backed, including both FREE - RPG Weapons meshes.
     for (const body of ["male", "female"] as const) {
       for (const def of EQUIPMENT) {
         for (const part of gearAppearanceParts(def.id, body)) {
-          const known = MANIFEST_IDS.has(part.assetId) || built.has(part.assetId);
-          expect(known, `${def.id} (${body}) -> ${part.assetId}`).toBe(true);
+          expect(MANIFEST_IDS.has(part.assetId), `${def.id} (${body}) -> ${part.assetId}`).toBe(true);
         }
       }
     }
   });
 
-  it("grows the staff silhouette monotonically up the tier ladder", () => {
-    // Tier reads through silhouette for the melee line via `tierSilhouetteScale`; the staff line has
-    // no shared GLB to scale, so its tier read is the authored length plus whatever the crown adds
-    // on top. Those are two independent numbers, and the first pass got them out of step: the cage
-    // crown reached 26 cm over the shaft against the cluster's 11 cm, which put the tier-5 duskoak
-    // staff at 1.854 m and the tier-10 cairnpine at 1.851 m — the ONE step where the upgrade is
-    // supposed to be visible, and it went backwards. Heights are measured over the built geometry
-    // rather than read off `StaffLook.length`, because `length` is the shaft and the bug was in
-    // the part `length` does not describe.
-    const order = ["worn_staff", "palewood_staff", "duskoak_staff", "cairnpine_staff"];
-    const heights = order.map((id) => {
-      const look = STAFF_LOOKS[id];
-      expect(look, `${id} has no STAFF_LOOKS entry`).toBeDefined();
-      const size = new THREE.Box3().setFromObject(buildStaff(look!)).getSize(new THREE.Vector3());
-      return { id, height: size.y };
-    });
-    for (let index = 1; index < heights.length; index += 1) {
-      const previous = heights[index - 1]!;
-      const current = heights[index]!;
-      expect(
-        current.height,
-        `${current.id} (${current.height.toFixed(3)} m) must stand taller than ${previous.id} `
-        + `(${previous.height.toFixed(3)} m)`,
-      ).toBeGreaterThan(previous.height + 0.05);
+  it("uses the pack wand and staff silhouettes while the wood tier changes only base colour", () => {
+    for (const kind of ["wand", "staff"] as const) {
+      const ids = ["basic_wooden", "palewood", "duskoak", "cairnpine"].map((wood) => `${wood}_${kind}`);
+      const parts = ids.map((id) => gearAppearanceParts(id)[0]);
+      for (const [index, part] of parts.entries()) {
+        expect(part, `${ids[index]} draws nothing`).toBeDefined();
+        expect(part?.assetId, ids[index]).toBe(`rpg_weapon_${kind}`);
+        expect(part?.accent, `${ids[index]} should be unlit`).toBeUndefined();
+        expect(part?.orb, `${ids[index]} should have an empty socket by itself`).toBeUndefined();
+        expect(weaponSocket(part?.assetId ?? ""), `${ids[index]} has no hand socket`).not.toBeNull();
+      }
+      expect(new Set(parts.map((part) => part?.tint)).size, `${kind} wood colours`).toBe(4);
+      expect(new Set(parts.map((part) => part?.scale)).size, `${kind} silhouette scales`).toBe(1);
     }
   });
 
-  it("builds a mesh for every staff, since the library has none", () => {
-    // The gap this closes was real and measured: there is no staff in the 213-asset library, so all
-    // three staffs rendered NOTHING and a mage held empty air. `worn_staff` would have been the
-    // fourth, and it is the first weapon a Magic character is ever handed.
-    for (const def of EQUIPMENT) {
-      if (!def.id.endsWith("_staff")) continue;
-      const parts = gearAppearanceParts(def.id);
-      expect(parts, `${def.id} draws nothing`).toHaveLength(1);
-      expect(isProceduralGearAsset(parts[0]!.assetId), `${def.id} -> ${parts[0]!.assetId}`).toBe(true);
-      expect(weaponSocket(parts[0]!.assetId), `${def.id} has no socket`).not.toBeNull();
-    }
-  });
-
-  it("builds and sockets every wand as a visible one-handed magic weapon", () => {
-    const order = ["palewood_wand", "duskoak_wand", "cairnpine_wand"] as const;
-    let previousHeight = 0;
-    for (const id of order) {
-      const parts = gearAppearanceParts(id);
-      expect(parts, `${id} draws nothing`).toHaveLength(1);
-      expect(isProceduralGearAsset(parts[0]!.assetId), `${id} -> ${parts[0]!.assetId}`).toBe(true);
-      expect(weaponSocket(parts[0]!.assetId), `${id} has no socket`).not.toBeNull();
-      const look = WAND_LOOKS[id];
-      expect(look, `${id} has no WAND_LOOKS entry`).toBeDefined();
-      const height = new THREE.Box3().setFromObject(buildWand(look!)).getSize(new THREE.Vector3()).y;
-      expect(height).toBeGreaterThan(previousHeight);
-      previousHeight = height;
-    }
+  it("renders the crafted elemental core on the weapon", () => {
+    expect(gearAppearanceParts("air_orb")).toHaveLength(0);
+    const wand = gearAppearancePartsWithFocus("air_wand", { itemId: "air_wand", charged: true });
+    expect(wand).toHaveLength(1);
+    expect(wand[0]?.orb).toMatchObject({ element: "wind", charged: true });
+    const uncharged = gearAppearancePartsWithFocus("water_staff", { itemId: "water_staff", charged: false });
+    expect(uncharged[0]?.orb).toMatchObject({ element: "water", charged: false });
   });
 
   it("shows something for every visible slot, with no gaps left", () => {
@@ -222,17 +227,13 @@ describe("gear appearance", () => {
       .filter((def) => def.equip && VISIBLE_EQUIP_SLOTS.includes(def.equip.slot))
       .filter((def) => gearAppearance(def.id) === null)
       .map((def) => def.id);
-    // Was "exactly the three staffs", which rendered nothing because the library has no staff mesh.
-    // `render/proceduralGear.ts` builds them now, so the honest assertion is that NOTHING in a
-    // visible slot draws nothing — and `GEAR_ASSET_GAPS` is empty rather than deleted, so the next
-    // item the library cannot dress has somewhere to be declared instead of silently vanishing.
     expect(empty).toEqual([]);
     expect(Object.keys(GEAR_ASSET_GAPS)).toEqual([]);
   });
 
-  it("leaves rings and pendants unrendered, because they are not visible slots", () => {
+  it("leaves rings and pendants out of the direct rig slots", () => {
     for (const def of EQUIPMENT) {
-      if (def.equip?.slot !== "accessory1" && def.equip?.slot !== "accessory2") continue;
+      if (!["accessory1", "accessory2"].includes(def.equip?.slot ?? "")) continue;
       expect(gearAppearanceParts(def.id)).toHaveLength(0);
     }
     expect(VISIBLE_EQUIP_SLOTS).not.toContain("accessory1");
@@ -272,7 +273,8 @@ describe("weapon sockets", () => {
     });
     expect(weaponSocket("shield")?.bone).toBe("hand_l");
     expect(weaponSocket("pickaxe")?.rotation[1]).toBeCloseTo(Math.PI / 2, 10);
-    expect(weaponSocket("staff")).toBeNull();
+    expect(weaponSocket("rpg_weapon_staff")?.bone).toBe("hand_r");
+    expect(weaponSocket("rpg_weapon_wand")?.bone).toBe("hand_r");
   });
 
   it("shrinks the grip offset with the part, so a dagger does not float off the pommel", () => {
@@ -321,12 +323,12 @@ describe("tinting", () => {
 });
 
 describe("item icons", () => {
-  // Slot alone drew 21 of the 57 rows with the wrong silhouette, including a sword glyph for the
+  // Slot alone drew many rows with the wrong silhouette, including a sword glyph for the
   // Cairnpine Staff in the Worn panel.
   it("draws the archetype, not the slot", () => {
     expect(iconShapeFor(BY_ID.get("cairnpine_staff"))).toBe("staff");
     expect(iconShapeFor(BY_ID.get("kaldite_dagger"))).toBe("dagger");
-    expect(iconShapeFor(BY_ID.get("garnet_focus"))).toBe("orb");
+    expect(iconShapeFor(ALL_BY_ID.get("air_orb"))).toBe("orb");
     expect(iconShapeFor(BY_ID.get("storm_charm"))).toBe("amulet");
     expect(iconShapeFor(BY_ID.get("grithe_pendant"))).toBe("amulet");
     expect(iconShapeFor(BY_ID.get("wightshroud_robe"))).toBe("robe");

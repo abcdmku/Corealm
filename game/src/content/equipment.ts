@@ -56,17 +56,20 @@
  * Magic damage: maxHit = floor(spell.baseMax + (magicLevel + gearMagicPower) / spell.divisor)
  *
  *   The tier 10 magic kit is solved from PRD 2.4's headline claim, "at Magic 10 with a Kaldite
- *   staff, Voltrend kills a Cairnwight in 24 s where a Kaldite sword at Melee 12 takes 33 s":
- *     magicPower    +32 -> Voltrend maxHit = floor(8 + (10 + 32)/6) = 15, average hit 8.0
+ *   staff, the Magic 10 water lash kills a Cairnwight in 24 s where a Kaldite sword at Melee 12
+ *   takes 33 s:
+ *     magicPower    +32 -> Rimewash maxHit = floor(8 + (10 + 32)/6) = 15, average hit 8.0
  *     magicAccuracy +47 -> attackRoll = (10 + 9) * 1.15 * 1.47 = 32.12
  *     Cairnwight magic defence = (11 + 9) * 1.10 = 22.00 -> hitChance = 0.5935
  *     dps = 0.5935 * 8.0 / 3.0 s = 1.583 -> 38 HP / 1.583 = 24.0 s.  MATCHES.
- *   Lower tiers follow the same shape at 6 (t1) and 14 (t5) magicPower, which reproduces the PRD's
- *   "maxHit at unlock" column for Emberlash (3) and Stonebrand (7 against a quoted 6, see the note
- *   in `spells.ts`).
+ *   Tier 1 and tier 5 staffs carry enough extra power to produce a larger max-hit read than the
+ *   matching wand. That per-cast gap is the price for the wand's faster 2.2-second cadence.
  * ---------------------------------------------------------------------------------------------
  */
-import type { EquipmentBonuses, EquipSlot, ItemDef, SkillId } from "../contracts.js";
+import type {
+  ElementalWeaponChargeSpec, EquipmentBonuses, EquipSlot, ItemDef, MagicWeaponSpec,
+  SkillId, SpellElement,
+} from "../contracts.js";
 
 /** Zero-filled bonuses, so a row only writes the fields it actually changes. */
 function bonuses(partial: Partial<EquipmentBonuses>): EquipmentBonuses {
@@ -91,6 +94,7 @@ interface GearRow {
   requires: Partial<Record<SkillId, number>>;
   bonuses: Partial<EquipmentBonuses>;
   attackSpeedMs?: number;
+  magicWeapon?: MagicWeaponSpec;
 }
 
 function gear(row: GearRow): ItemDef {
@@ -102,7 +106,7 @@ function gear(row: GearRow): ItemDef {
       attackSpeedMs: row.attackSpeedMs,
       requires: row.requires,
     };
-  return {
+  const item: ItemDef = {
     id: row.id,
     name: row.name,
     tier: row.tier,
@@ -112,6 +116,8 @@ function gear(row: GearRow): ItemDef {
     category: "equipment",
     equip,
   };
+  if (row.magicWeapon !== undefined) item.magicWeapon = row.magicWeapon;
+  return item;
 }
 
 /**
@@ -120,57 +126,49 @@ function gear(row: GearRow): ItemDef {
  * and trade damage for cost rather than for speed.
  */
 const MELEE_SPEED_MS = 2400;
-/** PRD 2.4: "Magic is slower (3.0 s per cast against 2.4 s for a standard sword)". */
-const CAST_SPEED_MS = 3000;
+/** Two-handed staffs trade cadence for damage. */
+const STAFF_CAST_SPEED_MS = 3000;
+/** One-handed wands cast faster, with lower magic accuracy and power at the same tier. */
+const WAND_CAST_SPEED_MS = 2200;
 
-type GatheringTier = 1 | 5 | 10;
-
-interface StaffBonuses {
-  readonly power?: number;
-  readonly magicAccuracy: number;
-  readonly magicPower: number;
-  readonly magicArmour: number;
+interface OrbRow {
+  id: string;
+  name: string;
+  tier: number;
+  element: SpellElement;
+  released: boolean;
 }
 
-const STAFF_BONUSES: Readonly<Record<GatheringTier, StaffBonuses>> = {
-  1: { magicAccuracy: 6, magicPower: 4, magicArmour: 1 },
-  5: { power: 2, magicAccuracy: 12, magicPower: 9, magicArmour: 2 },
-  10: { power: 4, magicAccuracy: 24, magicPower: 20, magicArmour: 4 },
-};
+const ORB_ROWS: readonly OrbRow[] = [
+  { id: "air_orb", name: "Air Orb", tier: 1, element: "wind", released: true },
+  { id: "earth_orb", name: "Earth Orb", tier: 5, element: "earth", released: true },
+  { id: "water_orb", name: "Water Orb", tier: 10, element: "water", released: true },
+];
 
-/** Wands keep two thirds of a staff's magic stats and never inherit its incidental melee power. */
-function wandBonuses(tier: GatheringTier): Partial<EquipmentBonuses> {
-  const staff = STAFF_BONUSES[tier];
-  return {
-    magicAccuracy: Math.round(staff.magicAccuracy * 2 / 3),
-    magicPower: Math.round(staff.magicPower * 2 / 3),
-    magicArmour: Math.round(staff.magicArmour * 2 / 3),
-  };
-}
+/** Singleton boss drops consumed by the elemental-weapon recipes. They are never equipment. */
+export const MAGIC_ORBS: readonly ItemDef[] = ORB_ROWS.map((row) => ({
+  id: row.id,
+  name: row.name,
+  tier: row.tier,
+  description: row.released
+    ? `A region-boss core used to craft a charged ${row.name.slice(0, -4)} wand or staff.`
+    : "A sealed future-region core. No released boss provides it yet.",
+  stackable: false,
+  value: 0,
+  category: "component",
+  orb: {
+    element: row.element,
+    released: row.released,
+  },
+}));
 
 // -------------------------------------------------------------- starter kit, tier 0 (Worn)
 /**
  * What the player wakes up with.
  *
- * Tier 0 exists so the first minute of the game has a weapon in it and so the tier ladder starts
- * below the first thing you can buy, rather than at it. The numbers are deliberately under
- * `grithe_dagger`'s 6/6 and `palewood_staff`'s 6/4/1: these are things someone else wore out, and
- * replacing them has to be worth 90 and 140 marks. Neither row is part of any `KITS` entry, because
- * the PRD's derived-health and damage tables are written against tiers 1, 5 and 10 only.
- *
- * Tier 0 now carries ONE WEAPON PER COMBAT LINE, which it did not before `worn_staff` existed. The
- * melee line opened at Melee 1 with a blade already in hand; the magic line opened with nothing, so
- * a player who read "Magic" on the character sheet and wanted to train it from level 1 had to earn
- * the 140 marks `palewood_staff` costs with a sword first — buy your way into the skill, before the
- * skill has shown you anything. Both lines now start in the first minute.
- *
- * The staff is only half of that, and the other half is in `items.ts`: a cast also spends an Essence
- * Shard, and a new character has `currency: 0` and nothing to sell, so `STARTING_INVENTORY` carries
- * twenty shards alongside the staff. Without them this row would be a weapon that cannot be fired
- * once. The two must move together.
- *
- * `requires` is empty on both rows on purpose. A starting item that the starting character cannot
- * equip would be a bug the player meets before they meet anything else.
+ * Tier 0 includes the starting one-handed wand and a stronger two-handed staff. Both use plain
+ * brown wood and empty sockets, so neither emits light. Their requirements are empty because they
+ * sit below the first crafted wood tier.
  */
 const STARTER_EQUIPMENT: readonly ItemDef[] = [
   gear({
@@ -180,18 +178,18 @@ const STARTER_EQUIPMENT: readonly ItemDef[] = [
     bonuses: { accuracy: 3, power: 3 },
   }),
   gear({
-    id: "worn_staff", name: "Worn Staff", tier: 0, slot: "mainHand", value: 15,
-    description: "A split shaft with a quartz chip wound into the crack. It holds a cast, barely.",
-    requires: {}, attackSpeedMs: CAST_SPEED_MS,
-    // 3/2 against `palewood_staff`'s 6/4/1. Worked through, because "slightly worse" is easy to
-    // write and easy to get wrong: Emberlash at Magic 1 is floor(3 + (1 + 2)/8) = 3 on this staff
-    // and floor(3 + (1 + 4)/8) = 3 on the palewood one, so at the level a player meets both, the
-    // upgrade buys ACCURACY and not damage — attack roll 1.03 against 1.06. Max hit first splits at
-    // Magic 4: floor(3 + 6/8) = 3 here against floor(3 + 8/8) = 4 there. That is the intended
-    // shape. Any higher and the first staff a player can buy would be a sidegrade at the moment
-    // they can afford it, which is the trap the tier-0 tools in `items.ts` sidestep for the same
-    // reason.
-    bonuses: { magicAccuracy: 3, magicPower: 2 },
+    id: "basic_wooden_wand", name: "Basic Wooden Wand", tier: 0, slot: "mainHand", value: 12,
+    description: "Plain brown wood from grip to socket, with no light or elemental charge.",
+    requires: {}, attackSpeedMs: WAND_CAST_SPEED_MS,
+    magicWeapon: { kind: "wand", hands: 1 },
+    bonuses: { magicAccuracy: 2, magicPower: 1 },
+  }),
+  gear({
+    id: "basic_wooden_staff", name: "Basic Wooden Staff", tier: 0, slot: "mainHand", value: 20,
+    description: "A plain two-handed staff with an empty brown socket and no glow of its own.",
+    requires: {}, attackSpeedMs: STAFF_CAST_SPEED_MS,
+    magicWeapon: { kind: "staff", hands: 2 },
+    bonuses: { magicAccuracy: 3, magicPower: 7 },
   }),
 ];
 
@@ -397,45 +395,34 @@ const MELEE_TIER_10: readonly ItemDef[] = [
   }),
 ];
 
-// ------------------------------------------------------------------------- the staff ladder
-// THE STAFF LADDER IS A WOODCUTTING LADDER. The three rows below already are the "wood from better
-// trees" progression the design asks for; there is no fourth staff to add, and the real gate on
-// each one is the WOOD, not the `requires` field printed on the row. Written out here because the
-// chain is otherwise only discoverable by cross-reading three files:
+// -------------------------------------------------------------------- the magic-weapon ladder
+// Each released wood has a wand and a staff. Wands use two matching shafts; staffs use three.
+// Orbs are boss rewards used to turn these plain weapons into charged elemental weapons.
 //
-//   palewood_staff   Magic 1  <- 3 palewood_shaft  + 1 pale_quartz  <- palewood_log,  Woodcutting 1
-//   duskoak_staff    Magic 5  <- 3 duskoak_shaft   + 1 vell_amber   <- duskoak_log,   Woodcutting 5
-//   cairnpine_staff  Magic 10 <- 3 cairnpine_shaft + 1 cairn_garnet <- cairnpine_log, Woodcutting 10
+//   palewood_{wand,staff}   Magic 1  <- palewood_shaft  <- palewood_log,  Woodcutting 1
+//   duskoak_{wand,staff}    Magic 5  <- duskoak_shaft   <- duskoak_log,   Woodcutting 5
+//   cairnpine_{wand,staff}  Magic 10 <- cairnpine_shaft <- cairnpine_log, Woodcutting 10
 //
-// `content/recipes.ts` fletches each staff at the fletching bench out of its OWN wood's shafts
-// (1 log -> 4 shafts, then 3 shafts + 1 tier gem -> 1 staff), and `content/regions.ts` puts the
-// duskoak node at reqLevel 5 and the cairnpine node at reqLevel 10. So the Woodcutting gate is real
-// and already enforced upstream, by the only source of the material. Copying it into `requires`
-// would double-gate the player who buys logs instead of cutting them, which is a legal route.
+// `requires` gates equipping by Magic. The log source provides the gathering progression.
 
 // ------------------------------------------------------------------ magic, tier 1 (Marchhide)
-// Kit totals: magicAccuracy 12, magicPower 6, armour 3, magicArmour 13, vitality 4.
-// Emberlash at Magic 1 with the full kit: floor(3 + (1 + 6)/8) = 3, matching PRD 2.4's
-// "maxHit at unlock" column.
+// Kit totals: magicAccuracy 12, magicPower 9, armour 3, magicArmour 13, vitality 4.
+// Voltrend at Magic 1 has max hit 4 with the staff kit and 3 after swapping in the wand.
 
 const MAGIC_TIER_1: readonly ItemDef[] = [
   gear({
+    id: "palewood_wand", name: "Palewood Wand", tier: 1, slot: "mainHand", value: 95,
+    description: "Pale wood with an empty socket at the tip. It stays unlit until upgraded.",
+    requires: { magic: 1 }, attackSpeedMs: WAND_CAST_SPEED_MS,
+    magicWeapon: { kind: "wand", hands: 1 },
+    bonuses: { magicAccuracy: 4, magicPower: 3 },
+  }),
+  gear({
     id: "palewood_staff", name: "Palewood Staff", tier: 1, slot: "mainHand", value: 140,
-    description: "A shaved palewood shaft with a quartz chip wedged in the split top.",
-    requires: { magic: 1 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: STAFF_BONUSES[1],
-  }),
-  gear({
-    id: "palewood_wand", name: "Palewood Wand", tier: 1, slot: "mainHand", value: 84,
-    description: "A palewood shaft cut short around a pale quartz point. Quick to make, modest in a fight.",
-    requires: { magic: 1 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: wandBonuses(1),
-  }),
-  gear({
-    id: "quartz_focus", name: "Quartz Focus", tier: 1, slot: "offHand", value: 70,
-    description: "Pale quartz on a thong. Held in the off hand, it keeps a cast from wandering.",
-    requires: { magic: 1 },
-    bonuses: { magicAccuracy: 1, magicPower: 1, magicArmour: 2 },
+    description: "A pale two-handed shaft with an empty socket. The wood itself gives off no light.",
+    requires: { magic: 1 }, attackSpeedMs: STAFF_CAST_SPEED_MS,
+    magicWeapon: { kind: "staff", hands: 2 },
+    bonuses: { magicAccuracy: 6, magicPower: 7, magicArmour: 1 },
   }),
   gear({
     id: "marchhide_hood", name: "Marchhide Hood", tier: 1, slot: "head", value: 90,
@@ -482,27 +469,23 @@ const MAGIC_TIER_1: readonly ItemDef[] = [
 ];
 
 // ------------------------------------------------------------------ magic, tier 5 (Bramblehide)
-// Kit totals: magicAccuracy 24, magicPower 14, armour 4, magicArmour 28, vitality 10.
-// Stonebrand at Magic 5 with the full kit: floor(5 + (5 + 14)/7) = 7.
+// Kit totals: magicAccuracy 24, magicPower 16, armour 4, magicArmour 28, vitality 10.
+// Stonebrand at Magic 5 has max hit 8 with the staff kit and 7 after swapping in the wand.
 
 const MAGIC_TIER_5: readonly ItemDef[] = [
   gear({
+    id: "duskoak_wand", name: "Duskoak Wand", tier: 5, slot: "mainHand", value: 340,
+    description: "Dark duskoak with an empty crown. Its polished wood remains unlit on its own.",
+    requires: { magic: 5 }, attackSpeedMs: WAND_CAST_SPEED_MS,
+    magicWeapon: { kind: "wand", hands: 1 },
+    bonuses: { magicAccuracy: 9, magicPower: 6, magicArmour: 1 },
+  }),
+  gear({
     id: "duskoak_staff", name: "Duskoak Staff", tier: 5, slot: "mainHand", value: 500,
-    description: "Duskoak, banded in Corven, an amber the size of a thumb in the crown.",
-    requires: { magic: 5 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: STAFF_BONUSES[5],
-  }),
-  gear({
-    id: "duskoak_wand", name: "Duskoak Wand", tier: 5, slot: "mainHand", value: 300,
-    description: "A dense duskoak wand capped with Vell amber. Easier to replace than a full staff.",
-    requires: { magic: 5 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: wandBonuses(5),
-  }),
-  gear({
-    id: "amber_focus", name: "Amber Focus", tier: 5, slot: "offHand", value: 240,
-    description: "Vell amber in a duskoak cradle. Holds a Stonebrand steady through the whole cast.",
-    requires: { magic: 5 },
-    bonuses: { armour: 1, magicAccuracy: 3, magicPower: 2, magicArmour: 3, vitality: 1 },
+    description: "Dark duskoak banded in Corven around an empty, unlit crown.",
+    requires: { magic: 5 }, attackSpeedMs: STAFF_CAST_SPEED_MS,
+    magicWeapon: { kind: "staff", hands: 2 },
+    bonuses: { power: 2, magicAccuracy: 12, magicPower: 11, magicArmour: 2 },
   }),
   gear({
     id: "bramblehide_hood", name: "Bramblehide Hood", tier: 5, slot: "head", value: 300,
@@ -550,26 +533,22 @@ const MAGIC_TIER_5: readonly ItemDef[] = [
 
 // ------------------------------------------------------------------ magic, tier 10 (Wightshroud)
 // Kit totals: magicAccuracy 47, magicPower 32, armour 8, magicArmour 50, vitality 12.
-// Both totals are solved from the Voltrend-vs-Cairnwight 24 s claim; see the header block.
+// Both totals are solved from the Magic 10 Rimewash-vs-Cairnwight 24 s claim; see the header block.
 
 const MAGIC_TIER_10: readonly ItemDef[] = [
   gear({
+    id: "cairnpine_wand", name: "Cairnpine Wand", tier: 10, slot: "mainHand", value: 820,
+    description: "Resin-dark cairnpine with an empty Kaldite socket and no light of its own.",
+    requires: { magic: 10 }, attackSpeedMs: WAND_CAST_SPEED_MS,
+    magicWeapon: { kind: "wand", hands: 1 },
+    bonuses: { magicAccuracy: 18, magicPower: 14, magicArmour: 3 },
+  }),
+  gear({
     id: "cairnpine_staff", name: "Cairnpine Staff", tier: 10, slot: "mainHand", value: 1180,
-    description: "Cairnpine with a Kaldite ferrule and a cairn garnet caged at the head. Voltrend needs the cage.",
-    requires: { magic: 10 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: STAFF_BONUSES[10],
-  }),
-  gear({
-    id: "cairnpine_wand", name: "Cairnpine Wand", tier: 10, slot: "mainHand", value: 708,
-    description: "A cairnpine wand with a garnet cage at the tip. It trades reach and power for a shorter build.",
-    requires: { magic: 10 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: wandBonuses(10),
-  }),
-  gear({
-    id: "garnet_focus", name: "Garnet Focus", tier: 10, slot: "offHand", value: 560,
-    description: "Cairn garnet in a Kaldite ring. Cold enough to ache through a glove.",
-    requires: { magic: 10 },
-    bonuses: { armour: 2, magicAccuracy: 6, magicPower: 4, magicArmour: 6, vitality: 1 },
+    description: "A two-handed cairnpine shaft with an empty Kaldite cage. It stays dark until upgraded.",
+    requires: { magic: 10 }, attackSpeedMs: STAFF_CAST_SPEED_MS,
+    magicWeapon: { kind: "staff", hands: 2 },
+    bonuses: { power: 4, magicAccuracy: 24, magicPower: 20, magicArmour: 4 },
   }),
   gear({
     id: "wightshroud_hood", name: "Wightshroud Hood", tier: 10, slot: "head", value: 700,
@@ -615,14 +594,82 @@ const MAGIC_TIER_10: readonly ItemDef[] = [
   }),
 ];
 
+/** Authored for the tier-15 region, but unobtainable until that region ships. */
+function chargedWeapon(
+  base: ItemDef,
+  id: string,
+  name: string,
+  charge: ElementalWeaponChargeSpec,
+  addedBonuses: Partial<EquipmentBonuses>,
+): ItemDef {
+  if (!base.equip || !base.magicWeapon) throw new Error(`Charged weapon base ${base.id} is invalid`);
+  const baseBonuses = base.equip.bonuses;
+  return {
+    ...base,
+    id,
+    name,
+    description:
+      `${base.name} fitted with a ${name.split(" ")[0]} Orb. Its charge pays for matching spells before carried Essence.`,
+    value: base.value,
+    equip: {
+      ...base.equip,
+      bonuses: bonuses({
+        accuracy: baseBonuses.accuracy + (addedBonuses.accuracy ?? 0),
+        power: baseBonuses.power + (addedBonuses.power ?? 0),
+        armour: baseBonuses.armour + (addedBonuses.armour ?? 0),
+        magicAccuracy: baseBonuses.magicAccuracy + (addedBonuses.magicAccuracy ?? 0),
+        magicPower: baseBonuses.magicPower + (addedBonuses.magicPower ?? 0),
+        magicArmour: baseBonuses.magicArmour + (addedBonuses.magicArmour ?? 0),
+        vitality: baseBonuses.vitality + (addedBonuses.vitality ?? 0),
+      }),
+    },
+    magicWeapon: { ...base.magicWeapon, charge },
+  };
+}
+
+function magicBase(id: string): ItemDef {
+  const found = [...MAGIC_TIER_1, ...MAGIC_TIER_5, ...MAGIC_TIER_10].find((item) => item.id === id);
+  if (!found) throw new Error(`Missing magic weapon base ${id}`);
+  return found;
+}
+
+const AIR_CHARGE: ElementalWeaponChargeSpec = {
+  element: "wind", capacity: 1000, initialCharges: 1000,
+  rechargeItemId: "air_essence", rechargeCost: 100, orbItemId: "air_orb", released: true,
+};
+const EARTH_CHARGE: ElementalWeaponChargeSpec = {
+  element: "earth", capacity: 1000, initialCharges: 1000,
+  rechargeItemId: "earth_essence", rechargeCost: 100, orbItemId: "earth_orb", released: true,
+};
+const WATER_CHARGE: ElementalWeaponChargeSpec = {
+  element: "water", capacity: 1000, initialCharges: 1000,
+  rechargeItemId: "water_essence", rechargeCost: 100, orbItemId: "water_orb", released: true,
+};
+/** Released Orb-crafted weapon outputs. Fire remains absent until its region ships. */
+export const ELEMENTAL_MAGIC_WEAPONS: readonly ItemDef[] = [
+  chargedWeapon(magicBase("palewood_wand"), "air_wand", "Air Wand", AIR_CHARGE,
+    { magicAccuracy: 1, magicPower: 1, magicArmour: 2 }),
+  chargedWeapon(magicBase("palewood_staff"), "air_staff", "Air Staff", AIR_CHARGE,
+    { magicAccuracy: 1, magicPower: 1, magicArmour: 2 }),
+  chargedWeapon(magicBase("duskoak_wand"), "earth_wand", "Earth Wand", EARTH_CHARGE,
+    { armour: 1, magicAccuracy: 3, magicPower: 2, magicArmour: 3, vitality: 1 }),
+  chargedWeapon(magicBase("duskoak_staff"), "earth_staff", "Earth Staff", EARTH_CHARGE,
+    { armour: 1, magicAccuracy: 3, magicPower: 2, magicArmour: 3, vitality: 1 }),
+  chargedWeapon(magicBase("cairnpine_wand"), "water_wand", "Water Wand", WATER_CHARGE,
+    { armour: 2, magicAccuracy: 6, magicPower: 4, magicArmour: 6, vitality: 1 }),
+  chargedWeapon(magicBase("cairnpine_staff"), "water_staff", "Water Staff", WATER_CHARGE,
+    { armour: 2, magicAccuracy: 6, magicPower: 4, magicArmour: 6, vitality: 1 }),
+];
+
 /**
- * Every equippable item: the tier-0 starter pair, then the melee line and the magic line at tiers
- * 1 / 5 / 10. The three wands bring the table to 62 rows.
+ * Every equippable item: the tier-0 weapons, released tier ladders, and elemental weapon outputs.
+ * Orbs are components and live in `MAGIC_ORBS` above.
  */
 export const EQUIPMENT: readonly ItemDef[] = [
   ...STARTER_EQUIPMENT,
   ...MELEE_TIER_1, ...MELEE_TIER_5, ...MELEE_TIER_10,
   ...MAGIC_TIER_1, ...MAGIC_TIER_5, ...MAGIC_TIER_10,
+  ...ELEMENTAL_MAGIC_WEAPONS,
 ];
 
 /**
@@ -644,15 +691,15 @@ export const KITS: Readonly<Record<string, readonly string[]>> = {
     "kaldite_boots", "kaldite_gauntlets", "kaldite_ring", "kaldite_pendant",
   ],
   magic_t1: [
-    "palewood_staff", "quartz_focus", "marchhide_hood", "marchhide_robe", "marchhide_leggings",
+    "air_staff", "marchhide_hood", "marchhide_robe", "marchhide_leggings",
     "marchhide_boots", "marchhide_wraps", "ember_ring", "ember_charm",
   ],
   magic_t5: [
-    "duskoak_staff", "amber_focus", "bramblehide_hood", "bramblehide_robe", "bramblehide_leggings",
+    "earth_staff", "bramblehide_hood", "bramblehide_robe", "bramblehide_leggings",
     "bramblehide_boots", "bramblehide_wraps", "stone_ring", "stone_charm",
   ],
   magic_t10: [
-    "cairnpine_staff", "garnet_focus", "wightshroud_hood", "wightshroud_robe", "wightshroud_leggings",
+    "water_staff", "wightshroud_hood", "wightshroud_robe", "wightshroud_leggings",
     "wightshroud_boots", "wightshroud_wraps", "storm_ring", "storm_charm",
   ],
 };

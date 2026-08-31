@@ -1,7 +1,9 @@
 # Corealm — final architecture (root)
 
-Status: **PRD approved with the corrections below.** `runs/corealm/PRD.md` is authoritative for
-content, formulas, names, and numbers. This document is authoritative wherever the two disagree.
+Status: **PRD approved with the corrections below and the August 30, 2026 magic-equipment
+amendment.** `runs/corealm/PRD.md`, `game/src/contracts.ts`, and the amended
+`runs/corealm/magic-ladder-spec.md` are authoritative for the current magic, equipment, and essence
+systems. This document remains authoritative for the original Phase 1 architecture elsewhere.
 
 ## Lab-first amendment
 
@@ -33,8 +35,10 @@ The curve is a closed form, so `xpForLevel` is O(1) with no summation table. Kee
 2. *Death drops inventory, not equipment.* The brief says "a recoverable death-container system for
    **carried** items". Worn gear is not carried inventory. This also keeps the agent recovery loop
    testable.
-3. *Magic consumes Essence Shards.* Uncosted magic dominates melee at every tier. Shards come from
-   Crafting (gem + log) and shops, which wires Magic into Mining and Crafting. Good design, keep it.
+3. *Magic consumes elemental fuel.* A plain wand or staff spends one matching carried Essence per
+   cast. A boss Orb is consumed to make a charged elemental weapon; that weapon spends its stored
+   charge first and falls back to carried Essence when empty. Remote Essence caches and settlement
+   altars provide upkeep; there is no Orb equipment slot.
 
 **All six cuts.** Each is outside the Phase 1 gate in the brief's §43.
 
@@ -102,7 +106,8 @@ This is simpler, fully testable through `getNavPath` and `getNavigationState`, a
 **R3 — Tier 1 yield floor is 8, not 9.** The brief's band is 8–15 at low tier. Use
 `yieldRange(tier) = [max(4, round(8.5 - 0.052*tier)), max(8, round(15 - 0.052*tier))]`, giving 8–15
 at tier 1, 8–15 at tier 5, 8–14 at tier 10, 6–12 at tier 50, 4–10 at tier 99. Matches the brief's
-three bands exactly.
+three bands exactly. This is the ordinary-node default; authored exceptional nodes may override
+capacity and respawn. Released essence-cache nodes use 40–90 and exactly 30 seconds.
 
 **R4 — Contradiction C1 resolved as the PRD read it.** Phase 1 builds every system's *architecture*
 at tier 1/5/10 content depth. Content breadth is Phases 2 and 3. This is what "prove Corealm" means
@@ -171,8 +176,10 @@ Fixed, because two WASM modules and the navmesh have hard ordering (verified in 
 
 ## 4. Simulation
 
-Fixed 100 ms sim tick with an accumulator, decoupled from render. Combat resolves on a 600 ms
-cadence (every 6th sim tick); gathering on 1800 ms. Render interpolates. Determinism comes from
+Fixed 100 ms sim tick with an accumulator, decoupled from render. Melee and enemy combat resolve on
+a 600 ms cadence (every 6th sim tick); gathering on 1800 ms. Magic readiness is checked each 100 ms
+tick so the 2.2-second wand and 3.0-second staff cadences resolve exactly. Render interpolates.
+Determinism comes from
 seeded RNG streams — one per concern (gather, combat, loot, scatter) so that consuming a combat roll
 cannot shift a scatter layout. `setSeed` + `setPaused` + `step` gives reproducible tests.
 

@@ -14,6 +14,7 @@ import { paletteForTier } from "./materials.js";
 export type ItemIconPrimitive =
   | "amulet"
   | "dagger"
+  | "essence"
   | "fish"
   | "focus"
   | "handle"
@@ -96,14 +97,26 @@ function tierAccent(id: ItemId): number {
 }
 
 const WOOD: Readonly<Record<number, number>> = {
-  0: 0x66503c,
-  1: 0xb18b62,
-  5: 0x604734,
-  10: 0x7a6046,
+  0: 0x68472f,
+  1: 0xb99a6b,
+  5: 0x51372a,
+  10: 0x765238,
+};
+
+/** Exact solid colours used by the worn Blink meshes in equipmentVisuals.ts. */
+const MAGIC_WOOD: Readonly<Record<number, number>> = {
+  0: 0x8a5a32,
+  1: 0xd7bd8e,
+  5: 0x53341f,
+  10: 0x596162,
 };
 
 function wood(id: ItemId): number {
   return WOOD[def(id).tier] ?? WOOD[1]!;
+}
+
+function magicWood(id: ItemId): number {
+  return MAGIC_WOOD[def(id).tier] ?? MAGIC_WOOD[1]!;
 }
 
 // Currency and gathered resources.
@@ -141,7 +154,19 @@ for (const id of ["palewood_handle", "duskoak_handle", "cairnpine_handle"] as co
 put("coarse_hide", [primitive("hide", 0x9a7654, 0x5b4432)]);
 put("bramble_hide", [primitive("hide", 0x65503d, 0x362d26)]);
 put("wight_shroud", [primitive("hide", 0xb6b4aa, 0x686b70)]);
-put("essence_shard", [primitive("focus", 0x8171b5, 0xd9c6ff)]);
+
+/** Element colour stays consistent between the loose essence and the boss-won orb. */
+const ELEMENT_COLOURS = {
+  air: { body: 0x78cce8, glow: 0xd8f7ff },
+  earth: { body: 0x668c43, glow: 0xb9d66b },
+  water: { body: 0x327fc2, glow: 0xa9e6ff },
+  fire: { body: 0xb9472b, glow: 0xffa33d },
+} as const;
+
+for (const element of ["air", "earth", "water", "fire"] as const) {
+  const colours = ELEMENT_COLOURS[element];
+  put(`${element}_essence`, [primitive("essence", colours.body, colours.glow)], { frameScale: 1.2 });
+}
 
 // Seeds and food. Raw and cooked fish share a model, while colour carries preparation state.
 put("bittergrain_seed", [primitive("seed", 0xc9a65a, 0x765829)]);
@@ -165,21 +190,26 @@ for (const id of ["worn_rod", "palewood_rod", "duskoak_rod", "cairnpine_rod"] as
   put(id, [primitive("rod", wood(id), id === "worn_rod" ? 0x77716a : tierMetal(id))], { rotation: [0, 0, -0.18] });
 }
 
-// Equipment normally reuses the same appearance the character rig wears. The library has no
-// jewelry, staff, or honest focus model, so those families get small icon-only 3D models.
+for (const item of ALL_ITEMS.filter((entry) => entry.orb !== undefined)) {
+  const element = item.orb!.element === "wind" ? "air" : item.orb!.element;
+  const colours = ELEMENT_COLOURS[element];
+  put(item.id, [primitive("focus", colours.body, colours.glow)], {
+    frameScale: item.orb!.released ? 1 : 1.06,
+  });
+}
+
+// Equipment normally reuses the same appearance the character rig wears. Magic weapons are
+// explicit here because their silhouettes come from Blink's FREE - RPG Weapons pack. The wood
+// tint carries the log tier while the absent accent keeps an unequipped weapon visibly unlit.
 for (const item of ALL_ITEMS.filter((entry) => entry.category === "equipment")) {
   const id = item.id;
-  if (/_staff$/.test(id)) {
-    put(id, [primitive("staff", wood(id), tierAccent(id))], { rotation: [0, 0, -0.18] });
+  if (item.magicWeapon) {
+    const assetId = item.magicWeapon.kind === "staff" ? "rpg_weapon_staff" : "rpg_weapon_wand";
+    put(id, [asset(assetId, magicWood(id))], { rotation: [0, 0, -0.2] });
     continue;
   }
   if (/_dagger$/.test(id)) {
     put(id, [primitive("dagger", tierMetal(id), tierBody(id))], { rotation: [0, 0, -0.32] });
-    continue;
-  }
-  if (/_focus$/.test(id)) {
-    const colour = id === "quartz_focus" ? 0xe3ded2 : id === "amber_focus" ? 0xc47b2b : 0x8e2337;
-    put(id, [primitive("focus", colour, tierAccent(id))]);
     continue;
   }
   if (/_ring$/.test(id)) {

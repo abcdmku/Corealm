@@ -2,6 +2,14 @@
 
 Build: `phase1-round3`. Content tiers 1, 5 and 10 across three connected regions plus a dungeon.
 
+This report records the Phase 1 round-3 snapshot. Its 25-check gate transcript and 25-test run are
+historical results, not current project totals. The later magic-equipment extension adds typed
+Essence, Orb-crafted charged wands and staffs, three remote Essence caches, and settlement altars.
+Orbs are crafting components and do not add an equipment slot. The current test tree has 29 test
+files and 198 tests, including focused
+coverage in `magic-essence.test.ts`, `magic-cadence.test.ts`, and
+`magic-migration-containers.test.ts`.
+
 ## Verdict
 
 Phase 1's systems are built and proven, and the presentation issues round 2 left open are closed.
@@ -20,7 +28,8 @@ orbit camera, Rapier collision, semantic entities, a 28-slot inventory, 9-slot e
 bank, currency, shops, gathering with depletion and respawn, four production skills, melee and magic
 combat, enemy AI with three behaviours, a two-phase boss, loot, derived health, death with a
 recoverable cache, NPCs, dialogue, quests, a dungeon, persistence, generated documentation, a
-19-tool agent surface with WebMCP registration, agent events, overlays, and the HUD plus six panels
+20-tool agent surface with WebMCP registration, spellbook and weapon-charge reads, agent events,
+overlays, and the HUD plus six panels
 behind a permanent on-screen dock.
 
 ## Content counts
@@ -42,19 +51,23 @@ behind a permanent on-screen dock.
 
 ## Asset packs used
 
-All CC0 by Quaternius, 213 GLBs totalling 37.6 MB after optimisation from 740 MB of source:
-Medieval Village MegaKit, Stylized Nature MegaKit, Fantasy Props MegaKit, Universal Base Characters,
-Modular Character Outfits: Fantasy, Universal Animation Library 1 and 2. Every pack, licence and
-source URL is recorded in `game/public/assets/manifest.json`.
+The original Phase 1 set is 213 CC0 GLBs from eight Quaternius packs, totalling 37.6 MB after
+optimisation from 740 MB of source. The current manifest has 217 GLBs across eleven packs plus one
+recorded VFX atlas artifact. The four
+later assets are the wand and staff from Blink's `FREE - RPG Weapons`, plus the large cache and
+satellite node from DEXSOFT's `Rocks FREE pack`. Those four files are not CC0. They remain subject
+to the Unity Asset Store EULA; the project owner must confirm entitlement before shipping. The
+manifest records both licence classes;
+`game/public/assets/UNITY_ASSET_SOURCES.md` records the local package hashes and conversion audit.
 
 The single most useful measured fact: every character pack and both animation libraries share one
 identical 65-bone skeleton, so 86 animation clips play on any rig with no retargeting at all.
 
-## Test evidence
+## Phase 1 round-3 test evidence
 
 ```
 npm run smoke        9/9 checks, zero console/page/request errors
-npm test             25/25 unit tests (the XP curve and every PRD formula, frozen)
+npm test             25/25 unit tests (round-3 snapshot; not the current suite total)
 npm run build        clean
 npm run gate-check   25/25 Phase 1 gate lines
 npm run agent-proof  2/2 agent proofs
@@ -76,7 +89,7 @@ spent-node        depleted node draws 3.9 x 2.0 m in 1 mesh, live sibling in 2 (
 farming           xp 0 -> 3
 smithing          xp 0 -> 16 via smelt_grithe_bar
 cooking           xp 0 -> 15 via cook_seared_minnow
-crafting          xp 0 -> 24 via craft_essence_shard_t1
+crafting          xp 0 -> 24 via craft_essence_shard_t1 [historical recipe]
 fletching         xp 0 -> 20 via fletch_palewood_shaft
 melee             xp 0 -> 1761, killed=true
 magic             xp 0 -> 1776
@@ -93,6 +106,12 @@ objective-prose   1 active, 0 printing ids, 1 carrying refs
 long-cairn        long_cairn active stage 2/7, driven by dialogue and movement
 persistence       save 7 KB, 4 skills above level 1
 ```
+
+The generic Essence Shard recipe in that transcript has since been retired. A plain wand or staff
+spends one matching carried Essence per cast. A boss Orb is consumed to craft a charged elemental
+weapon, which spends its charge first and falls back to carried Essence. Air, Earth, and Water
+Essence come from typed world caches and refill the equipped elemental weapon at an Essence Altar;
+Fire remains authored for tier 15 but unreleased.
 
 The seven checks added this round exist because each one is a bug that shipped in round 2 and that
 no existing check could see. Three of them needed new observation, not new play: a screenshot cannot
@@ -142,10 +161,12 @@ same scene. That number is meaningless as performance and is never used as evide
 
 ## WebMCP capabilities
 
-19 tools, consolidated from the brief's ~30 capability bullets. `observe` absorbs known-location
+20 tools, consolidated from the brief's ~30 capability bullets. `observe` absorbs known-location
 recall through a `scope` parameter, `interact` absorbs gather/agility/loot/talk/door through the
 `InteractionId` it is given, and `events` absorbs both draining and long-poll waiting through an
-optional timeout.
+optional timeout. `corealm_spellbook` is the dedicated read/select tool for spells, equipped focus
+charge, carried essence, and current castability. Altar recharge remains an ordinary `interact`
+action, so agents and humans use the same route.
 
 One implementation, three ways in: `window.corealm.agent` always; `document.modelContext` when the
 browser supports it, with a local polyfill otherwise so the registration path stays exercised; and

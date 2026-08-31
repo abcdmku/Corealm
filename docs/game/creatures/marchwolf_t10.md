@@ -37,7 +37,9 @@ description: "Tarn Marchwolf spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 30-110 | Always |
 | [Bramble Hide](../../items/#bramble-hide) | 1-2 | 40% |

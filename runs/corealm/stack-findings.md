@@ -90,8 +90,12 @@ scale factor is needed anywhere**. Author the world in metres.
 
 ## 5. Licensing
 
-Every pack used is **CC0-1.0** (public domain) by Quaternius. No attribution is legally required,
-but the asset manifest records pack, author, source URL, and licence for each asset anyway.
+The original eight Quaternius packs and their 213 GLBs are CC0-1.0. The magic update added four
+GLBs from Blink's FREE - RPG Weapons and DEXSOFT's Rocks FREE pack, plus a texture atlas derived
+from Hovl Studio's Magic Effects FREE. Those three source packs use the Standard Unity Asset Store
+EULA and are not CC0. A package in the local Asset Store cache does not prove entitlement. The
+project owner must confirm entitlement before shipping. Exact package records, official product
+pages, output hashes, and reproduction commands are in `game/public/assets/UNITY_ASSET_SOURCES.md`.
 
 ## 6. WebMCP
 

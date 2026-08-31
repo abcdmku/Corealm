@@ -2,9 +2,9 @@
  * Semantic entities -> Three.js objects.
  *
  * This is the render half of the seam the contract describes: the world layer owns what an entity
- * IS, this file owns what it LOOKS LIKE. It reads `SemanticEntity.view` and nothing else about
- * appearance, and it never writes gameplay state. If a value is not on `view`, it is not this
- * file's business to invent it.
+ * IS, this file owns what it LOOKS LIKE. It reads `SemanticEntity.view` plus explicit visual tags
+ * in `meta` (such as an essence cache's element), and it never writes gameplay state. If a value
+ * is not authored on the semantic entity, it is not this file's business to invent it.
  *
  * The performance shape that matters: entities are grouped by (assetId, material tier or
  * architecture region, archetype, 128 m cell) and every group's parts are drawn out of a
@@ -165,6 +165,37 @@ const SCRATCH_COLOUR = new THREE.Color();
 
 /** States that render with the spent treatment. Everything else renders live. */
 const SPENT_STATES = new Set(["depleted", "dead", "empty", "harvested", "closed", "spent"]);
+
+type EssenceElement = "wind" | "earth" | "water" | "fire";
+
+const ESSENCE_CACHE_ASSETS: ReadonlySet<string> = new Set([
+  "rocks_free_essence_cache",
+  "rocks_free_essence_node",
+]);
+
+const ESSENCE_VEINS_MASK_URL = "/assets/textures/essence_veins_mask.png";
+
+/** Emissive colour and energy are element identity; the rock's authored albedo stays underneath. */
+const ESSENCE_GLOW: Readonly<Record<EssenceElement, { colour: number; intensity: number }>> = {
+  wind: { colour: 0xbff8ff, intensity: 2.15 },
+  earth: { colour: 0xb5d34b, intensity: 1.9 },
+  water: { colour: 0x168cff, intensity: 2.25 },
+  fire: { colour: 0xff521c, intensity: 2.3 },
+};
+
+/** Only explicit cache metadata on the two imported DEXSOFT rock assets activates this look. */
+function essenceElementFor(entity: SemanticEntity): EssenceElement | null {
+  const assetId = entity.view?.assetId;
+  if (entity.archetype !== "ore"
+    || entity.meta?.essenceCache !== true
+    || !assetId
+    || !ESSENCE_CACHE_ASSETS.has(assetId)) return null;
+
+  const element = entity.meta.essenceElement;
+  return element === "wind" || element === "earth" || element === "water" || element === "fire"
+    ? element
+    : null;
+}
 
 /**
  * Archetypes whose tier is a gameplay ladder, and are therefore allowed to move their proportions.
@@ -860,6 +891,8 @@ interface InstanceGroup {
   tier: number;
   /** Region whose architecture palette this group uses, or null for ordinary entity art. */
   regionId: RegionId | null;
+  /** Elemental material identity for a DEXSOFT essence cache, otherwise null. */
+  essenceElement: EssenceElement | null;
   /** slot -> entity, or null for a freed slot. */
   slots: (EntityId | null)[];
   free: number[];
@@ -1164,6 +1197,10 @@ export class EntityViews {
   /** Only fishing nodes need generated motion, so the render tick never walks every resource. */
   private readonly fishingViews = new Set<ViewRecord>();
   private resourceTimeSeconds = 0;
+  /** Element/state clones owned here; their albedo maps remain shared with the imported GLB. */
+  private readonly essenceMaterials = new Map<string, THREE.MeshStandardMaterial>();
+  /** One browser-loaded mask shared by every elemental material variant. */
+  private readonly essenceVeinsMask = loadEssenceVeinsMask();
   /** Per-entity dye clones for the non-instanced path, keyed (source material, tint hex). */
   private readonly tintedMaterials = new Map<string, THREE.Material>();
   private readonly bakedGeometries: THREE.BufferGeometry[] = [];
@@ -1501,7 +1538,10 @@ export class EntityViews {
     const campfire = entity.station?.kind === "campfire";
     const authoredWaterOffset = entity.meta?.waterOffset;
     const waterOffset = typeof authoredWaterOffset === "number" ? authoredWaterOffset : 0;
-    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${regionId ?? "-"}|${entity.archetype}|${clip}|${campfire ? "fire" : "-"}|${batchCell(entity.archetype, entity.position)}`;
+    const essenceElement = essenceElementFor(entity);
+    // Element is material identity, not instance colour. Keeping it in the group key prevents an
+    // air cache and a water cache that share one rock asset from ever sharing the wrong parts.
+    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${regionId ?? "-"}|${entity.archetype}|essence:${essenceElement ?? "-"}|${clip}|${campfire ? "fire" : "-"}|${batchCell(entity.archetype, entity.position)}`;
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
@@ -1542,7 +1582,7 @@ export class EntityViews {
     }
 
     const record = this.records.get(entity.id)
-      ?? this.acquire(entity, groupKey, tier, clip, character, regionId);
+      ?? this.acquire(entity, groupKey, tier, clip, character, regionId, essenceElement);
     if (!record) return;
 
     record.signature = signature;
@@ -1607,12 +1647,14 @@ export class EntityViews {
     clip: number,
     character: CharacterSpec | null,
     regionId: RegionId | null,
+    essenceElement: EssenceElement | null,
   ): ViewRecord | null {
     const view = entity.view!;
     const group = this.ensureGroup(
       groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier,
       batchCell(entity.archetype, entity.position), clip, character, regionId,
       entity.station?.kind === "campfire",
+      essenceElement,
     );
     if (!group) return null;
 
@@ -1949,6 +1991,7 @@ export class EntityViews {
     character: CharacterSpec | null = null,
     regionId: RegionId | null = null,
     campfire = false,
+    essenceElement: EssenceElement | null = null,
   ): InstanceGroup | null {
     const existing = this.groups.get(key);
     if (existing) return existing;
@@ -1957,7 +2000,7 @@ export class EntityViews {
     const ready = rigged && this.characterReady(assetId, character);
     let liveParts = ready
       ? this.bakedParts(assetId, character, archetype, tier, regionId, false, "idle")
-      : this.collectParts(assetId, archetype, tier, regionId, false);
+      : this.collectParts(assetId, archetype, tier, regionId, false, essenceElement);
 
     // `view.clipFraction` keeps only the bottom of the mesh. One geometry per group, built once.
     if (clipFraction > 0 && clipFraction < 1) {
@@ -1973,7 +2016,7 @@ export class EntityViews {
 
     // The ore seam. It is a separate part on the LIVE side only: losing the vein is half of what
     // makes a depleted node read as depleted.
-    if (archetype === "ore" && liveParts.length > 0) {
+    if (archetype === "ore" && !essenceElement && liveParts.length > 0) {
       const seam = this.seamPart(assetId, tier, liveParts);
       if (seam) liveParts.push(seam);
     }
@@ -1987,6 +2030,7 @@ export class EntityViews {
       archetype,
       tier,
       regionId,
+      essenceElement,
       slots: [],
       free: [],
       liveParts,
@@ -2075,6 +2119,7 @@ export class EntityViews {
     const live = this.spentMaterialParts(group);
 
     if (group.archetype === "ore") {
+      if (group.essenceElement) return live;
       const rock = live.filter((part) => part.resourceDetail?.kind !== "oreVein");
       if (rock.length > 0) return [...rock, ...this.workedOutOreParts(group, rock)];
     }
@@ -2131,8 +2176,14 @@ export class EntityViews {
       ? this.bakedParts(
         group.assetId, group.character, group.archetype, group.tier, group.regionId, true, "death",
       )
-      : this.collectParts(group.assetId, group.archetype, group.tier, group.regionId, true);
+      : this.collectParts(
+        group.assetId, group.archetype, group.tier, group.regionId, true, group.essenceElement,
+      );
     if (group.archetype !== "ore" || parts.length === 0) return parts;
+
+    // The emissive map is the essence cache's vein. It is part of the rock material rather than a
+    // generated geometry part, so there is nothing to append (or later remove) for these groups.
+    if (group.essenceElement) return parts;
 
     // The ore seam is generated, not authored, so `collectParts` never returns it. Re-append it in
     // the same position the live side has it, or the index arithmetic above lines up with nothing.
@@ -2152,6 +2203,7 @@ export class EntityViews {
     tier: number,
     regionId: RegionId | null,
     spent: boolean,
+    essenceElement: EssenceElement | null = null,
   ): SourcePart[] {
     if (!this.assets.isLoaded(assetId)) return [];
     const source = this.sources.get(assetId) ?? this.assets.instance(assetId);
@@ -2165,7 +2217,9 @@ export class EntityViews {
       if (!base) return;
       parts.push({
         geometry: mesh.geometry,
-        material: this.variantFor(base, assetId, archetype, tier, regionId, spent),
+        material: this.variantFor(
+          base, assetId, archetype, tier, regionId, spent, essenceElement,
+        ),
         matrix: mesh.matrixWorld.clone(),
         triangles: triangleCount(mesh.geometry),
       });
@@ -2399,6 +2453,7 @@ export class EntityViews {
     tier: number,
     regionId: RegionId | null,
     spent: boolean,
+    essenceElement: EssenceElement | null = null,
   ): THREE.Material {
     if (regionId && ARCHITECTURE_ARCHETYPES.has(archetype)) {
       const architectureRole = architectureMaterialRoleForAsset(assetId, base.name);
@@ -2406,6 +2461,17 @@ export class EntityViews {
     }
 
     const look = this.appearanceFor(archetype, base);
+    if (essenceElement) {
+      // State must not desaturate or darken the surface: depletion is the loss of charge, not a
+      // different rock. MaterialLibrary's normal tier treatment preserves the imported albedo map.
+      const surface = this.materials.variant(base, {
+        tier,
+        state: "normal",
+        strength: look.strength,
+        swatch: look.swatch,
+      });
+      return this.essenceMaterial(surface, essenceElement, spent);
+    }
     const variant = this.materials.variant(base, {
       tier,
       state: spent ? "depleted" : "normal",
@@ -2419,6 +2485,36 @@ export class EntityViews {
     // Farm beds and rails are separate landmark entities. A farm_plot material is the live crop.
     if (archetype === "farm_plot") return this.materials.wind(variant, CROP_WIND);
     return variant;
+  }
+
+  /**
+   * Imported rock surface plus the seamless elemental vein mask.
+   *
+   * `clone()` shares the original `map`, normal map and PBR maps, so the DEXSOFT texture remains
+   * the base surface. Only the emissive channel is replaced. One clone per (surface, element,
+   * state) keeps all five rocks in a cache inside the existing BatchedMesh shape.
+   */
+  private essenceMaterial(
+    surface: THREE.Material,
+    element: EssenceElement,
+    spent: boolean,
+  ): THREE.Material {
+    const standard = surface as THREE.MeshStandardMaterial;
+    if (!standard.isMeshStandardMaterial) return surface;
+
+    const key = `${surface.uuid}|${element}|${spent ? "spent" : "live"}`;
+    const cached = this.essenceMaterials.get(key);
+    if (cached) return cached;
+
+    const glow = ESSENCE_GLOW[element];
+    const material = standard.clone();
+    material.name = `${surface.name || "rock"}@essence:${element}:${spent ? "spent" : "live"}`;
+    material.emissiveMap = this.essenceVeinsMask;
+    material.emissive = new THREE.Color(spent ? 0x000000 : glow.colour);
+    material.emissiveIntensity = spent ? 0 : glow.intensity;
+    material.needsUpdate = true;
+    this.essenceMaterials.set(key, material);
+    return material;
   }
 
   private appearanceFor(archetype: Archetype, material: THREE.Material): Appearance {
@@ -4122,6 +4218,9 @@ export class EntityViews {
     this.uniqueViewCount = 0;
     for (const material of this.tintedMaterials.values()) material.dispose();
     this.tintedMaterials.clear();
+    for (const material of this.essenceMaterials.values()) material.dispose();
+    this.essenceMaterials.clear();
+    this.essenceVeinsMask.dispose();
     for (const geometry of this.seamGeometries.values()) geometry.dispose();
     for (const entry of this.workedOreGeometries.values()) {
       entry.scar.dispose();
@@ -4153,6 +4252,41 @@ export class EntityViews {
     this.ringGeometry = null;
     this.pipGeometry = null;
   }
+}
+
+/**
+ * Loads the authored grayscale vein mask without making Node-side renderer tests depend on a DOM.
+ *
+ * An empty texture in Node still keeps `emissiveMap !== null`, so shader/material identity matches
+ * the browser even though that environment never draws pixels. In Chromium the one TextureLoader
+ * request is shared by every element and every live cache node.
+ */
+function loadEssenceVeinsMask(): THREE.Texture {
+  const texture = typeof document === "undefined"
+    ? new THREE.Texture()
+    : new THREE.TextureLoader().load(
+      ESSENCE_VEINS_MASK_URL,
+      undefined,
+      undefined,
+      (error: unknown) => {
+        console.error(
+          `[entityViews] essence vein mask failed to load from ${ESSENCE_VEINS_MASK_URL}. `
+          + "Essence caches will keep their rock texture but lose their elemental glow.",
+          error,
+        );
+      },
+    );
+  texture.name = "essence-veins-mask";
+  // This is a scalar mask, not display colour. Decoding it as sRGB would crush the dim vein edges.
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.flipY = false;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(1.5, 1.5);
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  return texture;
 }
 
 function round(value: number): number {

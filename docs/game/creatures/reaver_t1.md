@@ -37,10 +37,12 @@ description: "March Road Reaver spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 7-27 | Always |
 | [Coarse Hide](../../items/#coarse-hide) | 1-2 | 35% |
 | [Grithe Ore](../../items/#grithe-ore) | 1-2 | 25% |
-| [Essence Shard](../../items/#essence-shard) | 1 | 10% |
+| [Air Essence](../../items/#air-essence) | 1 | 10% |
 | [Grithe Helm](../../items/#grithe-helm) | 1 | 3% |

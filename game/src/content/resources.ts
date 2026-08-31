@@ -8,6 +8,29 @@ import type { ResourceDef } from "./index.js";
 import { gatherXp } from "./index.js";
 import { GATHERING_PRODUCTION_TIERS } from "./gatheringProductionTiers.js";
 
+const ESSENCE_RESOURCES: readonly ResourceDef[] = GATHERING_PRODUCTION_TIERS.map((definition) => {
+  const label = definition.magic.element === "wind"
+    ? "Air"
+    : `${definition.magic.element[0]?.toUpperCase() ?? ""}${definition.magic.element.slice(1)}`;
+  return {
+    id: `essence_${definition.magic.element === "wind" ? "air" : definition.magic.element}`,
+    name: `${label} Essence Cache`,
+    archetype: "ore",
+    skill: "mining",
+    tier: definition.tier,
+    reqLevel: definition.reqLevel,
+    itemId: definition.magic.essence,
+    yieldRange: [40, 90],
+    respawnSeconds: 30,
+    presentation: {
+      availableAssetIds: ["rocks_free_essence_node"],
+      targetWorldSize: 1.58,
+      variantScale: [0.96, 1.04],
+      materialTier: definition.tier,
+    },
+  };
+});
+
 const FARMING_RESOURCES: readonly ResourceDef[] = [
   {
     id: "plot_bittergrain", name: "Marchfield Plot", archetype: "farm_plot", skill: "farming",
@@ -26,6 +49,7 @@ const FARMING_RESOURCES: readonly ResourceDef[] = [
 /** Canonical archetypes only. Cluster aliases are deliberately unsupported. */
 export const RESOURCES: readonly ResourceDef[] = [
   ...GATHERING_PRODUCTION_TIERS.flatMap((definition) => definition.resourceDefs),
+  ...ESSENCE_RESOURCES,
   ...FARMING_RESOURCES,
 ];
 
@@ -38,7 +62,7 @@ export function resourceDef(resourceId: string): ResourceDef {
   return resource;
 }
 
-/** The twelve canonical archetypes, without cluster aliases. Useful for docs and guides. */
+/** Canonical resource rows without cluster aliases. Useful for docs and guides. */
 export const RESOURCE_ARCHETYPES: readonly ResourceDef[] = RESOURCES;
 
 /**

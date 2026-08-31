@@ -40,7 +40,9 @@ description: "Terrace Mudback spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 30-110 | Always |
 | [Kaldite Ore](../../items/#kaldite-ore) | 2-4 | 55% |

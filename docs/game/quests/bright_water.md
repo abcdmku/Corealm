@@ -27,7 +27,7 @@ Six plots sit inside the old wall line. `interact(<plot>, "rake")`, then `"plant
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#marchfield">Marchfield</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 1"><span>Items</span><a href="../../items/#bittergrain">Bittergrain</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/marchfield_farm.webp" alt="Marchfield in the running Corealm world" loading="lazy" /><figcaption><strong>Marchfield</strong><span>Marchfield</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/marchfield_farm.webp" alt="Marchfield in the running Corealm world" loading="lazy" /><figcaption><strong>Marchfield</strong><span>Marchfield, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bright Water, step 1">
 <div class="corealm-map-stage" data-map-stage>
@@ -59,7 +59,7 @@ Four fishing spots on the red silt, 120 m east of town. `interact(<spot>, "fish"
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#redsill-shallows">Redsill Shallows</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 2"><span>Items</span><a href="../../items/#silt-minnow">Silt Minnow</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/redsill_shallows.webp" alt="Redsill Shallows in the running Corealm world" loading="lazy" /><figcaption><strong>Redsill Shallows</strong><span>Redsill Shallows</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/redsill_shallows.webp" alt="Redsill Shallows in the running Corealm world" loading="lazy" /><figcaption><strong>Redsill Shallows</strong><span>Redsill Shallows, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bright Water, step 2">
 <div class="corealm-map-stage" data-map-stage>
@@ -91,7 +91,7 @@ At Cooking 1 nearly half of them burn. That is the rule, not bad luck - cook spa
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#seared-minnow">Seared Minnow</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_range.webp" alt="Coldbrace Cooking Range in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Cooking Range</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_range.webp" alt="Coldbrace Cooking Range in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Cooking Range</strong><span>Coldbrace Square, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bright Water, step 3">
 <div class="corealm-map-stage" data-map-stage>
@@ -123,7 +123,7 @@ She is in Coldbrace Square. The handover takes the food out of your bag.
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 4"><span>Items</span><a href="../../items/#seared-minnow">Seared Minnow</a><a href="../../items/#bittergrain">Bittergrain</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_ranger_syb.webp" alt="Ranger Syb in the running Corealm world" loading="lazy" /><figcaption><strong>Ranger Syb</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_ranger_syb.webp" alt="Ranger Syb in the running Corealm world" loading="lazy" /><figcaption><strong>Ranger Syb</strong><span>Coldbrace Square, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bright Water, step 4">
 <div class="corealm-map-stage" data-map-stage>

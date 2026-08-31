@@ -552,8 +552,8 @@ const KNOTS_AND_NAMES: QuestDef = {
   regionId: "vellenwood",
   kind: "skill",
   summary:
-    "Seamer Juno makes the parts of things: shafts, cord, hide, and the small bright shards that "
-    + "make a staff do anything at all. She will teach both trades to anyone who brings her the "
+    "Seamer Juno makes the parts of things: shafts, cord, hide, and the elemental essence that "
+    + "powers magic weapons. She will teach both trades to anyone who brings her the "
     + "raw material and does not pretend to already know.",
   giverNpcId: "npc_seamer_juno",
   requirements: {},
@@ -582,27 +582,25 @@ const KNOTS_AND_NAMES: QuestDef = {
     {
       index: 1,
       objective:
-        "Craft 5 Essence Shards at a crafting table.",
+        "Mine 5 Air Essence from the distant Fallowmarch cache.",
       refs: [
-        { kind: "item", id: "essence_shard" },
-        { kind: "entity", id: "coldbrace_crafting" },
-        { kind: "location", id: "bracken_pit" },
-        { kind: "location", id: "town_center" },
+        { kind: "item", id: "air_essence" },
+        { kind: "location", id: "fallowmarch_air_cache" },
       ],
       hint:
-        "Shards come off gems. Pale Quartz drops as a bonus while mining Grithe, and Juno already "
-        + "gave you three to be going on with. Shards stack, so this is one inventory slot.",
-      completion: { kind: "have", itemId: "essence_shard", quantity: 5 },
-      grants: { xp: { crafting: 60 } },
+        "The Air Essence Cache lies deep in southern Fallowmarch. Mine any of its five glowing "
+        + "rocks; essence stacks, so this is one inventory slot.",
+      completion: { kind: "have", itemId: "air_essence", quantity: 5 },
+      grants: { xp: { mining: 60 } },
     },
     {
       index: 2,
       objective:
-        "Bring Seamer Juno the 4 shafts and 5 shards so she can show you what they are for.",
+        "Bring Seamer Juno the 4 shafts and 5 Air Essence so she can show you what they are for.",
       refs: [
         { kind: "entity", id: "npc_seamer_juno" },
         { kind: "item", id: "palewood_shaft" },
-        { kind: "item", id: "essence_shard" },
+        { kind: "item", id: "air_essence" },
         { kind: "location", id: "rootfall_hamlet" },
       ],
       hint: "She works the trade post side of the Rootfall stump. The handover takes both.",
@@ -613,10 +611,10 @@ const KNOTS_AND_NAMES: QuestDef = {
     xp: { crafting: 240, fletching: 240 },
     items: [
       { itemId: "bramblehide_wraps", quantity: 1 },
-      { itemId: "essence_shard", quantity: 10 },
+      { itemId: "air_essence", quantity: 10 },
     ],
     currency: 300,
-    unlocks: ["Juno will explain what an essence shard is actually doing inside a spell."],
+    unlocks: ["Juno will explain how a boss Orb can be crafted into an elemental weapon."],
   },
 };
 
@@ -782,8 +780,8 @@ const BAD_GROUND: QuestDef = {
 // ------------------------------------------------------------------ quest 9
 
 /**
- * The Magic introduction. Vess hands over a staff on start, so a player who has never cast can
- * reach the skill gate from a standing start with nothing borrowed.
+ * The Magic introduction. Essence powers the staff directly. The Tempest Roc's Air Orb is a later
+ * crafting upgrade that turns the Palewood Staff into a charged Air Staff.
  */
 const SPARKING_STONE: QuestDef = {
   id: "sparking_stone",
@@ -799,41 +797,71 @@ const SPARKING_STONE: QuestDef = {
   onStart: {
     items: [
       { itemId: "palewood_staff", quantity: 1 },
-      { itemId: "essence_shard", quantity: 12 },
+      { itemId: "air_essence", quantity: 100 },
     ],
-    unlocks: ["Vess lends you her brother's old staff and a dozen shards."],
+    unlocks: ["Vess lends you her brother's old staff and 100 measures of Air Essence."],
   },
   stages: [
     {
       index: 0,
-      objective: "Equip the staff Vess lent you.",
+      objective: "Return to Fallowmarch and kill the Tempest Roc west of the Air Essence Cache.",
       refs: [
-        { kind: "item", id: "palewood_staff" },
-        { kind: "location", id: "highcairn_outpost" },
+        { kind: "entity", id: "tempest_roc" },
+        { kind: "location", id: "fallowmarch_air_cache" },
       ],
       hint:
-        "`equipItem(\"palewood_staff\")`. A staff in the main hand is what lets `cast` resolve at "
-        + "all; the shards are the ammunition.",
-      completion: { kind: "equipped", itemId: "palewood_staff" },
+        "Go south through Vellenwood to Coldbrace, then follow the western track to locationId "
+        + "fallowmarch_air_cache. The Tempest Roc, entity tempest_roc, nests about 42 metres west "
+        + "of the cache. The Air Essence Vess gave you can power Voltrend during the fight.",
+      completion: { kind: "kill", enemyFamily: "tempest_roc", count: 1 },
     },
     {
       index: 1,
-      objective: "Raise Magic to level 5 by casting Emberlash at something that will hold still for it.",
+      objective: "Loot the Air Orb dropped by the Tempest Roc.",
       refs: [
-        { kind: "spell", id: "emberlash" },
-        { kind: "enemyFamily", id: "skitterling" },
-        { kind: "location", id: "great_cairn" },
-        { kind: "location", id: "upper_karrow_seam" },
+        { kind: "item", id: "air_orb" },
+        { kind: "entity", id: "tempest_roc" },
+        { kind: "location", id: "fallowmarch_air_cache" },
       ],
       hint:
-        "Every cast eats one Essence Shard and pays Magic XP for the damage. Skitterlings on the "
-        + "moor around (170, -160) are the cheap target; Cairnwights are not. Craft more shards at "
-        + "a crafting table if you run out - gems drop while mining.",
+        "The guaranteed Air Orb remains in the Tempest Roc's loot pile after the kill. Use `loot` "
+        + "on that pile. This step checks the orb in your inventory, not merely the boss kill.",
+      completion: { kind: "have", itemId: "air_orb", quantity: 1 },
+    },
+    {
+      index: 2,
+      objective: "Craft an Air Staff from Vess's Palewood Staff and the Air Orb, then equip it.",
+      refs: [
+        { kind: "item", id: "palewood_staff" },
+        { kind: "item", id: "air_orb" },
+        { kind: "item", id: "air_staff" },
+        { kind: "entity", id: "coldbrace_essence_altar" },
+        { kind: "location", id: "town_center" },
+      ],
+      hint:
+        "At a crafting table, make recipe craft_air_staff from the Palewood Staff and Air Orb. "
+        + "Equip the finished Air Staff. It starts with 1000 charges. Once partly spent, entity "
+        + "coldbrace_essence_altar restores it to 1000 for exactly 100 Air Essence.",
+      completion: { kind: "equipped", itemId: "air_staff" },
+    },
+    {
+      index: 3,
+      objective: "Raise Magic to level 5 by casting Voltrend at something that will hold still for it.",
+      refs: [
+        { kind: "spell", id: "voltrend" },
+        { kind: "enemyFamily", id: "skitterling" },
+        { kind: "location", id: "redsill_shallows" },
+        { kind: "entity", id: "coldbrace_essence_altar" },
+      ],
+      hint:
+        "The Air Staff spends its charge before carried Air Essence. Rill Skitterlings near "
+        + "locationId redsill_shallows are cheap targets. Recharge at entity "
+        + "coldbrace_essence_altar with 100 Air Essence when needed.",
       completion: { kind: "skill", skill: "magic", level: 5 },
       grants: { xp: { magic: 60 } },
     },
     {
-      index: 2,
+      index: 4,
       objective:
         "Bring Quarrier Vess 6 Kaldite ore so she can watch what a live spell does to it.",
       refs: [
@@ -848,8 +876,7 @@ const SPARKING_STONE: QuestDef = {
   rewards: {
     xp: { magic: 700, mining: 200 },
     items: [
-      { itemId: "amber_focus", quantity: 1 },
-      { itemId: "essence_shard", quantity: 25 },
+      { itemId: "earth_essence", quantity: 25 },
     ],
     currency: 700,
     unlocks: ["Vess stops calling the Kaldite \"that\" and starts calling it by its name."],

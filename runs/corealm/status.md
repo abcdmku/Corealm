@@ -5,17 +5,18 @@
 - [x] Root PRD review — approved with corrections R1-R6 (`architecture.md`)
 - [x] Stack de-risked before writing game code (`stack-findings.md`)
 - [x] WebMCP researched before building the adapter (`webmcp-research.md`)
-- [x] Asset pipeline — 213 CC0 GLBs, 37.6 MB (`asset-report.md`)
+- [x] Asset pipeline — 213 CC0 GLBs, four Unity-derived magic GLBs, and one Unity-derived VFX atlas (`asset-report.md`)
 - [x] Round 0 — foundation passes the Chromium smoke test
 - [x] Round 1 — world, movement, navigation
 - [x] Round 1 critique and fix round (`critique-round1.md`)
 - [x] Round 2 — gathering, inventory, banking, economy, UI
 - [x] Round 3 — combat, production, quests, dialogue, dungeon
-- [x] Agent interface — 19 tools, WebMCP, generated docs, overlays
+- [x] Agent interface — 20 tools, WebMCP, generated docs, overlays
 - [x] Phase 1 report (`phase1-report.md`)
 - [x] Round 4 — every High and Medium issue in that report
 - [x] Round 5 — the screens a human needs, built by six parallel workers
-- [x] **Gate check 27/27, agent proofs 2/2, perf 18/18**
+- [x] **Historical Phase 1 gate 27/27, agent proofs 2/2, perf 18/18**
+- [x] Magic amendment: direct Essence casting, Orb-crafted elemental weapons, live weapon charges
 
 Phase 1 is closed and playable end to end by a human. What remains is Phase 2 content depth,
 listed under "Still open" in the report.
@@ -28,12 +29,12 @@ All Phase 2 and later features use the lab-first workflow in `docs/feature-lab.m
 
 ```
 npm run smoke       -- --run runs/corealm     9/9 checks
-npm test                                       25/25 unit tests
+npm test                                       198 tests across 29 files
 npm run build                                  clean
-npm run gate-check  -- --run runs/corealm     27/27 gate lines
+npm run gate-check  -- --run runs/corealm     last full Phase 1 run: 27/27
 npm run agent-proof -- --run runs/corealm     2/2 agent proofs
 npm run perf        -- --run runs/corealm     18/18 poses in budget
-npm run gen-docs                               10 files from canonical content
+npm run gen-docs                               42 guide files from canonical content
 ```
 
 `gate-check` is the one that matters. Every line it reports is a state delta produced by playing

@@ -30,6 +30,7 @@ import { setSkillLevel } from "../state/store.js";
 import type { CombatSystem } from "../systems/combat.js";
 import type { EquipmentSystem } from "../systems/equipment.js";
 import type { InventorySystem } from "../systems/inventory.js";
+import { ESSENCE_BY_ELEMENT } from "../systems/essence.js";
 import type { EntityStore } from "../world/entities.js";
 import { FEATURE_LAB_CATALOG, createFeatureLabEntity } from "./catalog.js";
 
@@ -115,7 +116,8 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
   deps.store.get().inventory.slots.fill(null);
   for (const skill of SKILL_IDS) setSkillLevel(deps.store.get(), skill, 99);
   deps.store.markDirty();
-  for (const itemId of new Set(SPELLS.map((spell) => spell.cost.itemId))) {
+  for (const itemId of Object.values(ESSENCE_BY_ELEMENT)) {
+    if (!itemId) continue;
     requireOk(deps.inventory.addItem(itemId, LAB_ITEM_QUANTITY), `stock ${itemId}`);
   }
   const initialSpellId = FEATURE_LAB_CATALOG.spells[0]?.id ?? null;

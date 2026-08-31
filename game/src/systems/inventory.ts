@@ -3,7 +3,7 @@
  *
  * Slot pressure is the reason a route matters. Ore, logs, fish, bars and equipment each burn a real
  * slot, so a trip to Karrowmoor is a decision about what you carry back, not a formality. Only the
- * kinds PRD 2.10 calls stackable (currency, essence shards, seeds, shafts, gems) collapse into one
+ * kinds PRD 2.10 calls stackable (currency, elemental essence, seeds, shafts, gems) collapse into one
  * slot, and that is read straight off `ItemDef.stackable` rather than re-listed here — the content
  * table is the single source of truth for it.
  *
@@ -17,6 +17,7 @@ import type { GameState, Store } from "../state/store.js";
 import { INVENTORY_SLOTS } from "../state/store.js";
 import { content, healAmount } from "../content/index.js";
 import type { EventBus } from "../core/events.js";
+import { initialiseWeaponCharge } from "./essence.js";
 
 /** PRD 2.7: eating occupies the player for 1.8 s. */
 export const EAT_DURATION_MS = 1_800;
@@ -37,6 +38,12 @@ export const MAX_STACK = 2_147_483_647;
  */
 export interface ItemMoveOptions {
   silent?: boolean;
+  /** Extra facts carried on the one inventory-owned receipt event. */
+  eventData?: Record<string, unknown>;
+  /** Source entity for a receipt, such as the resource node that yielded it. */
+  eventEntityId?: EntityId;
+  /** Source-system timestamp when it differs from `now()`. */
+  eventAtMs?: number;
 }
 
 export interface InventoryDeps {
@@ -66,8 +73,13 @@ export class InventorySystem {
     return this.deps.store.get();
   }
 
-  private emit(type: "item.received" | "item.lost" | "inventory.full", data: Record<string, unknown>): void {
-    this.deps.events.emit(type, data, undefined, this.deps.now());
+  private emit(
+    type: "item.received" | "item.lost" | "inventory.full",
+    data: Record<string, unknown>,
+    entityId?: EntityId,
+    atMs = this.deps.now(),
+  ): void {
+    this.deps.events.emit(type, data, entityId, atMs);
   }
 
   // ------------------------------------------------------------ SystemHooks
@@ -155,8 +167,19 @@ export class InventorySystem {
       return err("INVENTORY_FULL", `No room for ${def.name}: all ${INVENTORY_SLOTS} slots are full`);
     }
 
+    // Crafted elemental weapons get their boss Orb's initial charge once. Moving one through the
+    // inventory, bank, equipment, death recovery, or loot never refills it.
+    if (def.magicWeapon?.charge) initialiseWeaponCharge(this.state, itemId);
+
     this.deps.store.markDirty();
-    if (!options.silent) this.emit("item.received", { itemId, name: def.name, quantity: added });
+    if (!options.silent) {
+      this.emit(
+        "item.received",
+        { ...options.eventData, itemId, name: def.name, quantity: added },
+        options.eventEntityId,
+        options.eventAtMs,
+      );
+    }
     if (added < wanted) {
       this.emit("inventory.full", { itemId, name: def.name, attempted: wanted, added });
     }
@@ -194,7 +217,9 @@ export class InventorySystem {
     }
 
     this.deps.store.markDirty();
-    if (!options.silent) this.emit("item.lost", { itemId, name: def.name, quantity: wanted });
+    if (!options.silent) {
+      this.emit("item.lost", { ...options.eventData, itemId, name: def.name, quantity: wanted });
+    }
     return ok(wanted);
   }
 

@@ -3,7 +3,7 @@ title: "Knots and Names"
 description: "Knots and Names start location, requirements, walkthrough, and rewards."
 ---
 
-Seamer Juno makes the parts of things: shafts, cord, hide, and the small bright shards that make a staff do anything at all. She will teach both trades to anyone who brings her the raw material and does not pretend to already know.
+Seamer Juno makes the parts of things: shafts, cord, hide, and the elemental essence that powers magic weapons. She will teach both trades to anyone who brings her the raw material and does not pretend to already know.
 
 ![Seamer Juno](../assets/captures/npcs/npc_seamer_juno.webp)
 
@@ -27,12 +27,12 @@ Shafts come from Palewood logs, cut at the Palewood Copse in Fallowmarch (locati
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#palewood-copse">Palewood Copse</a><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 1"><span>Items</span><a href="../../items/#palewood-shaft">Palewood Shaft</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_fletching.webp" alt="Coldbrace Fletching Bench in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Fletching Bench</strong><span>Palewood Copse, Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_fletching.webp" alt="Coldbrace Fletching Bench in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Fletching Bench</strong><span>Coldbrace Bank, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 1">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#palewood-copse" style="--map-x:35.4667%;--map-y:57.5500%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Fletching Bench, Fallowmarch" title="Coldbrace Fletching Bench, Fallowmarch"><span>Coldbrace Fletching Bench<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#coldbrace-bank" style="--map-x:35.4667%;--map-y:57.5500%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Fletching Bench, Fallowmarch" title="Coldbrace Fletching Bench, Fallowmarch"><span>Coldbrace Fletching Bench<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#palewood-copse" style="--map-x:22.1667%;--map-y:55.3333%" data-map-side="right" data-map-kind="grove" data-map-marker aria-label="Palewood Copse, Fallowmarch" title="Palewood Copse, Fallowmarch"><span>Palewood Copse<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -53,20 +53,19 @@ Shafts come from Palewood logs, cut at the Palewood Copse in Fallowmarch (locati
 | --- | --- |
 | Fletching XP | 60 |
 
-### 2. Craft 5 Essence Shards at a crafting table.
+### 2. Mine 5 Air Essence from the distant Fallowmarch cache.
 
-Shards come off gems. Pale Quartz drops as a bonus while mining Grithe, and Juno already gave you three to be going on with. Shards stack, so this is one inventory slot.
+The Air Essence Cache lies deep in southern Fallowmarch. Mine any of its five glowing rocks; essence stacks, so this is one inventory slot.
 
-<nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#bracken-pit">Bracken Pit</a><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
-<nav class="corealm-quest-items" aria-label="Items for step 2"><span>Items</span><a href="../../items/#essence-shard">Essence Shard</a></nav>
+<nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#air-essence-cache">Air Essence Cache</a></nav>
+<nav class="corealm-quest-items" aria-label="Items for step 2"><span>Items</span><a href="../../items/#air-essence">Air Essence</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_crafting.webp" alt="Coldbrace Crafting Table in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Crafting Table</strong><span>Bracken Pit, Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/fallowmarch_air_cache.webp" alt="Air Essence Cache in the running Corealm world" loading="lazy" /><figcaption><strong>Air Essence Cache</strong><span>Air Essence Cache, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 2">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#bracken-pit" style="--map-x:35.4667%;--map-y:57.7833%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Crafting Table, Fallowmarch" title="Coldbrace Crafting Table, Fallowmarch"><span>Coldbrace Crafting Table<small>Fallowmarch</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#bracken-pit" style="--map-x:36.6667%;--map-y:43.3333%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Bracken Pit, Fallowmarch" title="Bracken Pit, Fallowmarch"><span>Bracken Pit<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:62.5000%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -76,7 +75,7 @@ Shards come off gems. Pale Quartz drops as a bonus while mining Grithe, and Juno
 </div>
 <button class="corealm-map-expand" type="button" data-map-action="expand" aria-label="Expand map" aria-pressed="false" title="Expand map">&#x26F6;</button>
 </div>
-<figcaption>Bracken Pit, Coldbrace Square.</figcaption>
+<figcaption>Air Essence Cache.</figcaption>
 </figure>
 </div>
 
@@ -84,16 +83,16 @@ Shards come off gems. Pale Quartz drops as a bonus while mining Grithe, and Juno
 
 | Reward | Amount |
 | --- | --- |
-| Crafting XP | 60 |
+| Mining XP | 60 |
 
-### 3. Bring Seamer Juno the 4 shafts and 5 shards so she can show you what they are for.
+### 3. Bring Seamer Juno the 4 shafts and 5 Air Essence so she can show you what they are for.
 
 She works the trade post side of the Rootfall stump. The handover takes both.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#rootfall">Rootfall</a></nav>
-<nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#palewood-shaft">Palewood Shaft</a><a href="../../items/#essence-shard">Essence Shard</a></nav>
+<nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#palewood-shaft">Palewood Shaft</a><a href="../../items/#air-essence">Air Essence</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_seamer_juno.webp" alt="Seamer Juno in the running Corealm world" loading="lazy" /><figcaption><strong>Seamer Juno</strong><span>Rootfall</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_seamer_juno.webp" alt="Seamer Juno in the running Corealm world" loading="lazy" /><figcaption><strong>Seamer Juno</strong><span>Rootfall Bank Chest, Vellenwood</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 3">
 <div class="corealm-map-stage" data-map-stage>
@@ -120,6 +119,6 @@ She works the trade post side of the Rootfall stump. The handover takes both.
 | Crafting XP | 240 |
 | Fletching XP | 240 |
 | [Bramblehide Wraps](../../items/#bramblehide-wraps) | 1 |
-| [Essence Shard](../../items/#essence-shard) | 10 |
+| [Air Essence](../../items/#air-essence) | 10 |
 | Marks | 300 |
-| Unlock | Juno will explain what an essence shard is actually doing inside a spell. |
+| Unlock | Juno will explain how a boss Orb can be crafted into an elemental weapon. |

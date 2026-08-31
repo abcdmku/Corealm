@@ -9,8 +9,8 @@
  * material that never compiled, an InstancedMesh whose `count` is never written. So this drives the
  * shipped Vite game through the same `__gameDebug` surface the harness uses, and reports:
  *
- *  1. THE LADDER RESOLVES. Every one of the sixteen spells is reachable through the real API at a
- *     Magic level that unlocks it, and `corealm_spellbook` agrees with the content table.
+ *  1. THE LADDER RESOLVES. All sixteen rows reach the real API, the three released elements cast,
+ *     and Fire stays visible but blocked until its region ships.
  *  2. THE EFFECT DRAWS. Casting moves `drawCalls` by exactly one and puts particles on screen, and
  *     the count returns to its idle value once the effect ends. One draw call is the budget in
  *     `runs/corealm/magic-ladder-spec.md` section 8; Highcairn measures 397 against 400.
@@ -34,20 +34,59 @@ import { startGameServer } from "./lib/server.js";
 import { argValue, prepareRun } from "./lib/paths.js";
 import { installTestDeadline } from "./lib/deadline.js";
 import { SPELLS } from "../game/src/content/spells.js";
-import { SPELL_ELEMENTS } from "../game/src/contracts.js";
-import { MELEE_RANGE, SPELL_RANGE } from "../game/src/app/config.js";
+import type { GameEvent, SpellElement } from "../game/src/contracts.js";
+import { MELEE_RANGE, PLAYER_SPEED, SPELL_RANGE } from "../game/src/app/config.js";
 
 interface Metrics { drawCalls: number; programs: number; triangles: number; fps: number; spellParticles: number }
 interface ObservedEnemy { id: string; name: string; distance: number; state: string }
+interface SpellbookAudit {
+  spells?: {
+    id: string;
+    element: SpellElement;
+    reqLevel: number;
+    unlocked: boolean;
+    castable: boolean;
+    maxHit: number;
+    castMs: number;
+    requiredElement: SpellElement;
+    fuelCost: number;
+    blockedBy: string | null;
+  }[];
+  magicLevel?: number;
+  activeSpellId?: string | null;
+  equippedWeapon?: { itemId: string; element: SpellElement; charges: number; capacity: number } | null;
+  essence?: Record<SpellElement, number>;
+  releasedElements?: SpellElement[];
+}
 
 /** Magic level granted before casting. Above the top of the ladder, so all sixteen are unlocked. */
 const TEST_MAGIC_LEVEL = 75;
-/** One shard per cast; enough for the whole sweep with room for retries. */
-const SHARDS = 200;
 /** Keep the caster safely inside spell reach while still outside melee reach. */
 const TARGET_DISTANCE_M = 4;
-/** The production SpellVfx instance buffer, also exercised headlessly in tests/spell-vfx.test.ts. */
-const SPELL_PARTICLE_CAP = 640;
+/** Frozen in magic-ladder-spec.md section 8. Keep the verifier and runtime budget aligned. */
+export const SPELL_PARTICLE_CAP = 640;
+const RELEASED_ELEMENTS = ["wind", "earth", "water"] as const satisfies readonly SpellElement[];
+const WEAPON_BY_ELEMENT: Readonly<Record<(typeof RELEASED_ELEMENTS)[number], string>> = {
+  wind: "air_staff",
+  earth: "earth_staff",
+  water: "water_staff",
+};
+
+export function shaderProgramGrowthFailure(
+  element: SpellElement,
+  spellId: string,
+  before: number,
+  after: number,
+): string | null {
+  if (after <= before) return null;
+  return `${element}: shader program count rose from ${before} to ${after} during ${spellId}; `
+    + "SpellVfx.primeShader() did not stabilize the cast";
+}
+
+export function particleCapFailure(peakParticles: number): string | null {
+  if (peakParticles <= SPELL_PARTICLE_CAP) return null;
+  return `${peakParticles} live particles; the cap is ${SPELL_PARTICLE_CAP}`;
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -65,7 +104,7 @@ async function main(): Promise<void> {
     // The lowest graphics preset the settings panel offers. This tool measures the SPELL layer, not
     // the world's fidelity, and at default settings the frame cost is high enough that a 1.3 s
     // effect can fall entirely between two samples — a full sweep at 527 draw calls reported zero
-    // particles on all four elements, and the same sweep at 193 saw them immediately. Audio is
+    // particles on every released element, and the same sweep at 193 saw them immediately. Audio is
     // silenced for the same reason it is not asserted here: `AudioEngine` needs a gesture to unlock
     // and this session never makes one.
     settings: {
@@ -87,9 +126,15 @@ async function main(): Promise<void> {
     // ---------------------------------------------------------------- setup
     await driver.callDebug("setSkillLevel", ["magic", TEST_MAGIC_LEVEL]);
     await driver.callDebug("setSkillLevel", ["melee", TEST_MAGIC_LEVEL]);
-    await driver.callDebug("giveItem", ["essence_shard", SHARDS, "inventory"]);
+    await driver.callDebug("giveItem", ["basic_wooden_wand", 1, "inventory"]);
     await driver.callDebug("giveItem", ["cairnpine_staff", 1, "inventory"]);
-    await driver.callDebug("callTool", ["corealm_equip", { itemId: "cairnpine_staff" }]);
+    for (const weaponItemId of Object.values(WEAPON_BY_ELEMENT)) {
+      await driver.callDebug("giveItem", [weaponItemId, 1, "inventory"]);
+    }
+    const wandEquip = await driver.callDebug(
+      "callTool", ["corealm_equip", { itemId: "basic_wooden_wand" }],
+    ) as { error?: string; message?: string };
+    if (wandEquip.error) failures.push(`basic wand equip rejected: ${wandEquip.error} ${wandEquip.message ?? ""}`);
     // The sim only advances on rendered frames and `app/loop.ts` clamps a frame to 250 ms, so on a
     // software rasteriser pushing 18 M triangles the world runs at a small fraction of wall clock —
     // a 600 ms combat tick can take many seconds to arrive, and a respawn longer still. Time scale
@@ -97,11 +142,16 @@ async function main(): Promise<void> {
     await driver.callDebug("setTimeScale", [6]);
 
     // ------------------------------------------------- 1. the ladder resolves
-    const book = await driver.callDebug("callTool", ["corealm_spellbook", { op: "read" }]) as {
-      spells?: { id: string; element: string; reqLevel: number; unlocked: boolean; maxHit: number }[];
-      magicLevel?: number;
-      activeSpellId?: string | null;
-    };
+    const wandBook = await spellbook(driver);
+    for (const row of wandBook.spells ?? []) {
+      if (row.castMs !== 2200) failures.push(`${row.id}: wand cadence is ${row.castMs} ms, expected 2200`);
+    }
+    const staffEquip = await driver.callDebug(
+      "callTool", ["corealm_equip", { itemId: "cairnpine_staff" }],
+    ) as { error?: string; message?: string };
+    if (staffEquip.error) failures.push(`Cairnpine Staff equip rejected: ${staffEquip.error} ${staffEquip.message ?? ""}`);
+
+    const book = await spellbook(driver);
     const rows = book.spells ?? [];
     if (rows.length !== SPELLS.length) {
       failures.push(`spellbook returned ${rows.length} rows, content has ${SPELLS.length}`);
@@ -114,8 +164,24 @@ async function main(): Promise<void> {
       }
       if (!row.unlocked) failures.push(`${spell.id} still locked at Magic ${TEST_MAGIC_LEVEL}`);
       if (row.maxHit <= 0) failures.push(`${spell.id} reports maxHit ${row.maxHit}`);
+      if (row.castMs !== 3000) failures.push(`${spell.id}: staff cadence is ${row.castMs} ms, expected 3000`);
+      if (row.requiredElement !== spell.cost.element) {
+        failures.push(`${spell.id}: needs ${row.requiredElement}, content costs ${spell.cost.element}`);
+      }
+      if (row.fuelCost !== 1) failures.push(`${spell.id}: fuel cost is ${row.fuelCost}, expected 1`);
     }
-    notes.push(`spellbook: ${rows.length} rows, active = ${String(book.activeSpellId)}`);
+    const released = book.releasedElements ?? [];
+    if (JSON.stringify(released) !== JSON.stringify(RELEASED_ELEMENTS)) {
+      failures.push(`released elements are [${released.join(", ")}], expected [${RELEASED_ELEMENTS.join(", ")}]`);
+    }
+    const fireRows = rows.filter((row) => row.element === "fire");
+    if (fireRows.some((row) => row.castable)) {
+      failures.push("Fire spells became castable before Fire entered releasedElements");
+    }
+    notes.push(
+      `spellbook: ${rows.length} rows, active = ${String(book.activeSpellId)}, `
+      + "wand 2.2 s / staff 3.0 s",
+    );
 
     // ------------------------------------------------------ find something to hit
     const enemy = await nearestEnemy(driver);
@@ -127,9 +193,9 @@ async function main(): Promise<void> {
       notes.push(`target: ${enemy.name} (${enemy.id}) at ${enemy.distance.toFixed(1)} m`);
 
       // One living enemy per element, so no cast has to wait on a revive.
-      const victims = (await allEnemies(driver)).filter((row) => row.state !== "dead").slice(0, 4);
-      if (victims.length < SPELL_ELEMENTS.length) {
-        failures.push(`only ${victims.length} living enemies in reach; the sweep needs 4`);
+      const victims = (await allEnemies(driver)).filter((row) => row.state !== "dead").slice(0, RELEASED_ELEMENTS.length);
+      if (victims.length < RELEASED_ELEMENTS.length) {
+        failures.push(`only ${victims.length} living enemies in reach; the sweep needs ${RELEASED_ELEMENTS.length}`);
       }
 
       // TELEPORTED, not walked, and that is a statement about the harness rather than about the
@@ -192,17 +258,36 @@ async function main(): Promise<void> {
       // ------------------------------------------- 2 and 3. the effect draws
       let peakDrawCalls = 0;
       let peakParticles = 0;
-      for (const [index, element] of SPELL_ELEMENTS.entries()) {
+      for (const [index, element] of RELEASED_ELEMENTS.entries()) {
         // The TOP spell of each element, so the sweep also exercises the surge rung — the widest,
         // most expensive effect and the one most likely to breach a budget.
         const spell = [...SPELLS].reverse().find((row) => row.element === element);
         if (!spell) { failures.push(`no ${element} spell in the table`); continue; }
 
+        const weaponItemId = WEAPON_BY_ELEMENT[element];
+        const equipped = await driver.callDebug(
+          "callTool", ["corealm_equip", { itemId: weaponItemId }],
+        ) as { error?: string; message?: string };
+        if (equipped.error) {
+          failures.push(`${weaponItemId} equip rejected: ${equipped.error} ${equipped.message ?? ""}`);
+          continue;
+        }
+        const beforeCast = await spellbook(driver);
+        if (beforeCast.equippedWeapon?.itemId !== weaponItemId) {
+          failures.push(`${element}: spellbook equipped ${beforeCast.equippedWeapon?.itemId ?? "no charged weapon"}`);
+          continue;
+        }
+        if (beforeCast.equippedWeapon.charges !== 1000 || beforeCast.equippedWeapon.capacity !== 1000) {
+          failures.push(
+            `${weaponItemId}: starts ${beforeCast.equippedWeapon.charges}/${beforeCast.equippedWeapon.capacity}, expected 1000/1000`,
+          );
+        }
+
         // A FRESH TARGET per element, rather than reviving one.
         //
         // Full health before every cast. Teleporting next to four aggressive enemies in a row costs
         // real hit points at 23 starting health, and a dead caster casts nothing — an earlier run
-        // lost three of four elements that way and reported them as "no particles".
+        // lost casts that way and reported them as "no particles".
         await driver.callDebug("setHealth", [9999]);
 
         // A Magic 75 caster one-shots a tier 1 skitterling, so the first cast always kills and every
@@ -225,6 +310,7 @@ async function main(): Promise<void> {
         // spot, and the delta afterwards is the effect and nothing else.
         await driver.wait(8000);
         const floor = await metrics(driver);
+        const eventFloor = await spellLaunchEvents(driver, 0, 0);
 
         const cast = await driver.callDebug("callTool", [
           "corealm_attack", { entityId: victim.id, spellId: spell.id },
@@ -232,6 +318,25 @@ async function main(): Promise<void> {
         if (cast.error) {
           failures.push(`${spell.id} rejected: ${cast.error} ${cast.message ?? ""}`);
           continue;
+        }
+
+        const launched = await spellLaunchEvents(driver, eventFloor.nextSeq, 30_000);
+        await driver.callDebug("callTool", ["corealm_stop", {}]);
+        const launch = launched.events.find((event) => event.data.spellId === spell.id);
+        if (!launch) {
+          failures.push(`${spell.id}: no spell.launched event arrived`);
+        } else {
+          const remaining = Number(launch.data.remainingCharges);
+          if (launch.data.weaponItemId !== weaponItemId || launch.data.fuelSource !== "weapon" || remaining !== 999) {
+            failures.push(
+              `${spell.id}: launch used ${String(launch.data.weaponItemId)} at ${remaining} charges, `
+              + `expected ${weaponItemId} at 999`,
+            );
+          }
+          const afterCast = await spellbook(driver);
+          if (afterCast.equippedWeapon?.charges !== 999) {
+            failures.push(`${spell.id}: one launch left ${afterCast.equippedWeapon?.charges ?? "no"} charges, expected 999`);
+          }
         }
 
         // Polled on `spellParticles`, not on draw calls, and polled for a long time.
@@ -246,7 +351,7 @@ async function main(): Promise<void> {
         let peakDrawsThisCast = floor.drawCalls;
         // 150 samples at 200 ms is 30 s of wall clock per cast. Generous on purpose: at the 3 fps
         // this browser manages, a cast has to wait for a 600 ms combat tick that only advances on a
-        // rendered frame, and a 14 s window caught only one or two of the four elements per run.
+        // rendered frame, and a 14 s window caught only part of the released sweep per run.
         for (let sample = 0; sample < 150; sample += 1) {
           await driver.wait(200);
           const now = await metrics(driver);
@@ -274,18 +379,8 @@ async function main(): Promise<void> {
         // cast was still running.
         await driver.wait(4000);
         const settled = await metrics(driver);
-        if (settled.programs > floor.programs) {
-          // Reported, not diagnosed. It is one program and it appears on the first cast that
-          // actually DRAWS, but three attributions have been tried and none held: the automatic
-          // `scene.traverse` in `WebGLRenderer.compile`, a one-instance proxy through
-          // `Renderer.warmup({ materials })`, and `SpellVfx.primeShader` drawing the real mesh a
-          // frame early. Something else in the frame a spell lands on is also compiling. Worth one
-          // frame, worth knowing about, not worth asserting a cause for.
-          notes.push(
-            `${element}: ${settled.programs - floor.programs} shader program(s) compiled during this `
-            + "cast (known residual, one frame)",
-          );
-        }
+        const shaderFailure = shaderProgramGrowthFailure(element, spell.id, floor.programs, settled.programs);
+        if (shaderFailure) failures.push(shaderFailure);
         if (settled.spellParticles !== 0) {
           failures.push(`${element}: ${settled.spellParticles} particles still alive 4 s after the cast`);
         }
@@ -293,11 +388,10 @@ async function main(): Promise<void> {
 
       const after = await metrics(driver);
       notes.push(`worst case: +${peakDrawCalls} draw calls over the local floor, ${peakParticles} particles`);
-      // SpellVfx has a hard cap of 640 live particles. The draw-call budget is asserted per cast
+      // Spec section 8: a hard cap of 640 live particles. The draw-call budget is asserted per cast
       // above, against that cast's own floor.
-      if (peakParticles > SPELL_PARTICLE_CAP) {
-        failures.push(`${peakParticles} live particles; the cap is ${SPELL_PARTICLE_CAP}`);
-      }
+      const particleFailure = particleCapFailure(peakParticles);
+      if (particleFailure) failures.push(particleFailure);
       if (after.spellParticles !== 0) {
         failures.push(`${after.spellParticles} particles still alive after the sweep; casts do not reap`);
       }
@@ -324,6 +418,20 @@ async function main(): Promise<void> {
     return;
   }
   console.log("\nmagic ladder verified in the browser");
+}
+
+async function spellbook(driver: GameDriver): Promise<SpellbookAudit> {
+  return await driver.callDebug("callTool", ["corealm_spellbook", { op: "read" }]) as SpellbookAudit;
+}
+
+async function spellLaunchEvents(
+  driver: GameDriver,
+  sinceSeq: number,
+  timeoutMs: number,
+): Promise<{ events: GameEvent[]; nextSeq: number }> {
+  return await driver.callDebug("callTool", [
+    "corealm_events", { sinceSeq, types: ["spell.launched"], timeoutMs },
+  ]) as { events: GameEvent[]; nextSeq: number };
 }
 
 /** Sim milliseconds. Advances only inside the render loop, so it doubles as a frame heartbeat. */

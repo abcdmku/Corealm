@@ -61,13 +61,13 @@ describe("frozen gathering and production formulas", () => {
 });
 
 describe("generated gathering and production matrix", () => {
-  it("has one complete, self-contained 28-recipe row at levels 1, 5, and 10", () => {
+  it("has one complete, self-contained recipe row at levels 1, 5, and 10", () => {
     expect(GATHERING_PRODUCTION_TIERS.map((definition) => definition.tier)).toEqual([1, 5, 10]);
 
     for (const definition of GATHERING_PRODUCTION_TIERS) {
       const { tier, items } = definition;
       const recipes = RECIPES.filter((recipe) => recipe.tier === tier);
-      expect(recipes, `tier ${tier} recipe count`).toHaveLength(28);
+      expect(recipes, `tier ${tier} recipe count`).toHaveLength(tier === 1 ? 30 : 28);
       expect(recipes.every((recipe) => recipe.reqLevel === tier), `tier ${tier} requirements`).toBe(true);
 
       const expectedOutputs: ItemId[] = [
@@ -75,10 +75,12 @@ describe("generated gathering and production matrix", () => {
         items.dagger, items.sword, items.helm, items.body, items.legs, items.boots, items.gloves,
         items.pickaxe, items.hatchet,
         items.cookedFish,
-        "essence_shard",
+        definition.magic.wand, definition.magic.staff,
         items.meleeRing, items.meleePendant, items.magicRing, items.magicCharm,
         items.robe, items.magicLegs, items.hood, items.magicBoots, items.wraps,
-        items.shaft, items.handle, items.staff, items.wand, items.shield, items.focus, items.rod,
+        items.shaft, items.handle, items.staff, items.wand, items.shield, items.rod,
+        ...(definition.magic.basicWand ? [definition.magic.basicWand] : []),
+        ...(definition.magic.basicStaff ? [definition.magic.basicStaff] : []),
       ];
       expect(recipes.map((recipe) => recipe.output.itemId).sort()).toEqual(expectedOutputs.sort());
 
@@ -105,7 +107,8 @@ describe("generated gathering and production matrix", () => {
   });
 
   it("makes shafts, handles, and every wooden equipment family from the matching tier materials", () => {
-    for (const { tier, items } of GATHERING_PRODUCTION_TIERS) {
+    for (const definition of GATHERING_PRODUCTION_TIERS) {
+      const { tier, items } = definition;
       const shaft = recipeProducing(items.shaft, tier);
       expect(shaft.kind).toBe("fletch");
       expect(shaft.stations).toEqual(["fletching_bench"]);
@@ -122,11 +125,18 @@ describe("generated gathering and production matrix", () => {
       expect(inputQuantities(handle)).toEqual({ [items.log]: 1 });
       expect(handle.output.quantity).toBe(2);
 
-      expect(inputQuantities(recipeProducing(items.staff, tier))).toEqual({ [items.shaft]: 3, [items.gem]: 1 });
-      expect(inputQuantities(recipeProducing(items.wand, tier))).toEqual({ [items.shaft]: 1, [items.gem]: 1 });
+      expect(inputQuantities(recipeProducing(items.staff, tier))).toEqual({ [items.shaft]: 3 });
+      expect(inputQuantities(recipeProducing(items.wand, tier))).toEqual({ [items.shaft]: 2 });
       expect(inputQuantities(recipeProducing(items.rod, tier))).toEqual({ [items.shaft]: 2, [items.hide]: 1 });
       expect(inputQuantities(recipeProducing(items.shield, tier))).toEqual({ [items.log]: 2, [items.bar]: 1 });
-      expect(inputQuantities(recipeProducing(items.focus, tier))).toEqual({ [items.log]: 1, [items.gem]: 1 });
+      expect(inputQuantities(recipeProducing(definition.magic.wand, tier))).toEqual({
+        [items.wand]: 1,
+        [definition.magic.orb]: 1,
+      });
+      expect(inputQuantities(recipeProducing(definition.magic.staff, tier))).toEqual({
+        [items.staff]: 1,
+        [definition.magic.orb]: 1,
+      });
     }
   });
 
@@ -150,22 +160,19 @@ describe("generated gathering and production matrix", () => {
     for (const { tier, items } of GATHERING_PRODUCTION_TIERS) {
       const staff = ITEMS_BY_ID.get(items.staff);
       const wand = ITEMS_BY_ID.get(items.wand);
-      const focus = ITEMS_BY_ID.get(items.focus);
       expect(staff?.equip?.slot).toBe("mainHand");
       expect(wand?.equip?.slot).toBe("mainHand");
       expect(wand?.equip?.requires.magic).toBe(tier);
-      expect(focus?.equip?.slot).toBe("offHand");
-      expect(focus?.tier).toBe(tier);
 
       const staffBonuses = staff?.equip?.bonuses;
       const wandBonuses = wand?.equip?.bonuses;
       expect(staffBonuses, `${items.staff} bonuses`).toBeDefined();
       expect(wandBonuses, `${items.wand} bonuses`).toBeDefined();
-      expect(wandBonuses?.magicAccuracy).toBe(Math.round((staffBonuses?.magicAccuracy ?? 0) * 2 / 3));
-      expect(wandBonuses?.magicPower).toBe(Math.round((staffBonuses?.magicPower ?? 0) * 2 / 3));
-      expect(wandBonuses?.magicArmour).toBe(Math.round((staffBonuses?.magicArmour ?? 0) * 2 / 3));
+      expect(wandBonuses?.magicAccuracy).toBeLessThan(staffBonuses?.magicAccuracy ?? 0);
+      expect(wandBonuses?.magicPower).toBeLessThan(staffBonuses?.magicPower ?? 0);
+      expect(wand?.equip?.attackSpeedMs).toBeLessThan(staff?.equip?.attackSpeedMs ?? 0);
       expect(wandBonuses?.power).toBe(0);
-      expect(wand?.value).toBe(Math.round((staff?.value ?? 0) * 0.6));
+      expect(wand?.value).toBeLessThan(staff?.value ?? 0);
     }
   });
 

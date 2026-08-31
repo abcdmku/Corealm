@@ -1,7 +1,9 @@
-# Magic ladder, Magic 1–70 — frozen spec
+# Magic ladder, Magic 1–70 — current frozen spec
 
 Root-authored. Workers build against this and do not change it; a worker who finds it wrong stops
-and reports the mismatch (AGENTS.md rule 5).
+and reports the mismatch (AGENTS.md rule 5). This revision incorporates the August 30, 2026
+magic-equipment amendment. It supersedes the earlier Essence Shard, `worn_staff`, and universal
+3.0-second-cast rules.
 
 ## 0. What this wave adds
 
@@ -11,8 +13,8 @@ and reports the mismatch (AGENTS.md rule 5).
 2. A spell VFX layer: cast, flight and impact, drawn from one baked sprite atlas, one draw call.
 3. A procedural audio layer — the game currently has none — with a cast and an impact voice per
    element and per rung.
-4. A visible staff. Staves render NOTHING today (`render/equipmentVisuals.ts` `GEAR_ASSET_GAPS`:
-   there is no staff mesh in the 213-asset library), so a "basic staff" would be an invisible one.
+4. Visible wands and staffs imported from Blink's `FREE - RPG Weapons` Unity Asset Store pack, with
+   unlit wood variants and glowing elemental weapon upgrades.
 5. A spellbook panel, because with sixteen spells the player needs to choose an element.
 
 ## 1. Contracts — ALREADY FROZEN, do not re-edit
@@ -25,17 +27,18 @@ and a sixteen-way `SpellId`. `game/src/content/index.ts` `SpellDef` now carries 
 
 `maxHit = floor(baseMax + (magicLevel + gearMagicPower) / divisor)` — PRD 2.4, unchanged.
 
-Every row costs **1 Essence Shard** and casts in **3000 ms**. Both are PRD section 0 decision 3 and
-PRD 2.4 respectively, and both are held across all sixteen rows on purpose: scaling shard cost with
-rung would need the gem-drop economy re-solved, and that is not what this wave is for. What
-separates the rungs is required Magic level, damage and XP.
+Every row costs **one unit of matching fuel**. A matching elemental weapon spends one stored charge
+first; a plain or empty weapon spends one carried Essence. The equipped weapon owns cadence: a wand
+casts in **2200 ms** and a staff in **3000 ms**. A spell row retains `castMs: 3000` only as the
+unresolved static fallback. Fire rows remain visible but cannot launch until Fire Essence and Fire
+weapons release. Required Magic level, damage and XP separate the rungs.
 
 | id | name | element | rung | reqLevel | tier | baseMax | divisor | baseXp |
 | -- | ---- | ------- | ---- | -------: | ---: | ------: | ------: | -----: |
-| `emberlash`   | Emberlash   | fire  | lash  | 1  | 1  | 3  | 8   | 5   |
+| `voltrend`    | Voltrend    | wind  | lash  | 1  | 1  | 3  | 8   | 5   |
 | `stonebrand`  | Stonebrand  | earth | lash  | 5  | 5  | 5  | 7   | 12  |
-| `voltrend`    | Voltrend    | wind  | lash  | 10 | 10 | 8  | 6   | 22  |
-| `rimewash`    | Rimewash    | water | lash  | 13 | 10 | 9  | 6   | 28  |
+| `rimewash`    | Rimewash    | water | lash  | 10 | 10 | 8  | 6   | 22  |
+| `emberlash`   | Emberlash   | fire  | lash  | 15 | 10 | 9  | 6   | 30  |
 | `skirlbolt`   | Skirlbolt   | wind  | bolt  | 17 | 10 | 11 | 5.5 | 36  |
 | `sleetbolt`   | Sleetbolt   | water | bolt  | 23 | 20 | 13 | 5.2 | 47  |
 | `shalebolt`   | Shalebolt   | earth | bolt  | 29 | 20 | 15 | 5.0 | 59  |
@@ -54,53 +57,53 @@ tiers two rows at a time, which put `skirlbolt`, `shalebolt` and `scarpsurge` on
 their own unlock level reaches; W-CONTENT reported the contradiction instead of shipping it and the
 root floored all three. `tests/spells.test.ts` now pins the invariant.
 
-### Why the lash rung's element order differs from the other three
+### Why the lash rung follows region order
 
-Rungs 2–4 run wind → water → earth → fire, weakest to strongest. The lash rung runs fire → earth →
-wind → water because PRD 2.4 fixes Emberlash at Magic 1, Stonebrand at 5 and Voltrend at 10, and
-those are load-bearing for the quest reference in `content/quests.ts:741` and the gate check in
-`tools/gate-check.ts:561`. Rimewash was authored at 13 to complete the set. Do not renumber them.
+The entry rung is the region-boss handoff: Air at Magic 1, Earth at 5, Water at 10, then future Fire
+at 15. Those levels match the regional Essence sequence, while each boss Orb upgrades that region's
+wood weapon. The later rungs retain their authored rotations and numbers.
 
 ### The rotation this produces, which is the design
 
-The strongest spell a caster owns rotates by element as they level: wind leads at 10–12 and 41–46
-and 62–64, water at 13–16 and 47–52 and 65–67, earth at 5–9 and 29–34 and 53–58 and 68–69, fire at
-1–4 and 35–40 and 59–61 and 70+. So "I want to cast fire" costs a few points of max hit for part of
-the climb and nothing for the rest, which is a real preference rather than a free one.
+The strongest newly unlocked row rotates by element: wind leads at 1–4, 17–22, 41–46 and 62–64;
+earth at 5–9, 29–34, 53–58 and 68–69; water at 10–14, 23–28, 47–52 and 65–67; fire at 15–16,
+35–40, 59–61 and 70+. A caster still needs matching released fuel, so the visible Fire rows do not
+enter automatic selection in the current release.
 
 ### Checkpoints a test must pin (tier-10 magic kit, `magicPower` 32)
 
 Holding gear fixed at the tier 10 kit across all sixteen rows, which is what makes this a ladder
 rather than sixteen unrelated readings:
 
-`emberlash`@1 → 7, `stonebrand`@5 → 10, `voltrend`@10 → 15. The PRD's quoted 3 and 7 for the first
-two are against the tier 1 and tier 5 kits a caster would actually own at those levels, and are
-pinned separately; do not conflate the two columns, which the first draft of this spec did.
-Then `rimewash`@13 → 16, `skirlbolt`@17 → 19,
+`voltrend`@1 → 7, `stonebrand`@5 → 10, `rimewash`@10 → 15, and `emberlash`@15 → 16. The PRD's
+lower entry values use the tier kit a caster actually owns at each unlock and are pinned separately;
+do not conflate the two columns. Then `skirlbolt`@17 → 19,
 `sleetbolt`@23 → 23, `shalebolt`@29 → 27, `cinderbolt`@35 → 30, `galeburst`@41 → 34,
 `spateburst`@47 → 38, `cragburst`@53 → 43, `pyreburst`@59 → 47, `squallsurge`@62 → 51,
 `tidesurge`@65 → 55, `scarpsurge`@68 → 59, `kilnsurge`@70 → 63.
 
-## 3. Staves
+## 3. Wands, staffs, and elemental upgrades
 
-The existing three staves already ARE the "wood from better trees" ladder and must not be
-duplicated:
+Both weapon families follow the same wood ladder. Wands are one-handed, weaker, and cast every
+2200 ms. Staffs are two-handed, stronger, and cast every 3000 ms. Orbs are crafting components and
+there is no separate Orb equipment slot.
 
-| staff | requires | wood | that log needs |
-| ----- | -------- | ---- | -------------- |
-| `palewood_staff`  | Magic 1  | Palewood  | Woodcutting 1  |
-| `duskoak_staff`   | Magic 5  | Duskoak   | Woodcutting 5  |
-| `cairnpine_staff` | Magic 10 | Cairnpine | Woodcutting 10 |
+| tier | wand | staff | wood | wood requirement |
+| ---: | ---- | ----- | ---- | ---------------- |
+| 0 | `basic_wooden_wand` | `basic_wooden_staff` | plain wood | none |
+| 1 | `palewood_wand` | `palewood_staff` | Palewood | Woodcutting 1 |
+| 5 | `duskoak_wand` | `duskoak_staff` | Duskoak | Woodcutting 5 |
+| 10 | `cairnpine_wand` | `cairnpine_staff` | Cairnpine | Woodcutting 10 |
 
-Each is already fletched from `3 x <wood> shaft + 1 x <tier gem>` in `content/recipes.ts`, and the
-shafts come from logs, so the Woodcutting 5 / 10 gate is real and already enforced by the source of
-the wood. What is MISSING and must be added:
+Wands use two matching shafts and staffs use three. The fresh character starts with
+`basic_wooden_wand` equipped and 50 Air Essence, enough to cast Voltrend directly.
+`basic_wooden_staff` is the tier-0 two-handed alternative. Legacy `worn_staff` saves migrate to
+`basic_wooden_staff` and safely displace any ordinary offhand item.
 
-* `worn_staff`, tier 0, no requirements, the mate of `worn_sword` — the basic staff the player
-  starts with. Bonuses must sit below `palewood_staff`'s 6/4/1 so the first upgrade is worth buying:
-  use `magicAccuracy 3, magicPower 2`, value 15, `attackSpeedMs` 3000.
-* It goes in `STARTING_INVENTORY` (carried), NOT `STARTING_EQUIPMENT` — `worn_sword` holds
-  `mainHand` and a hand holds one thing.
+Air, Earth, and Water Orbs release at tiers 1, 5, and 10. Each is consumed with the matching wood
+weapon to make `air_*`, `earth_*`, or `water_*`; the finished weapon starts at 1,000 charges and
+falls back to carried Essence when empty. Later boss kills do not replace an Orb already consumed
+in crafting. Fire outputs are authored at tier 15 but remain unavailable.
 
 ## 4. Frozen module APIs
 
@@ -223,7 +226,11 @@ Two properties matter more than the exact numbers, and both are asserted:
 Flight time is a SPEED, not a fixed duration, so a bolt across the room and one at the 15 m maximum
 read the same. A lash must be legibly the small, cheap thing and a surge legibly the expensive one.
 
-## 7. File ownership this wave
+## 7. File ownership of the original ladder wave (historical)
+
+This section records the completed original ladder wave; it is not a current implementation plan.
+The August 30 amendment replaced its procedural-staff assignment with the pack-backed wand/staff,
+weapon charge, Essence, cache, altar, persistence, and UI work specified above and in the PRD.
 
 Concurrent workers never touch a file outside their own list.
 
@@ -237,7 +244,8 @@ Remaining:
 
 * **W-VFX** — `render/spellVfx.ts` (new)
 * **W-AUDIO** — `audio/spellSound.ts` (new), `audio/gameAudio.ts`
-* **W-STAFF** — `render/proceduralGear.ts` (new), `render/equipmentVisuals.ts`, `render/assets.ts`
+* **W-STAFF (superseded)** — the procedural proxy was removed. The shipped implementation uses
+  Blink's pack-backed meshes through `render/equipmentVisuals.ts` and `render/assets.ts`.
 * **W-GEAR** — `content/equipment.ts`, `content/items.ts`
 * **W-UI** — `ui/spellbookPanel.ts` (new), `ui/styles/spellbook.css` (new)
 * **ROOT** — `app/boot.ts`, `ui/panels.ts`, `render/renderer.ts`, integration, remaining tests

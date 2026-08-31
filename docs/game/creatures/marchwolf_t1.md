@@ -37,7 +37,9 @@ description: "Marchwolf Pup spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 3-11 | Always |
 | [Coarse Hide](../../items/#coarse-hide) | 1-2 | 60% |

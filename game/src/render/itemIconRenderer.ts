@@ -73,6 +73,16 @@ function material(colour: number, roughness = 0.62, metalness = 0.05): THREE.Mes
   return new THREE.MeshStandardMaterial({ color: colour, roughness, metalness });
 }
 
+function luminousMaterial(colour: number, intensity: number): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: colour,
+    emissive: colour,
+    emissiveIntensity: intensity,
+    roughness: 0.28,
+    metalness: 0.04,
+  });
+}
+
 function ownedMesh(geometry: THREE.BufferGeometry, source: THREE.Material): THREE.Mesh {
   geometry.userData["itemIconOwned"] = true;
   const mesh = new THREE.Mesh(geometry, source);
@@ -121,6 +131,28 @@ function buildPrimitive(part: ItemIconPrimitivePart): THREE.Group {
       const pommel = ownedMesh(new THREE.SphereGeometry(0.15, 12, 8), secondary.clone());
       pommel.position.y = -1.13;
       group.add(pommel);
+    },
+    essence: () => {
+      // Loose essence is a compact cluster, not a miniature orb. The uneven satellites also keep
+      // it readable beside a round currency stack when the generated icon is reduced to 32 px.
+      const core = ownedMesh(new THREE.OctahedronGeometry(0.5, 0), luminousMaterial(part.colour, 0.38));
+      core.scale.set(0.72, 1.2, 0.72);
+      core.rotation.set(0.12, 0.34, 0.08);
+      group.add(core);
+      for (const [x, y, z, scale, angle] of [
+        [-0.42, -0.28, 0.04, 0.48, -0.38],
+        [0.4, -0.34, -0.02, 0.4, 0.44],
+        [0.25, 0.34, -0.08, 0.28, 0.2],
+      ] as const) {
+        const shard = ownedMesh(
+          new THREE.OctahedronGeometry(0.5, 0),
+          luminousMaterial(part.accent ?? part.colour, 0.55),
+        );
+        shard.position.set(x, y, z);
+        shard.scale.set(scale * 0.68, scale, scale * 0.68);
+        shard.rotation.z = angle;
+        group.add(shard);
+      }
     },
     ingot: () => {
       const shape = new THREE.Shape();
@@ -177,10 +209,13 @@ function buildPrimitive(part: ItemIconPrimitivePart): THREE.Group {
       group.add(eye);
     },
     focus: () => {
-      const stone = ownedMesh(new THREE.DodecahedronGeometry(0.68, 1), primary);
+      const stone = ownedMesh(new THREE.DodecahedronGeometry(0.68, 1), luminousMaterial(part.colour, 0.34));
       stone.rotation.set(0.2, 0.35, 0.1);
       group.add(stone);
-      const orbit = ownedMesh(new THREE.TorusGeometry(0.88, 0.055, 10, 48), secondary);
+      const orbit = ownedMesh(
+        new THREE.TorusGeometry(0.88, 0.055, 10, 48),
+        luminousMaterial(part.accent ?? part.colour, 0.68),
+      );
       orbit.rotation.x = Math.PI / 2.6;
       group.add(orbit);
     },

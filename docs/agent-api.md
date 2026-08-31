@@ -73,23 +73,27 @@ The event types are:
 navigation.started  navigation.completed  navigation.failed
 activity.started    activity.stopped      resource.depleted   inventory.full
 item.received       item.lost             item.equipped       item.unequipped
-combat.started      combat.ended          spell.launched      health.low
-player.died         level.gained          production.completed
+combat.started      combat.ended          spell.launched      essence.recharged
+health.low          player.died           level.gained        production.completed
 quest.updated       dialogue.opened       dialogue.closed     entity.discovered
 ```
 
 `spell.launched` fires when a cast is rolled and its bolt leaves, carrying
-`{ spellId, targetId, element, rung, flightMs, hit }`. It matters to an agent because a spell does
+`{ spellId, targetId, element, rung, flightMs, hit, orbItemId, remainingCharges }`. It matters to an agent because a spell does
 NOT damage anything until it arrives: `flightMs` later, the target's health moves and the kill (if
 any) resolves. So a cast that has been accepted is not yet a hit, and an agent that reads health
 immediately after `corealm_attack` will read the old value.
+
+`essence.recharged` carries
+`{ altarId, orbItemId, element, before, after, essenceItemId, essenceSpent }`. Use `after` as the new
+charge count and advance the event cursor before issuing another command.
 
 You can reconstruct your inventory from `item.received` and `item.lost` alone. Gear moving onto or
 off the body is **not** a loss or a gain: it emits `item.equipped` or `item.unequipped` instead, and
 neither of the two item events fires for it. A swap emits one `item.equipped` carrying `replaced`
 with the id of the piece that went back into the pack.
 
-## The 19 tools
+## The 20 tools
 
 ### Reading state
 - `corealm_player` — position, region, health, dead, moving, activityKind, and two separate
@@ -106,6 +110,27 @@ with the id of the piece that went back into the pack.
     paused or rescaled.
 - `corealm_skills` — all 11 skills with level, xp, xpToNext
 - `corealm_inventory` — 28 slots, equipment with summed bonuses, mark balance
+- `corealm_spellbook` — call with `{ op: "read" }` to read all sixteen spells and the live magic
+  loadout. The response contains:
+
+  ```js
+  {
+    spells: [{
+      id, name, element, rung, reqLevel, maxHit, baseXp, castMs,
+      requiredElement, fuelCost, unlocked, castable, blockedBy, description,
+    }],
+    preferredSpellId, activeSpellId, magicLevel,
+    equippedWeapon: {
+      itemId, name, element, charges, capacity, rechargeItemId, rechargeCost,
+    } ?? null,
+    essence: { wind, earth, water, fire },
+    releasedElements,
+  }
+  ```
+
+  Call `{ op: "select", spellId }` to set the standing choice. Pass `spellId: null` to return to
+  automatic selection. `activeSpellId` is what an attack will cast now. `blockedBy` states why a
+  row cannot be cast.
 - `corealm_quests` — every known quest with status, stage, and objective. `currentObjective` is
   prose written for a player and contains no ids; `currentObjectiveRefs` is the same objective as
   data — `{ kind: "item" | "entity" | "location" | "enemyFamily" | "recipe" | "spell", id }` — in
@@ -143,12 +168,13 @@ with the id of the piece that went back into the pack.
 - `corealm_move_to` — walk to an entity, a location id, or a position
 - `corealm_stop` — cancel navigation, activity, and combat
 - `corealm_interact` — mine, chop, fish, rake, plant, harvest, talk, open, climb, vault, loot, take,
-  produce, bank, trade, inspect
+  produce, recharge, bank, trade, inspect
 - `corealm_use_item` — eat food, apply a seed, combine two items
 - `corealm_equip` — equip an item or clear a slot
 - `corealm_produce` — smelt, smith, cook, craft, fletch
-- `corealm_attack` — attack with whatever is in the main hand. A staff CASTS (reaching 15 m, so the
-  character opens fire without closing); a blade or bare hands swing at 1.6 m and walk in first.
+- `corealm_attack` — attack with whatever is in the main hand. A one-handed wand casts every 2.2
+  seconds. A stronger two-handed staff casts every 3.0 seconds. Both reach 15 m, so the character
+  opens fire without closing. A blade or bare hands swing at 1.6 m and walk in first.
   Pass `spellId` to force a specific spell. Damage lands when the bolt arrives, not when the call
   returns — see `spell.launched`
 - `corealm_dialogue` — read, choose an option, end
@@ -158,6 +184,33 @@ with the id of the piece that went back into the pack.
 ### Helping the human
 - `corealm_overlay` — highlight, path, marker, label
 - `corealm_events` — the cursor and long-poll described above
+
+## Magic loadout and recharging
+
+A cast needs a wand or staff in `mainHand` and one unit of matching fuel. A matching elemental
+weapon spends one stored charge first, including on a miss. A plain or empty weapon spends one
+carried Essence instead. Boss-dropped Air, Earth, and Water Orbs are singleton crafting components,
+not equipment. Fire remains visible in the spellbook but is not released.
+
+An Essence Altar refills the equipped elemental weapon to 1,000 for exactly 100 matching Essence.
+The altar does not accept a plain weapon, a full weapon, the wrong Essence, or less than 100 Essence.
+
+```js
+const before = await agent.call("corealm_spellbook", { op: "read" });
+const result = await agent.call("corealm_interact", {
+  entityId: "coldbrace_essence_altar",
+  interaction: "recharge",
+});
+if (result.error) throw new Error(result.message);
+
+const { events, nextSeq } = await agent.call("corealm_events", {
+  sinceSeq: cursor,
+  types: ["essence.recharged"],
+  timeoutMs: 5000,
+});
+cursor = nextSeq;
+const after = await agent.call("corealm_spellbook", { op: "read" });
+```
 
 ## Three things that will surprise you
 

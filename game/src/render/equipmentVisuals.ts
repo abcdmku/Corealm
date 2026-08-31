@@ -1,73 +1,13 @@
 /**
- * What worn gear looks like: every equippable id in `content/equipment.ts` mapped onto the assets
- * that actually exist, with generated geometry for staffs and wands, plus the
- * hand sockets and the tier tints.
+ * Item-to-model mappings, hand sockets, and per-item material treatment for worn gear.
  *
- * This file exists because the render half of equipment was never written. Measured before this
- * landed: `getSceneStats().totalObjects` read 1077 naked, 1077 in a full tier-10 Kaldite kit and
- * 1077 in a full Wightshroud kit — the player's rig children never changed
- * (runs/corealm/diagnosis/equipment.md, finding 1).
- *
- * THE LIBRARY IS SMALLER THAN THE LADDER, so the mapping is 59 ids onto 2 outfit sets x 6 tints
- * rather than 59 meshes. Measured from game/public/assets/manifest.json: the outfit category holds
- * 20 modular parts in exactly four sets (male/female x peasant/ranger) and the weapon category
- * holds exactly four GLBs — axe, pickaxe, shield, sword. There is no staff, dagger, bow, helm,
- * ring or pendant mesh anywhere in the 213 assets.
- *
- * The consequences of that, decided explicitly rather than papered over:
- *
- *   - Daggers are `weapon/sword` at 0.62 and foci are `weapon/shield` at 0.40. Both read as what
- *     they are at the default camera pitch, and both are the diagnosis's own recommendation.
- *   - The four STAFFS (worn_staff, palewood_staff, duskoak_staff, cairnpine_staff) are the one
- *     place this file stops mapping and starts BUILDING. They rendered nothing for the whole of
- *     Phase 1, and at the time that was the honest answer rather than an oversight: there is no
- *     staff mesh in the library, a sword in a mage's hand is a lie about what the player is
- *     holding, and the nearest pole-shaped props (`torch` 0.65 m, `candle_stand` 1.31 m with a
- *     floor base) read as what they are. What changed is that the magic ladder added `worn_staff`
- *     to the starting inventory, so the gap stopped being a missing nice-to-have at tier 1 and
- *     became the FIRST weapon a caster is ever handed — "the basic staff" would have been an
- *     invisible one on the very character it is given to.
- *
- *     So the mesh is generated instead of loaded. `render/proceduralGear.ts` builds each staff from
- *     a tapered shaft, two grip rings, a butt ferrule and a faceted gem, merges it down to two draw
- *     calls, and `AssetRegistry.registerBuilt` publishes it under a `proc_staff_*` id in the same
- *     cache `load()` reads first. Nothing downstream changed: `characterRig.attachBoneSlot`, the
- *     socket table below and the appearance rows all treat it as any other bone attachment and none
- *     of them knows the difference. Building won on the alternatives' own terms — 7 to 9 primitives
- *     and 212-344 triangles is no download, no pack licence and no draw-call budget worth arguing
- *     about, and unlike a proxy it reports what is actually held. Staff rows deliberately carry no
- *     `tint` and no `accent`: the colour is already in the built material, and
- *     `applyGearAppearance` would flatten the gem to the shaft's colour. (The diagnosis says "6
- *     staffs"; the content table has 4 — 11 mainHand rows are 2 worn, 3 daggers, 3 swords, 3
- *     tiered staffs.)
- *   - Helms borrow the ranger HOOD, the library's only skinned head part (the peasant set has
- *     four parts and no head at all). Rings and pendants stay invisible: accessory1 and
- *     accessory2 are not in `VISIBLE_EQUIP_SLOTS`, because a ring is about a pixel at gameplay
- *     distance and the nearest proxy would cost a draw call to show nothing.
- *
- * TIER READS THROUGH MATERIAL, NOT GEOMETRY. All four weapon GLBs are single-material and tagged
- * `recolour` in the manifest (sword/axe/pickaxe are MI_Trim_Props_Vertex, shield is three trims);
- * every outfit part is MI_Ranger or MI_Peasant. So one tint per line-and-tier plus
- * `tierSilhouetteScale` gives the whole ladder three readable looks per line for the cost of a
- * material clone per attachment. Tinting is done here, on attach, rather than in
- * `render/materials.ts`, so nothing else has to know that equipment exists.
- *
- * Nothing in this file touches game state; it is a pure lookup plus one Three.js material helper.
+ * Magic weapons use the staff and wand meshes from Blink's FREE - RPG Weapons pack. Every wood
+ * tier keeps the same silhouette and changes only its unlit base colour. Orb-crafted elemental
+ * weapons add one small faceted mesh at the crown.
  */
 import * as THREE from "three";
 import type { EquipSlot, ItemId } from "../contracts.js";
 import { tierSilhouetteScale } from "./materials.js";
-// One direction only: this file imports proceduralGear.ts and never the reverse. Both build their
-// tables at module scope, so a cycle would leave one of them reading the other's constants in the
-// temporal dead zone, and which one would depend on load order. `registerProceduralGear` and
-// `isProceduralGearAsset` are therefore imported from there by boot and by the test, not re-exported
-// through here.
-import {
-  PROCEDURAL_GEAR_ASSETS,
-  PROCEDURAL_WAND_ASSETS,
-  staffAssetId,
-  wandAssetId,
-} from "./proceduralGear.js";
 
 /** Which base body the parts are resolved against. `boot.ts` builds the player as `base_male`. */
 export type CharacterBody = "male" | "female";
@@ -92,6 +32,25 @@ export interface GearAppearance {
    * the weapon GLBs carry ONE material, so the accent has nowhere to live except emissive.
    */
   accent?: number;
+  /** The crafted elemental socket drawn at the weapon head. The weapon material itself remains non-emissive. */
+  orb?: GearOrbAppearance;
+}
+
+export type GearOrbElement = "wind" | "earth" | "water" | "fire";
+
+export interface GearOrbAppearance {
+  element: GearOrbElement;
+  charged: boolean;
+  colour: number;
+  emissive: number;
+  position: readonly [number, number, number];
+  radius: number;
+}
+
+/** The render-only focus state passed from the loop. Exact charge count does not change the mesh. */
+export interface GearFocusPresentation {
+  itemId: ItemId | null;
+  charged: boolean;
 }
 
 /**
@@ -147,26 +106,34 @@ const QUARTZ = 0xd8d4cc;
 const AMBER = 0xc98a2a;
 const GARNET = 0x7a1a2c;
 
+/** Magic tiers share geometry. Their unlit wood colour is the only tier-specific treatment. */
+const BASIC_WOOD = 0x8a5a32;
+const PALEWOOD = 0xd7bd8e;
+const DUSKOAK = 0x53341f;
+const CAIRNPINE = 0x596162;
+
+/** Source bounds are 2.212 m for the staff and 0.985 m for the wand. */
+const MAGIC_STAFF_SCALE = 0.82;
+const MAGIC_WAND_SCALE = 0.80;
+
 // ------------------------------------------------------------------------ the ladder
 
 type OutfitKit = "ranger" | "peasant";
 type OutfitPart = "hood" | "chest" | "legs" | "boots" | "gloves" | "pauldron";
-type WeaponAsset = "sword" | "shield" | "axe" | "pickaxe";
+type WeaponAsset = "sword" | "shield" | "axe" | "pickaxe" | "rpg_weapon_staff" | "rpg_weapon_wand";
 
 /**
  * A resolved part before the body variant is chosen. One item can be more than one part.
  *
- * `built` carries no tint: a generated mesh already has its colours, and `applyGearAppearance`
- * paints every material in the graph with the same one, which would turn the gem into wood.
+ * Every weapon entry is file-backed. Magic variants deliberately reuse one mesh per weapon kind.
  */
 type PartSpec =
   | { kind: "outfit"; kit: OutfitKit; part: OutfitPart; tint: number; accent?: number }
-  | { kind: "weapon"; assetId: WeaponAsset; tint: number; accent?: number; scale: number }
-  | { kind: "built"; assetId: string };
+  | { kind: "weapon"; assetId: WeaponAsset; tint: number; accent?: number; scale: number };
 
 interface GearVisual {
   slot: EquipSlot;
-  /** Empty when the id is covered but has no mesh: staffs, rings, pendants. */
+  /** Empty when the id is covered but has no direct mesh, such as an orb or accessory. */
   parts: readonly PartSpec[];
 }
 
@@ -182,12 +149,10 @@ interface LadderTier {
   /** Tint for the off-hand shield or focus. */
   offHandTint: number;
   /**
-   * `sword` covers both dagger and sword geometry; `staff` and `wand` mean
-   * `render/proceduralGear.ts` makes the mesh. `scale` is only meaningful for a library GLB — a built staff is authored at its true
-   * length, so there is nothing to fit.
+   * `sword` covers both dagger and sword geometry. Magic variants use the pack staff or wand.
    */
-  mainHand: readonly { id: ItemId; asset: WeaponAsset | "staff" | "wand"; scale?: number }[];
-  offHand: { id: ItemId; scale: number };
+  mainHand: readonly { id: ItemId; asset: WeaponAsset; scale?: number; fixedScale?: boolean }[];
+  offHand?: { id: ItemId; scale: number };
   head: ItemId;
   body: ItemId;
   legs: ItemId;
@@ -237,55 +202,44 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["kaldite_ring", "kaldite_pendant"],
   },
   {
-    tier: 1, kit: "peasant", cloth: MARCHHIDE, weapon: MARCHHIDE, offHandTint: QUARTZ,
+    tier: 1, kit: "peasant", cloth: MARCHHIDE, weapon: PALEWOOD, offHandTint: QUARTZ,
     mainHand: [
-      { id: "palewood_staff", asset: "staff" },
-      { id: "palewood_wand", asset: "wand" },
+      { id: "palewood_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
+      { id: "palewood_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
+      { id: "air_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
+      { id: "air_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
     ],
-    offHand: { id: "quartz_focus", scale: 0.4 },
     head: "marchhide_hood", body: "marchhide_robe", legs: "marchhide_leggings",
     feet: "marchhide_boots", hands: "marchhide_wraps",
     accessories: ["ember_ring", "ember_charm"],
   },
   {
-    tier: 5, kit: "peasant", cloth: BRAMBLEHIDE, weapon: BRAMBLEHIDE, offHandTint: AMBER,
+    tier: 5, kit: "peasant", cloth: BRAMBLEHIDE, weapon: DUSKOAK, offHandTint: AMBER,
     mainHand: [
-      { id: "duskoak_staff", asset: "staff" },
-      { id: "duskoak_wand", asset: "wand" },
+      { id: "duskoak_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
+      { id: "duskoak_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
+      { id: "earth_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
+      { id: "earth_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
     ],
-    offHand: { id: "amber_focus", scale: 0.4 },
     head: "bramblehide_hood", body: "bramblehide_robe", legs: "bramblehide_leggings",
     feet: "bramblehide_boots", hands: "bramblehide_wraps",
     accessories: ["stone_ring", "stone_charm"],
   },
   {
-    tier: 10, kit: "peasant", cloth: WIGHTSHROUD, weapon: WIGHTSHROUD, offHandTint: GARNET,
+    tier: 10, kit: "peasant", cloth: WIGHTSHROUD, weapon: CAIRNPINE, offHandTint: GARNET,
     mainHand: [
-      { id: "cairnpine_staff", asset: "staff" },
-      { id: "cairnpine_wand", asset: "wand" },
+      { id: "cairnpine_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
+      { id: "cairnpine_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
+      { id: "water_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
+      { id: "water_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
     ],
-    offHand: { id: "garnet_focus", scale: 0.4 },
     head: "wightshroud_hood", body: "wightshroud_robe", legs: "wightshroud_leggings",
     feet: "wightshroud_boots", hands: "wightshroud_wraps",
     accessories: ["storm_ring", "storm_charm"],
   },
 ];
 
-/**
- * Ids that are covered but have no mesh, and why.
- *
- * EMPTY, and the empty table is the point rather than dead code. It held the three staffs from the
- * day this file was written until the magic ladder landed, and it did the job it was there for: the
- * gap was a value in the program instead of a note in a file nobody reads, so when a fourth staff
- * arrived the cost of leaving it open was visible. `render/proceduralGear.ts` then closed it by
- * building the mesh, and nothing else in the 59 rows resolves to an empty visible slot.
- *
- * It stays exported because the test that reads it is the tripwire: it asserts these are the ONLY
- * visible-slot ids resolving to nothing, so a future item that would render as an empty hand fails
- * CI instead of shipping, and whoever adds it has to either give it a mesh or write down here why
- * it has none. Rings and pendants are not in it and never were — they are excluded one level up, by
- * `VISIBLE_EQUIP_SLOTS`.
- */
+/** Visible-slot ids that still lack a mesh. Focus orbs and accessories are intentionally indirect. */
 export const GEAR_ASSET_GAPS: Readonly<Record<ItemId, string>> = {};
 
 function outfitPart(kit: OutfitKit, part: OutfitPart, tint: number, accent?: number): PartSpec {
@@ -298,10 +252,6 @@ function weaponPart(assetId: WeaponAsset, tint: number, scale: number, accent?: 
   return accent === undefined
     ? { kind: "weapon", assetId, tint, scale }
     : { kind: "weapon", assetId, tint, scale, accent };
-}
-
-function builtPart(assetId: string): PartSpec {
-  return { kind: "built", assetId };
 }
 
 function buildTable(): Map<ItemId, GearVisual> {
@@ -317,29 +267,35 @@ function buildTable(): Map<ItemId, GearVisual> {
     parts: [weaponPart("sword", WORN, round3(tierSilhouetteScale(1) * 0.86))],
   });
 
-  // The starting staff, tier 0 and outside the LADDER for the same reason worn_sword is. It needs
-  // none of the tier-0 scale fudge above: that one exists because `tierSilhouetteScale(0)` clamps to
-  // tier 1, so the only way to make the worn blade smaller than a Grithe one is to multiply the
-  // shared GLB. A built staff carries its own length — `STAFF_LOOKS.worn_staff` is 1.32 m against
-  // palewood's 1.48 — so the tier reads out of the geometry with nothing to cancel.
-  table.set("worn_staff", { slot: "mainHand", parts: [builtPart(staffAssetId("worn_staff"))] });
+  // Both starter weapons are plain brown and unlit.
+  table.set("basic_wooden_wand", {
+    slot: "mainHand",
+    parts: [weaponPart("rpg_weapon_wand", BASIC_WOOD, MAGIC_WAND_SCALE)],
+  });
+  table.set("basic_wooden_staff", {
+    slot: "mainHand",
+    parts: [weaponPart("rpg_weapon_staff", BASIC_WOOD, MAGIC_STAFF_SCALE)],
+  });
 
   for (const row of LADDER) {
     const silhouette = tierSilhouetteScale(row.tier);
     for (const hand of row.mainHand) {
       table.set(hand.id, {
         slot: "mainHand",
-        parts: [hand.asset === "staff"
-          ? builtPart(staffAssetId(hand.id))
-          : hand.asset === "wand"
-            ? builtPart(wandAssetId(hand.id))
-            : weaponPart(hand.asset, row.weapon, (hand.scale ?? 1) * silhouette, row.weaponAccent)],
+        parts: [weaponPart(
+          hand.asset,
+          row.weapon,
+          (hand.scale ?? 1) * (hand.fixedScale ? 1 : silhouette),
+          row.weaponAccent,
+        )],
       });
     }
-    table.set(row.offHand.id, {
-      slot: "offHand",
-      parts: [weaponPart("shield", row.offHandTint, row.offHand.scale * silhouette)],
-    });
+    if (row.offHand) {
+      table.set(row.offHand.id, {
+        slot: "offHand",
+        parts: [weaponPart("shield", row.offHandTint, row.offHand.scale * silhouette)],
+      });
+    }
 
     // The peasant set has no head part in the library (measured: 4 parts, chest/legs/boots/gloves),
     // so both lines borrow the ranger hood. It is the only skinned head mesh that exists.
@@ -360,6 +316,7 @@ function buildTable(): Map<ItemId, GearVisual> {
       table.set(id, { slot: index === 0 ? "accessory1" : "accessory2", parts: [] });
     }
   }
+
   return table;
 }
 
@@ -382,7 +339,7 @@ export function gatheringToolAppearance(itemId: ItemId): GearAppearance | null {
   return GATHERING_TOOL_APPEARANCES.get(itemId) ?? null;
 }
 
-/** Every id this file covers. The test asserts it equals the content table exactly. */
+/** Every equipment id this file covers. The equipment test compares it with the content table. */
 export const GEAR_APPEARANCE_IDS: readonly ItemId[] = [...GEAR_VISUALS.keys()];
 
 /**
@@ -395,20 +352,12 @@ export const GEAR_APPEARANCE_IDS: readonly ItemId[] = [...GEAR_VISUALS.keys()];
  * first request. For those seconds the player equips a sword and their hand stays empty, which
  * reads exactly like the render seam still being unwired. Second request: 3 ms, from the cache.
  *
- * Eight ids for a male character, of which six (the ranger set) are already loaded for the NPCs and
- * two (sword, shield) are not — 269 KB combined.
- *
- * The four built staves are NOT in here, and that is not an omission. Warming means "fetch and
- * parse the GLB before the player needs it"; a built staff has no fetch and no parse, it is already
- * in the cache from `registerProceduralGear`, and asking for one before boot registers it would
- * throw an "Unknown asset id" that `preloadGear` would then swallow. Every id this returns has a
- * file behind it, which is the only useful promise the function can make.
+ * Both pack weapon GLBs are included so a starter wand and a later staff do not appear late.
  */
 export function gearAssetIds(body: CharacterBody = "male"): readonly string[] {
   const ids = new Set<string>();
   for (const visual of GEAR_VISUALS.values()) {
     for (const spec of visual.parts) {
-      if (spec.kind === "built") continue;
       ids.add(resolve(spec, visual.slot, body).assetId);
     }
   }
@@ -417,10 +366,6 @@ export function gearAssetIds(body: CharacterBody = "male"): readonly string[] {
 }
 
 function resolve(spec: PartSpec, slot: EquipSlot, body: CharacterBody): GearAppearance {
-  // Scale 1, not `tierSilhouetteScale`: the staff line's tier growth is BUILT IN (1.32 m worn to
-  // 1.74 m cairnpine), so scaling on top would double-count it and thicken the shaft and the gem
-  // along with it. A Cairnpine staff is a longer staff, not a fatter one.
-  if (spec.kind === "built") return { assetId: spec.assetId, slot, attach: "bone", scale: 1 };
   if (spec.kind === "weapon") {
     const appearance: GearAppearance = {
       assetId: spec.assetId, slot, attach: "bone", tint: spec.tint, scale: round3(spec.scale),
@@ -460,6 +405,60 @@ export function gearAppearanceParts(itemId: ItemId, body: CharacterBody = "male"
   return visual.parts.map((spec) => resolve(spec, visual.slot, body));
 }
 
+interface OrbPalette {
+  element: GearOrbElement;
+  colour: number;
+  emissive: number;
+}
+
+const ORB_PALETTES: Readonly<Record<string, OrbPalette>> = {
+  air_wand: { element: "wind", colour: 0xd6fbff, emissive: 0x79edff },
+  air_staff: { element: "wind", colour: 0xd6fbff, emissive: 0x79edff },
+  earth_wand: { element: "earth", colour: 0xd5b558, emissive: 0x83bd50 },
+  earth_staff: { element: "earth", colour: 0xd5b558, emissive: 0x83bd50 },
+  water_wand: { element: "water", colour: 0x6cbcff, emissive: 0x197ce8 },
+  water_staff: { element: "water", colour: 0x6cbcff, emissive: 0x197ce8 },
+};
+
+/**
+ * Root-local sockets derived from the source FBX bounds.
+ *
+ * The staff spans y -1.335..0.877 m and the wand -0.319..0.666 m. These points sit at 94–95% of
+ * each +Y extent, just inside the modeled crown. The root integration screenshot is the final check
+ * because the Unity-to-GLB export may add a wrapper transform around the original mesh node.
+ */
+const ORB_SOCKETS: Readonly<Record<string, {
+  position: readonly [number, number, number];
+  radius: number;
+}>> = {
+  rpg_weapon_staff: { position: [0, 0.744, 0], radius: 0.092 },
+  rpg_weapon_wand: { position: [-0.052, 0.617, 0], radius: 0.070 },
+};
+
+/** Adds the crafted elemental core to a magic weapon. */
+export function gearAppearancePartsWithFocus(
+  itemId: ItemId,
+  focus: GearFocusPresentation,
+  body: CharacterBody = "male",
+): readonly GearAppearance[] {
+  const parts = gearAppearanceParts(itemId, body);
+  const palette = focus.itemId ? ORB_PALETTES[focus.itemId] : undefined;
+  if (!palette) return parts;
+  return parts.map((part) => {
+    const socket = ORB_SOCKETS[part.assetId];
+    if (!socket) return part;
+    return {
+      ...part,
+      orb: {
+        ...palette,
+        charged: focus.charged,
+        position: socket.position,
+        radius: socket.radius,
+      },
+    };
+  });
+}
+
 // ------------------------------------------------------------------------ hand sockets
 
 /**
@@ -484,12 +483,8 @@ export function gearAppearanceParts(itemId: ItemId, body: CharacterBody = "male"
  *   shield   face in XY, boss toward +Z, grip bar at z [-0.001, +0.044], centre z = +0.022
  * The offset is `fistCentre - R * gripCentre`, which is where each Z component below comes from.
  *
- * The built staves are the one entry with a ZERO grip offset, and that is the whole reason
- * `render/proceduralGear.ts` puts its origin at the grip instead of at the butt: a generated mesh
- * gets to choose where its origin is, so it chooses the one point that makes the correction below
- * unnecessary. They take the sword's rotation because a staff and a sword are gripped the same way
- * — asset +Y along local +Z — which also means every pose the rig already animates a sword through
- * applies unchanged.
+ * The pack weapons also point along asset +Y. Their grip offsets use a point 12% above the lower
+ * bound, which keeps a short butt below the fist and most of the shaft above it.
  *
  * The previous shared constant (characterRig.ts: rotation (PI/2,0,0), position (0, 0.03, 0.04))
  * put the sword's entire 21 cm grip and pommel outside the fist with only the guard touching it.
@@ -519,35 +514,20 @@ interface SocketParts {
   rotation: readonly [number, number, number];
 }
 
-/**
- * Every built staff shares one socket: the MAIN hand, same grip axis as the sword, no grip offset.
- *
- * A staff is a `mainHand` item and is held in the right hand like every other weapon. The animation
- * was the thing that had to move, not the weapon: the library's only cast raises the LEFT hand, so
- * `render/assets.ts` registers a mirrored copy and `characterRig.ts` plays that. Measured on the
- * mirrored clip with the staff attached here, the crown reaches 0.377 m ABOVE the head with 0.684 m
- * of reach — identical to the original clip's left-hand figures, because the rig's bind pose is
- * symmetric.
- *
- * An earlier pass socketed staves LEFT to match the unmirrored clip. That worked visually and was
- * wrong: it put a main-hand weapon in the off hand and collided with the off-hand focus.
- */
-const STAFF_SOCKET: SocketParts = {
-  bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0], rotation: [Math.PI / 2, 0, 0],
-};
-
 /** Where the grip centre lands relative to the asset origin AFTER `rotation`, at scale 1. */
 const SOCKET_PARTS: Readonly<Record<string, SocketParts>> = {
   sword: { bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.100], rotation: [Math.PI / 2, 0, 0] },
   axe: { bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.250], rotation: [Math.PI / 2, 0, 0] },
   pickaxe: { bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.150], rotation: [Math.PI / 2, Math.PI / 2, 0] },
   shield: { bone: "hand_l", fist: FIST_LEFT, grip: [0.022, 0, 0], rotation: [Math.PI / 2, -Math.PI / 2, 0] },
-  // Spread rather than four literal `proc_staff_*` keys, so the ids stay derived from
-  // `staffAssetId` in exactly one place and a fifth staff cannot arrive with no socket.
-  ...Object.fromEntries(
-    [...PROCEDURAL_GEAR_ASSETS, ...PROCEDURAL_WAND_ASSETS]
-      .map((asset) => [asset.assetId, STAFF_SOCKET]),
-  ),
+  rpg_weapon_staff: {
+    // Hand-local -Y points up the relaxed arm. A small turn past PI leans the crown away from the
+    // torso while keeping the 12%-of-height grip point fixed in the fist.
+    bone: "hand_r", fist: FIST_RIGHT, grip: [0, -1.036, -0.266], rotation: [Math.PI * 1.08, 0, 0],
+  },
+  rpg_weapon_wand: {
+    bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.200], rotation: [Math.PI / 2, 0, 0],
+  },
 };
 
 function socketAt(assetId: string, scale: number): WeaponSocket | null {
@@ -595,14 +575,16 @@ export function weaponAttachment(appearance: GearAppearance): WeaponSocket | nul
  * two draws.
  */
 export function applyGearAppearance(object: THREE.Object3D, appearance: GearAppearance): void {
-  if (appearance.tint === undefined && appearance.accent === undefined) return;
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    mesh.material = Array.isArray(mesh.material)
-      ? mesh.material.map((material) => tintedMaterial(material, appearance))
-      : tintedMaterial(mesh.material, appearance);
-  });
+  if (appearance.tint !== undefined || appearance.accent !== undefined) {
+    object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map((material) => tintedMaterial(material, appearance))
+        : tintedMaterial(mesh.material, appearance);
+    });
+  }
+  if (appearance.orb) object.add(focusOrbMesh(appearance.orb));
 }
 
 function tintedMaterial(material: THREE.Material, appearance: GearAppearance): THREE.Material {
@@ -619,5 +601,47 @@ function tintedMaterial(material: THREE.Material, appearance: GearAppearance): T
     // light source. Raising this past ~0.3 makes the whole armour glow.
     shaded.emissiveIntensity = 0.15;
   }
+  if (isMagicWeaponAsset(appearance.assetId)) {
+    // The source FBXs each use one material, so there is no safe sub-material to recolour. Removing
+    // the albedo and vertex-colour multipliers makes the authored normal detail read in exactly one
+    // wood colour. It also removes the basic staff texture's green accent. The model stays unlit.
+    shaded.map = null;
+    shaded.emissiveMap = null;
+    shaded.vertexColors = false;
+    if (shaded.emissive instanceof THREE.Color) shaded.emissive.setHex(0x000000);
+    shaded.emissiveIntensity = 0;
+    shaded.metalness = 0.04;
+    shaded.roughness = 0.72;
+    clone.needsUpdate = true;
+  }
   return clone;
+}
+
+function isMagicWeaponAsset(assetId: string): boolean {
+  return assetId === "rpg_weapon_staff" || assetId === "rpg_weapon_wand";
+}
+
+/** One shared 20-triangle shape. Each attachment owns only its tiny material. */
+const FOCUS_ORB_GEOMETRY = new THREE.IcosahedronGeometry(1, 0);
+
+function focusOrbMesh(appearance: GearOrbAppearance): THREE.Mesh {
+  const charged = appearance.charged;
+  const material = new THREE.MeshStandardMaterial({
+    color: charged ? appearance.colour : 0x181b1c,
+    emissive: charged ? appearance.emissive : 0x000000,
+    emissiveIntensity: charged ? 2.1 : 0,
+    metalness: charged ? 0.05 : 0.18,
+    roughness: charged ? 0.24 : 0.58,
+    transparent: true,
+    opacity: charged ? 0.94 : 0.42,
+    depthWrite: charged,
+  });
+  const orb = new THREE.Mesh(FOCUS_ORB_GEOMETRY, material);
+  orb.name = `magic-weapon-socket-${appearance.element}-${charged ? "charged" : "empty"}`;
+  orb.position.set(...appearance.position);
+  orb.rotation.set(0.34, 0.51, 0.18);
+  orb.scale.setScalar(appearance.radius);
+  orb.castShadow = false;
+  orb.receiveShadow = false;
+  return orb;
 }

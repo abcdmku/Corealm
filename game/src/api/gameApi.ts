@@ -13,7 +13,8 @@ import type {
   ActivitySummary, BankView, DialogueView, DocHit, EntityId, EquipSlot, EquipmentBonuses,
   GameApi as GameApiContract, GameEvent, GameEventType, InteractionId, InventorySlot, ItemId,
   ItemStack, MoveTarget, ObserveFilter, ObservedEntity, PlayerView, QuestSummary, RecipeId, TimeView,
-  Result, SemanticEntity, SkillId, SkillView, SpellbookView, SpellId, SpellRow, Vec3, OverlaySpec,
+  Result, SemanticEntity, SkillId, SkillView, SpellbookView, SpellElement, SpellId, SpellRow, Vec3,
+  OverlaySpec,
 } from "../contracts.js";
 import { EQUIP_SLOTS, SKILL_IDS, err, ok } from "../contracts.js";
 import type { GameState, Store } from "../state/store.js";
@@ -27,9 +28,9 @@ import { distanceXZ } from "../core/math.js";
 import { INTERACT_RANGE, PLAYER_SPEED } from "../app/config.js";
 import { content } from "../content/index.js";
 import { magicMaxHit } from "../systems/combat.js";
-
-/** What every attack spell is paid for in. One id, because PRD section 0 decision 3 says so. */
-const ESSENCE_SHARD_ITEM_ID = "essence_shard";
+import {
+  ESSENCE_BY_ELEMENT, RELEASED_MAGIC_ELEMENTS, equippedMagicWeaponView, spellBlockReason,
+} from "../systems/essence.js";
 
 /**
  * Metres of reach given up when walking into range of a ranged interaction.
@@ -38,6 +39,13 @@ const ESSENCE_SHARD_ITEM_ID = "essence_shard";
  * wandering enemy would then bounce them between "in range" and "walk closer" for the whole fight.
  */
 const RANGED_APPROACH_SLACK = 1.5;
+
+/** The terminal result of an interaction that first had to walk into range. */
+export interface PendingInteractionOutcome {
+  entityId: EntityId;
+  interaction: InteractionId;
+  result: Result<{ started: string }>;
+}
 
 /** Total quantity of one item across inventory slots, ignoring the empty ones. */
 function countIn(slots: readonly (InventorySlot | null)[], itemId: ItemId): number {
@@ -125,6 +133,7 @@ export class CorealmGameApi implements GameApiContract {
    * for a human click and an agent tool call alike.
    */
   private pending: { entityId: EntityId; interaction: InteractionId; expiresAtMs: number } | null = null;
+  private readonly pendingResultListeners = new Set<(outcome: PendingInteractionOutcome) => void>();
 
   constructor(
     private readonly store: Store,
@@ -146,6 +155,18 @@ export class CorealmGameApi implements GameApiContract {
     if (this.movement.stop(this.store.get(), this.clock.elapsedMs, "movement-disabled")) {
       this.store.markDirty();
     }
+  }
+
+  /**
+   * Receives the real handler result after a routed interaction reaches its target.
+   *
+   * The initial `interact` call can only report that walking began. Boot uses this callback to put
+   * a later rejection, such as an altar refusing an already-full weapon, in the same notice channel as
+   * an interaction that started in range. Listener failures are isolated from gameplay.
+   */
+  subscribePendingResult(listener: (outcome: PendingInteractionOutcome) => void): () => void {
+    this.pendingResultListeners.add(listener);
+    return () => this.pendingResultListeners.delete(listener);
   }
 
   // ------------------------------------------------------------------ state
@@ -370,6 +391,7 @@ export class CorealmGameApi implements GameApiContract {
       state.combat.targetId = null;
       stopped.push("combat");
     }
+    state.combat.activeSpellId = null;
     this.store.markDirty();
     return ok({ stopped });
   }
@@ -496,14 +518,19 @@ export class CorealmGameApi implements GameApiContract {
     const gear = equipmentTotalsOf(state.equipment);
     const inventory = this.hooks.inventory;
 
-    // Shard counts come from the inventory slots directly. The `inventory` hook exposes `slots()`
-    // but no count helper, and reaching for `countItem` on the combat system would make the read
-    // path depend on a system that is allowed to be absent.
     const slots = inventory ? inventory.slots() : state.inventory.slots;
+    const essence: Record<SpellElement, number> = { wind: 0, earth: 0, water: 0, fire: 0 };
+    for (const element of Object.keys(ESSENCE_BY_ELEMENT) as SpellElement[]) {
+      const itemId = ESSENCE_BY_ELEMENT[element];
+      if (itemId) essence[element] = countIn(slots, itemId);
+    }
+
+    const mainHandId = state.equipment.mainHand?.itemId;
+    const mainHand = mainHandId ? content.item(mainHandId) : undefined;
 
     const spells = content.allSpells().map((spell) => {
-      const shards = countIn(slots, spell.cost.itemId);
       const unlocked = magicLevel >= spell.reqLevel;
+      const blockedBy = spellBlockReason(state, spell);
       return {
         id: spell.id,
         name: spell.name,
@@ -512,11 +539,12 @@ export class CorealmGameApi implements GameApiContract {
         reqLevel: spell.reqLevel,
         maxHit: magicMaxHit(magicLevel, gear.magicPower, spell),
         baseXp: spell.baseXp,
-        castMs: spell.castMs,
-        costItemId: spell.cost.itemId,
-        costQuantity: spell.cost.quantity,
+        castMs: mainHand?.magicWeapon ? (mainHand.equip?.attackSpeedMs ?? spell.castMs) : spell.castMs,
+        requiredElement: spell.cost.element,
+        fuelCost: spell.cost.charges,
         unlocked,
-        castable: unlocked && shards >= spell.cost.quantity,
+        castable: blockedBy === null,
+        blockedBy,
         description: spell.description,
       };
     });
@@ -538,7 +566,9 @@ export class CorealmGameApi implements GameApiContract {
       preferredSpellId,
       activeSpellId: active?.id ?? null,
       magicLevel,
-      shards: countIn(slots, ESSENCE_SHARD_ITEM_ID),
+      equippedWeapon: equippedMagicWeaponView(state),
+      essence,
+      releasedElements: [...RELEASED_MAGIC_ELEMENTS],
     };
   }
 
@@ -607,10 +637,22 @@ export class CorealmGameApi implements GameApiContract {
     const pending = this.pending;
     if (!pending) return null;
     this.pending = null;
-    if (this.clock.elapsedMs > pending.expiresAtMs) return null;
+    if (this.clock.elapsedMs > pending.expiresAtMs) {
+      return this.publishPendingResult(pending, err(
+        "TIMEOUT",
+        "That interaction expired before you reached it. Try again.",
+        pending.entityId,
+      ));
+    }
 
     const entity = this.hooks.entities?.get(pending.entityId);
-    if (!entity) return null;
+    if (!entity) {
+      return this.publishPendingResult(pending, err(
+        "NOT_FOUND",
+        `No entity with id ${pending.entityId}`,
+        pending.entityId,
+      ));
+    }
     // The world moves while the player walks: a node can deplete or an enemy die en route, and a
     // click that lands minutes later on something that has wandered off is worse than no click.
     //
@@ -624,11 +666,23 @@ export class CorealmGameApi implements GameApiContract {
     // `world/interactions.ts` applies the real range immediately below.
     const reach = this.hooks.interactions?.rangeFor?.(pending.interaction) ?? INTERACT_RANGE;
     const gap = distanceXZ(this.store.get().player.position, entity.position);
-    if (gap > reach * 1.6) return null;
+    if (gap > reach * 1.6) {
+      return this.publishPendingResult(pending, err(
+        "OUT_OF_RANGE",
+        `${entity.name} moved out of range before the interaction could start.`,
+        entity.id,
+      ));
+    }
 
     const runner = this.hooks.interactions;
-    if (!runner) return null;
-    return runner.run(pending.entityId, pending.interaction);
+    if (!runner) {
+      return this.publishPendingResult(pending, err(
+        "UNAVAILABLE",
+        "Interaction system is not available yet",
+        pending.entityId,
+      ));
+    }
+    return this.publishPendingResult(pending, runner.run(pending.entityId, pending.interaction));
   }
 
   /** Drops any remembered interaction. Called when the player cancels or is interrupted. */
@@ -638,6 +692,25 @@ export class CorealmGameApi implements GameApiContract {
 
   hasPending(): boolean {
     return this.pending !== null;
+  }
+
+  private publishPendingResult(
+    pending: Pick<PendingInteractionOutcome, "entityId" | "interaction">,
+    result: Result<{ started: string }>,
+  ): Result<{ started: string }> {
+    const outcome: PendingInteractionOutcome = {
+      entityId: pending.entityId,
+      interaction: pending.interaction,
+      result,
+    };
+    for (const listener of this.pendingResultListeners) {
+      try {
+        listener(outcome);
+      } catch {
+        // A feedback subscriber must not turn a valid gameplay result into an exception.
+      }
+    }
+    return result;
   }
 
   // ---------------------------------------------------------------- helpers

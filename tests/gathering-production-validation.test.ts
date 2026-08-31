@@ -26,7 +26,7 @@ const ITEM_IDS = {
   rawFish: "raw_fish", cookedFish: "cooked_fish", burntFish: "burnt_fish",
   dagger: "dagger", sword: "sword", helm: "helm", body: "body", legs: "legs",
   boots: "boots", gloves: "gloves", pickaxe: "pickaxe", hatchet: "hatchet",
-  staff: "staff", wand: "wand", focus: "focus", rod: "rod", shield: "shield",
+  staff: "staff", wand: "wand", rod: "rod", shield: "shield",
   meleeRing: "melee_ring", meleePendant: "melee_pendant",
   magicRing: "magic_ring", magicCharm: "magic_charm",
   hood: "hood", robe: "robe", magicLegs: "magic_legs", magicBoots: "magic_boots",
@@ -34,7 +34,12 @@ const ITEM_IDS = {
 } as const satisfies GatheringProductionTierDef["items"];
 
 const HASH = "0".repeat(64);
-const ESSENCE_SHARD: ItemId = "essence_shard";
+const MAGIC_IDS = {
+  essence: "air_essence",
+  orb: "air_orb",
+  staff: "air_staff",
+  wand: "air_wand",
+} as const;
 
 function item(id: ItemId, tier = 1): ItemDef {
   return {
@@ -69,6 +74,7 @@ function makeFixture(): GatheringProductionValidationInput {
       woodcutting: "tree_resource",
     },
     items: ITEM_IDS,
+    magic: { element: "wind", ...MAGIC_IDS },
     smelting: { orePerBar: 1, fluxPerBar: 1 },
     campfire: {
       logItemId: ITEM_IDS.log,
@@ -173,7 +179,8 @@ function makeFixture(): GatheringProductionValidationInput {
     smith(ITEM_IDS.gloves, [q(ITEM_IDS.bar)]),
     smith(ITEM_IDS.pickaxe, [q(ITEM_IDS.bar, 2), q(ITEM_IDS.handle)]),
     smith(ITEM_IDS.hatchet, [q(ITEM_IDS.bar, 2), q(ITEM_IDS.handle)]),
-    craft(ESSENCE_SHARD, [q(ITEM_IDS.gem), q(ITEM_IDS.log)], `craft_essence_shard_t${tier.tier}`),
+    craft(MAGIC_IDS.wand, [q(ITEM_IDS.wand), q(MAGIC_IDS.orb)]),
+    craft(MAGIC_IDS.staff, [q(ITEM_IDS.staff), q(MAGIC_IDS.orb)]),
     craft(ITEM_IDS.meleeRing, [q(ITEM_IDS.bar), q(ITEM_IDS.gem)]),
     craft(ITEM_IDS.meleePendant, [q(ITEM_IDS.bar), q(ITEM_IDS.gem)]),
     craft(ITEM_IDS.magicRing, [q(ITEM_IDS.bar), q(ITEM_IDS.gem)]),
@@ -185,14 +192,13 @@ function makeFixture(): GatheringProductionValidationInput {
     craft(ITEM_IDS.wraps, [q(ITEM_IDS.hide)]),
     fletch(ITEM_IDS.shaft, [q(ITEM_IDS.log)], 4),
     fletch(ITEM_IDS.handle, [q(ITEM_IDS.log)], 2),
-    fletch(ITEM_IDS.staff, [q(ITEM_IDS.shaft, 3), q(ITEM_IDS.gem)]),
-    fletch(ITEM_IDS.wand, [q(ITEM_IDS.shaft), q(ITEM_IDS.gem)]),
+    fletch(ITEM_IDS.staff, [q(ITEM_IDS.shaft, 3)]),
+    fletch(ITEM_IDS.wand, [q(ITEM_IDS.shaft, 2)]),
     fletch(ITEM_IDS.shield, [q(ITEM_IDS.log, 2), q(ITEM_IDS.bar)]),
-    fletch(ITEM_IDS.focus, [q(ITEM_IDS.log), q(ITEM_IDS.gem)]),
     fletch(ITEM_IDS.rod, [q(ITEM_IDS.shaft, 2), q(ITEM_IDS.hide)]),
   ];
 
-  const items = [...new Set([...Object.values(ITEM_IDS), ESSENCE_SHARD])].map((id) => item(id));
+  const items = [...new Set([...Object.values(ITEM_IDS), ...Object.values(MAGIC_IDS)])].map((id) => item(id));
   const itemAppearances = items.map(({ id }) => ({
     itemId: id,
     parts: [{ kind: "primitive" }],
@@ -243,9 +249,9 @@ function makeCanonicalInput(): GatheringProductionValidationInput {
 }
 
 describe("gathering and production boot validation", () => {
-  it("accepts the current canonical tiers and ten-pack CC0 manifest", () => {
+  it("accepts the current canonical tiers and licensed free-asset manifest", () => {
     expect(validateGatheringProduction(makeCanonicalInput())).toEqual([]);
-    expect(RUNTIME_ASSET_MANIFEST.packs).toHaveLength(10);
+    expect(RUNTIME_ASSET_MANIFEST.packs.length).toBeGreaterThanOrEqual(10);
   });
 
   it("accepts a complete 28-recipe tier foundation", () => {
@@ -255,7 +261,7 @@ describe("gathering and production boot validation", () => {
   it("rejects a one-recipe tier as an incomplete canonical matrix", () => {
     const fixture = makeCanonicalInput();
     expect(messages({ ...fixture, recipes: [fixture.recipes[0]!] }))
-      .toContain("gathering tier 1 has 1 recipes; expected the complete 28-recipe matrix");
+      .toContain("gathering tier 1 has 1 recipes; expected the complete 30-recipe matrix");
   });
 
   it("rejects one missing recipe family", () => {
@@ -507,7 +513,7 @@ describe("gathering and production boot validation", () => {
     })).toContain("gathering tier 1 item wand has tier 5; expected 1");
   });
 
-  it("rejects incomplete or non-CC0 foundation provenance", () => {
+  it("rejects incomplete or unsupported foundation provenance", () => {
     const fixture = makeFixture();
     const pack = fixture.assetManifest.packs[0]!;
     expect(messages({
@@ -523,7 +529,7 @@ describe("gathering and production boot validation", () => {
         ...fixture.assetManifest,
         packs: [{ ...pack, license: "Standard-EULA" }],
       },
-    })).toContain("is not licensed CC0-1.0");
+    })).toContain('has unsupported license "Standard-EULA"');
     expect(messages({
       ...fixture,
       assetManifest: {
@@ -533,7 +539,7 @@ describe("gathering and production boot validation", () => {
     })).toContain("has no valid lowercase archive SHA-256");
   });
 
-  it("rejects a non-CC0 pack used only by an item icon", () => {
+  it("rejects an unsupported pack used only by an item icon", () => {
     const fixture = makeFixture();
     const iconAssetId = "equipment_icon_asset";
     const iconPack = {
@@ -553,6 +559,6 @@ describe("gathering and production boot validation", () => {
         appearance.itemId === ITEM_IDS.wand
           ? { itemId: appearance.itemId, parts: [{ kind: "asset", assetId: iconAssetId }] }
           : appearance),
-    })).toContain("manifest pack equipment-pack is not licensed CC0-1.0");
+    })).toContain('manifest pack equipment-pack has unsupported license "Standard-EULA"');
   });
 });

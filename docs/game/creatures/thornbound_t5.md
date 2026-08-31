@@ -37,7 +37,9 @@ description: "Thornbound Husk spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 15-55 | Always |
 | [Duskoak Log](../../items/#duskoak-log) | 1-3 | 40% |

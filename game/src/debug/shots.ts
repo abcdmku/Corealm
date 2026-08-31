@@ -24,6 +24,8 @@ export interface CameraShot {
   yaw: number;
   pitch: number;
   distance: number;
+  /** Optional player facing relative to the camera yaw. Defaults to PI (facing away). */
+  playerFacingOffsetRad?: number;
   /** What this shot is supposed to show. Read this when judging whether the image succeeded. */
   intent: string;
 }
@@ -34,6 +36,12 @@ const SOUTH = Math.PI;
 const WEST = Math.PI * 1.5;
 
 export const SHOTS: readonly CameraShot[] = [
+  {
+    id: "magic_player_close", locationId: "spawn", regionId: "fallowmarch",
+    yaw: SOUTH + 0.24, pitch: 0.28, distance: 3.2,
+    playerFacingOffsetRad: -Math.PI * 0.5,
+    intent: "Close three-quarter view of the held wand or staff, including its empty or socketed crown.",
+  },
   {
     id: "spawn", locationId: "spawn", regionId: "fallowmarch",
     yaw: SOUTH, pitch: 0.5, distance: 20,

@@ -89,6 +89,11 @@ export class SaveService {
     }
   }
 
+  /** Compatibility name used by callers that treat exported text as a deserialization boundary. */
+  deserialize(raw: string): LoadOutcome {
+    return this.loadSerialized(raw);
+  }
+
   /** The raw JSON that would be written. Used by the debug API and the export-on-failure path. */
   serialize(state: GameState): string {
     return JSON.stringify(state);
@@ -151,6 +156,9 @@ function recompute(state: GameState): GameState {
     ...fresh.combat,
     ...(isRecord(state.combat) ? state.combat : {}),
   } as GameState["combat"];
+  state.magic = state.magic ?? fresh.magic;
+  state.magic.weaponCharges = state.magic.weaponCharges ?? {};
+  state.magic.consumedOrbs = state.magic.consumedOrbs ?? {};
   state.settings = { ...fresh.settings, ...(state.settings ?? {}) };
 
   // Activity deadlines are measured on the per-session simulation clock. Reloading starts that

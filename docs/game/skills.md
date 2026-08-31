@@ -98,4 +98,4 @@ The unlock rows below come from the same tier, resource, recipe, and item tables
 
 ## Combat
 
-Attacks resolve on a 600 ms tick. Melee supplies physical defence; Magic supplies magical defence. Health is `20 + 3 × floor((Melee + Magic) / 2)` plus equipment vitality. Magic is 15% more accurate but consumes an essence shard per cast.
+Melee attacks resolve on a 600 ms combat tick. Magic launches and bolt arrivals resolve on the 100 ms simulation tick, so wands keep their exact 2.2 second cadence and staffs keep their exact 3.0 second cadence. Melee supplies physical defence; Magic supplies magical defence. Health is `20 + 3 × floor((Melee + Magic) / 2)` plus equipment vitality. Magic is 15% more accurate. Each cast spends one matching elemental-weapon charge first, then one carried Essence.

@@ -31,7 +31,6 @@ import type { Renderer } from "../render/renderer.js";
 import type { OrbitCamera } from "../render/camera.js";
 import type { AssetRegistry } from "../render/assets.js";
 import { addSkillXp, setSkillLevel as applySkillLevel } from "../state/store.js";
-import { PROCEDURAL_GEAR_ASSETS } from "../render/proceduralGear.js";
 import { roundVec3 } from "../core/math.js";
 import { keybindings } from "../input/keyboard.js";
 
@@ -743,35 +742,57 @@ export function installGameDebug(deps: DebugDeps): void {
     },
 
     /**
-     * Sets the character up to exercise the whole magic ladder in one call.
+     * Sets the character up to exercise the released magic ladder in one call.
      *
-     * Magic 70 (the top of the ladder — Kilnsurge unlocks exactly there), every staff, and enough
-     * Essence Shards that the pouch is not the thing under test. The best staff is equipped, because
-     * a staff sitting in the pack casts nothing: `systems/combat.ts` reads the MAIN HAND to decide
-     * whether "attack" swings or casts.
+     * The first argument remains the Magic level. The second remains numeric for older callers,
+     * but now means how much of each released essence to grant. Weapons, orbs, and essence all pass
+     * through the real inventory and equipment paths. This matters for orbs: the first inventory
+     * grant creates the charged weapon's 1,000-charge ledger entry, while duplicate grants do not
+     * refill one that has already been used.
      *
-     * A setup helper, and only that. It grants items and levels, which under the rules in
-     * `tools/gate-check.ts` may set a check up but can never satisfy one — nothing here fights,
-     * casts or earns anything.
-     *
-     * Returns what it did, so a console caller sees the result rather than `undefined`.
+     * The default level equips Cairnpine plus Water. A lower level equips the strongest released
+     * charged staff it can use. Fire stays out until its region ships.
      */
-    seedMagic(magicLevel = 70, shards = 5000): Record<string, unknown> {
+    seedMagic(magicLevel = 70, essenceQuantity = 5000): Record<string, unknown> {
       applySkillLevel(store.get(), "magic", magicLevel);
-      deps.giveItem("essence_shard", Math.max(1, Math.floor(shards)), "inventory");
-      const staffIds = PROCEDURAL_GEAR_ASSETS.map((asset) => asset.itemId);
-      for (const itemId of staffIds) deps.giveItem(itemId, 1, "inventory");
-      // Best last so it wins the main hand: the ladder is authored weakest-first.
-      const best = staffIds[staffIds.length - 1];
-      const equipped = best ? api.equipItem(best) : null;
+
+      const weapons: ItemId[] = [
+        "basic_wooden_wand", "basic_wooden_staff",
+        "palewood_wand", "palewood_staff",
+        "duskoak_wand", "duskoak_staff",
+        "cairnpine_wand", "cairnpine_staff",
+        "air_wand", "air_staff",
+        "earth_wand", "earth_staff",
+        "water_wand", "water_staff",
+      ];
+      const releasedOrbs: ItemId[] = ["air_orb", "earth_orb", "water_orb"];
+      const releasedEssence: ItemId[] = ["air_essence", "earth_essence", "water_essence"];
+      const essencePerType = Math.max(1, Math.floor(essenceQuantity));
+
+      // A two-handed staff cannot share the normal off hand. Use the same unequip path as the UI.
+      if (store.get().equipment.offHand) api.unequipItem("offHand");
+      for (const itemId of weapons) deps.giveItem(itemId, 1, "inventory");
+      for (const itemId of releasedOrbs) deps.giveItem(itemId, 1, "inventory");
+      for (const itemId of releasedEssence) deps.giveItem(itemId, essencePerType, "inventory");
+
+      const level = store.get().skills.magic.level;
+      const loadout = level >= 10
+        ? { weapon: "water_staff" as ItemId }
+        : level >= 5
+          ? { weapon: "earth_staff" as ItemId }
+          : { weapon: "air_staff" as ItemId };
+      const weaponResult = api.equipItem(loadout.weapon);
       store.markDirty();
 
       const book = api.getSpellbook();
+      const weapon = book.equippedWeapon;
       return {
-        magic: store.get().skills.magic.level,
-        shards: book.shards,
-        staffs: staffIds,
-        equipped: equipped?.ok === true ? best : `not equipped: ${equipped?.ok === false ? equipped.error.message : "no staff"}`,
+        magic: level,
+        weapons,
+        equippedWeapon: weaponResult.ok ? loadout.weapon : null,
+        weaponError: weaponResult.ok ? null : weaponResult.error.message,
+        weaponCharges: weapon?.charges ?? 0,
+        essence: book.essence,
         castable: book.spells.filter((row) => row.castable).length,
         activeSpellId: book.activeSpellId,
       };

@@ -40,7 +40,9 @@ description: "Thornbound Elder spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 30-110 | Always |
 | [Cairnpine Log](../../items/#cairnpine-log) | 1-3 | 45% |

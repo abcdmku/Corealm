@@ -917,7 +917,7 @@ const JUNO: DialogueNodeDef[] = [
       },
       {
         when: [{ kind: "questStatus", questId: "knots_and_names", status: "active", reason: "" }],
-        text: "Four shafts, five shards. Come back when you have both, not when you have one.",
+        text: "Four shafts, five Air Essence. Come back when you have both, not when you have one.",
       },
     ],
     options: [
@@ -929,7 +929,7 @@ const JUNO: DialogueNodeDef[] = [
       },
       {
         id: "juno_root#deliver",
-        text: "Four shafts and five shards, as asked.",
+        text: "Four shafts and five measures of Air Essence, as asked.",
         showIf: [{ kind: "questStatus", questId: "knots_and_names", status: "active", reason: "" }],
         requires: [
           {
@@ -937,24 +937,24 @@ const JUNO: DialogueNodeDef[] = [
             // the same tick the first two stages were still checking for it, and hand themselves a
             // dead quest. The stage gate makes the order deterministic.
             kind: "questStage", questId: "knots_and_names", min: 2,
-            reason: "Make the four shafts and the five shards first; Juno counts them in that order.",
+            reason: "Make the four shafts and mine the five essence first; Juno counts them in that order.",
           },
           {
             kind: "item", itemId: "palewood_shaft", quantity: 4,
             reason: "You need 4 Palewood shafts. Fletch them from Palewood logs at entity coldbrace_fletching.",
           },
           {
-            kind: "item", itemId: "essence_shard", quantity: 5,
-            reason: "You need 5 Essence Shards. Craft them from gems at entity coldbrace_crafting.",
+            kind: "item", itemId: "air_essence", quantity: 5,
+            reason: "You need 5 Air Essence. Mine it at location fallowmarch_air_cache.",
           },
         ],
         effects: [
           { kind: "takeItem", itemId: "palewood_shaft", quantity: 4 },
-          { kind: "takeItem", itemId: "essence_shard", quantity: 5 },
+          { kind: "takeItem", itemId: "air_essence", quantity: 5 },
         ],
         next: "juno_parts_taken",
       },
-      { id: "juno_root#shards", text: "What is an essence shard actually doing?", next: "juno_shards" },
+      { id: "juno_root#shards", text: "What is an elemental orb actually doing?", next: "juno_shards" },
       { id: "juno_root#hide", text: "What do you make out of hide?", next: "juno_hide" },
       LEAVE("juno_root#bye"),
     ],
@@ -964,12 +964,12 @@ const JUNO: DialogueNodeDef[] = [
     text:
       "Parts trades, both of them, one afternoon. Fletching first: shafts, which is a straight "
       + "length of split log, which is to say, sticks, but good ones. Four Palewood shafts. Then "
-      + "crafting: five essence shards off gems. Here, take three Pale Quartz to start, I have a "
-      + "drawer of them and no patience.",
+      + "mining next: five measures of Air Essence from the southern cache. Here, take three Pale "
+      + "Quartz as well; I have a drawer of them and no patience.",
     options: [
       {
         id: "juno_parts_offer#accept",
-        text: "Four shafts, five shards.",
+        text: "Four shafts, five Air Essence.",
         effects: [{ kind: "startQuest", questId: "knots_and_names" }],
         next: "juno_parts_accepted",
       },
@@ -979,10 +979,9 @@ const JUNO: DialogueNodeDef[] = [
   {
     id: "juno_parts_accepted",
     text:
-      "Benches are in Coldbrace, both of them, which is a walk, which is why I gave you the "
-      + "quartz. Fletching bench is entity coldbrace_fletching, crafting table is entity "
-      + "coldbrace_crafting, they are four metres apart on the west side of the square. Palewood "
-      + "logs come out of the copse at locationId palewood_copse.",
+      "The fletching bench is entity coldbrace_fletching on the west side of Coldbrace square. "
+      + "Palewood logs come out of the copse at locationId palewood_copse. The Air Essence Cache "
+      + "is the distant route node at locationId fallowmarch_air_cache.",
     options: [
       { id: "juno_parts_accepted#back", text: "Back soon.", next: "juno_root" },
       LEAVE("juno_parts_accepted#bye"),
@@ -993,20 +992,19 @@ const JUNO: DialogueNodeDef[] = [
     text:
       "Four and five. Grain runs true on all four, which means: you did not rush them. Right. "
       + "Wraps, take them, bramblehide, they will not stop a Cairnwight but they will stop the "
-      + "cold. And a stack of shards, because you are going to need them the first time you point "
-      + "a staff at something.",
+      + "cold. And a stack of Air Essence, because it powers Air spells before and after an upgrade.",
     options: [
-      { id: "juno_parts_taken#shards", text: "So what is a shard doing in there?", next: "juno_shards" },
+      { id: "juno_parts_taken#shards", text: "So what does the orb do?", next: "juno_shards" },
       LEAVE("juno_parts_taken#bye"),
     ],
   },
   {
     id: "juno_shards",
     text:
-      "It is the consumable half of a cast. Staff shapes it, shard pays for it. One shard, one "
-      + "cast, and when the bag is empty the spell fails with NOT_ENOUGH_ITEMS and you look "
-      + "foolish in front of something with teeth. Gems drop while you mine. Quartz here, amber "
-      + "in the wood, garnet on the moor.",
+      "Essence powers a plain wand or staff directly. A boss orb is a crafting part: combine it "
+      + "with the matching wooden weapon to make an elemental weapon with a thousand charges. That "
+      + "weapon spends its charge first, then falls back to carried Essence. An Essence Altar uses "
+      + "a hundred matching Essence to refill the weapon.",
     options: [
       { id: "juno_shards#back", text: "Something else.", next: "juno_root" },
       LEAVE("juno_shards#bye"),
@@ -1297,8 +1295,47 @@ const VESS: DialogueNodeDef[] = [
           + "that. Ridiculous.",
       },
       {
-        when: [{ kind: "questStatus", questId: "sparking_stone", status: "active", reason: "" }],
-        text: "Staff on. Magic five. Six ore. Get on with it before I lose my nerve about the whole idea.",
+        when: [
+          { kind: "questStatus", questId: "sparking_stone", status: "active", reason: "" },
+          { kind: "questStage", questId: "sparking_stone", min: 0, max: 0, reason: "" },
+        ],
+        text:
+          "Tempest Roc first. Back to Fallowmarch, west of the Air Essence Cache. Kill it without "
+          + "waiting for me. The Essence I gave you already lets the staff cast.",
+      },
+      {
+        when: [
+          { kind: "questStatus", questId: "sparking_stone", status: "active", reason: "" },
+          { kind: "questStage", questId: "sparking_stone", min: 1, max: 1, reason: "" },
+        ],
+        text:
+          "The Roc is dead. Good. Its Air Orb is still in the loot pile unless you picked it up, "
+          + "so go and pick it up.",
+      },
+      {
+        when: [
+          { kind: "questStatus", questId: "sparking_stone", status: "active", reason: "" },
+          { kind: "questStage", questId: "sparking_stone", min: 2, max: 2, reason: "" },
+        ],
+        text:
+          "Take the Palewood Staff and Air Orb to a crafting table. Make the Air Staff, then put "
+          + "that in your main hand.",
+      },
+      {
+        when: [
+          { kind: "questStatus", questId: "sparking_stone", status: "active", reason: "" },
+          { kind: "questStage", questId: "sparking_stone", min: 3, max: 3, reason: "" },
+        ],
+        text:
+          "Now Voltrend. Get Magic to five. Use Rill Skitterlings, and use the Coldbrace altar if "
+          + "you somehow chew through a thousand charges.",
+      },
+      {
+        when: [
+          { kind: "questStatus", questId: "sparking_stone", status: "active", reason: "" },
+          { kind: "questStage", questId: "sparking_stone", min: 4, reason: "" },
+        ],
+        text: "Magic five. Six Kaldite ore. Bring it here and we find out whether I was right.",
       },
     ],
     options: [
@@ -1320,8 +1357,9 @@ const VESS: DialogueNodeDef[] = [
         showIf: [{ kind: "questStatus", questId: "sparking_stone", status: "active", reason: "" }],
         requires: [
           {
-            kind: "questStage", questId: "sparking_stone", min: 2,
-            reason: "Equip the staff and get Magic to 5 first. She wants to see it done, not described.",
+            kind: "questStage", questId: "sparking_stone", min: 4,
+            reason:
+              "Kill the Tempest Roc, loot its Air Orb, craft and equip the Air Staff, and get Magic to 5 first.",
           },
           {
             kind: "item", itemId: "kaldite_ore", quantity: 6,
@@ -1330,6 +1368,12 @@ const VESS: DialogueNodeDef[] = [
         ],
         effects: [{ kind: "takeItem", itemId: "kaldite_ore", quantity: 6 }],
         next: "vess_stone_tested",
+      },
+      {
+        id: "vess_root#roc_route",
+        text: "Remind me where the Tempest Roc is.",
+        showIf: [{ kind: "questStatus", questId: "sparking_stone", status: "active", reason: "" }],
+        next: "vess_stone_accepted",
       },
       { id: "vess_root#faces", text: "Where are the Kaldite faces?", next: "vess_faces" },
       { id: "vess_root#cairns", text: "Who is stacking the cairns?", next: "vess_cairns" },
@@ -1341,12 +1385,13 @@ const VESS: DialogueNodeDef[] = [
     text:
       "It holds. Whatever you put in it, it holds it, and it gives it back later when nobody is "
       + "looking. I want somebody to put something in it on purpose so I can stop imagining what "
-      + "it is holding. Here. My brother's staff and a dozen shards. Wear the staff, get Magic to "
-      + "five with it, and bring me six ore.",
+      + "it is holding. Here. My brother's staff and 100 Air Essence. The Air Orb is not mine to "
+      + "give. Go back to Fallowmarch, kill the Tempest Roc west of the Air Essence Cache, and "
+      + "take its orb. Craft the orb and staff into an Air Staff, get Magic to five, and bring me six ore.",
     options: [
       {
         id: "vess_stone_offer#accept",
-        text: "Staff on, Magic five, six ore.",
+        text: "Tempest Roc, Air Orb, staff, Magic five, six ore.",
         effects: [{ kind: "startQuest", questId: "sparking_stone" }],
         next: "vess_stone_accepted",
       },
@@ -1364,9 +1409,14 @@ const VESS: DialogueNodeDef[] = [
   {
     id: "vess_stone_accepted",
     text:
-      "Emberlash is the cheap one, one shard a cast. Scree Skitterlings out at one-seventy, minus "
-      + "one-sixty, they are soft and there are six of them. Do not practise on Cairnwights. I "
-      + "have seen what a Cairnwight does to somebody practising.",
+      "Go south through Vellenwood to Coldbrace, then west to locationId fallowmarch_air_cache. "
+      + "The Tempest Roc, entity tempest_roc, nests about 42 metres west of the Air Essence Cache. "
+      + "Loot the Air Orb from the pile it leaves. The drop is guaranteed, but it does not jump "
+      + "into your bag. At a crafting table, combine it with my Palewood Staff using recipe "
+      + "craft_air_staff. Equip the Air Staff. It starts with 1000 charges and spends those before "
+      + "carried Air Essence. Entity coldbrace_essence_altar fills it back to 1000 for exactly 100 "
+      + "Air Essence. Then use Voltrend on Rill Skitterlings near locationId "
+      + "redsill_shallows. Do not practise on Cairnwights.",
     options: [
       { id: "vess_stone_accepted#back", text: "Right.", next: "vess_root" },
       LEAVE("vess_stone_accepted#bye"),
@@ -1377,7 +1427,7 @@ const VESS: DialogueNodeDef[] = [
     text:
       "Go on. ... There. It took it. It took the whole cast and the fracture line went white and "
       + "then it just, sat there, being a rock. Nine years. It is a rock that likes magic. That "
-      + "is all it ever was. Take the focus, take the shards, and take my brother's staff off my "
+      + "is all it ever was. Take the essence, and take my brother's staff off my "
       + "hands, I never liked looking at it.",
     options: [
       { id: "vess_stone_tested#cairns", text: "Then who is stacking the cairns?", next: "vess_cairns" },

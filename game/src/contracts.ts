@@ -99,10 +99,8 @@ export type QuestId = string;
  * They are a LOOK and a SOUND, not four damage types. There is no elemental weakness table and no
  * resistance stat: `EquipmentBonuses` carries one `magicArmour`, every enemy row carries one
  * `magicArmour`, and inventing a second axis would mean re-solving the whole PRD 2.4 magic balance
- * against four columns instead of one. What separates them is WHEN they unlock — the ladder in
- * `content/spells.ts` staggers the four elements inside each rung, so the strongest spell a caster
- * owns rotates wind -> water -> earth -> fire as they level, and a player who prefers one element's
- * look pays a small, temporary damage cost to stay on it.
+ * against four columns instead of one. What separates them is when their Essence and spells unlock.
+ * Air, Earth, and Water are released in the current world; Fire remains authored future progression.
  *
  * `wind` covers gale and charge, which is why Voltrend — a garnet cracked for the charge in it —
  * is a wind spell rather than a fifth element. The tier-10 magic kit already calls its accessories
@@ -128,9 +126,8 @@ export const SPELL_RUNGS: readonly SpellRung[] = ["lash", "bolt", "burst", "surg
 /**
  * Every attack spell, in unlock order, Magic 1 to Magic 70.
  *
- * Four rungs of four. `emberlash`, `stonebrand` and `voltrend` keep the ids, levels and damage
- * numbers PRD 2.4 fixes for them and now sit inside the ladder as the lash rung's fire, earth and
- * wind entries; `rimewash` completes that rung with the water entry the PRD never authored.
+ * Four rungs of four. The first rung follows the region ladder: Air at 1, Earth at 5, Water at 10,
+ * and the future Fire spell at 15.
  *
  * Widened from a three-way union together with its callers, per AGENTS.md rule 5: `content/spells.ts`,
  * `systems/combat.ts`, `agent/tools.ts` and `ui/spellbookPanel.ts`. Kept as a literal union rather
@@ -138,8 +135,8 @@ export const SPELL_RUNGS: readonly SpellRung[] = ["lash", "bolt", "burst", "surg
  * rather than a `NOT_FOUND` at runtime.
  */
 export type SpellId =
-  // lash — Magic 1 to 13
-  | "emberlash" | "stonebrand" | "voltrend" | "rimewash"
+  // lash — Magic 1 to 15
+  | "voltrend" | "stonebrand" | "rimewash" | "emberlash"
   // bolt — Magic 17 to 35
   | "skirlbolt" | "sleetbolt" | "shalebolt" | "cinderbolt"
   // burst — Magic 41 to 59
@@ -155,11 +152,12 @@ export type Archetype =
 export type InteractionId =
   | "inspect" | "mine" | "chop" | "fish" | "rake" | "plant" | "harvest"
   | "attack" | "cast" | "talk" | "open" | "enter" | "climb" | "vault"
-  | "loot" | "take" | "produce" | "bank" | "trade" | "equip" | "unequip";
+  | "loot" | "take" | "produce" | "recharge" | "bank" | "trade" | "equip" | "unequip";
 
 /** A production station category. Recipes may accept more than one category. */
 export type StationKind =
-  | "furnace" | "anvil" | "range" | "campfire" | "crafting_table" | "fletching_bench";
+  | "furnace" | "anvil" | "range" | "campfire" | "crafting_table" | "fletching_bench"
+  | "essence_altar";
 
 // ---------------------------------------------------------- structure library
 
@@ -210,6 +208,34 @@ export type ItemCategory =
   | "resource" | "bar" | "equipment" | "food" | "tool"
   | "seed" | "quest" | "currency" | "component";
 
+export type MagicWeaponKind = "wand" | "staff";
+
+export interface ElementalWeaponChargeSpec {
+  element: SpellElement;
+  capacity: number;
+  initialCharges: number;
+  rechargeItemId: ItemId;
+  rechargeCost: number;
+  /** The singleton boss drop consumed to craft this charged weapon. */
+  orbItemId: ItemId;
+  /** False for authored future content such as Fire weapons. */
+  released: boolean;
+}
+
+export interface MagicWeaponSpec {
+  kind: MagicWeaponKind;
+  /** Wands leave the off hand free. Staffs require it to be empty. */
+  hands: 1 | 2;
+  /** Present only after a boss Orb has been crafted into this weapon type. */
+  charge?: ElementalWeaponChargeSpec;
+}
+
+export interface EssenceOrbSpec {
+  element: SpellElement;
+  /** False for authored future content such as the tier-15 Fire Orb. */
+  released: boolean;
+}
+
 export interface ItemDef {
   id: ItemId;
   name: string;
@@ -225,6 +251,10 @@ export interface ItemDef {
     attackSpeedMs?: number;
     requires: Partial<Record<SkillId, number>>;
   };
+  /** Present only on main-hand magic weapons. */
+  magicWeapon?: MagicWeaponSpec;
+  /** Present only on boss-drop Orbs used to craft charged elemental weapons. */
+  orb?: EssenceOrbSpec;
   food?: { healAmount: number };
   tool?: { skill: SkillId; gatherBonus: number };
   seed?: { cropId: ItemId };
@@ -455,13 +485,20 @@ export type GameEventType =
    * Carries `flightMs`, the gap before the damage lands. This exists because a spell now HURTS on
    * arrival rather than on release (`systems/combat.ts landSpellHits`), so the hit log entry is
    * written at the far end of the flight — too late to be the renderer's cue to start drawing the
-   * bolt. `data` is `{ spellId, targetId, element, rung, flightMs, hit }`.
+   * bolt. `data` is
+   * `{ spellId, targetId, element, rung, flightMs, hit, fuelSource, weaponItemId,
+   * remainingCharges, essenceItemId, remainingEssence }`.
    *
    * `hit` is the resolved roll, published before the damage lands. That is deliberate rather than a
    * leak: the effect layer has to know at launch whether to draw a bolt that connects or one that
    * fizzles short, and this is a single-player simulation where the client already owns the world.
    */
   | "spell.launched"
+  /**
+   * One completed altar transaction. `data` names the altar, weapon, element and essence item and
+   * includes `before`, `after`, and `essenceSpent` so consumers can reconcile the exact change.
+   */
+  | "essence.recharged"
   | "health.low" | "player.died"
   | "level.gained" | "production.completed"
   | "campfire.built" | "campfire.replaced" | "campfire.expired"
@@ -587,8 +624,7 @@ export interface BankView { slots: ItemStack[]; usedSlots: number; capacity: num
  *
  * `maxHit` is computed WITH worn gear, not bare, because the question the panel answers is "what
  * does this do if I cast it now" and the player is wearing what they are wearing. `castable`
- * separates the two ways a spell can be unavailable — too low a level is permanent until you train,
- * an empty shard pouch is a trip to a general store — so the UI can say which.
+ * separates a locked spell from one missing its matching Essence, so the UI can say which.
  */
 export interface SpellRow {
   id: SpellId;
@@ -599,12 +635,25 @@ export interface SpellRow {
   /** Highest damage this spell can roll at the player's current Magic level and worn gear. */
   maxHit: number;
   baseXp: number;
+  /** Resolved from the equipped staff or wand, not a fixed spell-table cadence. */
   castMs: number;
-  costItemId: ItemId;
-  costQuantity: number;
+  requiredElement: SpellElement;
+  fuelCost: number;
   unlocked: boolean;
   castable: boolean;
+  /** Null when castable; otherwise a player-facing, current-state reason. */
+  blockedBy: string | null;
   description: string;
+}
+
+export interface EquippedMagicWeaponView {
+  itemId: ItemId;
+  name: string;
+  element: SpellElement;
+  charges: number;
+  capacity: number;
+  rechargeItemId: ItemId;
+  rechargeCost: number;
 }
 
 export interface SpellbookView {
@@ -614,8 +663,12 @@ export interface SpellbookView {
   /** What a "Cast at" would actually throw right now, or null if nothing is castable. */
   activeSpellId: SpellId | null;
   magicLevel: number;
-  /** Essence shards carried. Zero means every row is unaffordable, which the panel must explain. */
-  shards: number;
+  /** The equipped charged elemental wand or staff, if any. */
+  equippedWeapon: EquippedMagicWeaponView | null;
+  /** Matching essence carried in the 28-slot inventory, including zeroes. */
+  essence: Record<SpellElement, number>;
+  /** Fire is intentionally absent until its tier-15 region ships. */
+  releasedElements: SpellElement[];
 }
 
 export interface ShopView {
@@ -839,7 +892,7 @@ export interface GameApi {
   /**
    * Sets the standing spell choice, or clears it back to automatic with null.
    *
-   * Deliberately NOT gated on the level or the shard count. A player one level short still gets to
+   * Deliberately NOT gated on the level or available fuel. A player one level short still gets to
    * point at the spell they are working toward, and `systems/combat.ts` falls back to the automatic
    * pick until it becomes castable. Refusing the click would need the UI to explain a rejection
    * that the panel already shows as a lock icon.

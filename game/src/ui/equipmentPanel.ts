@@ -5,7 +5,9 @@
  * the tooltip: hovering an inventory item shows the green/red delta against whatever is worn in
  * that slot. This panel is where the player checks the total that delta moves.
  */
-import type { EquipSlot, EquipmentBonuses, FeatureLabApi, ItemId, ItemStack } from "../contracts.js";
+import type {
+  EquipSlot, EquipmentBonuses, EquippedMagicWeaponView, FeatureLabApi, ItemId, ItemStack,
+} from "../contracts.js";
 import { EQUIP_SLOTS } from "../contracts.js";
 import { notify } from "./contextMenu.js";
 import type { ContextMenuItem } from "./contextMenu.js";
@@ -23,6 +25,40 @@ const BONUS_ROWS: readonly [keyof EquipmentBonuses, string][] = [
   ["magicArmour", "Magic armour"],
   ["vitality", "Vitality"],
 ];
+
+/** Compact enough for the main-hand slot while keeping current and maximum values exact. */
+export function formatWeaponCharge(charges: number, capacity: number): string {
+  const current = Math.max(0, Math.floor(charges)).toLocaleString("en-US");
+  const maximum = Math.max(0, Math.floor(capacity)).toLocaleString("en-US");
+  return `${current} / ${maximum}`;
+}
+
+function paintWeaponCharge(
+  cell: HTMLButtonElement,
+  itemId: ItemId | null,
+  weapon: EquippedMagicWeaponView | null,
+): void {
+  const existing = cell.querySelector<HTMLElement>(".slot__charge");
+  if (!itemId || !weapon || weapon.itemId !== itemId) {
+    existing?.remove();
+    delete cell.dataset["weaponCharge"];
+    return;
+  }
+
+  const text = formatWeaponCharge(weapon.charges, weapon.capacity);
+  let label = existing;
+  if (!label) {
+    label = document.createElement("span");
+    label.className = "slot__charge u-numeric";
+    cell.appendChild(label);
+  }
+  if (label.textContent !== text) label.textContent = text;
+  cell.dataset["weaponCharge"] = `${weapon.charges}/${weapon.capacity}`;
+  cell.setAttribute(
+    "aria-label",
+    `${itemName(itemId)}, ${weapon.charges.toLocaleString("en-US")} of ${weapon.capacity.toLocaleString("en-US")} charges`,
+  );
+}
 
 export class EquipmentPanel implements ManagedPanel {
   readonly frame: PanelFrame;
@@ -103,9 +139,11 @@ export class EquipmentPanel implements ManagedPanel {
 
   refresh(force = false): void {
     const equipment = this.ctx.api.getEquipment();
+    const equippedWeapon = this.ctx.api.getSpellbook().equippedWeapon;
     const signature = [
       ...EQUIP_SLOTS.map((slot) => `${slot}=${stackSignature(equipment.slots[slot])}`),
       ...BONUS_ROWS.map(([key]) => `${key}=${equipment.totals[key]}`),
+      `weapon=${equippedWeapon?.itemId ?? "-"}:${equippedWeapon?.charges ?? "-"}:${equippedWeapon?.capacity ?? "-"}`,
     ].join("|");
     if (!force && signature === this.signature) return;
     this.signature = signature;
@@ -113,6 +151,8 @@ export class EquipmentPanel implements ManagedPanel {
 
     const filled = EQUIP_SLOTS.filter((slot) => equipment.slots[slot] !== null).length;
     this.slotGrid.render(equipment.slots);
+    const mainHand = equipment.slots.mainHand;
+    paintWeaponCharge(this.slotGrid.cell("mainHand"), mainHand?.itemId ?? null, equippedWeapon);
 
     for (const [key] of BONUS_ROWS) {
       const node = this.totals.get(key);
@@ -124,6 +164,8 @@ export class EquipmentPanel implements ManagedPanel {
 
     this.frame.setSubtitle(`${filled}/${EQUIP_SLOTS.length} worn`);
     if (this.selectedSlot) this.openPicker(this.selectedSlot);
+    // Keep a hovered weapon card open while its charge changes.
+    this.ctx.tooltip.refresh();
   }
 
   dispose(): void {

@@ -36,7 +36,9 @@ async function main(): Promise<void> {
     const representative = [
       "grithe_ore", "palewood_log", "silt_minnow", "grithe_bar", "coarse_hide",
       "bittergrain_seed", "grithe_pickaxe", "grithe_sword", "grithe_helm", "grithe_ring",
-      "palewood_staff", "quartz_focus", "marchhide_robe", "essence_shard",
+      "basic_wooden_wand", "palewood_staff", "cairnpine_wand", "marchhide_robe",
+      "air_orb", "earth_orb", "water_orb",
+      "air_essence", "earth_essence", "water_essence",
     ];
     await page.evaluate((itemIds) => {
       const api = window.__gameDebug as unknown as {
@@ -52,7 +54,13 @@ async function main(): Promise<void> {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "i", code: "KeyI", bubbles: true }));
     }, representative);
     process.stdout.write("icon verify: inventory setup dispatched\n");
-    await page.waitForSelector("#panel-inventory:not([hidden])", { state: "visible" });
+    // A continuously painted WebGL canvas can keep Playwright's actionability loop waiting even
+    // after it reports that this DOM panel is visible. The panel's own `hidden` state is the actual
+    // contract here and is the same readiness check used for bank, equipment, and shop below.
+    await page.waitForFunction(() => {
+      const panel = document.querySelector<HTMLElement>("#panel-inventory");
+      return panel !== null && !panel.hidden;
+    }, undefined, { timeout: 60_000 });
     await page.waitForFunction(({ minimum, size }) => {
       const images = [...document.querySelectorAll<HTMLImageElement>("#panel-inventory .item-icon__raster")];
       return images.length >= minimum && images.every((image) => image.complete && image.naturalWidth === size);
@@ -60,7 +68,9 @@ async function main(): Promise<void> {
     await driver.wait(200);
     process.stdout.write("icon verify: inventory loaded\n");
 
-    const auditPanel = async (selector: string): Promise<IconDomAudit> => page.locator(selector).evaluate((panel) => {
+    const auditPanel = async (selector: string): Promise<IconDomAudit> => page.evaluate((panelSelector) => {
+      const panel = document.querySelector<HTMLElement>(panelSelector);
+      if (!panel) throw new Error(`Missing icon panel ${panelSelector}`);
       const images = [...panel.querySelectorAll<HTMLImageElement>(".item-icon__raster")];
       return {
         rasterCount: images.length,
@@ -70,7 +80,7 @@ async function main(): Promise<void> {
         visibleFallbacks: [...panel.querySelectorAll<SVGElement>(".item-icon .icon")]
           .filter((svg) => getComputedStyle(svg).visibility !== "hidden").length,
       };
-    });
+    }, selector);
 
     const inventory = await auditPanel("#panel-inventory");
     if (inventory.rasterCount < representative.length || inventory.loadedCount !== inventory.rasterCount) {
@@ -113,7 +123,7 @@ async function main(): Promise<void> {
     await page.evaluate(() => document.querySelector<HTMLButtonElement>("#panel-bank .panel__close")?.click());
 
     const equipmentIds = [
-      "grithe_sword", "palewood_shield", "grithe_helm", "grithe_cuirass", "grithe_greaves",
+      "air_wand", "palewood_shield", "grithe_helm", "grithe_cuirass", "grithe_greaves",
       "grithe_boots", "grithe_gloves", "grithe_ring", "grithe_pendant",
     ];
     const equipmentSetup = await page.evaluate(async (itemIds) => {

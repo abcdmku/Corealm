@@ -5,6 +5,7 @@ import { SPELL_ELEMENTS, SPELL_RUNGS } from "../game/src/contracts.js";
 import { MELEE_RANGE, SPELL_RANGE, spellFlightMs } from "../game/src/app/config.js";
 import type { SpellElement, SpellId, SpellRung } from "../game/src/contracts.js";
 import { magicMaxHit } from "../game/src/systems/combat.js";
+import { ESSENCE_BY_ELEMENT } from "../game/src/systems/essence.js";
 import { TIERS, tierForLevel } from "../game/src/content/xp.js";
 import { ALL_ITEMS } from "../game/src/content/items.js";
 
@@ -17,9 +18,8 @@ import { ALL_ITEMS } from "../game/src/content/items.js";
  * produces a ladder that still loads, still casts and is quietly wrong for the rest of the game's
  * life. `tests/equipment.test.ts` exists for the same reason and its header says so.
  *
- * The three PRD spells are checked separately and harder, because they are the ones with external
- * dependents: `content/quests.ts` references `emberlash`, `tools/gate-check.ts` casts it, and PRD
- * 2.4's whole melee-versus-magic balance argument is solved from Voltrend's numbers.
+ * The regional entry rung is checked separately and harder because it is the handoff between world
+ * progression and magic: Air at 1, Earth at 5, Water at 10, then the unreleased Fire path at 15.
  */
 
 /** The full kit's `magicPower` at tier 10, from `content/equipment.ts`'s solved header. */
@@ -38,10 +38,10 @@ const BY_ID = new Map<SpellId, SpellDef>(SPELLS.map((spell) => [spell.id, spell]
  */
 const AUTHORED: readonly [SpellId, SpellElement, SpellRung, number, number, number, number][] = [
   // id, element, rung, reqLevel, baseMax, divisor, baseXp
-  ["emberlash", "fire", "lash", 1, 3, 8, 5],
+  ["voltrend", "wind", "lash", 1, 3, 8, 5],
   ["stonebrand", "earth", "lash", 5, 5, 7, 12],
-  ["voltrend", "wind", "lash", 10, 8, 6, 22],
-  ["rimewash", "water", "lash", 13, 9, 6, 28],
+  ["rimewash", "water", "lash", 10, 8, 6, 22],
+  ["emberlash", "fire", "lash", 15, 9, 6, 30],
   ["skirlbolt", "wind", "bolt", 17, 11, 5.5, 36],
   ["sleetbolt", "water", "bolt", 23, 13, 5.2, 47],
   ["shalebolt", "earth", "bolt", 29, 15, 5.0, 59],
@@ -84,21 +84,33 @@ describe("the spell ladder", () => {
     }
   });
 
-  it("keeps every row at one essence shard and a 3.0 s cast", () => {
-    // PRD section 0 decision 3 and PRD 2.4. Both held across all sixteen rows on purpose: scaling
-    // shard cost with rung would need the gem-drop economy re-solved, which this wave did not do.
+  it("spends one matching orb charge while retaining the 3.0 s table fallback", () => {
+    // The equipped weapon replaces `castMs` at runtime. The table keeps a staff-speed fallback for
+    // static consumers, while the cost follows the spell's element into the matching orb ledger.
     for (const spell of SPELLS) {
       expect(spell.castMs, `${spell.id} castMs`).toBe(3000);
-      expect(spell.cost.itemId, `${spell.id} cost item`).toBe("essence_shard");
-      expect(spell.cost.quantity, `${spell.id} cost quantity`).toBe(1);
+      expect(spell.cost.element, `${spell.id} cost element`).toBe(spell.element);
+      expect(spell.cost.charges, `${spell.id} charge cost`).toBe(1);
     }
   });
 
-  it("pays for itself with an item that exists", () => {
-    // A cost naming an item that no table defines would fail as NOT_ENOUGH_ITEMS forever, and
-    // nothing else in the game would report it.
-    const itemIds = new Set(ALL_ITEMS.map((item) => item.id));
-    for (const spell of SPELLS) expect(itemIds.has(spell.cost.itemId), spell.cost.itemId).toBe(true);
+  it("has an Orb, matching Essence, and charged weapon output for every spell element", () => {
+    for (const element of SPELL_ELEMENTS) {
+      const orb = ALL_ITEMS.find((item) => item.orb?.element === element);
+      expect(orb, `${element} has no orb`).toBeDefined();
+      const essenceItemId = ESSENCE_BY_ELEMENT[element];
+      expect(ALL_ITEMS.some((item) => item.id === essenceItemId), `${element} essence`).toBe(true);
+      expect(ALL_ITEMS.some((item) => {
+        const charge = item.magicWeapon?.charge;
+        if (!charge || !orb) return false;
+        return charge.orbItemId === orb.id && charge.rechargeItemId === essenceItemId;
+      }), `${element} charged weapon output`).toBe(true);
+    }
+  });
+
+  it("opens the regional entry rung at Air 1, Earth 5, Water 10, and Fire 15", () => {
+    expect(SPELLS.filter((spell) => spell.rung === "lash").map((spell) => [spell.element, spell.reqLevel]))
+      .toEqual([["wind", 1], ["earth", 5], ["water", 10], ["fire", 15]]);
   });
 
   it("covers Magic 1 to 70 with four elements of four", () => {
@@ -174,7 +186,7 @@ describe("magic damage at unlock, with the tier 10 kit", () => {
    * below pins the PRD's three at their own kit tiers.
    */
   const CHECKPOINTS: readonly [SpellId, number][] = [
-    ["emberlash", 7], ["stonebrand", 10], ["voltrend", 15], ["rimewash", 16],
+    ["voltrend", 7], ["stonebrand", 10], ["rimewash", 15], ["emberlash", 16],
     ["skirlbolt", 19], ["sleetbolt", 23], ["shalebolt", 27], ["cinderbolt", 30],
     ["galeburst", 34], ["spateburst", 38], ["cragburst", 43], ["pyreburst", 47],
     ["squallsurge", 51], ["tidesurge", 55], ["scarpsurge", 59], ["kilnsurge", 63],
@@ -189,13 +201,10 @@ describe("magic damage at unlock, with the tier 10 kit", () => {
     }
   });
 
-  it("reproduces the three PRD spells exactly, at their own kit tiers", () => {
-    // These three are the ones the PRD solved by hand, and `content/equipment.ts` derives the whole
-    // magic gear ladder from them. They must not move: PRD 2.4's "Voltrend kills a Cairnwight in
-    // 24 s" claim is what the tier 10 kit's magicPower 32 and magicAccuracy 47 were solved from.
-    expect(magicMaxHit(1, 6, BY_ID.get("emberlash")!)).toBe(3);
+  it("reproduces the three released entry spells at their own kit tiers", () => {
+    expect(magicMaxHit(1, 6, BY_ID.get("voltrend")!)).toBe(3);
     expect(magicMaxHit(5, 14, BY_ID.get("stonebrand")!)).toBe(7);
-    expect(magicMaxHit(10, 32, BY_ID.get("voltrend")!)).toBe(15);
+    expect(magicMaxHit(10, 32, BY_ID.get("rimewash")!)).toBe(15);
   });
 
   it("never rewards a lower rung more than a higher one at the same level", () => {

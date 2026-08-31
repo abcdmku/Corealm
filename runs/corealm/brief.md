@@ -1,5 +1,9 @@
 # Corealm — game brief
 
+> Historical intake brief. The approved August 30, 2026 magic amendment in `PRD.md` supersedes
+> this file's original nine-slot/staff/shard assumptions: the shipped contract has ten equipment
+> slots including `focus`, pack-backed wands and staffs, singleton elemental orbs, and typed essence.
+
 ## One line
 
 A persistent 3D browser RPG with classic-MMO progression clarity, where an AI agent can play the same character through the same semantic actions a human uses — and building a better agent is itself part of the game.

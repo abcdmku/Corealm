@@ -489,7 +489,7 @@ function playthroughSource(): string {
   for (const [skill, station, recipeHint] of [
     ["smithing", "furnace", "bar"],
     ["cooking", "range", "cook"],
-    ["crafting", "crafting_table", "shard"],
+    ["crafting", "crafting_table", "ring"],
     ["fletching", "fletching_bench", "shaft"],
   ]) {
     const before = (await skills())[skill].xp;
@@ -549,9 +549,16 @@ function playthroughSource(): string {
 
   // ---------------------------------------------------------------- magic
   {
-    const before = (await skills()).magic.xp;
     dbg.setSkillLevel("magic", 10);
-    dbg.giveItem("essence_shard", 20);
+    // Setup changes XP to the level-10 threshold, so the baseline must come afterwards. Otherwise
+    // this gate passes before a wand is equipped or a spell is launched.
+    const before = (await skills()).magic.xp;
+    dbg.clearInventory();
+    dbg.giveItem("basic_wooden_wand", 1);
+    dbg.giveItem("air_essence", 50);
+    const wand = await agent.call("corealm_equip", { itemId: "basic_wooden_wand" });
+    const spellbookBefore = await agent.call("corealm_spellbook", { op: "read" });
+    const essenceBefore = spellbookBefore.essence ? spellbookBefore.essence.wind : null;
     dbg.setHealth(999);
     // Filtered on "attack", not "cast". Enemies no longer advertise a separate cast verb - one
     // combat verb now means "hit that with what I am holding" - so a "cast" filter matches nothing
@@ -559,12 +566,14 @@ function playthroughSource(): string {
     // below still names its spell explicitly through corealm_attack, which is unchanged.
     // (No backticks in here: this whole block is inside the playthroughSource template literal.)
     const enemy = await findNear(["enemy"], "attack", "march|camp|pit|skitter");
-    let evidence = "no enemy found";
-    if (enemy) {
+    let evidence = wand.error
+      ? "wand equip refused: " + wand.error + " " + wand.message
+      : "no enemy found";
+    if (enemy && !wand.error) {
       await agent.call("corealm_move_to", { entityId: enemy.id });
       await waitFor(["navigation.completed", "navigation.failed"], 30000);
       for (let i = 0; i < 12; i += 1) {
-        const cast = await agent.call("corealm_attack", { entityId: enemy.id, spellId: "emberlash" });
+        const cast = await agent.call("corealm_attack", { entityId: enemy.id, spellId: "voltrend" });
         if (cast.error) { evidence = "cast refused: " + cast.error + " " + cast.message; break; }
         await sleep(700);
         if ((await skills()).magic.xp > before) break;
@@ -572,7 +581,13 @@ function playthroughSource(): string {
       const after = (await skills()).magic.xp;
       if (after > before) evidence = "magic xp " + before + " -> " + after;
     }
-    note("magic", (await skills()).magic.xp > before, evidence);
+    const after = (await skills()).magic.xp;
+    const spellbookAfter = await agent.call("corealm_spellbook", { op: "read" });
+    const essenceAfter = spellbookAfter.essence ? spellbookAfter.essence.wind : null;
+    const launched = typeof essenceBefore === "number" && typeof essenceAfter === "number"
+      && essenceAfter < essenceBefore;
+    note("magic", after > before && launched,
+      evidence + ", Air Essence " + essenceBefore + " -> " + essenceAfter);
   }
 
   // -------------------------------------------------------------- agility
@@ -747,7 +762,14 @@ function playthroughSource(): string {
     // eight seconds after the last enemy died and an agent waiting for \`inCombat === false\` hung.
     // It now means a fight is happening: a target, or an enemy that has engaged. The regen window
     // is \`regenBlocked\`, and after a kill the two must disagree.
+    // The preceding boss proof ends inside Gravelmaw with the tier-0 test wand still equipped.
+    // Return to the overworld and give this independent melee assertion its own suitable weapon;
+    // otherwise it can time out on a dungeon Elder and strand every later overworld quest check.
+    dbg.teleport({ locationId: "town_center" });
+    await sleep(500);
     dbg.setSkillLevel("melee", 30);
+    dbg.giveItem("kaldite_sword", 1);
+    await agent.call("corealm_equip", { itemId: "kaldite_sword" });
     dbg.setHealth(999);
     const enemy = await findNear(["enemy"], "attack", "march|camp|pit|skitter|moor");
     let evidence = "no enemy found";

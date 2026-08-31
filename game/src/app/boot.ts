@@ -37,6 +37,11 @@ import { Movement } from "../systems/movement.js";
 import { Solids } from "../systems/solids.js";
 import { CorealmGameApi } from "../api/gameApi.js";
 import { SaveService } from "../persistence/storage.js";
+import {
+  LOOT_PILE_VIEW,
+  RECOVERY_CACHE_VIEW,
+  rehydrateWorldContainers,
+} from "../persistence/worldContainers.js";
 import { installBootPlaceholder, installGameDebug, type RecordedError } from "../debug/gameDebug.js";
 import { GameLoop } from "./loop.js";
 import { InputController } from "../input/mouse.js";
@@ -53,6 +58,7 @@ import { ActivitySystem } from "../systems/activity.js";
 import { EatingSystem } from "../systems/eating.js";
 import { CAMPFIRE_ENTITY_ID, CampfireSystem, campfireFuelLookup } from "../systems/campfire.js";
 import { GatheringSystem } from "../systems/gathering.js";
+import { EssenceSystem } from "../systems/essence.js";
 import { FarmingSystem } from "../systems/farming.js";
 import { AgilitySystem } from "../systems/agility.js";
 import { CombatSystem } from "../systems/combat.js";
@@ -130,8 +136,21 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     if (node) node.textContent = message;
   };
 
-  // 2. Core services and content validation. Bad content is loud, never silently degrading.
+  // 2. Core services and save. The save must win before any seeded world work starts. Loading it
+  // after buildWorld meant a custom-seed save resumed inside a world built from seed 1337.
   const store = new Store(1337, Date.now());
+  const saves = new SaveService(profile.persistent);
+  const loadedSave = saves.load();
+  const resumedFromSave = loadedSave.status === "loaded" && loadedSave.state !== undefined;
+  if (resumedFromSave) {
+    store.replace(loadedSave.state!);
+  } else if (loadedSave.status === "failed") {
+    errors.push({
+      atMs: atMs(),
+      source: "persistence",
+      message: `Save could not be loaded: ${loadedSave.reason ?? "unknown"}`,
+    });
+  }
   const events = new EventBus();
   const clock = new SimClock();
   const rng = new RngStreams(store.get().meta.seed);
@@ -194,12 +213,6 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // 6. Assets. Animation libraries load once as a shared clip library; every rig plays from it.
   setStatus("loading assets…");
   const assets = new AssetRegistry();
-  // The staff meshes, built rather than loaded. There is no staff anywhere in the 213-asset library,
-  // so without this line all four staffs resolve to an asset id that `AssetRegistry.load` rejects,
-  // `characterRig.attachBoneSlot` swallows the rejection, and a mage holds empty air — which is
-  // exactly the state this wave set out to fix. Registered BEFORE the manifest loads and before the
-  // player rig is built, because `CharacterRig` warms gear through the same `load()` path.
-  registerProceduralGear(assets);
   try {
     await assets.loadManifest();
     await assets.loadAnimationLibraries();
@@ -358,6 +371,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   });
   entityStore.load(built.entities);
   entityStore.registerLocations(built.knownLocations);
+  rehydrateWorldContainers(store.get(), entityStore, {
+    regionAt: (position) => scene.regionAt(position[0], position[2]),
+  });
   const gameAudio = new CorealmAudioBridge({
     store,
     engine: audioEngine,
@@ -486,9 +502,13 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // Facing convention matches NpcStandDef and debug/shots.ts: 0 looks toward +z.
   // The camera sits behind the player, so its yaw is the player's facing plus pi.
   const spawnFacing = spawnSpec.facingRad;
-  store.get().player.position = spawn;
-  store.get().player.regionId = spawnSpec.regionId;
-  store.get().player.facingRad = spawnFacing;
+  if (!resumedFromSave) {
+    store.get().player.position = spawn;
+    store.get().player.regionId = spawnSpec.regionId;
+    store.get().player.facingRad = spawnFacing;
+  }
+  const initialPlayerPosition = store.get().player.position;
+  const initialPlayerFacing = store.get().player.facingRad;
   // A real skinned character rather than the round-0 capsule. If the rig fails to build for any
   // reason the capsule stays as the fallback, because a missing player is unrecoverable and an
   // ugly player is not.
@@ -499,24 +519,16 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   });
   if (rigged) {
     scene.entityGroup.add(playerRig.root);
-    playerRig.setPosition(spawn, spawnFacing);
+    playerRig.setPosition(initialPlayerPosition, initialPlayerFacing);
   } else {
     errors.push({ atMs: atMs(), source: "characterRig", message: "Player rig failed to build; using the placeholder" });
     scene.createPlaceholderPlayer();
   }
-  scene.syncPlayer(spawn, spawnFacing, true);
-  camera.setPose(spawnFacing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
-  camera.update(spawn[0], spawn[1], spawn[2], true);
+  scene.syncPlayer(initialPlayerPosition, initialPlayerFacing, true);
+  camera.setPose(initialPlayerFacing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
+  camera.update(initialPlayerPosition[0], initialPlayerPosition[1], initialPlayerPosition[2], true);
 
-  // 13. Save.
-  const saves = new SaveService(profile.persistent);
-  const loaded = saves.load();
-  if (loaded.status === "loaded" && loaded.state) {
-    store.replace(loaded.state);
-  } else if (loaded.status === "failed") {
-    errors.push({ atMs: atMs(), source: "persistence", message: `Save could not be loaded: ${loaded.reason ?? "unknown"}` });
-  }
-  // Region loops are selected only after the save decides the player's real starting region.
+  // 13. Region loops are selected only after the save decides the player's starting region.
   // Until this point gesture unlock has no desired loop to start, so the loading screen cannot
   // briefly play Fallowmarch over a character saved elsewhere.
   audioDirector.setRegion(store.get().player.regionId);
@@ -673,6 +685,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // node semantics, and this second sync makes depleted rocks, stumps, and fishing recovery marks
   // visible before the loading screen is dismissed.
   entityViews.sync(entityStore.all());
+  new EssenceSystem({
+    store, events, inventory: inventorySystem, dispatcher: interactions, now,
+  });
   const farmingSystem = new FarmingSystem({
     store, events, clock, rng, entities: entityStore,
     inventory: inventorySystem, activity: activitySystem, dispatcher: interactions,
@@ -693,6 +708,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     dispatcher: interactions,
     movement,
     activity: activitySystem,
+    lootView: LOOT_PILE_VIEW,
   });
   const enemyAiSystem = new EnemyAiSystem({
     store, events, entities: entityStore, combat: combatSystem, nav,
@@ -726,7 +742,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     // over it and nothing to right-click. The agent path never noticed, because an agent finds it
     // through `observe` and loots it by id; a human had no way to see that it was there at all.
     // That asymmetry is the exact thing this project's parity rule exists to catch.
-    cacheView: { assetId: "crate_wood", scale: 1.1, labelHeight: 1.4 },
+    cacheView: RECOVERY_CACHE_VIEW,
   });
   const productionSystem = new ProductionSystem({
     store, events, rng,
@@ -920,6 +936,15 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // damage back for the flight, so the hit log entry arrives at the far end and cannot be the cue.
   events.subscribe((event) => loop.handleSpellLaunch(event, performance.now()));
   events.subscribe((event) => gameAudio.handleEvent(event));
+
+  // An altar payment is small but irreversible. Persist its charge and essence changes as soon as
+  // the event publishes, and also on pagehide so a reload between the click and the next sim flush
+  // cannot roll the transaction back. The regular ten-second autosave remains the general path.
+  const persistCurrentState = (): void => { saves.save(store.get(), Date.now()); };
+  events.subscribe((event) => {
+    if (event.type === "essence.recharged") persistCurrentState();
+  });
+  window.addEventListener("pagehide", persistCurrentState);
 
   // Spell cast, flight and impact. A separate layer from `Vfx` and from `Ambience` because it is the
   // only one that is off entirely most of the time: one InstancedMesh drawing zero instances, which
@@ -1362,13 +1387,16 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     getHeadingRad: () => camera.yaw,
     // The minimap's destination marker. GameApi does not expose the live path; the store does.
     getDestination: () => store.get().player.movement.destination,
-    hasSave: () => loaded.status === "loaded",
+    hasSave: () => resumedFromSave,
     // Declared below. Referenced from inside a closure, so the temporal dead zone never applies:
     // nothing can press "New game" before boot has finished running.
     onNewGame: () => resetWorld(undefined, false),
     ...(featureLab ? { featureLab } : {}),
   });
   ui.mount(labelRoot);
+  api.subscribePendingResult(({ result }) => {
+    if (!result.ok) ui.notify(result.error.message, "error");
+  });
 
   // UI sound follows semantic activation, so pointer clicks and keyboard-generated clicks share
   // one path. Canvas clicks are excluded: world actions have their own material-specific cues.
@@ -1518,6 +1546,20 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     return entityStore.all().filter((entity) => (entity.regionId === "gravelmaw") === inside);
   });
 
+  const rebuildSemanticWorld = (): void => {
+    const rebuilt = profile.buildSemanticWorld(store.get().meta.seed, heightAt, worldPorts);
+    entityStore.load(rebuilt.entities);
+    entityStore.registerLocations(rebuilt.knownLocations);
+    nav.setRouteGraph(rebuilt.routeNodes, rebuilt.routeEdges);
+    rehydrateWorldContainers(store.get(), entityStore, { regionAt: regionAtPoint });
+    campfireSystem.reconstruct();
+    syncCampfireAmbience();
+    const inside = playerInDungeon();
+    entityViews.sync(profile.kind === "feature-lab"
+      ? entityStore.all()
+      : entityStore.all().filter((entity) => (entity.regionId === "gravelmaw") === inside));
+  };
+
   const resetWorld = (seed?: number, keepSave = false): void => {
     if (!keepSave) saves.clear();
     store.reset(seed ?? store.get().meta.seed, Date.now());
@@ -1544,14 +1586,32 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
     // Node yields and enemy health are seeded world state, so a reset rebuilds them rather than
     // leaving a half-mined world behind a nominally fresh character.
-    const rebuilt = profile.buildSemanticWorld(store.get().meta.seed, heightAt, worldPorts);
-    entityStore.load(rebuilt.entities);
-    entityStore.registerLocations(rebuilt.knownLocations);
-    campfireSystem.reconstruct();
-    syncCampfireAmbience();
-    nav.setRouteGraph(rebuilt.routeNodes, rebuilt.routeEdges);
-    entityViews.sync(entityStore.all());
+    rebuildSemanticWorld();
     errors.length = 0;
+  };
+
+  /** Applies a migrated save to every runtime owner, not just to the JSON store. */
+  const replaceWorldFromSave = (next: NonNullable<ReturnType<SaveService["deserialize"]>["state"]>): void => {
+    store.replace(next);
+    rng.reseed(next.meta.seed);
+    events.reset();
+    input.clear();
+    loop.resetPresentation();
+    combatSystem.resetForNewWorld();
+    gameAudio.reset();
+    rebuildSemanticWorld();
+    productionSystem.reset(clock.elapsedMs);
+    gatheringSystem.tick(0, clock.elapsedMs);
+
+    const position = store.get().player.position;
+    const facing = store.get().player.facingRad;
+    if (rigged) playerRig.setPosition(position, facing);
+    scene.syncPlayer(position, facing, true);
+    camera.reset();
+    camera.setPose(facing + Math.PI, CAMERA.defaultPitch, CAMERA.defaultDistance);
+    camera.update(position[0], position[1], position[2], true);
+    audioDirector.setRegion(store.get().player.regionId);
+    discoverySystem.sweep(clock.elapsedMs);
   };
 
   let capturePreviousPause = false;
@@ -1568,18 +1628,21 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     distance: number,
     reason: string,
     playerTarget: Vec3 = target,
+    playerFacingRad = yaw + Math.PI,
   ): void => {
     const landed = nav.closestPoint(playerTarget) ?? playerTarget;
     const regionId = regionAtPoint(landed);
     store.get().player.position = landed;
     store.get().player.regionId = regionId;
-    store.get().player.facingRad = yaw + Math.PI;
+    store.get().player.facingRad = playerFacingRad;
     entityViews.sync(entityStore.all().filter((entity) =>
       (entity.regionId === "gravelmaw") === (regionId === "gravelmaw")));
     audioDirector.setRegion(regionId);
     movement.stop(store.get(), clock.elapsedMs, reason);
-    scene.syncPlayer(landed, yaw + Math.PI, true);
-    camera.setPose(yaw, pitch, distance);
+    scene.syncPlayer(landed, playerFacingRad, true);
+    // Documentation poses may deliberately move inside the player-facing comfort zoom floor so a
+    // held item can be inspected. Interactive mouse-wheel zoom still keeps CAMERA.minDistance.
+    camera.setPose(yaw, pitch, distance, 2);
     camera.update(target[0], target[1], target[2], true);
     renderer.followShadow(renderer.camera.position.clone().setY(landed[1]));
   };
@@ -1651,14 +1714,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
         });
         return;
       }
-      store.replace(loadedBlob.state);
-      productionSystem.reset(clock.elapsedMs);
-      gatheringSystem.tick(0, clock.elapsedMs);
-      campfireSystem.reconstruct();
-      syncCampfireAmbience();
-      entityViews.sync(entityStore.all());
-      const player = store.get().player;
-      teleportPlayer(player.position, player.regionId);
+      replaceWorldFromSave(loadedBlob.state);
       ui.update();
     },
     advanceWorldTime: (seconds) => gatheringSystem.fastForwardRespawns(seconds),
@@ -1736,7 +1792,15 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
           scene.heightAt(shot.regionId, shot.position[0], shot.position[1]) + 0.2,
           shot.position[1],
         ] as Vec3;
-      frameDocumentationTarget(target, shot.yaw, shot.pitch, shot.distance, "focus-camera");
+      frameDocumentationTarget(
+        target,
+        shot.yaw,
+        shot.pitch,
+        shot.distance,
+        "focus-camera",
+        target,
+        shot.yaw + (shot.playerFacingOffsetRad ?? Math.PI),
+      );
       return true;
     },
     focusPlayer: () => {
@@ -1977,7 +2041,12 @@ function validateContentTables(): string[] {
     requireItem(recipe.output.itemId, `recipe ${recipe.id} output`);
     if (recipe.burntItemId) requireItem(recipe.burntItemId, `recipe ${recipe.id} burnt`);
   }
-  for (const spell of content.allSpells()) requireItem(spell.cost.itemId, `spell ${spell.id} cost`);
+  for (const item of content.allItems()) {
+    const charge = item.magicWeapon?.charge;
+    if (!charge) continue;
+    requireItem(charge.rechargeItemId, `magic weapon ${item.id} recharge`);
+    requireItem(charge.orbItemId, `magic weapon ${item.id} Orb recipe`);
+  }
   for (const enemy of content.allEnemies()) {
     for (const drop of enemy.drops) requireItem(drop.itemId, `enemy ${enemy.id} drop`);
   }

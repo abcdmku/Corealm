@@ -3,8 +3,17 @@
 Owner: asset-pipeline specialist. Files: `tools/fetch-assets.ts`, `tools/build-assets.ts`,
 `game/public/assets/**`, this report.
 
-Everything shipped here is **CC0-1.0** (Quaternius). No attribution obligation, no
-licence file needed in the build.
+The original 213-asset Quaternius set is **CC0-1.0**. The current asset tree is not all CC0.
+It also contains four GLBs imported from two packages in the user's Unity Asset Store cache. Those
+files remain subject to the Unity Asset Store EULA; a local cache does not prove entitlement, so the
+project owner must confirm it before shipping. Do not redistribute the source packages or describe
+the Unity-derived files as CC0. Package hashes and conversion details
+live in `game/public/assets/UNITY_ASSET_SOURCES.md`.
+
+Current manifest total: 217 GLBs across 11 packs, plus one recorded VFX atlas artifact. Of those,
+213 GLBs across eight packs are the historical Quaternius output described by the legacy pipeline
+sections below. The four Unity-derived magic assets add 14,662,376 bytes, bringing the models tree
+to 52,243,424 bytes; the eleventh pack is Hovl Studio's atlas source.
 
 ## Commands
 
@@ -12,8 +21,10 @@ licence file needed in the build.
 npx tsx tools/fetch-assets.ts <itch-slug> [...]   # download packs into .asset-cache/ (gitignored)
 npx tsx tools/build-assets.ts                     # incremental build -> game/public/assets/
 npx tsx tools/build-assets.ts --force             # rebuild everything
-npx tsx tools/build-assets.ts --check             # confirm every catalog source exists in its zip
-npx tsx tools/build-assets.ts --verify            # parse every GLB in the manifest
+npx tsx tools/build-assets.ts --check             # check the legacy Quaternius catalogue
+npx tsx tools/build-assets.ts --verify            # verify all 217 GLBs and the recorded atlas
+npx tsx tools/build-assets.ts --preservation-check # prove a legacy rebuild retains imported rows
+npx tsx tools/import-unity-magic-assets.ts         # audit the four Unity-derived magic GLBs
 ```
 
 ## Packs used
@@ -28,6 +39,13 @@ npx tsx tools/build-assets.ts --verify            # parse every GLB in the manif
 | Universal Base Characters | https://quaternius.itch.io/universal-base-characters | CC0-1.0 | 8 |
 | Universal Animation Library | https://quaternius.itch.io/universal-animation-library | CC0-1.0 | 1 |
 | Universal Animation Library 2 | https://quaternius.itch.io/universal-animation-library-2 | CC0-1.0 | 1 |
+| FREE - RPG Weapons | https://assetstore.unity.com/packages/3d/props/weapons/free-rpg-weapons-199738 | Unity Asset Store EULA; owner confirmation required | 2 |
+| Rocks FREE pack | https://assetstore.unity.com/packages/3d/props/exterior/rocks-free-pack-98219 | Unity Asset Store EULA; owner confirmation required | 2 |
+| Magic Effects FREE | https://assetstore.unity.com/packages/vfx/particles/spells/magic-effects-free-247933 | Unity Asset Store EULA; owner confirmation required | 1 atlas artifact |
+
+The first eight rows use the original zip-to-GLB pipeline. Blink and DEXSOFT use the separate Unity
+importer so prefab transforms, FBX scale, normals, UVs, and the selected rock LOD remain intact.
+Hovl contributes the source sprites for the one generated atlas recorded under `artifacts`.
 
 Ultimate Platformer Pack is the odd one out stylistically — flatter, more Mario than
 Synty. It is used only where the fantasy kits have nothing at all (cliffs, bridges,
@@ -61,7 +79,10 @@ clicks "No thanks, just take me to the downloads", then collects the upload butt
 old project-page flow is kept as a fallback. Verified against ten older slugs and the
 existing modern packs.
 
-## Size
+## Legacy Quaternius pipeline size
+
+The table below covers the original 213 Quaternius GLBs only. The four Unity-derived outputs add
+14,662,376 bytes, bringing the current models tree to 52,243,424 bytes.
 
 | | bytes |
 |---|---|
@@ -86,14 +107,16 @@ the subset the pipeline actually reads. Textures are 28% of the output; geometry
 | weapon | 4 | 0.41 MB | 101 KB |
 | **total** | **213** | **37.58 MB** | |
 
-**Budget: met.** Under the ~40 MB target with room to spare.
+**Historical budget: met.** The 37.58 MB Quaternius set stayed under its ~40 MB target. The current
+52.24 MB tree includes the later requested magic assets, so the old budget result does not apply to
+the current total.
 
 Five environment GLBs exceed the ~400 KB target, all of them the densest foliage:
 `tree_twisted_1..5` at 475-519 KB. They are leaf-card geometry, not texture (their
 textures are 42 KB combined). Simplifying them would visibly change the silhouette, so I
 left them; if the budget tightens, drop the twisted set to two variants instead of five.
 
-## Pipeline
+## Legacy Quaternius pipeline
 
 Per asset, read straight out of the zip (nothing is unpacked to disk):
 
@@ -113,7 +136,7 @@ Per asset, read straight out of the zip (nothing is unpacked to disk):
    also capped 512x512, then a sharp palette-quantization pass kept only when smaller.
 6. Write a single self-contained `.glb`.
 
-Measured result: max texture edge across all 213 assets is **512** (295 at 512x512, 5 at
+Measured result for the legacy set: max texture edge across all 213 assets is **512** (295 at 512x512, 5 at
 512x498, 2 at 256x256).
 
 ### Correctness note: quantization and skinned meshes
@@ -157,14 +180,26 @@ Verified:
   everything else was reused and `--verify` passed afterwards.
 - Stale outputs from an earlier catalogue revision are swept from `models/`, but only when
   the run had zero failures, so a partial failure can never delete good assets.
+- Current builds copy the complete models tree into a sibling transaction directory and build there.
+  Only a zero-failure run swaps that directory into place, so a failed conversion cannot alter the
+  published GLBs or manifest. Imported Unity models are copied through and merged back by pack ID.
 
 ## Verification
 
-- `--verify` loads every GLB in the manifest with `@gltf-transform/core`, checks the byte
-  count against the manifest, and requires ≥1 mesh (or ≥1 animation for the libraries).
+- In the recorded legacy run, `--verify` loaded all 213 Quaternius GLBs with
+  `@gltf-transform/core`, checked the byte
+  count against the manifest, and required ≥1 mesh (or ≥1 animation for the libraries).
   **Result: 213/213 parsed and non-empty. Zero failures.**
-- `--check` confirms all 213 catalogue source paths resolve inside their zips. 213/213.
+- In that same run, `--check` confirmed all 213 catalogue source paths resolved inside their zips.
+  Result: 213/213.
 - Manifest id uniqueness and `^[a-z0-9_]+$` are asserted at build time.
+- The current `--verify` run parses all 217 GLBs and enforces the byte counts plus recorded SHA-256
+  values for the four imported models and the atlas artifact. `--preservation-check` confirms that a
+  legacy rebuild retains four imported GLBs, one artifact, and three external pack records.
+- `tools/import-unity-magic-assets.ps1` checks the Blink and DEXSOFT package hashes before opening
+  Unity. `npx tsx tools/import-unity-magic-assets.ts` does not open the packages; it audits the four
+  committed GLBs, enforcing their output hashes, structure, meshes, textures, finite bounds,
+  expected scale, and zero material emission. `build-assets.ts --verify` enforces the Hovl atlas hash.
 
 ### Scale convention
 
@@ -192,7 +227,10 @@ scale at instantiation.
 
 ## Manifest
 
-`game/public/assets/manifest.json`, 213 assets, 8 packs. Shape matches the frozen contract
+`game/public/assets/manifest.json`, 217 GLB assets, one atlas artifact, and 11 packs. Eight packs and
+213 assets are CC0 Quaternius imports. Three source packs cover the four Unity-derived GLBs and the
+one Unity-derived VFX atlas described above.
+The manifest shape matches the frozen contract
 exactly: `generatedAt`, `packs[{id,name,author,source,license}]`,
 `assets[{id,file,pack,category,is,tags,bytes,size:{x,y,z},animations,materials}]`.
 
@@ -239,7 +277,7 @@ live in `building` but are tagged `dungeon`.
 | cliffs | substitute | `cliff_step_1..3`, `cliff_tall` (platformer pack) |
 | mushrooms | yes | `mushroom_common`, `mushroom_bracket` (2) |
 | logs, stumps | **gap** | `anvil_log`, `roof_log` only |
-| ore nodes (2-4 recolourable meshes) | yes | `rock_medium_1..3`, `rock_small_1..2` tagged `ore-node`/`recolour`; plus `ore_crystal_blue/green/pink` |
+| ore nodes (2-4 recolourable meshes) | yes | Standard ore uses `rock_medium_1..3`, `rock_small_1..2`, and `ore_crystal_blue/green/pink`; elemental essence uses DEXSOFT's `rocks_free_essence_cache` and `rocks_free_essence_node` |
 | paths / roads | yes | `path_rock_*` (6), `floor_brick`, `floor_cobble`, `kerb_straight/corner` |
 | houses, cottages | modular only | 42 `building` pieces — walls, corners, doors, windows, roofs, floors, stairs, balconies. **No prebuilt house.** |
 | walls | yes | `wall_plaster_*` (5), `wall_brick_*` (3), `wall_bottom_trim` |
@@ -284,7 +322,8 @@ live in `building` but are tagged `dungeon`.
 | boss | substitute | `enemy_skull` (tagged `boss`, `tier10`) |
 | weapons: sword, axe, pickaxe, shield | yes | `sword`, `axe`, `pickaxe`, `shield` (all tagged `recolour`) |
 | weapons: bow | **gap** | none |
-| weapons: staff | **gap** | none |
+| weapons: staff | yes | Blink `rpg_weapon_staff`, tinted at runtime for Basic Wood, Palewood, Duskoak, and Cairnpine |
+| weapons: wand | yes | Blink `rpg_weapon_wand`, with the same four runtime wood variants |
 | tools: fishing rod | **gap** | none |
 | tools: hammer | **gap** | none |
 | animations | yes | `animation_library_1` + `animation_library_2`, 86 clips total |
@@ -301,12 +340,11 @@ Ordered by how much they hurt Phase 1.
    HitRecieve, Dance, Yes, No — `enemy_bee` has only Bite_Front, Flying, Death,
    HitRecieve). Untextured flat materials, so recolouring per tier is trivial. Scale to
    ~0.7x. Style does not match the megakits; tagged `placeholder-style`.
-2. **No dedicated ore-node mesh.** Nothing in any pack is a mineable vein.
-   *Substitute:* `rock_medium_1..3` and `rock_small_1..2`, all single-material with a
-   `Rocks` base colour, tagged `ore-node`/`minable`/`recolour`. Tint the material per tier
-   (copper → orange-brown, tin → pale grey, iron → red-brown, coal → near-black, silver →
-   cool white, mithril → blue). `ore_crystal_blue/green/pink` are the alternative if you
-   want a crystal read instead of a vein.
+2. **Standard ore still uses shared rock meshes.** `rock_medium_1..3` and
+   `rock_small_1..2` remain the recoloured standard ore nodes. Elemental essence no longer uses
+   that substitute. DEXSOFT's `rocks_free_essence_cache` is the large centre cache and
+   `rocks_free_essence_node` supplies its four satellites. Runtime materials combine the retained
+   source rock textures with a separate glowing vein mask for Air, Earth, or Water.
 3. **No fish, and no boats.** `lowpoly-animated-fish` is OBJ/FBX only.
    *Substitute:* for the catch, reuse `crop_carrot` or a tinted `coin` as a caught-item
    icon until a fish mesh exists. For docks, lay `floor_wood` tiles on `support_beam`
@@ -322,13 +360,12 @@ Ordered by how much they hurt Phase 1.
    *Substitute:* barn = `wall_plaster_timber` walls + `roof_wood_plank`, scaled up. Plot =
    a flat quad with a dirt material bordered by `fence_wood_single`. Scarecrow =
    `training_dummy` (a post with a stuffed torso — reads correctly at distance).
-6. **Weapon set is four items: sword, axe, pickaxe, shield.** No bow, staff, hammer or
-   fishing rod. `lowpoly-medieval-weapons` (24 weapons) is OBJ/FBX only.
-   *Substitute:* staff → `torch` (metal shaft, works held); hammer → `axe` recoloured;
-   fishing rod → none, use `rope_coil` at the dock and animate an empty hand with
-   `Idle_Rail_Loop` from UAL2. Bow has no substitute; cut ranged from Phase 1 or model one.
-   All four existing weapons are single-material and tagged `recolour`, so tier variants
-   (bronze → iron → steel → mithril) are a material tint, not new meshes.
+6. **The physical weapon set now includes a wand and staff.** Blink's `FREE - RPG Weapons`
+   supplies `rpg_weapon_wand` and `rpg_weapon_staff`; the torch substitute is retired. Runtime
+   materials produce the four solid wood bases. Orb-crafted elemental weapon variants add the
+   glowing socket; the Orb itself is never equipped. The Quaternius set still has no bow, hammer,
+   or fishing rod. Hammer can reuse the
+   axe mesh; fishing can keep the empty-hand `Idle_Rail_Loop`; bow still has no suitable substitute.
 7. **No armour above ranger leather.** No metal helm, plate chest, gauntlets or greaves.
    *Substitute:* the ranger set is the top tier for Phase 1. Tint the ranger pieces cooler
    and darker for higher tiers. `outfit_*_ranger_hood` stands in for the helmet slot.
@@ -411,7 +448,8 @@ were deliberately not shipped). Retarget onto `base_male` / `base_female` by nod
 
 ## Notes for the root
 
-- `game/public/assets/manifest.json` is the contract. Nothing in `game/src/` was touched.
+- `game/public/assets/manifest.json` remains the asset contract. The legacy Quaternius builder and
+  Unity magic importer are separate pipelines that write compatible pack and asset records.
 - **Glean:** `chest_wood` is animated — `Chest_Open`, `Chest_Close`, `Chest_Opened`,
   `Chest_Closed`. Use it for the bank rather than faking a lid.
 - Output GLBs use **KHR_mesh_quantization** on unskinned meshes. three.js `GLTFLoader`
@@ -423,8 +461,9 @@ were deliberately not shipped). Retarget onto `base_male` / `base_female` by nod
   harmless and was left alone; ignore it.
 - Every asset from Ultimate Platformer Pack is tagged `placeholder-style`. That is the
   query for a future art pass.
-- `npm run typecheck` currently reports errors in `game/src/render/camera.ts` and an
-  `EventBus` type mismatch. Those are another worker's files and I did not touch them.
+- At the time of the original Phase 1 asset run, `npm run typecheck` reported errors in
+  `game/src/render/camera.ts` and an `EventBus` type mismatch. That note is historical and does not
+  describe the current build status.
   `tools/build-assets.ts` and `tools/fetch-assets.ts` typecheck clean.
 - Not added to `package.json`: nothing. The pipeline uses only the already-installed
   `@gltf-transform/*` and `sharp`, plus a ~120-line ZIP reader written into

@@ -22,7 +22,7 @@ Pick one seam and stay on it. `inspect` the node while you work: its `resource.r
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#bracken-pit">Bracken Pit</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 1"><span>Items</span><a href="../../items/#grithe-ore">Grithe Ore</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/bracken_pit.webp" alt="Bracken Pit in the running Corealm world" loading="lazy" /><figcaption><strong>Bracken Pit</strong><span>Bracken Pit</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/bracken_pit.webp" alt="Bracken Pit in the running Corealm world" loading="lazy" /><figcaption><strong>Bracken Pit</strong><span>Bracken Pit, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Dorn's Tally, step 1">
 <div class="corealm-map-stage" data-map-stage>
@@ -53,7 +53,7 @@ The exact figure was in the `resource.depleted` event, and the quest kept it: it
 
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_pitmaster_dorn.webp" alt="Pitmaster Dorn in the running Corealm world" loading="lazy" /><figcaption><strong>Pitmaster Dorn</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_pitmaster_dorn.webp" alt="Pitmaster Dorn in the running Corealm world" loading="lazy" /><figcaption><strong>Pitmaster Dorn</strong><span>Coldbrace Bank, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Dorn's Tally, step 2">
 <div class="corealm-map-stage" data-map-stage>
@@ -85,7 +85,7 @@ Walk to the bank counter and `bank("deposit", { itemId: "grithe_ore", quantity: 
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#coldbrace-bank">Coldbrace Bank</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#grithe-ore">Grithe Ore</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_bank.webp" alt="Coldbrace Bank in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Bank</strong><span>Coldbrace Bank</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_bank.webp" alt="Coldbrace Bank in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Bank</strong><span>Coldbrace Bank, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Dorn's Tally, step 3">
 <div class="corealm-map-stage" data-map-stage>
@@ -111,7 +111,7 @@ Back to the square. He will have a pen ready; he always has a pen ready.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_pitmaster_dorn.webp" alt="Pitmaster Dorn in the running Corealm world" loading="lazy" /><figcaption><strong>Pitmaster Dorn</strong><span>Coldbrace Square</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_pitmaster_dorn.webp" alt="Pitmaster Dorn in the running Corealm world" loading="lazy" /><figcaption><strong>Pitmaster Dorn</strong><span>Coldbrace Bank, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Dorn's Tally, step 4">
 <div class="corealm-map-stage" data-map-stage>

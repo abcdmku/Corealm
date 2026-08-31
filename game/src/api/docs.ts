@@ -19,7 +19,7 @@ import {
   content, gatherXp, healAmount, respawnSeconds, sellPrice, toolBonus, yieldRange,
 } from "../content/index.js";
 import { REGIONS } from "../content/regions.js";
-import { resourceDef } from "../content/resources.js";
+import { RESOURCE_ARCHETYPES, resourceDef } from "../content/resources.js";
 
 export interface DocEntry {
   id: string;
@@ -88,23 +88,42 @@ export function buildDocs(): DocEntry[] {
       + `Nodes give a limited number of yields before depleting: ${[1, 5, 10].map((tier) => {
         const [low, high] = yieldRange(tier);
         return `tier ${tier} gives ${low} to ${high} and respawns after ${respawnSeconds(tier)} seconds`;
-      }).join(", ")}.`,
+      }).join(", ")}. Essence caches are authored exceptions. Each one holds 40 to 90 successful `
+      + "mining yields and returns 30 seconds after depletion.",
     keywords: ["mining", "woodcutting", "fishing", "gather", "xp per hour", "respawn", "depleted"],
   });
+
+  for (const resource of RESOURCE_ARCHETYPES) {
+    const [low, high] = resource.yieldRange ?? yieldRange(resource.tier);
+    const cooldown = resource.respawnSeconds ?? respawnSeconds(resource.tier);
+    const item = content.item(resource.itemId);
+    entries.push({
+      id: `resource-${resource.id}`,
+      title: resource.name,
+      section: "Resources",
+      body:
+        `${resource.name} needs ${SKILLS[resource.skill]?.name ?? resource.skill} ${resource.reqLevel}. `
+        + `It yields ${item?.name ?? resource.itemId}, gives ${gatherXp(resource.tier)} XP per `
+        + `successful gather, holds ${low} to ${high} yields, and respawns after ${cooldown} seconds.`,
+      keywords: [resource.id, resource.itemId, resource.skill, "resource", "node", "respawn"],
+    });
+  }
 
   entries.push({
     id: "combat-formulas",
     title: "How combat works",
     section: "Combat",
     body:
-      "Attacks resolve on a 600 ms combat tick; a weapon's speed decides how many ticks between "
-      + "swings. Your chance to hit is attackRoll / (attackRoll + defenceRoll), clamped between 5% "
+      "Melee attacks resolve on a 600 ms combat tick. Magic launches and bolt arrivals resolve on "
+      + "the 100 ms simulation tick, which preserves the exact 2.2 second wand and 3.0 second staff "
+      + "cadences. Your chance to hit is attackRoll / (attackRoll + defenceRoll), clamped between 5% "
       + "and 95%, where attackRoll is (attackLevel + 9) scaled by your accuracy bonus and defenceRoll "
       + "is (defenceLevel + 9) scaled by the target's armour. Melee damage rolls between 1 and "
       + "floor(2 + (Melee level + gear power) / 4.2). Magic is 15% more accurate and rolls up to "
-      + "floor(spell base + (Magic level + magic power) / spell divisor), but it is slower and each "
-      + "cast consumes an essence shard. Attacking uses whatever is in your main hand: hold a staff "
-      + "and Attack casts at up to fifteen metres without closing, hold a blade and it swings at 1.6 m. "
+      + "floor(spell base + (Magic level + magic power) / spell divisor). Each cast consumes one "
+      + "matching elemental-weapon charge, then falls back to one carried Essence. Attacking uses whatever is in your main "
+      + "hand: a wand casts every 2.2 seconds for lower power, a two-handed staff casts every 3.0 "
+      + "seconds for higher power, and a blade swings at 1.6 m. Both magic weapons reach fifteen metres. "
       + "A spell does not hurt anything until its bolt arrives, which takes about 0.3 to 1.3 seconds "
       + "depending on the spell and the range, so the target's health moves after the cast rather "
       + "than with it. "
@@ -113,6 +132,25 @@ export function buildDocs(): DocEntry[] {
       + "maximum health when it dies. Health is derived: 20 + 3 * floor((Melee + Magic) / 2) plus any "
       + "vitality from equipment. Out of combat you regain 1 health every 6 seconds.",
     keywords: ["melee", "magic", "damage", "accuracy", "max hit", "health", "hp", "spell"],
+  });
+
+  entries.push({
+    id: "magic-agent-controls",
+    title: "Reading spells and recharging elemental weapons",
+    section: "Combat",
+    body:
+      "corealm_spellbook with op read returns every spell, the selected and active spell ids, the "
+      + "equipped charged weapon, carried Essence, and released elements. Each spell row includes castMs, "
+      + "requiredElement, fuelCost, castable, and blockedBy. The equippedWeapon row includes "
+      + "itemId, element, charges, capacity, rechargeItemId, and rechargeCost. To refill it, equip a "
+      + "charged elemental wand or staff and call corealm_interact with interaction recharge on an "
+      + "Essence Altar. A successful refill emits essence.recharged with altarId, weaponItemId, element, "
+      + "before, after, essenceItemId, and essenceSpent. spell.launched reports whether weapon charge or "
+      + "carried Essence paid for the cast.",
+    keywords: [
+      "corealm_spellbook", "corealm_interact", "recharge", "essence.recharged", "spell.launched",
+      "weapon charge", "equippedWeapon", "remainingCharges",
+    ],
   });
 
   entries.push({
@@ -166,6 +204,33 @@ export function buildDocs(): DocEntry[] {
         .map(([key, value]) => `${key} ${value > 0 ? "+" : ""}${value}`)
         .join(", ");
       if (bonuses) parts.push(`Bonuses: ${bonuses}.`);
+    }
+    if (item.magicWeapon) {
+      parts.push(
+        `${item.magicWeapon.kind === "wand" ? "One-handed wand" : "Two-handed staff"}; `
+        + `casts every ${((item.equip?.attackSpeedMs ?? 0) / 1000).toFixed(1)} seconds.`,
+      );
+      if (item.magicWeapon.charge) {
+        const charge = item.magicWeapon.charge;
+        const rechargeItem = content.item(charge.rechargeItemId)?.name ?? charge.rechargeItemId;
+        parts.push(
+          `Holds ${charge.capacity} ${charge.element} charges. An Essence Altar refills it for `
+          + `${charge.rechargeCost} ${rechargeItem}.`,
+        );
+      }
+    }
+    if (item.orb) {
+      const element = item.orb.element === "wind"
+        ? "Air"
+        : `${item.orb.element[0]!.toUpperCase()}${item.orb.element.slice(1)}`;
+      const craftedCharge = content.allItems()
+        .find((candidate) => candidate.magicWeapon?.charge?.orbItemId === item.id)
+        ?.magicWeapon?.charge;
+      parts.push(
+        `Crafting component for a ${element} wand or staff. The finished weapon starts with `
+        + `${craftedCharge?.initialCharges ?? 1000} stored charges. `
+        + `${item.orb.released ? "This orb is released." : "This orb is future content and cannot be obtained yet."}`,
+      );
     }
     if (item.food) parts.push(`Eating it restores ${item.food.healAmount} health.`);
     if (item.tool) parts.push(`Used for ${item.tool.skill}, adding ${item.tool.gatherBonus} effective levels.`);
@@ -223,11 +288,11 @@ export function buildDocs(): DocEntry[] {
         `${spell.name} is a ${spell.element} ${spell.rung} spell and needs Magic ${spell.reqLevel}. `
         + `${spell.description} `
         + `Maximum damage is ${spell.baseMax} plus (Magic level + magic power) / ${spell.divisor}. `
-        + `Each cast takes ${(spell.castMs / 1000).toFixed(1)} seconds, gives ${spell.baseXp} Magic `
-        + `experience hit or miss, and consumes ${spell.cost.quantity}x `
-        + `${content.item(spell.cost.itemId)?.name ?? spell.cost.itemId}. `
+        + `Cast cadence comes from the equipped weapon (wands are faster; staffs are stronger), `
+        + `gives ${spell.baseXp} Magic experience hit or miss, and consumes ${spell.cost.charges} `
+        + `${spell.cost.element === "wind" ? "Air" : spell.cost.element} weapon charge or Essence. `
         + "All four elements deal the same kind of damage; they differ in when they unlock, so the "
-        + "strongest spell available rotates between them as Magic levels.",
+        + "released Essence and elemental weapons gate which element can be cast.",
       // Element and rung are keywords because "what wind spells do I have" is the question a player
       // or an agent actually asks, and neither word appears in a spell's own name.
       keywords: [spell.id, spell.element, spell.rung, "spell", "magic"],

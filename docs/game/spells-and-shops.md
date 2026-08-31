@@ -7,22 +7,48 @@ description: "Spell costs and shop inventories from the live economy tables."
 
 | Spell | Magic level | Base max | Divisor | XP | Cast time | Cost |
 | --- | --- | --- | --- | --- | --- | --- |
-| Emberlash | 1 | 3 | 8 | 5 | 3.0 s | 1× Essence Shard |
-| Stonebrand | 5 | 5 | 7 | 12 | 3.0 s | 1× Essence Shard |
-| Voltrend | 10 | 8 | 6 | 22 | 3.0 s | 1× Essence Shard |
-| Rimewash | 13 | 9 | 6 | 28 | 3.0 s | 1× Essence Shard |
-| Skirlbolt | 17 | 11 | 5.5 | 36 | 3.0 s | 1× Essence Shard |
-| Sleetbolt | 23 | 13 | 5.2 | 47 | 3.0 s | 1× Essence Shard |
-| Shalebolt | 29 | 15 | 5 | 59 | 3.0 s | 1× Essence Shard |
-| Cinderbolt | 35 | 17 | 4.8 | 71 | 3.0 s | 1× Essence Shard |
-| Galeburst | 41 | 19 | 4.6 | 84 | 3.0 s | 1× Essence Shard |
-| Spateburst | 47 | 21 | 4.4 | 97 | 3.0 s | 1× Essence Shard |
-| Cragburst | 53 | 23 | 4.2 | 111 | 3.0 s | 1× Essence Shard |
-| Pyreburst | 59 | 25 | 4 | 125 | 3.0 s | 1× Essence Shard |
-| Squallsurge | 62 | 27 | 3.8 | 133 | 3.0 s | 1× Essence Shard |
-| Tidesurge | 65 | 29 | 3.6 | 141 | 3.0 s | 1× Essence Shard |
-| Scarpsurge | 68 | 31 | 3.5 | 149 | 3.0 s | 1× Essence Shard |
-| Kilnsurge | 70 | 33 | 3.4 | 155 | 3.0 s | 1× Essence Shard |
+| Voltrend | 1 | 3 | 8 | 5 | 2.2 s wand / 3.0 s staff | 1× Air weapon charge or Essence |
+| Stonebrand | 5 | 5 | 7 | 12 | 2.2 s wand / 3.0 s staff | 1× Earth weapon charge or Essence |
+| Rimewash | 10 | 8 | 6 | 22 | 2.2 s wand / 3.0 s staff | 1× Water weapon charge or Essence |
+| Emberlash | 15 | 9 | 6 | 30 | 2.2 s wand / 3.0 s staff | 1× Fire weapon charge or Essence |
+| Skirlbolt | 17 | 11 | 5.5 | 36 | 2.2 s wand / 3.0 s staff | 1× Air weapon charge or Essence |
+| Sleetbolt | 23 | 13 | 5.2 | 47 | 2.2 s wand / 3.0 s staff | 1× Water weapon charge or Essence |
+| Shalebolt | 29 | 15 | 5 | 59 | 2.2 s wand / 3.0 s staff | 1× Earth weapon charge or Essence |
+| Cinderbolt | 35 | 17 | 4.8 | 71 | 2.2 s wand / 3.0 s staff | 1× Fire weapon charge or Essence |
+| Galeburst | 41 | 19 | 4.6 | 84 | 2.2 s wand / 3.0 s staff | 1× Air weapon charge or Essence |
+| Spateburst | 47 | 21 | 4.4 | 97 | 2.2 s wand / 3.0 s staff | 1× Water weapon charge or Essence |
+| Cragburst | 53 | 23 | 4.2 | 111 | 2.2 s wand / 3.0 s staff | 1× Earth weapon charge or Essence |
+| Pyreburst | 59 | 25 | 4 | 125 | 2.2 s wand / 3.0 s staff | 1× Fire weapon charge or Essence |
+| Squallsurge | 62 | 27 | 3.8 | 133 | 2.2 s wand / 3.0 s staff | 1× Air weapon charge or Essence |
+| Tidesurge | 65 | 29 | 3.6 | 141 | 2.2 s wand / 3.0 s staff | 1× Water weapon charge or Essence |
+| Scarpsurge | 68 | 31 | 3.5 | 149 | 2.2 s wand / 3.0 s staff | 1× Earth weapon charge or Essence |
+| Kilnsurge | 70 | 33 | 3.4 | 155 | 2.2 s wand / 3.0 s staff | 1× Fire weapon charge or Essence |
+
+## Elemental orbs
+
+Boss orbs are singleton crafting components, not equipment. Combine one with the matching wood-tier wand or staff to create an elemental weapon with 1,000 charges.
+
+| Orb | Tier | Element | Crafted weapon | Matching Essence | Status |
+| --- | --- | --- | --- | --- | --- |
+| [Air Orb](./items/#air-orb) | 1 | Air | 1000 charges in the crafted weapon | Air Essence | Released |
+| [Earth Orb](./items/#earth-orb) | 5 | Earth | 1000 charges in the crafted weapon | Earth Essence | Released |
+| [Water Orb](./items/#water-orb) | 10 | Water | 1000 charges in the crafted weapon | Water Essence | Released |
+| [Fire Orb](./items/#fire-orb) | 15 | Fire | 1000 charges in the crafted weapon | Fire Essence | Future content |
+
+## Charged elemental weapons
+
+A matching weapon charge pays for the cast first. At zero charge, the weapon keeps casting from carried matching Essence. An Essence Altar consumes 100 matching Essence to refill the equipped weapon to 1,000.
+
+| Weapon | Element | Capacity | Full recharge | Status |
+| --- | --- | --- | --- | --- |
+| [Air Wand](./items/#air-wand) | Air | 1000 | 100× Air Essence | Released |
+| [Air Staff](./items/#air-staff) | Air | 1000 | 100× Air Essence | Released |
+| [Earth Wand](./items/#earth-wand) | Earth | 1000 | 100× Earth Essence | Released |
+| [Earth Staff](./items/#earth-staff) | Earth | 1000 | 100× Earth Essence | Released |
+| [Water Wand](./items/#water-wand) | Water | 1000 | 100× Water Essence | Released |
+| [Water Staff](./items/#water-staff) | Water | 1000 | 100× Water Essence | Released |
+| [Fire Wand](./items/#fire-wand) | Fire | 1000 | 100× Fire Essence | Future content |
+| [Fire Staff](./items/#fire-staff) | Fire | 1000 | 100× Fire Essence | Future content |
 
 ## Shops
 
@@ -35,7 +61,9 @@ description: "Spell costs and shop inventories from the live economy tables."
 | [Palewood Rod](./items/#palewood-rod) | 5 | 45 |
 | [Seared Minnow](./items/#seared-minnow) | 30 | 22 |
 | [Bittergrain Seed](./items/#bittergrain-seed) | 50 | 6 |
-| [Essence Shard](./items/#essence-shard) | 200 | 9 |
+| [Air Essence](./items/#air-essence) | 200 | 9 |
+| [Basic Wooden Wand](./items/#basic-wooden-wand) | 5 | 12 |
+| [Basic Wooden Staff](./items/#basic-wooden-staff) | 5 | 20 |
 | [Palewood Shaft](./items/#palewood-shaft) | 100 | 4 |
 | [Coarse Hide](./items/#coarse-hide) | 15 | 16 |
 
@@ -62,7 +90,7 @@ description: "Spell costs and shop inventories from the live economy tables."
 | [Seared Trout](./items/#seared-trout) | 25 | 62 |
 | [Seared Minnow](./items/#seared-minnow) | 20 | 22 |
 | [Duskberry Seed](./items/#duskberry-seed) | 30 | 22 |
-| [Essence Shard](./items/#essence-shard) | 200 | 9 |
+| [Earth Essence](./items/#earth-essence) | 200 | 24 |
 | [Duskoak Shaft](./items/#duskoak-shaft) | 80 | 14 |
 | [Bramble Hide](./items/#bramble-hide) | 12 | 55 |
 | [Corven Bar](./items/#corven-bar) | 30 | 110 |
@@ -77,7 +105,7 @@ description: "Spell costs and shop inventories from the live economy tables."
 | [Seared Cragfin](./items/#seared-cragfin) | 40 | 70 |
 | [Seared Trout](./items/#seared-trout) | 20 | 62 |
 | [Cairnleaf Seed](./items/#cairnleaf-seed) | 30 | 52 |
-| [Essence Shard](./items/#essence-shard) | 300 | 9 |
+| [Water Essence](./items/#water-essence) | 300 | 55 |
 | [Cairnpine Shaft](./items/#cairnpine-shaft) | 60 | 32 |
 | [Wight Shroud](./items/#wight-shroud) | 8 | 130 |
 

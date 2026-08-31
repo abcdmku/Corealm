@@ -332,7 +332,7 @@ export class BankPanel implements ManagedPanel {
     const result = this.ctx.api.bank("depositAll");
     if (result.ok) {
       this.paintBank(result.value, true);
-      notify("Deposited everything.", "success");
+      notify("Deposited all carried items that fit.", "success");
     } else {
       report(result);
     }

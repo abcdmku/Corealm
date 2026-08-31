@@ -16,7 +16,7 @@ Everything here is meant to be implemented literally. Where a number appears, it
 
 ### In scope
 
-All 11 skills, movement and camera, click-to-move over a real navmesh, keyboard movement, Rapier collision, semantic entities, 28-slot inventory, 9-slot equipment, bank, currency, shops, gathering with depletion and respawn, four production skills, melee and magic combat, enemies with three behaviours, loot, derived health, death and item recovery, NPCs, dialogue, 10 quests including one 7-stage chain, one dungeon, one boss, browser-local persistence, generated documentation, the WebMCP tool set, the agent event queue, four overlay kinds, and `window.__gameDebug`.
+All 11 skills, movement and camera, click-to-move over a real navmesh, keyboard movement, Rapier collision, semantic entities, 28-slot inventory, 9-slot equipment, bank, currency, shops, gathering with depletion and respawn, four production skills, melee and magic combat, enemies with three behaviours, loot, derived health, death and item recovery, NPCs, dialogue, 10 quests including one 7-stage chain, one dungeon, three released region bosses, browser-local persistence, generated documentation, the WebMCP tool set, the agent event queue, four overlay kinds, and `window.__gameDebug`.
 
 ### Cut from Phase 1
 
@@ -34,14 +34,72 @@ These appear in the brief but do not serve the Phase 1 gate. Each is listed with
 | Ranged combat, prayer-style systems, special attacks, multiple weapon styles | Not among the brief's 11 skills. | Never. |
 | Day/night, weather, ambient audio, music | Not gate-checked, and each is a full system. | Phase 2 at the earliest. |
 | Multiplayer, accounts, server persistence | The brief says browser-local for this roadmap. | Out of roadmap. |
-| Item degradation, repair, charges (except magic essence shards) | No gate criterion. | Out of scope. |
-| Paid or non-Quaternius assets, heavy VFX | Phase 1 is free Quaternius only, per the brief. | Phase 3. |
+| Item degradation and repair, outside elemental-weapon charges | No gate criterion. | Out of scope. |
+| Paid assets and heavy VFX | The approved magic amendment adds the free Blink `FREE - RPG Weapons` pack and DEXSOFT `Rocks FREE pack`; other paid or unapproved packs remain out of scope. | Phase 3. |
 
 ### Deliberate simplifications that need root sign-off
 
 1. **No separate Defence skill.** The brief lists Melee as covering "physical accuracy, damage, defense", so physical defence level equals the Melee level and magical defence level equals the Magic level. That keeps the skill count at exactly 11.
 2. **Death drops inventory only, not equipment.** The brief asks for consequence while keeping experimentation practical. Dropping worn gear makes the agent recovery loop much harder to test and much harsher for new players. Equipment stays worn through death.
-3. **Magic needs a consumable.** Attack spells consume one Essence Shard per cast. Without a cost, magic beats melee at every tier because it has no upkeep. Shards come from Crafting (gem plus log) and from shops, which wires Magic into Mining and Crafting.
+3. **Magic needs a consumable.** A cast spends one matching Essence. An upgraded elemental weapon spends its matching stored charge first and falls back to carried Essence when empty. Mining and the Essence Altar provide the upkeep loop.
+
+### Approved scope amendment: audio
+
+The August 29, 2026 audio brief reverses the Phase 1 cut for ambient audio and music. The shipped game now includes:
+
+- A rights-traced SFX library plus owner-supplied local music, curated to Corealm's grounded medieval-fantasy tone. Files that read as modern, sci-fi, cartoon, firearm, vehicle, electronic, or otherwise outside that tone are excluded.
+- SFX for player footsteps and every shipped interaction family: mining, woodcutting, fishing, farming, smithing, smelting, crafting, cooking, fletching, melee, magic, damage, death, looting, doors, portals, agility, equipment, banking, shops, dialogue, and UI feedback.
+- Repeated cue variants play in a fixed round-robin order at a fixed playback rate. Footsteps read the rendered ground material, with distinct families for grass, dirt and mud, stone and gravel, wood, forest floor, and cave floor.
+- Region ambience for the three surface regions and the Gravelmaw interior. Ambience changes with semantic player region and never changes game state.
+- Region music only where the supplied `C:\Users\Borg\Music\corealm` library names a shipped region theme. Fallowmarch uses plains music, Vellenwood uses `Deep Woodland`, Karrowmoor uses `Stone city`, and Gravelmaw has no music until a matching track is supplied. Desert, jungle, goblin-village, mire, and swamp tracks are reserved for future regions.
+- Three independently persisted client volumes, `music`, `ambient`, and `sfx`, exposed in an Audio section reachable from the main menu. Each control applies immediately and supports a true zero-volume state.
+- Browser acceptance that proves audio unlocks after a user gesture, region changes select the right ambience and eligible music, representative semantic actions select the right cue family, zero volume silences its own bus, settings survive reload, and no audio error reaches the console.
+
+### Approved scope amendment: magic weapons, elemental orbs, and essence
+
+The August 30, 2026 magic-equipment brief replaces generic Essence Shards and the procedural staff proxies with a physical weapon, orb, mining, and recharge loop.
+
+#### Weapon ladder
+
+- A new character starts with the Basic Wooden Wand equipped. Its wood and socket are plain brown and unlit.
+- A new character carries 50 Air Essence. A plain wand or staff consumes one matching Essence per cast, so Voltrend works immediately.
+- The Basic Wooden Staff is the tier-0 staff. Palewood, Duskoak, and Cairnpine variants follow at tiers 1, 5, and 10. The matching wand variants use the same log ladder. Wood species changes the base colour while every plain weapon remains unlit.
+- Staffs are two-handed, slower, and stronger. Wands are one-handed, weaker, and faster. The released cadence is 3.0 seconds for a staff and 2.2 seconds for a wand. A two-handed staff cannot be equipped alongside an off-hand item. There is no orb equipment slot.
+- Staff and wand meshes come from Blink's free `FREE - RPG Weapons` Unity Asset Store pack. An elemental weapon has a glowing socket in its element colour. Plain weapons stay non-emissive.
+- Tiered staffs and wands are Fletching products made from the matching log's shafts. Crafting a released boss Orb with its matching wood-tier wand or staff consumes the Orb and creates the elemental charged weapon: Air with Palewood, Earth with Duskoak, and Water with Cairnpine.
+
+#### Orb progression
+
+| Tier | Region | Boss reward | Released |
+| --- | --- | --- | --- |
+| 1 | Fallowmarch | Air Orb | Yes |
+| 5 | Vellenwood | Earth Orb | Yes |
+| 10 | Karrowmoor / Gravelmaw | Water Orb | Yes |
+| 15 | Future region | Fire Orb | No |
+
+- The tier 1 and tier 5 regions gain named region bosses. Ordrun remains the tier 10 boss. Each boss has a guaranteed orb drop for its tier.
+- Orbs are singleton crafting components, never equipment. The elemental weapon created from one starts at exactly 1,000 of 1,000 charges. One compatible spell cast spends one weapon charge whether the cast hits or misses.
+- The spell ladder opens with air at Magic 1, earth at Magic 5, water at Magic 10, and fire at Magic 15. Fire spells remain visible as future progression but cannot be cast because the Fire Orb and Fire Essence are not released.
+- Direct casts and automatic attacks require a wand or staff plus matching fuel. A matching charged weapon pays first; otherwise one carried matching Essence pays. Human, agent, debug, and persistence paths read and mutate the same weapon-charge and inventory state.
+
+#### Essence caches and altars
+
+- Each released surface region has one distant authored essence cache, placed away from its settlement and ordinary gathering loop. The cache contains one large mineable centre and four smaller mineable nodes around it.
+- Every node uses a model from DEXSOFT's free `Rocks FREE pack`. Its rock remains readable under the region palette and has element-coloured emissive veins. Depleted nodes keep the same silhouette, lose the emissive veins, and show the shared depleted state.
+- Each node rolls a total capacity of 40 to 90 essence when the world builds and every time it returns. A successful mining roll grants one matching, stackable essence and removes one capacity. The node respawns exactly 30 seconds after depletion.
+- Air, Earth, and Water Essence use the normal Mining requirements for tiers 1, 5, and 10. Fire Essence has no released node.
+- Every released settlement has an Essence Altar. Interacting with an altar while a partially charged elemental wand or staff is equipped consumes exactly 100 matching Essence and restores that weapon to 1,000 charges. A full weapon is refused without taking Essence.
+- Recharging emits a semantic event, updates the spellbook and equipment readouts immediately, and persists through save and reload.
+
+#### Acceptance additions
+
+1. A fresh character visibly holds the plain brown Basic Wooden Wand. No socket or weapon part emits light.
+2. Crafting and equipping each released elemental weapon shows the correct socket glow and an exact charge readout on the weapon.
+3. A wand's repeated casts resolve at 2.2 seconds and deal less damage than the same-tier 3.0-second staff. A staff refuses to equip while an off-hand item is worn.
+4. Killing each released region boss produces its guaranteed crafting Orb. The weapon crafted from it starts at 1,000 charges.
+5. Mining a released essence node yields one essence per successful roll, exhausts after a deterministic 40-to-90 roll, emits `resource.depleted`, and returns 30 seconds later with a fresh 40-to-90 roll.
+6. An altar interaction with 100 matching Essence and a partially charged elemental weapon removes exactly 100 Essence and restores exactly 1,000 charges. A plain weapon, wrong Essence, a full weapon, or fewer than 100 Essence changes nothing and returns a specific error.
+7. Browser state before and after an Essence-funded cast, a weapon-charge-funded cast, node depletion, node respawn, Orb loot, crafting, and altar recharge proves the semantic changes. Screenshots cover the starter wand, all three cache colours, both weapon families charged and unlit, an Orb drop, and the equipment charge readout.
 
 ---
 
@@ -163,7 +221,10 @@ Out of combat, health regenerates 1 point every 6.0 s. Regeneration stops while 
 
 ### 2.4 Combat formulas
 
-All rolls resolve on the combat tick, which is 600 ms. A weapon with speed 2.4 s attacks every 4 combat ticks.
+Melee and enemy rolls resolve on the 600 ms combat cadence. Magic is checked on every 100 ms sim
+tick so the authored 2.2-second wand and 3.0-second staff cadences resolve exactly rather than being
+rounded to a 600 ms boundary. A standard 2.4-second melee weapon still attacks every four combat
+ticks.
 
 **Accuracy.**
 
@@ -204,11 +265,11 @@ maxHit = floor(spell.baseMax + (magicLevel + gearMagicPower) / spell.divisor)
 
 | Spell | baseMax | divisor | maxHit at unlock | maxHit 10 levels later with tier gear |
 | --- | --- | --- | --- | --- |
-| Emberlash (Magic 1) | 3 | 8 | 3 | 6 |
+| Voltrend (Magic 1) | 3 | 8 | 3 | 6 |
 | Stonebrand (Magic 5) | 5 | 7 | 6 | 9 |
-| Voltrend (Magic 10) | 8 | 6 | 14 | 18 |
+| Rimewash (Magic 10) | 8 | 6 | 14 | 18 |
 
-Magic is slower (3.0 s per cast against 2.4 s for a standard sword) and costs one Essence Shard per cast, but it is 15% more accurate through `styleFactor`. Its niche is high-`armour`, low-`magicArmour` targets. Against a Cairnwight (armour +55, magicArmour +10) at Magic 10 with a Kaldite staff, Voltrend kills in 24 s where a Kaldite sword at Melee 12 takes 33 s. Against a Scree Skitterling (armour +30, magicArmour +40) melee wins. Both paths stay useful, which is a gate criterion.
+Magic costs one matching elemental-weapon charge or carried Essence per cast and is 15% more accurate through `styleFactor`. Wands cast every 2.2 seconds with lower power; two-handed staffs cast every 3.0 seconds with higher power. Its niche is high-`armour`, low-`magicArmour` targets. Against a Cairnwight (armour +55, magicArmour +10) at Magic 10 with a Water Staff, Rimewash outperforms the equivalent melee path. Against a Scree Skitterling (armour +30, magicArmour +40) melee wins. Both paths stay useful, which is a gate criterion.
 
 **Combat XP.**
 
@@ -266,18 +327,21 @@ Mining 1 to 10, switching to tier 5 ore at Mining 5, takes 9.4 minutes of pure g
 ### 2.6 Node durability and respawn
 
 ```
-yieldRange(tier)     = [ max(4, round(9  - 0.052 * tier)),
+yieldRange(tier)     = [ max(4, round(8.5 - 0.052 * tier)),
                          max(8, round(15 - 0.052 * tier)) ]
 respawnSeconds(tier) = round(18 + 3.2 * tier ^ 0.9)
 ```
 
 | Tier | Yields per life | Respawn |
 | --- | --- | --- |
-| 1 | 9 to 15 | 21 s |
-| 5 | 9 to 15 | 32 s |
+| 1 | 8 to 15 | 21 s |
+| 5 | 8 to 15 | 32 s |
 | 10 | 8 to 14 | 43 s |
 | 50 | 6 to 12 | 126 s |
 | 99 | 4 to 10 | 218 s |
+
+These formulas are the default for ordinary nodes. An authored `yieldRange` or `respawnSeconds`
+overrides it; each released essence-cache node uses 40–90 capacity and exactly 30 seconds.
 
 Yield count is rolled from the seeded RNG when a node respawns. A depleted node swaps to its depleted mesh variant and desaturates its material by 45%.
 
@@ -298,9 +362,9 @@ recipeXp = round(yieldXp(tier) * craftWeight)
 | Helm, boots, gloves | 2.5 | 3.0 s | Smithing |
 | Pickaxe or hatchet head | 2.2 | 3.0 s | Smithing |
 | Cooked food | 1.5 | 2.4 s | Cooking |
-| Essence shard (yields 5) | 1.2 | 2.4 s | Crafting |
 | Amulet or ring | 3.0 | 2.4 s | Crafting |
 | Leather body | 4.0 | 2.4 s | Crafting |
+| Wand | 2.4 | 1.8 s | Fletching |
 | Staff | 3.2 | 1.8 s | Fletching |
 | Tool handle | 1.0 | 1.8 s | Fletching |
 | Fishing rod | 1.8 | 1.8 s | Fletching |
@@ -364,7 +428,7 @@ Plot lifecycle: `empty -> raked -> planted -> growing(stage 1..n) -> ready -> ha
 
 ### 2.10 Inventory, bank, currency
 
-- Inventory: 28 slots. Stackable kinds are currency, essence shards, seeds, shafts, and gems. Everything else takes one slot per item, including every ore, log, fish, bar, and equipment piece.
+- Inventory: 28 slots. Stackable kinds are currency, elemental essence, seeds, shafts, and gems. Everything else takes one slot per item, including every ore, log, fish, bar, and equipment piece.
 - Bank: 400 slots, every slot stacks to 2,147,483,647. Deposit, withdraw, deposit-all, quantity selection (1 / 5 / 10 / all / custom), and a substring name filter.
 - Currency: **marks**. Stackable, carried in inventory, dropped by enemies, paid by quests, earned by selling.
 
@@ -381,7 +445,7 @@ Reference prices. Shop buy price to the player and sell price from the player, a
 | Grithe sword | 180 | 108 |
 | Corven sword | 620 | 372 |
 | Kaldite sword | 1,450 | 870 |
-| Essence shard | 9 | 5 |
+| Air essence | 9 | 5 |
 | Seared Cragfin | 70 | 42 |
 
 Enemy mark drops are `randomInt(round(tier * 3), round(tier * 11))`, so tier 1 drops 3 to 11 and tier 10 drops 30 to 110. Ordrun drops 900 to 1,400 plus a guaranteed Kaldite piece.
@@ -403,7 +467,10 @@ Movement speed is 4.2 m/s running and 1.9 m/s walking. Walking is used only by N
 The game runs a fixed-step simulation inside a variable-rate render loop. Two clocks:
 
 - **Sim tick:** 100 ms fixed step. Up to 5 sim steps per frame, then the accumulator clamps to avoid spiral-of-death after a tab restore.
-- **Combat / gather tick:** 600 ms, counted in sim ticks (every 6th sim step). All combat rolls, gather rolls, and production completions land here so results are reproducible from a seed and a tick count.
+- **Combat / gather tick:** 600 ms, counted in sim ticks (every 6th sim step). Melee, enemy attacks,
+  gather rolls, and production completions land here. Magic launch readiness is the deliberate
+  exception: it is checked each 100 ms sim tick so wands resolve at exactly 2.2 seconds and staffs at
+  exactly 3.0 seconds. Every path remains deterministic from the seed and sim-tick count.
 
 `__gameDebug.step(ms)` drives sim ticks manually while paused, which is how Playwright gets determinism.
 
@@ -511,6 +578,8 @@ Fallowmarch is the last surveyed land before the maps stop being useful. Two gen
 | --- | --- | --- |
 | Coldbrace town | Centre-south, walled, two gates | Bank (12 counter slots visually, one shared 400-slot store), General shop, Smith shop, furnace and anvil, cooking range, crafting table, fletching bench, 5 quest NPCs |
 | Bracken Pit | 160 m north of town | 6 Grithe ore nodes (tier 1), 2 stone nodes |
+| Galeheart Cache | Remote west march | Air Essence: one large centre plus four satellites, 40–90 capacity each, 30 s respawn |
+| Tempest Roc | Remote cache approach | Tier-1 region boss; first guaranteed singleton drop is the Air Orb |
 | Palewood Copse | 190 m west | 8 Palewood trees (tier 1) |
 | Redsill Shallows | 120 m east, on Corven Brook | 4 fishing spots, Silt minnow (tier 1) |
 | Marchfield | 90 m north-east, inside the wall line | 6 farm plots, Bittergrain seeds |
@@ -531,11 +600,12 @@ Vellenwood grows out of the north end of Fallowmarch the way a wall grows out of
 
 | Feature | Contents |
 | --- | --- |
-| Rootfall hamlet | Bank chest, general shop, cooking range, anvil, 3 quest NPCs |
+| Rootfall hamlet | Bank chest, general shop, cooking range, anvil, 3 quest NPCs, Essence Altar |
 | Duskoak Stand | 10 Duskoak trees (tier 5) |
 | Hollowcut Seam | 5 Corven ore nodes (tier 5), 38 m from the Rootfall bank chest |
 | Blackwater Pools | 5 fishing spots, Bramble trout (tier 5) |
 | The Thornline | Thornbound Husks, Bramble Skitterlings, Marchwolves |
+| Rootheart Cache | Remote eastern wood | Earth Essence: one large centre plus four satellites, 40–90 capacity each, 30 s respawn; Rootheart guards the first Earth Orb |
 | Fallen Duskoak (Agility 5) | Gorge crossing, saves 85 m |
 | Canopy Walk (Agility 6) | Three-platform route above the stand |
 | Root Tunnel (Agility 8) | Rootfall to the Thornline, saves 110 m |
@@ -572,7 +642,8 @@ Karrowmoor is what Fallowmarch would be if you tilted it sixty degrees and took 
 - Phase 1 (100% to 55% HP): melee only, chases, leashes at 24 m.
 - Transition at 55%: Ordrun plants and stone plates rise around the arena. 3 s of invulnerability.
 - Phase 2 (55% to 0%): every 12 s Ordrun telegraphs a ground slam. A 5 m red decal appears for 1.6 s, then deals 22 damage to anyone standing in it. Its melee cadence drops to 2.4 s. Armour drops to +38, so the fight speeds up if the player survives the slams.
-- Death drops 900 to 1,400 marks, one guaranteed Kaldite item from a 4-entry table, and the Quarrykeeper's Cairnstone quest item.
+- Death drops 900 to 1,400 marks, one guaranteed Kaldite item from a 4-entry table, the
+  Quarrykeeper's Cairnstone quest item, and the singleton Water Orb on first acquisition.
 
 **Look.** Cold blue-grey slate, lichen green-yellow accents, a single warm firelight source per camp. Sparse props, but very large ones. Sightlines are vertical: the player can see three terraces at once from most positions, which makes route planning readable at a glance.
 
@@ -618,7 +689,7 @@ Every interaction reachable by mouse also has a keyboard route, because Playwrig
 | HUD | Health bar with numeric `cur/max`, marks count, active activity bar with a label and progress, floating XP drops, event toast strip (bottom-left, 4 lines, 6 s decay), compass strip, Recovery Cache countdown banner when one is live. |
 | Inventory | 4 x 7 grid, drag to reorder, left click uses, right click opens the context menu, hover shows the tooltip. |
 | Skills | 11 rows: icon, name, level, XP bar, XP to next. Clicking a row opens that skill's generated guide with every unlock at every tier. |
-| Equipment | Nine slots laid out around a character silhouette, with the aggregate accuracy, power, armour, magicArmour, magicPower, and vitality totals shown below. |
+| Equipment | Nine slots laid out around a character silhouette. The main-hand readout shows live elemental-weapon charge when applicable, and aggregate accuracy, power, armour, magicArmour, magicPower, and vitality totals appear below. |
 | Bank | 8 x 10 visible grid with paging over 400 slots, quantity selector (1 / 5 / 10 / All / X), Deposit All button, substring name filter, inventory strip along the bottom for drag transfers. |
 | Shop | Two columns, shop stock and player inventory, with buy and sell price on every row and a quantity selector. |
 | Dialogue | Portrait, speaker name, body text, numbered option list. Options are keyboard-selectable with 1 to 9. |
@@ -675,6 +746,12 @@ interface GameState {
     slots: (InventorySlot | null)[];   // exactly 28
   };
   equipment: Record<EquipSlot, ItemStack | null>;   // exactly 9 keys
+  magic: {
+    // Canonical charge ledger for elemental weapon item ids.
+    weaponCharges: Record<ItemId, number>;
+    // Prevents a boss from replacing an Orb already consumed in elemental-weapon crafting.
+    consumedOrbs: Record<ItemId, boolean>;
+  };
   bank: {
     slots: ItemStack[];                // <= 400, dense, no nulls
     filter: string;
@@ -907,7 +984,13 @@ export type EquipSlot =
 export type EntityId = string;   // "ore_t10_0042", "npc_coldbrace_smith", "player"
 export type ItemId   = string;   // "kaldite_ore", "seared_cragfin"
 export type RecipeId = string;
-export type SpellId  = "emberlash" | "stonebrand" | "voltrend";
+export type SpellElement = "wind" | "water" | "earth" | "fire";
+export type SpellRung = "lash" | "bolt" | "burst" | "surge";
+export type SpellId =
+  | "voltrend" | "stonebrand" | "rimewash" | "emberlash"
+  | "skirlbolt" | "sleetbolt" | "shalebolt" | "cinderbolt"
+  | "galeburst" | "spateburst" | "cragburst" | "pyreburst"
+  | "squallsurge" | "tidesurge" | "scarpsurge" | "kilnsurge";
 export type QuestId  = string;
 
 export type Archetype =
@@ -918,7 +1001,7 @@ export type Archetype =
 export type InteractionId =
   | "inspect" | "mine" | "chop" | "fish" | "rake" | "plant" | "harvest"
   | "attack" | "cast" | "talk" | "open" | "enter" | "climb" | "vault"
-  | "loot" | "take" | "produce" | "bank" | "trade" | "equip" | "unequip";
+  | "loot" | "take" | "produce" | "recharge" | "bank" | "trade" | "equip" | "unequip";
 
 // ---------- items and equipment ----------
 export interface ItemStack { itemId: ItemId; quantity: number; }
@@ -937,7 +1020,7 @@ export interface EquipmentBonuses {
 export interface ItemDef {
   id: ItemId;
   name: string;
-  tier: number;                       // 1..99
+  tier: number;                       // 0..99; tier 0 is starter equipment
   description: string;
   stackable: boolean;
   value: number;                      // shop buy price; sell is round(value * 0.6)
@@ -947,6 +1030,17 @@ export interface ItemDef {
     bonuses: EquipmentBonuses;
     attackSpeedMs?: number;           // main hand only
     requires: Partial<Record<SkillId, number>>;
+  };
+  magicWeapon?: {
+    kind: "wand" | "staff";
+    hands: 1 | 2;
+    charge?: {
+      element: SpellElement; capacity: number; initialCharges: number;
+      rechargeItemId: ItemId; rechargeCost: number; orbItemId: ItemId; released: boolean;
+    };
+  };
+  orb?: {
+    element: SpellElement; released: boolean;
   };
   food?: { healAmount: number };
   tool?: { skill: SkillId; gatherBonus: number };
@@ -1015,7 +1109,7 @@ export type GameEventType =
   | "activity.started" | "activity.stopped"
   | "resource.depleted" | "inventory.full"
   | "item.received" | "item.lost"
-  | "combat.started" | "combat.ended"
+  | "combat.started" | "combat.ended" | "spell.launched" | "essence.recharged"
   | "health.low" | "player.died"
   | "level.gained" | "production.completed"
   | "quest.updated" | "dialogue.opened" | "dialogue.closed"
@@ -1124,6 +1218,8 @@ export interface ResourceNodeDef {
   id: string; archetype: "ore" | "tree" | "fishing_spot"; tier: number;
   name: string; skill: SkillId; reqLevel: number; itemId: ItemId;
   assetId: string; depletedAssetId: string;
+  yieldRange?: readonly [number, number]; // exceptional authored capacity, inclusive
+  respawnSeconds?: number;               // exceptional authored depletion cooldown
 }
 
 export interface RecipeDef {
@@ -1134,8 +1230,9 @@ export interface RecipeDef {
 
 export interface SpellDef {
   id: SpellId; name: string; tier: number; reqLevel: number;
+  element: SpellElement; rung: SpellRung;
   baseMax: number; divisor: number; baseXp: number; castMs: number;
-  costItemId: ItemId; costQuantity: number; vfxId: string;
+  cost: { element: SpellElement; charges: number }; description: string;
 }
 
 export interface EnemyDef {
@@ -1239,7 +1336,7 @@ Movement always runs at 4.2 m/s on the navmesh. There is no fast path.
 
 **6. `corealm_interact`**
 Args: `{ entityId: string, interaction: InteractionId }`.
-Returns: `{ started: "gathering"|"production"|"traversing"|"farming"|"dialogue"|"bank"|"shop"|"loot"|"door", activity?: ActivitySummary }`.
+Returns: `{ started: "gathering"|"production"|"recharged ..."|"traversing"|"farming"|"dialogue"|"bank"|"shop"|"loot"|"door", activity?: ActivitySummary }`.
 Errors: `NOT_FOUND`, `OUT_OF_RANGE` (with the required distance in the message), `REQUIREMENTS_NOT_MET`, `DEPLETED`, `INVENTORY_FULL`, `BUSY`, `DEAD`, `UNAVAILABLE`.
 One call starts exactly the continuing activity one human click starts.
 
@@ -1248,9 +1345,10 @@ Args: `{ what?: ("movement"|"activity"|"combat")[] }`, defaults to all three.
 Returns: `{ stopped: string[] }`. Never errors except `DEAD`.
 
 **8. `corealm_attack`**
-Args: `{ entityId: string, spellId?: SpellId }`. Omitting `spellId` means melee.
+Args: `{ entityId: string, spellId?: SpellId }`. With a wand or staff, omitting `spellId` uses the
+standing spell choice or strongest compatible charged spell. With a non-magic weapon it means melee.
 Returns: `{ targetId: string, attackSpeedMs: number, targetHealth: number, targetMaxHealth: number }`.
-Errors: `NOT_FOUND`, `OUT_OF_RANGE`, `REQUIREMENTS_NOT_MET` (spell level), `NOT_ENOUGH_ITEMS` (no essence shards), `DEAD`, `UNAVAILABLE` (target already dead or non-hostile).
+Errors: `NOT_FOUND`, `OUT_OF_RANGE`, `REQUIREMENTS_NOT_MET` (spell level, weapon, matching orb, or empty orb), `DEAD`, `UNAVAILABLE` (target already dead or non-hostile).
 
 **9. `corealm_use_item`**
 Args: `{ itemId: string, on?: { itemId: string } | { entityId: string } }`.
@@ -1320,6 +1418,8 @@ If the shipping WebMCP implementation supports server-initiated notifications, `
 | `item.lost` | `{ itemId: string, quantity: number, reason: "consumed"\|"sold"\|"banked"\|"died"\|"burnt" }` |
 | `combat.started` | `{ targetId: string, targetName: string, targetLevel: number, initiator: "player"\|"enemy" }` |
 | `combat.ended` | `{ targetId: string, outcome: "killed"\|"escaped"\|"died"\|"leashed", xpGained: number }` |
+| `spell.launched` | `{ spellId: SpellId, targetId: string, element: SpellElement, rung: SpellRung, flightMs: number, hit: boolean, orbItemId: ItemId, remainingCharges: number }` |
+| `essence.recharged` | `{ altarId: string, orbItemId: ItemId, element: SpellElement, essenceItemId: ItemId, before: number, after: 1000, essenceSpent: 100 }` |
 | `health.low` | `{ health: number, maxHealth: number, fraction: number }` fires once per crossing below 0.30 |
 | `player.died` | `{ at: Vec3, regionId: RegionId, killerId?: string, cacheId: string, cacheExpiresAtMs: number, respawnAt: Vec3 }` |
 | `level.gained` | `{ skill: SkillId, level: number, unlocked: string[] }` |
@@ -1440,7 +1540,7 @@ Every test ends by asserting `__gameDebug.getErrors()` has length 0.
 | D6 | `setSkillLevel("cooking", 16)` and repeat D5. Burnt count is 0. |
 | D7 | Sell 10 Grithe ore at the general shop. Currency increases by exactly 70 (10 x 7), inventory loses exactly 10 ore. |
 | D8 | Buy with insufficient marks. Error is `NOT_ENOUGH_CURRENCY`, currency and inventory unchanged. |
-| D9 | Craft 5 essence shards, cast Voltrend once. Shard count drops by exactly 1. Casting with 0 shards returns `NOT_ENOUGH_ITEMS`. |
+| D9 | With the starter Basic Wooden Wand, cast Voltrend once and observe Air Essence fall from 50 to 49. Craft and equip an Air Wand, observe its charge fall from 1000 to 999, then spend exactly 100 Air Essence at an Essence Altar to refill it; a full weapon refuses recharge without consuming Essence. |
 
 ### 8.5 Combat, health, death
 
@@ -1450,7 +1550,7 @@ Every test ends by asserting `__gameDebug.getErrors()` has length 0.
 | E2 | With `setPaused(true)` then `step(2400)` repeated, damage values are identical across two runs at the same seed. |
 | E3 | Kill the Skitterling. `combat.ended` fires with `outcome: "killed"`, Melee XP increases by exactly `4 * damageDealt + 12`, and a loot pile entity exists at the corpse position. |
 | E4 | `corealm_interact` with `loot` on the pile transfers marks and items into inventory, and the pile entity disappears. |
-| E5 | Magic parity: equip a Kaldite staff, `corealm_attack({ entityId: cairnwight, spellId: "voltrend" })`. Magic XP increases by `4 * damage + 22` per cast. |
+| E5 | Magic parity: equip a Water Staff, then `corealm_attack({ entityId: cairnwight, spellId: "rimewash" })`. Magic XP increases by `4 * damage + 22` per cast and the Water Staff loses exactly one charge at launch. |
 | E6 | `setHealth(6)` while in combat. `health.low` fires exactly once. Eating a cooked fish raises health by exactly `healAmount(tier)` and blocks attacks for 1800 ms. |
 | E7 | `setHealth(0)`. `player.died` fires. `getState().world.recoveryCache` is non-null with every pre-death inventory item, `getState().inventory` is empty, `getState().equipment` is unchanged, and skill XP is unchanged. Player position equals the Coldbrace respawn point and health equals `maxHealth`. |
 | E8 | Walk to the cache and loot it. Every item returns and the cache becomes null. |
@@ -1535,7 +1635,7 @@ Exit: D1 to D9.
 
 | Worker | Files | Deliverable |
 | --- | --- | --- |
-| D1 | `content/enemies.ts`, `content/spells.ts` | 9 enemies across 4 families, Ordrun with two phases, 3 spells |
+| D1 | `content/enemies.ts`, `content/spells.ts` | 21 enemy rows including three region bosses, plus the 16-spell elemental ladder |
 | D2 | `systems/combat.ts`, `systems/enemyAI.ts`, `systems/health.ts`, `systems/death.ts` | Accuracy and damage rolls, aggro and leash, regen, death and recovery cache |
 | D3 | `render/characterRig.ts`, `render/vfx.ts` | Animation blending, damage numbers, XP drops, spell effects, boss telegraph decal |
 
@@ -1655,19 +1755,501 @@ If it does not work, nothing after it matters.
 
 ## Browser evidence
 
-- test-results/agent-proof.json
-- test-results/perf.json
-- test-results/play-gathering-loop.json
-- test-results/play-inventory-bank-shop.json
-- test-results/play-long-cairn-chain.json
-- test-results/play-movement-and-camera.json
-- test-results/play-vertical-slice.json
-- test-results/play-visual-checkpoints.json
-- test-results/play-world-and-entities.json
+- test-results/gate-check.json
 - test-results/smoke.json
 
 ## Screenshots
 
+- screenshots/MON-bracken-fenmites.png
+- screenshots/MON-canopy-hollows.png
+- screenshots/MON-gorge-reavers.png
+- screenshots/MON-gravelmaw-ch1-reavers.png
+- screenshots/MON-gravelmaw-ch2-mudbacks.png
+- screenshots/MON-karrow-reavers.png
+- screenshots/MON-march-road-reavers.png
+- screenshots/MON-mire-fenmites.png
+- screenshots/MON-palewood-hollows.png
+- screenshots/MON-preset-bracken-pit.png
+- screenshots/MON-preset-hollowcut-seam.png
+- screenshots/MON-preset-march-road.png
+- screenshots/MON-preset-upper-karrow-seam.png
+- screenshots/MON-preset-vellenwood-canopy.png
+- screenshots/MON-redsill-mudbacks.png
+- screenshots/MON-tarn-marchwolves.png
+- screenshots/MON-terrace-mudbacks.png
+- screenshots/MON2-karrow-reavers.png
+- screenshots/MON2-mire-fenmites.png
+- screenshots/MOTION-canopy-cam.png
+- screenshots/MOTION-cast-0-crop.png
+- screenshots/MOTION-cast-0.png
+- screenshots/MOTION-cast-1.png
+- screenshots/MOTION-cast-10.png
+- screenshots/MOTION-cast-11.png
+- screenshots/MOTION-cast-12-crop.png
+- screenshots/MOTION-cast-12.png
+- screenshots/MOTION-cast-13.png
+- screenshots/MOTION-cast-2.png
+- screenshots/MOTION-cast-3-crop.png
+- screenshots/MOTION-cast-3.png
+- screenshots/MOTION-cast-4.png
+- screenshots/MOTION-cast-5.png
+- screenshots/MOTION-cast-6-crop.png
+- screenshots/MOTION-cast-6.png
+- screenshots/MOTION-cast-7.png
+- screenshots/MOTION-cast-8.png
+- screenshots/MOTION-cast-9-crop.png
+- screenshots/MOTION-cast-9.png
+- screenshots/MOTION-dungeon-cam.png
+- screenshots/MOTION-enemy-chase.png
+- screenshots/MOTION-enemy-fight.png
+- screenshots/MOTION-gate-blocked.png
+- screenshots/MOTION-karrow-lowpitch-a.png
+- screenshots/MOTION-karrow-lowpitch-d.png
+- screenshots/MOTION-karrow-lowpitch-s.png
+- screenshots/MOTION-karrow-lowpitch-w.png
+- screenshots/MOTION-karrow-path.png
+- screenshots/MOTION-karrow-walk.png
+- screenshots/MOTION-probe1-end.png
+- screenshots/MOTION-run-f0-crop.png
+- screenshots/MOTION-run-f0.png
+- screenshots/MOTION-run-f1-crop.png
+- screenshots/MOTION-run-f1.png
+- screenshots/MOTION-run-f2-crop.png
+- screenshots/MOTION-run-f2.png
+- screenshots/MOTION-run-f3.png
+- screenshots/MOTION-run-f4-crop.png
+- screenshots/MOTION-run-f4.png
+- screenshots/MOTION-run-f5.png
+- screenshots/MOTION-run-idle-after-crop.png
+- screenshots/MOTION-run-idle-after.png
+- screenshots/MOTION-terrace-climb.png
+- screenshots/MOTION-town-npcs.png
+- screenshots/MOTION-town-occlusion.png
+- screenshots/MOTION-walk-f0-crop.png
+- screenshots/MOTION-walk-f0.png
+- screenshots/MOTION-walk-f1-crop.png
+- screenshots/MOTION-walk-f1.png
+- screenshots/MOTION-walk-f2-crop.png
+- screenshots/MOTION-walk-f2.png
+- screenshots/MOTION-walk-f3-crop.png
+- screenshots/MOTION-walk-f3.png
+- screenshots/RIG-harrow.png
+- screenshots/RIG-npc-crop.png
+- screenshots/RIG-player-crop.png
+- screenshots/RIG-ranger-npc.png
+- screenshots/RIG-spawn-player.png
+- screenshots/RIG-town-center.png
+- screenshots/RIG-town-player.png
+- screenshots/SET-bank.png
+- screenshots/SET-highcairn.png
+- screenshots/SET-rootfall.png
+- screenshots/SET-town_center.png
+- screenshots/SET-town_entrance.png
+- screenshots/banner-perpendicular-coldbrace.png
+- screenshots/banner-rhythm-coldbrace.png
+- screenshots/banner-rhythm-final.png
+- screenshots/baseline-bank.png
+- screenshots/baseline-spawn.png
+- screenshots/baseline-town_center.png
+- screenshots/baseline-town_entrance.png
+- screenshots/before-bank.png
+- screenshots/before-spawn.png
+- screenshots/before-town_entrance.png
+- screenshots/bld-highcairn.png
+- screenshots/bld-hollowcut_seam.png
+- screenshots/bld-rootfall.png
+- screenshots/bld-spawn.png
+- screenshots/bld-town_center.png
+- screenshots/bld-town_entrance.png
+- screenshots/buildings-highcairn.png
+- screenshots/buildings-polish-coldbrace.png
+- screenshots/buildings-polish-highcairn.png
+- screenshots/buildings-polish-marchfield.png
+- screenshots/buildings-polish-rootfall.png
+- screenshots/buildings-town_entrance.png
+- screenshots/cam-bank.png
+- screenshots/cam-gravelmaw_entrance.png
+- screenshots/cam-highcairn.png
+- screenshots/cam-karrowmoor_terraces.png
+- screenshots/cam-rootfall.png
+- screenshots/cam-town_center.png
+- screenshots/camA-bank.png
+- screenshots/camA-gravelmaw_entrance.png
+- screenshots/camA-highcairn.png
+- screenshots/camA-karrowmoor_terraces.png
+- screenshots/camA-rootfall.png
+- screenshots/camA-town_center.png
+- screenshots/camB-bank.png
+- screenshots/camC-bank.png
+- screenshots/camC-gravelmaw_entrance.png
+- screenshots/camC-highcairn.png
+- screenshots/camC-karrowmoor_terraces.png
+- screenshots/camC-rootfall.png
+- screenshots/camC-town_center.png
+- screenshots/cambefore-bank.png
+- screenshots/cambefore-gravelmaw_entrance.png
+- screenshots/cambefore-highcairn.png
+- screenshots/cambefore-karrowmoor_terraces.png
+- screenshots/cambefore-rootfall.png
+- screenshots/cambefore-town_center.png
+- screenshots/camwalk-arcade.png
+- screenshots/camwalk-dungeon1.png
+- screenshots/camwalk-dungeon2.png
+- screenshots/camwalk-forge.png
+- screenshots/camwalk-hc_porch.png
+- screenshots/camwalk-porch.png
+- screenshots/camwalk-rf_counter.png
+- screenshots/camwalk-well.png
+- screenshots/cohesion-canopy-walk.png
+- screenshots/cohesion-gravelmaw-crop.png
+- screenshots/cohesion-gravelmaw.png
+- screenshots/cohesion-highcairn.png
+- screenshots/cohesion-lower-quarry.png
+- screenshots/cohesion-mire-skirt.png
+- screenshots/cohesion-region-gate.png
+- screenshots/cohesion-root-tunnel.png
+- screenshots/cohesion-rootfall.png
+- screenshots/cohesion-town-gate.png
+- screenshots/cohesion-west-track.png
+- screenshots/collision-anvil.png
+- screenshots/collision-bankchest.png
+- screenshots/collision-diagonal-hall.png
+- screenshots/collision-final.png
+- screenshots/collision-gate-gap.png
+- screenshots/collision-in-tree.png
+- screenshots/collision-in-water-2.png
+- screenshots/collision-in-water.png
+- screenshots/collision-inside-cottage.png
+- screenshots/collision-npc.png
+- screenshots/collision-on-hall-roof.png
+- screenshots/collision-pathed-into-cottage.png
+- screenshots/collision-pathed-out-of-cottage.png
+- screenshots/collision-spawn-to-bank.png
+- screenshots/collision-stall.png
+- screenshots/collision-wall-s.png
+- screenshots/cov-bank.png
+- screenshots/cov-bracken_pit.png
+- screenshots/cov-gravelmaw_entrance.png
+- screenshots/cov-great_cairn.png
+- screenshots/cov-highcairn.png
+- screenshots/cov-hollowcut_seam.png
+- screenshots/cov-karrowmoor_terraces.png
+- screenshots/cov-march_road.png
+- screenshots/cov-marchfield_farm.png
+- screenshots/cov-palewood_copse.png
+- screenshots/cov-redsill_shallows.png
+- screenshots/cov-rootfall.png
+- screenshots/cov-spawn.png
+- screenshots/cov-sunder_ledge.png
+- screenshots/cov-town_center.png
+- screenshots/cov-town_entrance.png
+- screenshots/cov-upper_karrow_seam.png
+- screenshots/cov-vellenwood_canopy.png
+- screenshots/dc-bank.png
+- screenshots/dc-highcairn.png
+- screenshots/dc-palewood_copse.png
+- screenshots/dc-rootfall.png
+- screenshots/dc-spawn.png
+- screenshots/dc-town_center.png
+- screenshots/dc-town_entrance.png
+- screenshots/dcb0-hollowcut_seam.png
+- screenshots/eq-01-naked-spawn-zoom.png
+- screenshots/eq-01-naked-spawn.png
+- screenshots/eq-02-full-kaldite-kit-spawn-zoom.png
+- screenshots/eq-02-full-kaldite-kit-spawn.png
+- screenshots/eq-03-full-wightshroud-staff-spawn-zoom.png
+- screenshots/eq-03-full-wightshroud-staff-spawn.png
+- screenshots/eq-04-panels-worn-corven-sword.png
+- screenshots/eq-05-worn-panel-magic-kit.png
+- screenshots/eq-05-worn-panel-zoom.png
+- screenshots/eq-06-worn-tooltip-cairnpine-staff.png
+- screenshots/eq-07-inventory-tooltip-unmet-kaldite-sword.png
+- screenshots/eq-07-two-swords-zoom.png
+- screenshots/eq-icons-sheet.png
+- screenshots/ev-bank.png
+- screenshots/ev-before-bank.png
+- screenshots/ev-before-highcairn.png
+- screenshots/ev-before-rootfall.png
+- screenshots/ev-before-town_center.png
+- screenshots/ev-crop-npc_foreman_arden.png
+- screenshots/ev-crop-npc_ranger_syb.png
+- screenshots/ev-crop-npc_seamer_juno.png
+- screenshots/ev-crop-npc_smith_harrow.png
+- screenshots/ev-crop-npc_trapper_mott.png
+- screenshots/ev-crop-npc_warden_ilse.png
+- screenshots/ev-enemy-alive.png
+- screenshots/ev-enemy-dead.png
+- screenshots/ev-highcairn.png
+- screenshots/ev-rootfall.png
+- screenshots/ev-town_center.png
+- screenshots/ev2-bank.png
+- screenshots/ev2-before-bank.png
+- screenshots/ev2-before-bracken_pit.png
+- screenshots/ev2-before-enemy-attack.png
+- screenshots/ev2-before-enemy-death.png
+- screenshots/ev2-before-highcairn.png
+- screenshots/ev2-before-rootfall.png
+- screenshots/ev2-before-town_center.png
+- screenshots/ev2-bracken_pit.png
+- screenshots/ev2-enemy-attack-crop.png
+- screenshots/ev2-enemy-attack.png
+- screenshots/ev2-enemy-dead-crop.png
+- screenshots/ev2-enemy-death-crop.png
+- screenshots/ev2-enemy-death.png
+- screenshots/ev2-enemy-hit-crop.png
+- screenshots/ev2-gravelmaw_entrance.png
+- screenshots/ev2-highcairn.png
+- screenshots/ev2-karrowmoor_terraces.png
+- screenshots/ev2-npc-crop.png
+- screenshots/ev2-npc-vs-enemy-attack.png
+- screenshots/ev2-npc-vs-enemy-death.png
+- screenshots/ev2-rootfall.png
+- screenshots/ev2-town_center.png
+- screenshots/ev2-vellenwood_canopy.png
+- screenshots/ev3-after-foe-bracken_fenmites.png
+- screenshots/ev3-after-foe-march_road_reavers.png
+- screenshots/ev3-after-foe-marchwolf_pups.png
+- screenshots/ev3-after-foe-palewood_hollows.png
+- screenshots/ev3-after-foe-redsill_mudbacks.png
+- screenshots/ev3-after-foe-rill_skitterlings.png
+- screenshots/ev3-after-npc-carter_bel.png
+- screenshots/ev3-after-npc-pitmaster_dorn.png
+- screenshots/ev3-after-npc-ranger_syb.png
+- screenshots/ev3-after-npc-smith_harrow.png
+- screenshots/ev3-after-npc-warden_ilse.png
+- screenshots/ev3-after-npc-woodward_ansel.png
+- screenshots/ev3-before-foe-bracken_fenmites.png
+- screenshots/ev3-before-foe-bramble_skitterlings.png
+- screenshots/ev3-before-foe-cairnwights_fields.png
+- screenshots/ev3-before-foe-canopy_hollows.png
+- screenshots/ev3-before-foe-gorge_reavers.png
+- screenshots/ev3-before-foe-gravelmaw_ch1_wights.png
+- screenshots/ev3-before-foe-gravelmaw_ch2_skitterlings.png
+- screenshots/ev3-before-foe-gravelmaw_ch3_elders.png
+- screenshots/ev3-before-foe-march_road_reavers.png
+- screenshots/ev3-before-foe-marchwolf_pups.png
+- screenshots/ev3-before-foe-marchwolves_deepwood.png
+- screenshots/ev3-before-foe-mire_fenmites.png
+- screenshots/ev3-before-foe-palewood_hollows.png
+- screenshots/ev3-before-foe-redsill_mudbacks.png
+- screenshots/ev3-before-foe-rill_skitterlings.png
+- screenshots/ev3-before-foe-scree_skitterlings.png
+- screenshots/ev3-before-foe-thornbound_elders_ridge.png
+- screenshots/ev3-before-foe-thornbound_husks.png
+- screenshots/ev3-before-npc-cairnkeeper_ode.png
+- screenshots/ev3-before-npc-carter_bel.png
+- screenshots/ev3-before-npc-foreman_arden.png
+- screenshots/ev3-before-npc-pitmaster_dorn.png
+- screenshots/ev3-before-npc-quarrier_vess.png
+- screenshots/ev3-before-npc-ranger_syb.png
+- screenshots/ev3-before-npc-seamer_juno.png
+- screenshots/ev3-before-npc-smith_harrow.png
+- screenshots/ev3-before-npc-trapper_mott.png
+- screenshots/ev3-before-npc-warden_ilse.png
+- screenshots/ev3-before-npc-watcher_hale.png
+- screenshots/ev3-before-npc-woodward_ansel.png
+- screenshots/ev3-zoom-foe-bracken_fenmites.png
+- screenshots/ev3-zoom-foe-march_road_reavers.png
+- screenshots/ev3-zoom-foe-marchwolf_pups.png
+- screenshots/ev3-zoom-foe-palewood_hollows.png
+- screenshots/ev3-zoom-foe-redsill_mudbacks.png
+- screenshots/ev3-zoom-foe-rill_skitterlings.png
+- screenshots/ev3-zoom-foe-thornbound_husks.png
+- screenshots/ev3-zoom-npc-carter_bel.png
+- screenshots/ev3-zoom-npc-pitmaster_dorn.png
+- screenshots/ev3-zoom-npc-ranger_syb.png
+- screenshots/ev3-zoom-npc-seamer_juno.png
+- screenshots/ev3-zoom-npc-smith_harrow.png
+- screenshots/ev3-zoom-npc-warden_ilse.png
+- screenshots/ev3-zoom-npc-woodward_ansel.png
+- screenshots/ev3-zoom-pose-highcairn.png
+- screenshots/ev3-zoom-pose-rootfall.png
+- screenshots/ev3-zoom-pose-town_center.png
+- screenshots/foundation-bank.png
+- screenshots/foundation-spawn.png
+- screenshots/foundation-town_center.png
+- screenshots/gd-bank.png
+- screenshots/gd-bracken_pit.png
+- screenshots/gd-crop-ground.png
+- screenshots/gd-gravelmaw_entrance.png
+- screenshots/gd-great_cairn.png
+- screenshots/gd-highcairn.png
+- screenshots/gd-hollowcut_seam.png
+- screenshots/gd-karrowmoor_terraces.png
+- screenshots/gd-march_road.png
+- screenshots/gd-marchfield_farm.png
+- screenshots/gd-palewood_copse.png
+- screenshots/gd-redsill_shallows.png
+- screenshots/gd-rootfall.png
+- screenshots/gd-spawn.png
+- screenshots/gd-sunder_ledge.png
+- screenshots/gd-town_center.png
+- screenshots/gd-town_entrance.png
+- screenshots/gd-upper_karrow_seam.png
+- screenshots/gd-vellenwood_canopy.png
+- screenshots/gnd-bank.png
+- screenshots/gnd-bracken_pit.png
+- screenshots/gnd-gravelmaw_entrance.png
+- screenshots/gnd-great_cairn.png
+- screenshots/gnd-highcairn.png
+- screenshots/gnd-hollowcut_seam.png
+- screenshots/gnd-karrowmoor_terraces.png
+- screenshots/gnd-march_road.png
+- screenshots/gnd-marchfield_farm.png
+- screenshots/gnd-palewood_copse.png
+- screenshots/gnd-redsill_shallows.png
+- screenshots/gnd-rootfall.png
+- screenshots/gnd-spawn.png
+- screenshots/gnd-sunder_ledge.png
+- screenshots/gnd-town_center.png
+- screenshots/gnd-town_entrance.png
+- screenshots/gnd-upper_karrow_seam.png
+- screenshots/gnd-vellenwood_canopy.png
+- screenshots/ground-coldbrace-fletching.png
+- screenshots/ground-fallen-duskoak.png
+- screenshots/ground-far-tarn.png
+- screenshots/ground-preset-bracken_pit.png
+- screenshots/ground-preset-great_cairn.png
+- screenshots/ground-preset-highcairn.png
+- screenshots/ground-preset-karrowmoor_terraces.png
+- screenshots/ground-preset-marchfield_farm.png
+- screenshots/ground-preset-palewood_copse.png
+- screenshots/ground-preset-sunder_ledge.png
+- screenshots/ground-preset-town_center.png
+- screenshots/ground-ridge-pines-pillar.png
+- screenshots/hc-highcairn.png
+- screenshots/hc-hollowcut_seam.png
+- screenshots/hc-karrowmoor_terraces.png
+- screenshots/hc-sunder_ledge.png
+- screenshots/head-gravelmaw_entrance.png
+- screenshots/head-great_cairn.png
+- screenshots/head-highcairn.png
+- screenshots/head-karrowmoor_terraces.png
+- screenshots/head-march_road.png
+- screenshots/head-redsill_shallows.png
+- screenshots/head-rootfall.png
+- screenshots/head-sunder_ledge.png
+- screenshots/lit-ab2-rootfall-group-overlays.png
+- screenshots/lit-abl-rootfall-noamb.png
+- screenshots/lit-abl-rootfall-with.png
+- screenshots/lit-abl-rootfall-without.png
+- screenshots/lit-abl-town_entrance-noamb.png
+- screenshots/lit-bank.png
+- screenshots/lit-bracken_pit.png
+- screenshots/lit-crop-black.png
+- screenshots/lit-crop-white.png
+- screenshots/lit-gravelmaw_entrance.png
+- screenshots/lit-great_cairn.png
+- screenshots/lit-highcairn.png
+- screenshots/lit-hollowcut_seam.png
+- screenshots/lit-karrowmoor_terraces.png
+- screenshots/lit-march_road.png
+- screenshots/lit-marchfield_farm.png
+- screenshots/lit-palewood_copse.png
+- screenshots/lit-redsill_shallows.png
+- screenshots/lit-rootfall.png
+- screenshots/lit-spawn.png
+- screenshots/lit-sunder_ledge.png
+- screenshots/lit-town_center.png
+- screenshots/lit-town_entrance.png
+- screenshots/lit-upper_karrow_seam.png
+- screenshots/lit-vellenwood_canopy.png
+- screenshots/lita1-abl-rootfall-noamb.png
+- screenshots/lita1-bank.png
+- screenshots/lita1-bracken_pit.png
+- screenshots/lita1-gravelmaw_entrance.png
+- screenshots/lita1-great_cairn.png
+- screenshots/lita1-highcairn.png
+- screenshots/lita1-hollowcut_seam.png
+- screenshots/lita1-karrowmoor_terraces.png
+- screenshots/lita1-march_road.png
+- screenshots/lita1-marchfield_farm.png
+- screenshots/lita1-palewood_copse.png
+- screenshots/lita1-redsill_shallows.png
+- screenshots/lita1-rootfall.png
+- screenshots/lita1-spawn.png
+- screenshots/lita1-sunder_ledge.png
+- screenshots/lita1-town_center.png
+- screenshots/lita1-town_entrance.png
+- screenshots/lita1-upper_karrow_seam.png
+- screenshots/lita1-vellenwood_canopy.png
+- screenshots/litb-spawn.png
+- screenshots/litb4-bank.png
+- screenshots/litb4-bracken_pit.png
+- screenshots/litb4-gravelmaw_entrance.png
+- screenshots/litb4-great_cairn.png
+- screenshots/litb4-highcairn.png
+- screenshots/litb4-hollowcut_seam.png
+- screenshots/litb4-karrowmoor_terraces.png
+- screenshots/litb4-march_road.png
+- screenshots/litb4-marchfield_farm.png
+- screenshots/litb4-palewood_copse.png
+- screenshots/litb4-redsill_shallows.png
+- screenshots/litb4-rootfall.png
+- screenshots/litb4-spawn.png
+- screenshots/litb4-sunder_ledge.png
+- screenshots/litb4-town_center.png
+- screenshots/litb4-town_entrance.png
+- screenshots/litb4-upper_karrow_seam.png
+- screenshots/litb4-vellenwood_canopy.png
+- screenshots/look-atlas-detail-grass.png
+- screenshots/look-atlas-detail-gravel.png
+- screenshots/look-atlas-detail-rock.png
+- screenshots/look-atlas-detail-soil.png
+- screenshots/look-atlas-macro-grass.png
+- screenshots/look-atlas-macro-gravel.png
+- screenshots/look-atlas-macro-rock.png
+- screenshots/look-atlas-macro-soil.png
+- screenshots/look-glbtex-0.png
+- screenshots/look1-bank.png
+- screenshots/look1-spawn.png
+- screenshots/look1-town_center.png
+- screenshots/look1-town_entrance.png
+- screenshots/look2-bank.png
+- screenshots/look2-bracken_pit.png
+- screenshots/look2-crop-anvil2.png
+- screenshots/look2-crop-barrel.png
+- screenshots/look2-crop-forge.png
+- screenshots/look2-gravelmaw_entrance.png
+- screenshots/look2-great_cairn.png
+- screenshots/look2-highcairn.png
+- screenshots/look2-hollowcut_seam.png
+- screenshots/look2-karrowmoor_terraces.png
+- screenshots/look2-march_road.png
+- screenshots/look2-marchfield_farm.png
+- screenshots/look2-palewood_copse.png
+- screenshots/look2-prop-coldbrace_anvil.png
+- screenshots/look2-prop-coldbrace_bank.png
+- screenshots/look2-prop-coldbrace_furnace.png
+- screenshots/look2-redsill_shallows.png
+- screenshots/look2-rootfall.png
+- screenshots/look2-spawn.png
+- screenshots/look2-sunder_ledge.png
+- screenshots/look2-town_center.png
+- screenshots/look2-town_entrance.png
+- screenshots/look2-upper_karrow_seam.png
+- screenshots/look2-vellenwood_canopy.png
+- screenshots/look3-crop-anvil.png
+- screenshots/look3-prop-coldbrace_anvil.png
+- screenshots/look3-prop-coldbrace_furnace.png
+- screenshots/magic-01-starter-wand.png
+- screenshots/magic-04-air-cache-five-nodes.png
+- screenshots/magic-05-air-cache-glowing-veins.png
+- screenshots/magic-06-air-cache-depleted.png
+- screenshots/magic-08-air-orb-boss-drop.png
+- screenshots/magic-cache-air-glow.png
+- screenshots/magic-cache-earth-glow.png
+- screenshots/magic-cache-water-glow.png
+- screenshots/magic-cast-kilnsurge.png
+- screenshots/magic-visual-basic-staff-unlit.png
+- screenshots/magic-visual-basic-wand-unlit.png
+- screenshots/magic-wood-cairnpine-staff-unlit.png
+- screenshots/magic-wood-cairnpine-wand-unlit.png
+- screenshots/magic-wood-duskoak-staff-unlit.png
+- screenshots/magic-wood-duskoak-wand-unlit.png
+- screenshots/magic-wood-palewood-staff-unlit.png
+- screenshots/magic-wood-palewood-wand-unlit.png
+- screenshots/message-log.png
 - screenshots/r1-after-movement.png
 - screenshots/r1-bank.png
 - screenshots/r1-bracken-pit.png
@@ -1708,5 +2290,334 @@ If it does not work, nothing after it matters.
 - screenshots/r4-gravelmaw-mouth.png
 - screenshots/r4-great-cairn.png
 - screenshots/r4-ordrun.png
+- screenshots/r5-coldbrace.png
+- screenshots/r5-highcairn.png
+- screenshots/r5-icons.png
+- screenshots/r5-node-spent.png
+- screenshots/r5-panels.png
+- screenshots/r5-rootfall.png
+- screenshots/r5-tree-spent.png
+- screenshots/r5-water.png
+- screenshots/r6-combat.png
+- screenshots/r6-controls.png
+- screenshots/r6-death.png
+- screenshots/r6-dialogue.png
+- screenshots/r6-map.png
+- screenshots/r6-title.png
+- screenshots/ramp-great_cairn.png
+- screenshots/ramp-highcairn.png
+- screenshots/ramp-hollowcut_seam.png
+- screenshots/ramp-karrowmoor_terraces.png
+- screenshots/ramp-sunder_ledge.png
+- screenshots/ramp-upper_karrow_seam.png
+- screenshots/rb-bank.png
+- screenshots/rb-highcairn.png
+- screenshots/rb-marchfield_farm.png
+- screenshots/rb-npc-crop.png
+- screenshots/rb-spawn.png
+- screenshots/rb-town_center.png
+- screenshots/rf1-rootfall.png
+- screenshots/rig-bank-zoom.png
+- screenshots/rig-bank.png
+- screenshots/rig-combat-zoom.png
+- screenshots/rig-combat.png
+- screenshots/rig-kitted-zoom.png
+- screenshots/rig-kitted.png
+- screenshots/rig-run-a-zoom.png
+- screenshots/rig-run-a.png
+- screenshots/rig-run-b-zoom.png
+- screenshots/rig-run-b.png
+- screenshots/rig-spawn-zoom.png
+- screenshots/rig-spawn.png
+- screenshots/rig-town-center-zoom.png
+- screenshots/rig-town-peasant-zoom.png
+- screenshots/rig-town-peasant.png
+- screenshots/rig2-a1-bank-crop.png
+- screenshots/rig2-a1-bank.png
+- screenshots/rig2-before-bank-crop.png
+- screenshots/rig2-before-bank.png
+- screenshots/rig2-equip-grithe_dagger-crop.png
+- screenshots/rig2-equip-grithe_dagger.png
+- screenshots/rig2-equip-grithe_sword-crop.png
+- screenshots/rig2-equip-grithe_sword.png
+- screenshots/rig2-equip-kaldite_sword-crop.png
+- screenshots/rig2-equip-kaldite_sword.png
+- screenshots/rig2-equip-palewood_shield-crop.png
+- screenshots/rig2-equip-palewood_shield.png
+- screenshots/root-bank2.png
+- screenshots/root-bank3.png
+- screenshots/root-bankporch.png
+- screenshots/root-forgeyard.png
 - screenshots/round0-scatter.png
 - screenshots/round0-spawn.png
+- screenshots/scatter-bank.png
+- screenshots/scatter-bracken_pit.png
+- screenshots/scatter-fallow-open.png
+- screenshots/scatter-gravelmaw_entrance.png
+- screenshots/scatter-great_cairn.png
+- screenshots/scatter-highcairn.png
+- screenshots/scatter-hollowcut_seam.png
+- screenshots/scatter-karrow-open.png
+- screenshots/scatter-karrowmoor_terraces.png
+- screenshots/scatter-march_road.png
+- screenshots/scatter-marchfield_farm.png
+- screenshots/scatter-palewood_copse.png
+- screenshots/scatter-redsill_shallows.png
+- screenshots/scatter-rootfall.png
+- screenshots/scatter-seam-fallow-vellen.png
+- screenshots/scatter-seam-vellen-karrow.png
+- screenshots/scatter-spawn.png
+- screenshots/scatter-sunder_ledge.png
+- screenshots/scatter-town_center.png
+- screenshots/scatter-town_entrance.png
+- screenshots/scatter-upper_karrow_seam.png
+- screenshots/scatter-vellen-open.png
+- screenshots/scatter-vellenwood_canopy.png
+- screenshots/sct-bank.png
+- screenshots/sct-bracken_pit.png
+- screenshots/sct-crop-bloom.png
+- screenshots/sct-gravelmaw_entrance.png
+- screenshots/sct-great_cairn.png
+- screenshots/sct-highcairn.png
+- screenshots/sct-hollowcut_seam.png
+- screenshots/sct-karrowmoor_terraces.png
+- screenshots/sct-leaves-atlas.png
+- screenshots/sct-march_road.png
+- screenshots/sct-marchfield_farm.png
+- screenshots/sct-palewood_copse.png
+- screenshots/sct-redsill_shallows.png
+- screenshots/sct-rootfall.png
+- screenshots/sct-spawn.png
+- screenshots/sct-sunder_ledge.png
+- screenshots/sct-town_center.png
+- screenshots/sct-town_entrance.png
+- screenshots/sct-upper_karrow_seam.png
+- screenshots/sct-vellenwood_canopy.png
+- screenshots/seeded-mage.png
+- screenshots/shell-highcairn.png
+- screenshots/shell-hollowcut_seam.png
+- screenshots/shell-rootfall.png
+- screenshots/shell-town_center.png
+- screenshots/shell-town_entrance.png
+- screenshots/sky-bank.png
+- screenshots/sky-bracken_pit.png
+- screenshots/sky-dungeon-chamber1-up.png
+- screenshots/sky-dungeon-chamber1.png
+- screenshots/sky-dungeon-chamber1b.png
+- screenshots/sky-dungeon-chamber3-up.png
+- screenshots/sky-dungeon-chamber3.png
+- screenshots/sky-gravelmaw_entrance.png
+- screenshots/sky-great_cairn.png
+- screenshots/sky-highcairn.png
+- screenshots/sky-hollowcut_seam.png
+- screenshots/sky-karrowmoor_terraces.png
+- screenshots/sky-march_road.png
+- screenshots/sky-marchfield_farm.png
+- screenshots/sky-palewood_copse.png
+- screenshots/sky-probe-pitchup.png
+- screenshots/sky-probe-yaw0.png
+- screenshots/sky-probe-yaw180.png
+- screenshots/sky-probe-yaw270.png
+- screenshots/sky-probe-yaw90.png
+- screenshots/sky-redsill_shallows.png
+- screenshots/sky-rootfall.png
+- screenshots/sky-spawn.png
+- screenshots/sky-sunder_ledge.png
+- screenshots/sky-town_center.png
+- screenshots/sky-town_entrance.png
+- screenshots/sky-upper_karrow_seam.png
+- screenshots/sky-vellenwood_canopy.png
+- screenshots/sky-walk-town.png
+- screenshots/spellbook-icons.png
+- screenshots/staff-in-hand.png
+- screenshots/terrain-bank.png
+- screenshots/terrain-bracken_pit.png
+- screenshots/terrain-gravelmaw_entrance.png
+- screenshots/terrain-great_cairn.png
+- screenshots/terrain-highcairn.png
+- screenshots/terrain-hollowcut_seam.png
+- screenshots/terrain-karrowmoor_terraces.png
+- screenshots/terrain-march_road.png
+- screenshots/terrain-marchfield_farm.png
+- screenshots/terrain-palewood_copse.png
+- screenshots/terrain-redsill_shallows.png
+- screenshots/terrain-rootfall.png
+- screenshots/terrain-spawn.png
+- screenshots/terrain-sunder_ledge.png
+- screenshots/terrain-town_center.png
+- screenshots/terrain-town_entrance.png
+- screenshots/terrain-upper_karrow_seam.png
+- screenshots/terrain-vellenwood_canopy.png
+- screenshots/vfx-canopy-leaves-crop.png
+- screenshots/vfx-canopy-leaves.png
+- screenshots/vfx-contact-bracken.png
+- screenshots/vfx-contact-hollowcut-OFF-crop.png
+- screenshots/vfx-contact-hollowcut-OFF.png
+- screenshots/vfx-contact-hollowcut-ON-crop.png
+- screenshots/vfx-contact-hollowcut-ON.png
+- screenshots/vfx-contact-hollowcut.png
+- screenshots/vfx-contact-palewood-OFF.png
+- screenshots/vfx-contact-palewood-ON.png
+- screenshots/vfx-contact-palewood.png
+- screenshots/vfx-damage-numbers-2-crop.png
+- screenshots/vfx-damage-numbers-2.png
+- screenshots/vfx-damage-numbers-3-crop.png
+- screenshots/vfx-damage-numbers-3.png
+- screenshots/vfx-damage-numbers-crop.png
+- screenshots/vfx-damage-numbers.png
+- screenshots/vfx-fishing-ripple.png
+- screenshots/vfx-forge-furnace-crop.png
+- screenshots/vfx-forge-sparks.png
+- screenshots/vfx-highcairn-forge.png
+- screenshots/vfx-overlay-conform.png
+- screenshots/vfx-run-dust-2-crop.png
+- screenshots/vfx-run-dust-2.png
+- screenshots/vfx-run-dust-crop.png
+- screenshots/vfx-run-dust.png
+- screenshots/vfx-telegraph-a.png
+- screenshots/vfx-telegraph-b.png
+- screenshots/vfx-telegraph-c.png
+- screenshots/vfx-telegraph-slope.png
+- screenshots/vfx-terraces-contact.png
+- screenshots/vfx-town-smoke.png
+- screenshots/vfx-xp-drop.png
+- screenshots/visual-before-coldbrace-20260829.png
+- screenshots/visual-before-highcairn-20260829.png
+- screenshots/visual-before-rootfall-20260829.png
+- screenshots/w-cache.png
+- screenshots/w-controls-1280-transient.png
+- screenshots/w-controls-1280.png
+- screenshots/w-controls-1440.png
+- screenshots/w-death-720.png
+- screenshots/w-death-carrying.png
+- screenshots/w-death-empty.png
+- screenshots/w-death-expired.png
+- screenshots/w-dialogue-ansel-1440x900.png
+- screenshots/w-dialogue-controls-while-talking-1440x900.png
+- screenshots/w-dialogue-harrow-after-1-1280x720.png
+- screenshots/w-dialogue-harrow-after-1-1440x900.png
+- screenshots/w-dialogue-harrow-root-1280x720.png
+- screenshots/w-dialogue-harrow-root-1440x900.png
+- screenshots/w-dialogue-ilse-scrollback-1280x720.png
+- screenshots/w-dialogue-ilse-scrollback-1440x900.png
+- screenshots/w-dialogue-ode-levers-1280x720.png
+- screenshots/w-dialogue-ode-levers-1440x900.png
+- screenshots/w-dialogue-ode-levers-scrolled-1280x720.png
+- screenshots/w-dialogue-ode-levers-scrolled-1440x900.png
+- screenshots/w-dialogue-ode-refused-1280x720.png
+- screenshots/w-dialogue-ode-refused-1440x900.png
+- screenshots/w-dialogue-ode-root-1280x720.png
+- screenshots/w-dialogue-ode-root-1440x900.png
+- screenshots/w-map-1280.png
+- screenshots/w-map-early-crop.png
+- screenshots/w-map-early.png
+- screenshots/w-map-empty.png
+- screenshots/w-map-failure.png
+- screenshots/w-map-keyboard.png
+- screenshots/w-map-nothing.png
+- screenshots/w-map-spawn-crop.png
+- screenshots/w-map-spawn.png
+- screenshots/w-map-walking-crop.png
+- screenshots/w-map-walking.png
+- screenshots/w-map-zoom.png
+- screenshots/w-title-confirm-720.png
+- screenshots/w-title-confirm-armed.png
+- screenshots/w-title-confirm.png
+- screenshots/w-title-damage-numbers-on.png
+- screenshots/w-title-menu-720.png
+- screenshots/w-title-menu-continue.png
+- screenshots/w-title-menu.png
+- screenshots/w-title-panels-compact.png
+- screenshots/w-title-panels-normal.png
+- screenshots/w-title-settings-720.png
+- screenshots/w-title-settings-after-reload.png
+- screenshots/w-title-settings-compact.png
+- screenshots/w-title-settings-defaults.png
+- screenshots/w-title-settings.png
+- screenshots/w-title-world-shadows-off.png
+- screenshots/w-title-world-shadows-on.png
+- screenshots/w1-bank.png
+- screenshots/w1-bracken_pit.png
+- screenshots/w1-gravelmaw_entrance.png
+- screenshots/w1-great_cairn.png
+- screenshots/w1-highcairn.png
+- screenshots/w1-hollowcut_seam.png
+- screenshots/w1-karrowmoor_terraces.png
+- screenshots/w1-march_road.png
+- screenshots/w1-marchfield_farm.png
+- screenshots/w1-palewood_copse.png
+- screenshots/w1-redsill_shallows.png
+- screenshots/w1-rootfall.png
+- screenshots/w1-spawn.png
+- screenshots/w1-sunder_ledge.png
+- screenshots/w1-town_center.png
+- screenshots/w1-town_entrance.png
+- screenshots/w1-upper_karrow_seam.png
+- screenshots/w1-vellenwood_canopy.png
+- screenshots/w1fix-highcairn.png
+- screenshots/w1fix-town_center.png
+- screenshots/w2-bank.png
+- screenshots/w2-highcairn.png
+- screenshots/w2-march_road.png
+- screenshots/w2-palewood_copse.png
+- screenshots/w2-rootfall.png
+- screenshots/w2-spawn.png
+- screenshots/w2-town_center.png
+- screenshots/w2-town_entrance.png
+- screenshots/w3-bank.png
+- screenshots/w3-bracken_pit.png
+- screenshots/w3-crop-black.png
+- screenshots/w3-crop-blob1.png
+- screenshots/w3-crop-cart.png
+- screenshots/w3-crop-chimney.png
+- screenshots/w3-crop-cobble.png
+- screenshots/w3-crop-far-rock.png
+- screenshots/w3-crop-gravel.png
+- screenshots/w3-crop-hcblob.png
+- screenshots/w3-crop-horizon.png
+- screenshots/w3-crop-horizon2.png
+- screenshots/w3-crop-mf.png
+- screenshots/w3-crop-spawnblob.png
+- screenshots/w3-crop-square-ba.png
+- screenshots/w3-gravelmaw_entrance.png
+- screenshots/w3-great_cairn.png
+- screenshots/w3-highcairn.png
+- screenshots/w3-hollowcut_seam.png
+- screenshots/w3-karrowmoor_terraces.png
+- screenshots/w3-march_road.png
+- screenshots/w3-marchfield_farm.png
+- screenshots/w3-palewood_copse.png
+- screenshots/w3-redsill_shallows.png
+- screenshots/w3-rootfall.png
+- screenshots/w3-spawn.png
+- screenshots/w3-sunder_ledge.png
+- screenshots/w3-town_center.png
+- screenshots/w3-town_entrance.png
+- screenshots/w3-upper_karrow_seam.png
+- screenshots/w3-vellenwood_canopy.png
+- screenshots/w3acc-crop-spawnA.png
+- screenshots/w4a-highcairn.png
+- screenshots/w4a-hollowcut_seam.png
+- screenshots/w4a-rootfall.png
+- screenshots/w4a-town_center.png
+- screenshots/w4a-town_entrance.png
+- screenshots/w4b-highcairn.png
+- screenshots/w4b-hollowcut_seam.png
+- screenshots/w4b-rootfall.png
+- screenshots/w4b-town_center.png
+- screenshots/w4b-town_entrance.png
+- screenshots/wd-bank.png
+- screenshots/wd-cover-arcade.png
+- screenshots/wd-cover-forge.png
+- screenshots/wd-cover-porch.png
+- screenshots/wd-gravelmaw_entrance.png
+- screenshots/wd-great_cairn.png
+- screenshots/wd-karrowmoor_terraces.png
+- screenshots/wd-marchfield_farm.png
+- screenshots/wd-redsill_shallows.png
+- screenshots/wd-rootfall.png
+- screenshots/wd-town_center.png
+- screenshots/wire-bank.png
+- screenshots/wire-spawn.png
+- screenshots/wire-town_center.png
+- screenshots/wire-town_entrance.png

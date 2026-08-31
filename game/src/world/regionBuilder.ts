@@ -1744,14 +1744,17 @@ function buildCluster(
   ctx: BuildContext,
 ): void {
   const resource = resourceDef(cluster.resourceId);
-  const respawn = respawnSeconds(resource.tier);
+  const respawn = resource.respawnSeconds ?? respawnSeconds(resource.tier);
   const interaction = gatherInteraction(resource.archetype);
   const out = ctx.out;
 
   for (let index = 0; index < cluster.count; index += 1) {
     const id = `${cluster.id}_${index + 1}`;
-    const assetId = presentationAsset(resource, id);
-    const viewScale = presentationScale(ctx, resource, assetId, id);
+    const isHero = index === 0 && cluster.heroAssetId !== undefined;
+    const assetId = isHero ? cluster.heroAssetId! : presentationAsset(resource, id);
+    const viewScale = isHero && cluster.heroScale !== undefined
+      ? cluster.heroScale
+      : presentationScale(ctx, resource, assetId, id);
     const scale = drawnScale(resource.archetype, viewScale, resource.tier);
     let spot = spiralSpot(cluster.centre, cluster.radius, index, cluster.count, rng);
     if (resource.archetype === "tree" || resource.archetype === "ore") {
@@ -1805,7 +1808,8 @@ function buildCluster(
       continue;
     }
 
-    const maxYields = rollYield(rng, resource.tier);
+    const [yieldMin, yieldMax] = resource.yieldRange ?? yieldRange(resource.tier);
+    const maxYields = rng.int(yieldMin, yieldMax);
     const rotationY = presentationRotation(id);
     preserveLegacyResourceRotationDraw(rng);
     const requirements: Partial<Record<SkillId, number>> = {};
@@ -1842,6 +1846,9 @@ function buildCluster(
       meta: {
         resourceId: resource.id, clusterId: cluster.id, locationId: cluster.locationId,
         skill: resource.skill,
+        ...(cluster.essenceElement === undefined
+          ? {}
+          : { essenceElement: cluster.essenceElement, essenceCache: true, essenceHero: isHero }),
         ...(resource.presentation.waterOffset === undefined
           ? {}
           : { waterOffset: resource.presentation.waterOffset }),

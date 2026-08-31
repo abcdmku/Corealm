@@ -154,7 +154,7 @@ const BY_CATEGORY: Record<ItemCategory, IconShape> = {
 const BY_ITEM_ID: readonly { readonly pattern: RegExp; readonly shape: IconShape }[] = [
   { pattern: /_staff$/, shape: "staff" },
   { pattern: /_dagger$/, shape: "dagger" },
-  { pattern: /_focus$/, shape: "orb" },
+  { pattern: /_(?:focus|orb)$/, shape: "orb" },
   { pattern: /_pendant$|_charm$/, shape: "amulet" },
   { pattern: /_robe$/, shape: "robe" },
   { pattern: /_hood$/, shape: "hood" },
@@ -165,8 +165,8 @@ const LOG_ITEM = /_log$|_plank|_shaft$/;
 
 export function iconShapeFor(def: ItemDef | undefined): IconShape {
   if (!def) return "shard";
+  for (const rule of BY_ITEM_ID) if (rule.pattern.test(def.id)) return rule.shape;
   if (def.equip) {
-    for (const rule of BY_ITEM_ID) if (rule.pattern.test(def.id)) return rule.shape;
     return BY_EQUIP_SLOT[def.equip.slot];
   }
   if (def.category === "resource" && LOG_ITEM.test(def.id)) return "log";

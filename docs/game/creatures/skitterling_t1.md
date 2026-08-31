@@ -37,7 +37,9 @@ description: "Rill Skitterling spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 3-11 | Always |
 | [March Stone](../../items/#march-stone) | 1-2 | 35% |

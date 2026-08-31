@@ -108,11 +108,11 @@ export function resourceGuideLifecycle(resourceId: string): {
     };
   }
 
-  const [low, high] = yieldRange(resource.tier);
+  const [low, high] = resource.yieldRange ?? yieldRange(resource.tier);
   return {
     xpEach: gatherXp(resource.tier),
     perNode: `${low}-${high}`,
-    recovery: `${respawnSeconds(resource.tier)} s respawn`,
+    recovery: `${resource.respawnSeconds ?? respawnSeconds(resource.tier)} s respawn`,
   };
 }
 
@@ -426,6 +426,10 @@ function recipeStations(recipe: typeof RECIPES[number]): string {
   return recipe.stations?.map(humanizeId).join(" / ") ?? "Anywhere";
 }
 
+function elementName(element: string): string {
+  return element === "wind" ? "Air" : `${element[0]?.toUpperCase() ?? ""}${element.slice(1)}`;
+}
+
 function itemIcon(id: string, label = itemName(id)): string {
   return `![${label}](./assets/items/${id}.png)`;
 }
@@ -685,15 +689,40 @@ function enemyGroupForStage(
   stage: QuestStageDef,
   family: string,
 ): ResolvedEnemyGroup | undefined {
-  const region = REGIONS.find((candidate) => candidate.id === quest.regionId);
-  if (!region) return undefined;
-  const insideDungeon = stagePlaces(stage).some((place) => place.regionId === "gravelmaw");
-  if (insideDungeon && region.dungeon) {
-    const group = region.dungeon.enemyGroups.find((candidate) => candidate.family === family);
-    if (group) return { group, regionId: region.dungeon.id };
+  const places = stagePlaces(stage);
+  if (places.some((place) => place.regionId === "gravelmaw")) {
+    for (const region of REGIONS) {
+      const group = region.dungeon?.enemyGroups.find((candidate) => candidate.family === family);
+      if (group && region.dungeon) return { group, regionId: region.dungeon.id };
+    }
   }
-  const group = region.enemyGroups.find((candidate) => candidate.family === family);
-  return group ? { group, regionId: region.id } : undefined;
+
+  // A quest may send the player back to an earlier region. Resolve the enemy from the stage's
+  // authored locations first, then use the quest region as a fallback. The Sparking Stone is based
+  // in Karrowmoor but names Rill Skitterlings in Fallowmarch, so quest.regionId alone picks the
+  // tier-10 Scree group and teaches the wrong route.
+  const candidateRegionIds = [
+    ...new Set([
+      ...places.map((place) => place.regionId).filter((id) => id !== "gravelmaw"),
+      quest.regionId,
+    ]),
+  ];
+  for (const regionId of candidateRegionIds) {
+    const region = REGIONS.find((candidate) => candidate.id === regionId);
+    const group = region?.enemyGroups.find((candidate) => candidate.family === family);
+    if (group && region) return { group, regionId: region.id };
+  }
+  return undefined;
+}
+
+function enemyGroupById(id: string): ResolvedEnemyGroup | undefined {
+  for (const region of REGIONS) {
+    const surface = region.enemyGroups.find((group) => group.id === id);
+    if (surface) return { group: surface, regionId: region.id };
+    const dungeon = region.dungeon?.enemyGroups.find((group) => group.id === id);
+    if (dungeon && region.dungeon) return { group: dungeon, regionId: region.dungeon.id };
+  }
+  return undefined;
 }
 
 function distanceBetween(a: readonly [number, number], b: readonly [number, number]): number {
@@ -747,17 +776,24 @@ function questStepMap(quest: QuestDef, stage: QuestStageDef): string {
   for (const ref of stage.refs ?? []) {
     if (ref.kind === "entity") {
       const point = authoredEntityPoint(ref.id);
-      if (!point || point.regionId === "gravelmaw") continue;
       const person = npc(ref.id);
+      const enemyGroup = enemyGroupById(ref.id);
+      const position = point?.position ?? enemyGroup?.group.centre;
+      const regionId = point?.regionId ?? enemyGroup?.regionId;
+      if (!position || !regionId || regionId === "gravelmaw") continue;
       subjectPoints.push({
         id: ref.id,
-        label: person?.name ?? point.name,
-        context: regionName(point.regionId),
-        kind: person ? "npc" : "entity",
-        position: point.position,
+        label: person?.name ?? enemyGroup?.group.name ?? point?.name ?? humanizeId(ref.id),
+        context: regionName(regionId),
+        kind: person ? "npc" : enemyGroup ? "enemy" : "entity",
+        position,
         href: person
           ? `../../npcs/#${headingSlug(person.name)}`
-          : `../../regions/#${headingSlug(places[0]!.location.name)}`,
+          : enemyGroup
+            ? `../../creatures/${creatureForGroup(enemyGroup.group).id}/`
+            : point
+              ? `../../regions/#${headingSlug(nearestPlace(point.regionId, point.position).location.name)}`
+              : `../../regions/#${headingSlug(places[0]!.location.name)}`,
       });
     }
     if (ref.kind === "enemyFamily") {
@@ -819,6 +855,7 @@ interface QuestScene {
   kind: CaptureKind;
   id: string;
   label: string;
+  context: string;
 }
 
 function questStepScenes(quest: QuestDef, stage: QuestStageDef): QuestScene[] {
@@ -827,11 +864,25 @@ function questStepScenes(quest: QuestDef, stage: QuestStageDef): QuestScene[] {
     if (ref.kind === "entity") {
       const person = npc(ref.id);
       const point = authoredEntityPoint(ref.id);
+      const enemyGroup = enemyGroupById(ref.id);
+      if (enemyGroup) {
+        scenes.push({
+          key: `enemyGroup:${enemyGroup.group.id}`,
+          kind: "enemyGroup",
+          id: enemyGroup.group.id,
+          label: enemyGroup.group.name,
+          context: `${nearestPlace(enemyGroup.regionId, enemyGroup.group.centre).location.name}, ${regionName(enemyGroup.regionId)}`,
+        });
+        continue;
+      }
       scenes.push({
         key: `entity:${ref.id}`,
         kind: person ? "npc" : "entity",
         id: ref.id,
         label: person?.name ?? point?.name ?? humanizeId(ref.id),
+        context: point
+          ? `${nearestPlace(point.regionId, point.position).location.name}, ${regionName(point.regionId)}`
+          : stagePlaces(stage).map((place) => place.location.name).join(", "),
       });
     }
     if (ref.kind === "enemyFamily") {
@@ -842,6 +893,7 @@ function questStepScenes(quest: QuestDef, stage: QuestStageDef): QuestScene[] {
         kind: "enemyGroup",
         id: resolved.group.id,
         label: resolved.group.name,
+        context: `${nearestPlace(resolved.regionId, resolved.group.centre).location.name}, ${regionName(resolved.regionId)}`,
       });
     }
   }
@@ -852,6 +904,7 @@ function questStepScenes(quest: QuestDef, stage: QuestStageDef): QuestScene[] {
         kind: "location",
         id: place.location.id,
         label: place.location.name,
+        context: `${place.location.name}, ${place.regionLabel}`,
       });
     }
   }
@@ -870,11 +923,10 @@ function questStepEvidence(quest: QuestDef, stage: QuestStageDef): string {
   const items = itemLinks
     ? `<nav class="corealm-quest-items" aria-label="Items for step ${stage.index + 1}"><span>Items</span>${itemLinks}</nav>`
     : "";
-  const placeNames = places.map((place) => place.location.name).join(", ");
   const scenes = questStepScenes(quest, stage).map((scene) => [
     `<figure class="corealm-quest-scene">`,
     `<img src="${publicCaptureAsset(scene.kind, scene.id, "../../")}" alt="${escapeHtml(`${scene.label} in the running Corealm world`)}" loading="lazy" />`,
-    `<figcaption><strong>${escapeHtml(scene.label)}</strong><span>${escapeHtml(placeNames)}</span></figcaption>`,
+    `<figcaption><strong>${escapeHtml(scene.label)}</strong><span>${escapeHtml(scene.context)}</span></figcaption>`,
     `</figure>`,
   ].join("")).join("\n");
   return [
@@ -972,7 +1024,7 @@ function skillsDoc(): string {
     "",
     "## Combat",
     "",
-    "Attacks resolve on a 600 ms tick. Melee supplies physical defence; Magic supplies magical defence. Health is `20 + 3 × floor((Melee + Magic) / 2)` plus equipment vitality. Magic is 15% more accurate but consumes an essence shard per cast.",
+    "Melee attacks resolve on a 600 ms combat tick. Magic launches and bolt arrivals resolve on the 100 ms simulation tick, so wands keep their exact 2.2 second cadence and staffs keep their exact 3.0 second cadence. Melee supplies physical defence; Magic supplies magical defence. Health is `20 + 3 × floor((Melee + Magic) / 2)` plus equipment vitality. Magic is 15% more accurate. Each cast spends one matching elemental-weapon charge first, then one carried Essence.",
   ].join("\n"));
 }
 
@@ -980,11 +1032,21 @@ function itemsDoc(): string {
   const rows = [...ALL_ITEMS]
     .sort((a, b) => a.tier - b.tier || a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
     .map((item) => {
+      const craftedCharge = item.orb
+        ? ALL_ITEMS.find((candidate) => candidate.magicWeapon?.charge?.orbItemId === item.id)?.magicWeapon?.charge
+        : undefined;
       const requires = item.equip
         ? Object.entries(item.equip.requires).map(([skill, level]) => `${skillName(skill as SkillId)} ${level}`).join(", ")
         : "";
       const notes = [
         item.equip?.slot,
+        item.magicWeapon
+          ? `${item.magicWeapon.kind}; ${item.magicWeapon.hands}-handed; ${((item.equip?.attackSpeedMs ?? 0) / 1000).toFixed(1)} s cast cadence`
+            + (item.magicWeapon.charge ? `; ${item.magicWeapon.charge.capacity} ${elementName(item.magicWeapon.charge.element)} charges` : "")
+          : "",
+        item.orb
+          ? `boss crafting component; makes a ${craftedCharge?.initialCharges ?? 1000}-charge elemental weapon; ${item.orb.released ? "released" : "unreleased"}`
+          : "",
         item.food ? `Heals ${item.food.healAmount}` : "",
         item.tool ? `${skillName(item.tool.skill)} +${item.tool.gatherBonus}` : "",
         requires,
@@ -1252,11 +1314,17 @@ function creatureDoc(creature: EnemyDef): string {
     `<figcaption><strong>${escapeHtml(spawn.group.name)}</strong><span>${escapeHtml(`${spawn.place.location.name}, ${spawn.regionLabel}`)}</span></figcaption>`,
     `</figure>`,
   ].join("")).join("\n");
-  const dropRows: (string | number)[][] = creature.drops.map((drop) => [
-    itemLink(drop.itemId, itemName(drop.itemId), "../../"),
-    drop.quantity[0] === drop.quantity[1] ? drop.quantity[0] : `${drop.quantity[0]}-${drop.quantity[1]}`,
-    `${Math.round(drop.chance * 1000) / 10}%`,
-  ]);
+  const hasOrbDrop = creature.drops.some((drop) => content.item(drop.itemId)?.orb);
+  const dropRows: (string | number)[][] = creature.drops.map((drop) => {
+    const singletonOrb = Boolean(content.item(drop.itemId)?.orb);
+    return [
+      itemLink(drop.itemId, itemName(drop.itemId), "../../"),
+      drop.quantity[0] === drop.quantity[1] ? drop.quantity[0] : `${drop.quantity[0]}-${drop.quantity[1]}`,
+      singletonOrb
+        ? (drop.chance === 1 ? "First eligible acquisition" : `${Math.round(drop.chance * 1000) / 10}% when eligible`)
+        : `${Math.round(drop.chance * 1000) / 10}%`,
+    ];
+  });
   if (creature.marks) {
     dropRows.unshift([
       "Marks",
@@ -1292,7 +1360,11 @@ function creatureDoc(creature: EnemyDef): string {
     "",
     "## Drops",
     "",
-    table(["Drop", "Quantity", "Chance"], dropRows),
+    hasOrbDrop
+      ? "Elemental orbs are singleton crafting rewards. The boss drops its orb when no physical copy exists. Repeat kills do not create a duplicate while that orb is carried, banked, or waiting in loot or recovery. If the copy is lost before crafting, the boss can drop it again. Once consumed to make an elemental weapon, it never drops again."
+      : "",
+    "",
+    table(["Drop", "Quantity", "Chance or rule"], dropRows),
   ].join("\n"));
 }
 
@@ -1493,8 +1565,31 @@ function questDoc(quest: QuestDef): string {
 function spellsAndShopsDoc(): string {
   const spellRows = SPELLS.map((spell) => [
     spell.name, spell.reqLevel, spell.baseMax, spell.divisor, spell.baseXp,
-    `${(spell.castMs / 1000).toFixed(1)} s`, `${spell.cost.quantity}× ${itemName(spell.cost.itemId)}`,
+    "2.2 s wand / 3.0 s staff", `${spell.cost.charges}× ${elementName(spell.cost.element)} weapon charge or Essence`,
   ]);
+  const orbRows = ALL_ITEMS.filter((item) => item.orb).map((item) => {
+    const orb = item.orb!;
+    const charge = ALL_ITEMS.find((candidate) => candidate.magicWeapon?.charge?.orbItemId === item.id)
+      ?.magicWeapon?.charge;
+    return [
+      itemLink(item.id),
+      item.tier,
+      elementName(orb.element),
+      `${charge?.initialCharges ?? 1000} charges in the crafted weapon`,
+      charge ? itemName(charge.rechargeItemId) : "-",
+      orb.released ? "Released" : "Future content",
+    ];
+  });
+  const chargedWeaponRows = ALL_ITEMS.filter((item) => item.magicWeapon?.charge).map((item) => {
+    const charge = item.magicWeapon!.charge!;
+    return [
+      itemLink(item.id),
+      elementName(charge.element),
+      charge.capacity,
+      `${charge.rechargeCost}× ${itemName(charge.rechargeItemId)}`,
+      charge.released ? "Released" : "Future content",
+    ];
+  });
   const shopSections = SHOPS.map((shop) => {
     const rows = shop.stock.map((entry) => {
       const item = content.item(entry.itemId);
@@ -1506,6 +1601,18 @@ function spellsAndShopsDoc(): string {
     "## Spells",
     "",
     table(["Spell", "Magic level", "Base max", "Divisor", "XP", "Cast time", "Cost"], spellRows),
+    "",
+    "## Elemental orbs",
+    "",
+    "Boss orbs are singleton crafting components, not equipment. Combine one with the matching wood-tier wand or staff to create an elemental weapon with 1,000 charges.",
+    "",
+    table(["Orb", "Tier", "Element", "Crafted weapon", "Matching Essence", "Status"], orbRows),
+    "",
+    "## Charged elemental weapons",
+    "",
+    "A matching weapon charge pays for the cast first. At zero charge, the weapon keeps casting from carried matching Essence. An Essence Altar consumes 100 matching Essence to refill the equipped weapon to 1,000.",
+    "",
+    table(["Weapon", "Element", "Capacity", "Full recharge", "Status"], chargedWeaponRows),
     "",
     "## Shops",
     "",

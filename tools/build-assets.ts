@@ -26,9 +26,9 @@
  */
 import path from "node:path";
 import zlib from "node:zlib";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { open, mkdir, readFile, writeFile, rm, readdir, stat } from "node:fs/promises";
+import { open, mkdir, readFile, writeFile, rm, readdir, stat, rename, cp } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import { Document, Logger, NodeIO, type JSONDocument, type TypedArray } from "@gltf-transform/core";
@@ -798,6 +798,19 @@ interface ManifestAsset {
   base: { x: number; y: number; z: number };
   animations: string[];
   materials: string[];
+  /** Optional for historical CC0 rows. Required and audited for imported Unity outputs. */
+  sha256?: string;
+}
+
+interface ManifestArtifact {
+  id: string;
+  file: string;
+  pack: string;
+  kind: string;
+  mediaType: string;
+  bytes: number;
+  sha256: string;
+  dimensions?: { width: number; height: number };
 }
 
 interface Manifest {
@@ -811,6 +824,8 @@ interface Manifest {
     archiveSha256: string;
   }>;
   assets: ManifestAsset[];
+  /** Non-GLB files with third-party provenance. The runtime ignores this audit-only list. */
+  artifacts?: ManifestArtifact[];
 }
 
 interface BuildRecord {
@@ -827,7 +842,15 @@ interface BuildRecord {
 const CACHE_DIR = path.join(repoRoot, ".asset-cache");
 const OUT_DIR = path.join(gameRoot, "public", "assets");
 const MODELS_DIR = path.join(OUT_DIR, "models");
+const MANIFEST_FILE = path.join(OUT_DIR, "manifest.json");
 const STATE_FILE = path.join(CACHE_DIR, "build-assets-state.json");
+const LEGACY_PACK_IDS = new Set(PACKS.map((pack) => pack.id));
+const REQUIRED_UNITY_ASSET_IDS = new Set([
+  "rpg_weapon_staff",
+  "rpg_weapon_wand",
+  "rocks_free_essence_cache",
+  "rocks_free_essence_node",
+]);
 
 /** Bump when the transform pipeline changes so cached outputs are invalidated. */
 const PIPELINE_VERSION = "1.3.0";
@@ -848,6 +871,73 @@ async function sha256File(file: string): Promise<string> {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
   return hash.digest("hex");
+}
+
+function sha256(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex").toUpperCase();
+}
+
+async function writeTextAtomically(file: string, contents: string): Promise<void> {
+  await mkdir(path.dirname(file), { recursive: true });
+  const temporary = `${file}.tmp-${process.pid}-${randomUUID()}`;
+  await writeFile(temporary, contents, "utf8");
+  try {
+    await rename(temporary, file);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
+async function readManifest(): Promise<Manifest> {
+  const manifest = JSON.parse(await readFile(MANIFEST_FILE, "utf8")) as Manifest;
+  if (!Array.isArray(manifest.packs) || !Array.isArray(manifest.assets)) {
+    throw new Error(`${MANIFEST_FILE} is not a valid asset manifest`);
+  }
+  if (manifest.artifacts !== undefined && !Array.isArray(manifest.artifacts)) {
+    throw new Error(`${MANIFEST_FILE} has a non-array artifacts field`);
+  }
+  return manifest;
+}
+
+function resolvePublishedFile(relative: string): string {
+  const absolute = path.resolve(OUT_DIR, relative);
+  const prefix = `${path.resolve(OUT_DIR)}${path.sep}`;
+  if (!absolute.startsWith(prefix)) throw new Error(`Manifest path escapes assets/: ${relative}`);
+  return absolute;
+}
+
+async function validatePublishedFile(
+  entry: { id: string; file: string; bytes: number; sha256?: string },
+): Promise<void> {
+  const bytes = await readFile(resolvePublishedFile(entry.file));
+  if (bytes.byteLength !== entry.bytes) {
+    throw new Error(`${entry.id}: ${entry.file} is ${bytes.byteLength} bytes; manifest records ${entry.bytes}`);
+  }
+  if (entry.sha256) {
+    const actual = sha256(bytes);
+    if (actual !== entry.sha256.toUpperCase()) {
+      throw new Error(`${entry.id}: SHA-256 ${actual}; manifest records ${entry.sha256}`);
+    }
+  }
+}
+
+async function preservedManifestRows(manifest: Manifest): Promise<{
+  packs: Manifest["packs"];
+  assets: ManifestAsset[];
+  artifacts: ManifestArtifact[];
+}> {
+  const assets = manifest.assets.filter((asset) => !LEGACY_PACK_IDS.has(asset.pack));
+  const artifacts = (manifest.artifacts ?? []).filter((artifact) => !LEGACY_PACK_IDS.has(artifact.pack));
+  const referencedPackIds = new Set([...assets.map((asset) => asset.pack), ...artifacts.map((artifact) => artifact.pack)]);
+  const packs = manifest.packs.filter((pack) => !LEGACY_PACK_IDS.has(pack.id) && referencedPackIds.has(pack.id));
+  const availablePackIds = new Set(packs.map((pack) => pack.id));
+
+  for (const entry of [...assets, ...artifacts]) {
+    if (!availablePackIds.has(entry.pack)) throw new Error(`${entry.id}: missing external pack ${entry.pack}`);
+    await validatePublishedFile(entry);
+  }
+
+  return { packs, assets, artifacts };
 }
 
 function round(value: number): number {
@@ -1512,9 +1602,10 @@ async function buildOne(
   pick: Pick,
   state: Record<string, BuildRecord>,
   force: boolean,
+  outputRoot = OUT_DIR,
 ): Promise<{ asset: ManifestAsset; sourceBytes: number; reused: boolean; note?: string }> {
   const relative = `models/${pick.category}/${pick.id}.glb`;
-  const outFile = path.join(OUT_DIR, relative);
+  const outFile = path.join(outputRoot, relative);
   const limit = pick.textureLimit ?? TEXTURE_LIMIT;
   const optionsHash = sha1(
     PIPELINE_VERSION,
@@ -1626,13 +1717,16 @@ async function directorySize(dir: string): Promise<number> {
 }
 
 async function verify(): Promise<number> {
-  const manifest = JSON.parse(await readFile(path.join(OUT_DIR, "manifest.json"), "utf8")) as Manifest;
+  const manifest = await readManifest();
   let failures = 0;
   for (const asset of manifest.assets) {
     const file = path.join(OUT_DIR, asset.file);
     try {
       const bytes = await readFile(file);
       if (bytes.byteLength !== asset.bytes) throw new Error(`size ${bytes.byteLength} != manifest ${asset.bytes}`);
+      if (asset.sha256 && sha256(bytes) !== asset.sha256.toUpperCase()) {
+        throw new Error(`SHA-256 does not match manifest ${asset.sha256}`);
+      }
       const document = await io.readBinary(new Uint8Array(bytes));
       const meshes = document.getRoot().listMeshes().length;
       const animations = document.getRoot().listAnimations().length;
@@ -1646,7 +1740,21 @@ async function verify(): Promise<number> {
       console.error(`FAIL ${asset.id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+  let artifactFailures = 0;
+  for (const artifact of manifest.artifacts ?? []) {
+    try {
+      await validatePublishedFile(artifact);
+    } catch (error) {
+      artifactFailures += 1;
+      console.error(`FAIL ${artifact.id}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   console.log(`verify: ${manifest.assets.length - failures}/${manifest.assets.length} GLBs parsed and non-empty`);
+  console.log(
+    `verify: ${(manifest.artifacts?.length ?? 0) - artifactFailures}/${manifest.artifacts?.length ?? 0} ` +
+      "recorded non-GLB artifacts match byte counts and SHA-256",
+  );
+  failures += artifactFailures;
   return failures;
 }
 
@@ -1689,7 +1797,7 @@ async function metrics(write: boolean): Promise<number> {
   }
   for (const zip of archives.values()) await zip.close();
   if (write && changed > 0) {
-    await writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
+    await writeTextAtomically(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
     console.log(`metrics: rewrote ${changed} of ${manifest.assets.length} entries`);
   } else {
     console.log(`metrics: ${manifest.assets.length - changed}/${manifest.assets.length} entries match their source`);
@@ -1734,6 +1842,24 @@ async function main(): Promise<void> {
     process.exitCode = (await verify()) === 0 ? 0 : 1;
     return;
   }
+  if (args[0] === "--preservation-check") {
+    const manifest = await readManifest();
+    const preserved = await preservedManifestRows(manifest);
+    const preservedIds = new Set(preserved.assets.map((asset) => asset.id));
+    const missing = [...REQUIRED_UNITY_ASSET_IDS].filter((id) => !preservedIds.has(id));
+    if (missing.length > 0) throw new Error(`Missing required Unity manifest rows: ${missing.join(", ")}`);
+    const combinedIds = new Set(CATALOG.map((pick) => pick.id));
+    for (const asset of preserved.assets) {
+      if (combinedIds.has(asset.id)) throw new Error(`Legacy/imported asset id collision: ${asset.id}`);
+      combinedIds.add(asset.id);
+    }
+    console.log(
+      `preservation-check: a legacy build would retain ${preserved.assets.length} imported GLBs, ` +
+        `${preserved.artifacts.length} external artifact(s), and ${preserved.packs.length} external pack record(s)`,
+    );
+    console.log(`preservation-check: ${[...preservedIds].sort().join(", ")}`);
+    return;
+  }
   if (args[0] === "--metrics") {
     const changed = await metrics(args.includes("--write"));
     process.exitCode = changed === 0 || args.includes("--write") ? 0 : 1;
@@ -1748,6 +1874,26 @@ async function main(): Promise<void> {
     ids.add(pick.id);
   }
 
+  const previousManifest = await readManifest();
+  const preserved = await preservedManifestRows(previousManifest);
+  const previousManifestText = await readFile(MANIFEST_FILE, "utf8");
+  let previousStateText: string | null = null;
+  try {
+    previousStateText = await readFile(STATE_FILE, "utf8");
+  } catch {
+    previousStateText = null;
+  }
+  const transactionId = randomUUID();
+  const stageRoot = path.join(path.dirname(OUT_DIR), `.corealm-assets-stage-${transactionId}`);
+  const stagedModelsDir = path.join(stageRoot, "models");
+  await mkdir(stageRoot, { recursive: true });
+  try {
+    await cp(MODELS_DIR, stagedModelsDir, { recursive: true, force: true });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") throw error;
+    await mkdir(stagedModelsDir, { recursive: true });
+  }
   const state = await loadState();
   const assets: ManifestAsset[] = [];
   const failures: Array<{ id: string; error: string }> = [];
@@ -1760,7 +1906,7 @@ async function main(): Promise<void> {
 
   for (const pick of CATALOG) {
     try {
-      const result = await buildOne(pick, state, force);
+      const result = await buildOne(pick, state, force, stageRoot);
       assets.push(result.asset);
       totalSource += result.sourceBytes;
       totalOut += result.asset.bytes;
@@ -1782,26 +1928,29 @@ async function main(): Promise<void> {
     }
   }
 
-  // Drop stale outputs from earlier catalog revisions.
-  const expected = new Set(assets.map((asset) => path.join(OUT_DIR, asset.file)));
+  if (failures.length > 0) {
+    for (const zip of archives.values()) await zip.close();
+    await rm(stageRoot, { recursive: true, force: true });
+    console.log("\nlegacy build failed; manifest, build state, external GLBs, and stale outputs were left untouched");
+    for (const failure of failures) console.log(`  ${failure.id}: ${failure.error}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  // Drop only files that the previous manifest attributed to this legacy builder. Imported Unity
+  // GLBs and unregistered files are outside this tool's ownership and are never sweep candidates.
+  const currentLegacyIds = new Set(assets.map((asset) => asset.id));
   const removed: string[] = [];
-  const sweep = async (dir: string): Promise<void> => {
-    let items: Dirent[];
-    try {
-      items = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
+  for (const previous of previousManifest.assets) {
+    if (!LEGACY_PACK_IDS.has(previous.pack) || currentLegacyIds.has(previous.id)) continue;
+    const full = path.resolve(stageRoot, previous.file);
+    const modelsPrefix = `${path.resolve(stagedModelsDir)}${path.sep}`;
+    if (!full.startsWith(modelsPrefix) || path.extname(full).toLowerCase() !== ".glb") {
+      throw new Error(`Refusing to sweep unexpected legacy path: ${previous.file}`);
     }
-    for (const item of items) {
-      const full = path.join(dir, item.name);
-      if (item.isDirectory()) await sweep(full);
-      else if (full.endsWith(".glb") && !expected.has(full)) {
-        await rm(full);
-        removed.push(path.relative(OUT_DIR, full));
-      }
-    }
-  };
-  if (failures.length === 0) await sweep(MODELS_DIR);
+    await rm(full, { force: true });
+    removed.push(previous.file);
+  }
   for (const id of Object.keys(state)) {
     if (!ids.has(id)) delete state[id];
   }
@@ -1809,19 +1958,46 @@ async function main(): Promise<void> {
   const usedPacks = new Set(assets.map((asset) => asset.pack));
   const manifest: Manifest = {
     generatedAt: new Date().toISOString(),
-    packs: PACKS.filter((pack) => usedPacks.has(pack.id)).map(({ id, name, author, source, license, archiveSha256 }) => ({
-      id,
-      name,
-      author,
-      source,
-      license,
-      archiveSha256,
-    })),
-    assets: assets.sort((a, b) => a.category.localeCompare(b.category) || a.id.localeCompare(b.id)),
+    packs: [
+      ...PACKS.filter((pack) => usedPacks.has(pack.id)).map(({ id, name, author, source, license, archiveSha256 }) => ({
+        id,
+        name,
+        author,
+        source,
+        license,
+        archiveSha256,
+      })),
+      ...preserved.packs,
+    ],
+    assets: [...assets, ...preserved.assets].sort(
+      (a, b) => a.category.localeCompare(b.category) || a.id.localeCompare(b.id),
+    ),
+    artifacts: preserved.artifacts.sort((a, b) => a.id.localeCompare(b.id)),
   };
   await mkdir(OUT_DIR, { recursive: true });
-  await writeFile(path.join(OUT_DIR, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  await writeFile(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`);
+  const backupModelsDir = path.join(OUT_DIR, `.models-backup-${transactionId}`);
+  let modelsPublished = false;
+  let manifestPublished = false;
+  try {
+    await rename(MODELS_DIR, backupModelsDir);
+    await rename(stagedModelsDir, MODELS_DIR);
+    modelsPublished = true;
+    await writeTextAtomically(MANIFEST_FILE, `${JSON.stringify(manifest, null, 2)}\n`);
+    manifestPublished = true;
+    await writeTextAtomically(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`);
+  } catch (error) {
+    if (modelsPublished) {
+      await rm(MODELS_DIR, { recursive: true, force: true });
+      await rename(backupModelsDir, MODELS_DIR);
+    }
+    if (manifestPublished) await writeFile(MANIFEST_FILE, previousManifestText, "utf8");
+    if (previousStateText === null) await rm(STATE_FILE, { force: true });
+    else await writeFile(STATE_FILE, previousStateText, "utf8");
+    await rm(stageRoot, { recursive: true, force: true });
+    throw error;
+  }
+  await rm(backupModelsDir, { recursive: true, force: true });
+  await rm(stageRoot, { recursive: true, force: true });
 
   for (const zip of archives.values()) await zip.close();
 
@@ -1846,11 +2022,6 @@ async function main(): Promise<void> {
   if (oversize.length) {
     console.log(`\n${oversize.length} environment GLB(s) over the 400 KB target:`);
     for (const asset of oversize) console.log(`  ${asset.id} ${readableSize(asset.bytes)}`);
-  }
-  if (failures.length) {
-    console.log(`\n${failures.length} failure(s):`);
-    for (const failure of failures) console.log(`  ${failure.id}: ${failure.error}`);
-    process.exitCode = 1;
   }
 }
 

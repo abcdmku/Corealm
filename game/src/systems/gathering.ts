@@ -37,6 +37,7 @@ import type { ActivityDriver, ActivityTickResult, EntityLookup, InventoryPort } 
 import type { ActivitySystem } from "./activity.js";
 import { CONTINUE, awardXp, clamp01, stopWith } from "./activity.js";
 import type { TickSystem } from "../app/loop.js";
+import type { ItemMoveOptions } from "./inventory.js";
 import type { ResourceDef } from "../content/index.js";
 import {
   content, gatherSuccessChance, gatherXp, respawnSeconds, toolBonus, yieldRange,
@@ -46,7 +47,7 @@ export type { EntityLookup, InventoryPort } from "./activity.js";
 
 /** Inventory adds owned by gathering suppress the inventory layer's generic receipt event. */
 export interface GatheringInventoryPort extends InventoryPort {
-  addItem(itemId: ItemId, quantity: number, options?: { silent?: boolean }): Result<number>;
+  addItem(itemId: ItemId, quantity: number, options?: ItemMoveOptions): Result<number>;
 }
 
 /** The gathering verbs and the skill each one trains. `harvest` is farming's, and lives there. */
@@ -138,7 +139,10 @@ export class GatheringSystem implements TickSystem {
       if (node.respawnAtMs === null || playedAtMs < node.respawnAtMs) continue;
 
       const tier = entity?.tier ?? 1;
-      const [min, max] = yieldRange(tier);
+      const authored = entity?.resource
+        ? this.resourceDefFor(entity, entity.resource.itemId)?.yieldRange
+        : undefined;
+      const [min, max] = authored ?? yieldRange(tier);
       const rolled = this.deps.rng.get("gather").int(min, max);
 
       node.remaining = rolled;
@@ -263,25 +267,15 @@ export class GatheringSystem implements TickSystem {
         this.deps.events.emit("inventory.full", { itemId }, entity.id, atMs);
         return stopWith("inventory-full");
       }
-      const added = this.deps.inventory.addItem(itemId, 1, { silent: true });
+      const added = this.deps.inventory.addItem(itemId, 1, {
+        eventData: { source: "gather", skill: activity.skill },
+        eventEntityId: entity.id,
+        eventAtMs: atMs,
+      });
       if (!added.ok || added.value <= 0) {
         this.deps.events.emit("inventory.full", { itemId }, entity.id, atMs);
         return stopWith("inventory-full");
       }
-
-      this.deps.events.emit(
-        "item.received",
-        {
-          itemId,
-          name: content.item(itemId)?.name ?? itemId,
-          quantity: added.value,
-          source: "gather",
-          skill: activity.skill,
-        },
-        entity.id,
-        atMs,
-      );
-
       awardXp(state, this.deps.events, activity.skill, gatherXp(entity.tier), atMs);
       activity.yieldsThisSession += 1;
       gained = true;
@@ -462,19 +456,12 @@ export class GatheringSystem implements TickSystem {
       // Bonus drops stay on the loot stream so they never shift the gather sequence.
       if (!this.deps.rng.get("loot").chance(drop.chance)) continue;
       if (!this.deps.inventory.hasRoomFor(drop.itemId, 1)) continue;
-      const added = this.deps.inventory.addItem(drop.itemId, 1, { silent: true });
+      const added = this.deps.inventory.addItem(drop.itemId, 1, {
+        eventData: { source: "gather-bonus" },
+        eventEntityId: entity.id,
+        eventAtMs: atMs,
+      });
       if (!added.ok || added.value <= 0) continue;
-      this.deps.events.emit(
-        "item.received",
-        {
-          itemId: drop.itemId,
-          name: content.item(drop.itemId)?.name ?? drop.itemId,
-          quantity: added.value,
-          source: "gather-bonus",
-        },
-        entity.id,
-        atMs,
-      );
     }
   }
 

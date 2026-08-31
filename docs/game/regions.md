@@ -20,6 +20,7 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#marchfield" style="--map-x:42.0000%;--map-y:51.8333%" data-map-side="right" data-map-kind="farm" data-map-marker aria-label="Marchfield, Fallowmarch" title="Marchfield, Fallowmarch"><span>Marchfield<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#west-track" style="--map-x:30.8333%;--map-y:55.0000%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="West Track, Fallowmarch" title="West Track, Fallowmarch"><span>West Track<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#the-open-march" style="--map-x:29.1667%;--map-y:47.5000%" data-map-side="right" data-map-kind="camp" data-map-marker aria-label="The Open March, Fallowmarch" title="The Open March, Fallowmarch"><span>The Open March<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="#air-essence-cache" style="--map-x:29.1667%;--map-y:62.5000%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#north-gate" style="--map-x:47.8333%;--map-y:40.1667%" data-map-side="right" data-map-kind="gate" data-map-marker aria-label="North Gate, Fallowmarch" title="North Gate, Fallowmarch"><span>North Gate<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#marchgate" style="--map-x:49.0000%;--map-y:39.8333%" data-map-side="right" data-map-kind="gate" data-map-marker aria-label="Marchgate, Vellenwood" title="Marchgate, Vellenwood"><span>Marchgate<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="#rootfall" style="--map-x:55.0000%;--map-y:40.0000%" data-map-side="right" data-map-kind="settlement" data-map-marker aria-label="Rootfall, Vellenwood" title="Rootfall, Vellenwood"><span>Rootfall<small>Vellenwood</small></span></a>
@@ -31,6 +32,7 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#gorge-ford" style="--map-x:69.1667%;--map-y:46.3333%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Gorge Ford, Vellenwood" title="Gorge Ford, Vellenwood"><span>Gorge Ford<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="#gorge-head" style="--map-x:58.6667%;--map-y:34.0000%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Gorge Head, Vellenwood" title="Gorge Head, Vellenwood"><span>Gorge Head<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="#the-thornline" style="--map-x:66.3333%;--map-y:37.3333%" data-map-side="left" data-map-kind="camp" data-map-marker aria-label="The Thornline, Vellenwood" title="The Thornline, Vellenwood"><span>The Thornline<small>Vellenwood</small></span></a>
+<a class="corealm-map-marker" href="#earth-essence-cache" style="--map-x:71.8333%;--map-y:35.3333%" data-map-side="left" data-map-kind="landmark" data-map-marker aria-label="Earth Essence Cache, Vellenwood" title="Earth Essence Cache, Vellenwood"><span>Earth Essence Cache<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="#cairn-gate" style="--map-x:70.8333%;--map-y:48.0000%" data-map-side="left" data-map-kind="gate" data-map-marker aria-label="Cairn Gate, Vellenwood" title="Cairn Gate, Vellenwood"><span>Cairn Gate<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="#moorgate" style="--map-x:71.3333%;--map-y:49.6667%" data-map-side="left" data-map-kind="gate" data-map-marker aria-label="Moorgate, Karrowmoor" title="Moorgate, Karrowmoor"><span>Moorgate<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#moor-road-bend" style="--map-x:64.1667%;--map-y:50.5000%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Moor Road Bend, Karrowmoor" title="Moor Road Bend, Karrowmoor"><span>Moor Road Bend<small>Karrowmoor</small></span></a>
@@ -47,6 +49,7 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#ridge-pines" style="--map-x:70.8333%;--map-y:58.0000%" data-map-side="left" data-map-kind="grove" data-map-marker aria-label="Ridge Pines, Karrowmoor" title="Ridge Pines, Karrowmoor"><span>Ridge Pines<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#far-tarn" style="--map-x:73.6667%;--map-y:59.1667%" data-map-side="left" data-map-kind="water" data-map-marker aria-label="Far Tarn, Karrowmoor" title="Far Tarn, Karrowmoor"><span>Far Tarn<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#tarn-track" style="--map-x:75.0000%;--map-y:56.6667%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Tarn Track, Karrowmoor" title="Tarn Track, Karrowmoor"><span>Tarn Track<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="#water-essence-cache" style="--map-x:77.3333%;--map-y:64.6667%" data-map-side="left" data-map-kind="landmark" data-map-marker aria-label="Water Essence Cache, Karrowmoor" title="Water Essence Cache, Karrowmoor"><span>Water Essence Cache<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -169,6 +172,14 @@ Open tussock. Skitterlings in the wet, wolf pups on the rise.
 
 **Tier:** 1 · **Type:** camp
 
+### Air Essence Cache
+
+![Air Essence Cache](./assets/captures/locations/fallowmarch_air_cache.webp)
+
+A wind-scoured stone cache far beyond the west track, bright with trapped air essence.
+
+**Tier:** 1 · **Type:** landmark
+
 ### North Gate
 
 ![North Gate](./assets/captures/locations/fallowmarch_north_gate.webp)
@@ -263,6 +274,14 @@ Where the gorge peters out against the northern ridge.
 The edge the Thornbound keep to. They do not enter the clearings and nobody says why.
 
 **Tier:** 5 · **Type:** camp
+
+### Earth Essence Cache
+
+![Earth Essence Cache](./assets/captures/locations/vellenwood_earth_cache.webp)
+
+An old stone heart under the eastern canopy, split through with earth essence.
+
+**Tier:** 5 · **Type:** landmark
 
 ### Cairn Gate
 
@@ -398,6 +417,14 @@ Across the terrace three gap. Two more tarns, and nobody fishing them.
 The long way round the terrace three gap.
 
 **Tier:** 10 · **Type:** junction
+
+### Water Essence Cache
+
+![Water Essence Cache](./assets/captures/locations/karrowmoor_water_cache.webp)
+
+A blue-lit cache at the moor's far edge, where water essence beads on dry slate.
+
+**Tier:** 10 · **Type:** landmark
 ## The Gravelmaw
 
 Tier 10. Enter through [The Gravelmaw](#the-gravelmaw).

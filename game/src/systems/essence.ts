@@ -1,0 +1,233 @@
+/** Essence casting, elemental-weapon charge, and altar recharge rules. */
+import type {
+  ElementalWeaponChargeSpec, EquippedMagicWeaponView, ItemDef, ItemId, Result, SpellElement,
+} from "../contracts.js";
+import { err, ok } from "../contracts.js";
+import type { SpellDef } from "../content/index.js";
+import { content } from "../content/index.js";
+import type { EventBus } from "../core/events.js";
+import type { GameState, Store } from "../state/store.js";
+import type { InteractionDispatcher } from "../world/interactions.js";
+
+export const RELEASED_MAGIC_ELEMENTS: readonly SpellElement[] = ["wind", "earth", "water"] as const;
+
+export const ELEMENT_LABELS: Readonly<Record<SpellElement, string>> = {
+  wind: "Air",
+  earth: "Earth",
+  water: "Water",
+  fire: "Fire",
+};
+
+export const ESSENCE_BY_ELEMENT: Readonly<Partial<Record<SpellElement, ItemId>>> = {
+  wind: "air_essence",
+  earth: "earth_essence",
+  water: "water_essence",
+};
+
+export interface MagicLoadout {
+  weaponItemId: ItemId;
+  weapon: ItemDef;
+  charge: ElementalWeaponChargeSpec | null;
+  charges: number;
+  castMs: number;
+}
+
+/** The equipped magic weapon. Plain weapons are valid and use carried Essence. */
+export function magicLoadout(state: GameState): MagicLoadout | null {
+  const weaponStack = state.equipment.mainHand;
+  if (!weaponStack) return null;
+  const weapon = content.item(weaponStack.itemId);
+  if (!weapon?.magicWeapon) return null;
+  const charge = weapon.magicWeapon.charge ?? null;
+  return {
+    weaponItemId: weapon.id,
+    weapon,
+    charge,
+    charges: charge ? weaponCharge(state, weapon.id) : 0,
+    castMs: weapon.equip?.attackSpeedMs ?? 3_000,
+  };
+}
+
+/** Returns current weapon charge, clamped to the authored capacity. */
+export function weaponCharge(state: GameState, weaponItemId: ItemId): number {
+  const charge = content.item(weaponItemId)?.magicWeapon?.charge;
+  if (!charge) return 0;
+  const raw = state.magic.weaponCharges[weaponItemId];
+  if (raw === undefined || !Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.min(charge.capacity, Math.floor(raw)));
+}
+
+/** A newly crafted elemental weapon receives its Orb's starting charge exactly once. */
+export function initialiseWeaponCharge(state: GameState, weaponItemId: ItemId): number | null {
+  const charge = content.item(weaponItemId)?.magicWeapon?.charge;
+  if (!charge) return null;
+  const existing = state.magic.weaponCharges[weaponItemId];
+  if (Number.isFinite(existing)) return weaponCharge(state, weaponItemId);
+  const initial = Math.max(0, Math.min(charge.capacity, Math.floor(charge.initialCharges)));
+  state.magic.weaponCharges[weaponItemId] = initial;
+  state.magic.consumedOrbs[charge.orbItemId] = true;
+  return initial;
+}
+
+function carriedInState(state: GameState, itemId: ItemId): number {
+  let quantity = 0;
+  for (const stack of state.inventory.slots) {
+    if (stack?.itemId === itemId) quantity += stack.quantity;
+  }
+  return quantity;
+}
+
+/** One reason, in command-validation order, or null when this spell can launch now. */
+export function spellBlockReason(state: GameState, spell: SpellDef): string | null {
+  if (state.skills.magic.level < spell.reqLevel) return `${spell.name} needs Magic ${spell.reqLevel}.`;
+  if (!RELEASED_MAGIC_ELEMENTS.includes(spell.cost.element)) {
+    return `${ELEMENT_LABELS[spell.cost.element]} magic is not released yet.`;
+  }
+
+  const loadout = magicLoadout(state);
+  if (!loadout) return "Equip a wand or staff first.";
+
+  if (
+    loadout.charge?.released
+    && loadout.charge.element === spell.cost.element
+    && loadout.charges >= spell.cost.charges
+  ) {
+    return null;
+  }
+
+  const essenceItemId = ESSENCE_BY_ELEMENT[spell.cost.element];
+  if (!essenceItemId) return `${ELEMENT_LABELS[spell.cost.element]} magic is not released yet.`;
+  if (carriedInState(state, essenceItemId) >= spell.cost.charges) return null;
+
+  const label = ELEMENT_LABELS[spell.cost.element];
+  return `Carry ${spell.cost.charges} ${label} Essence to cast ${spell.name}.`;
+}
+
+export interface SpellFuelInventory {
+  countItem(itemId: ItemId): number;
+  removeItem(itemId: ItemId, quantity: number): Result<number>;
+}
+
+export type SpellFuelSpend =
+  | { source: "weapon"; weaponItemId: ItemId; remainingCharges: number }
+  | { source: "essence"; essenceItemId: ItemId; remainingEssence: number };
+
+/** Charged matching weapons pay first. Plain, empty, or other-element weapons spend Essence. */
+export function spendSpellFuel(
+  state: GameState,
+  spell: SpellDef,
+  inventory: SpellFuelInventory,
+): Result<SpellFuelSpend> {
+  const blocked = spellBlockReason(state, spell);
+  if (blocked) return err("NOT_ENOUGH_ITEMS", blocked);
+  const loadout = magicLoadout(state);
+  if (!loadout) return err("REQUIREMENTS_NOT_MET", "Equip a wand or staff first.");
+
+  if (
+    loadout.charge?.released
+    && loadout.charge.element === spell.cost.element
+    && loadout.charges >= spell.cost.charges
+  ) {
+    const remainingCharges = loadout.charges - spell.cost.charges;
+    state.magic.weaponCharges[loadout.weaponItemId] = remainingCharges;
+    return ok({ source: "weapon", weaponItemId: loadout.weaponItemId, remainingCharges });
+  }
+
+  const essenceItemId = ESSENCE_BY_ELEMENT[spell.cost.element];
+  if (!essenceItemId) {
+    return err("UNAVAILABLE", `${ELEMENT_LABELS[spell.cost.element]} magic is not released yet.`);
+  }
+  const removed = inventory.removeItem(essenceItemId, spell.cost.charges);
+  if (!removed.ok) return removed;
+  return ok({
+    source: "essence",
+    essenceItemId,
+    remainingEssence: inventory.countItem(essenceItemId),
+  });
+}
+
+export function equippedMagicWeaponView(state: GameState): EquippedMagicWeaponView | null {
+  const loadout = magicLoadout(state);
+  const charge = loadout?.charge;
+  if (!loadout || !charge || !charge.released) return null;
+  return {
+    itemId: loadout.weaponItemId,
+    name: loadout.weapon.name,
+    element: charge.element,
+    charges: loadout.charges,
+    capacity: charge.capacity,
+    rechargeItemId: charge.rechargeItemId,
+    rechargeCost: charge.rechargeCost,
+  };
+}
+
+interface EssenceInventory {
+  countItem(itemId: ItemId): number;
+  removeItem(
+    itemId: ItemId,
+    quantity: number,
+    options?: { eventData?: Record<string, unknown> },
+  ): Result<number>;
+}
+
+export interface EssenceSystemDeps {
+  store: Store;
+  events: EventBus;
+  inventory: EssenceInventory;
+  dispatcher: InteractionDispatcher;
+  now: () => number;
+}
+
+/** Owns Essence Altar recharge. Casting remains CombatSystem's responsibility. */
+export class EssenceSystem {
+  constructor(private readonly deps: EssenceSystemDeps) {
+    deps.dispatcher.registerHandler("recharge", (context) => this.recharge(context.entity.id));
+  }
+
+  recharge(altarId: string): Result<{ started: string }> {
+    const state = this.deps.store.get();
+    const loadout = magicLoadout(state);
+    const charge = loadout?.charge;
+    if (!loadout || !charge || !charge.released) {
+      return err("REQUIREMENTS_NOT_MET", "Equip a charged elemental wand or staff first.", altarId);
+    }
+
+    const before = loadout.charges;
+    if (before >= charge.capacity) {
+      return err("UNAVAILABLE", `${loadout.weapon.name} is already fully charged.`, altarId);
+    }
+    const held = this.deps.inventory.countItem(charge.rechargeItemId);
+    if (held < charge.rechargeCost) {
+      const essenceName = content.item(charge.rechargeItemId)?.name ?? charge.rechargeItemId;
+      return err(
+        "NOT_ENOUGH_ITEMS",
+        `${loadout.weapon.name} needs ${charge.rechargeCost} ${essenceName}; you have ${held}.`,
+        altarId,
+      );
+    }
+
+    const paid = this.deps.inventory.removeItem(
+      charge.rechargeItemId,
+      charge.rechargeCost,
+      { eventData: { reason: "consumed", source: "essence_altar", altarId } },
+    );
+    if (!paid.ok) return paid;
+    state.magic.weaponCharges[loadout.weaponItemId] = charge.capacity;
+    this.deps.store.markDirty();
+    this.deps.events.emit(
+      "essence.recharged",
+      {
+        altarId,
+        weaponItemId: loadout.weaponItemId,
+        element: charge.element,
+        before,
+        after: charge.capacity,
+        essenceItemId: charge.rechargeItemId,
+        essenceSpent: charge.rechargeCost,
+      },
+      altarId,
+      this.deps.now(),
+    );
+    return ok({ started: `recharged ${loadout.weapon.name} to ${charge.capacity}` });
+  }
+}

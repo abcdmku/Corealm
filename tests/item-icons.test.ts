@@ -17,10 +17,26 @@ import { isProceduralGearAsset } from "../game/src/render/proceduralGear.js";
 
 describe("3D item icon catalog", () => {
   it("covers every item explicitly", () => {
-    // Three handles and three wands extend the earlier 107-item catalog.
-    expect(ALL_ITEMS).toHaveLength(113);
+    expect(new Set(ALL_ITEMS.map((item) => item.id)).size).toBe(ALL_ITEMS.length);
     expect([...ITEM_ICON_APPEARANCE_IDS].sort()).toEqual(ALL_ITEMS.map((item) => item.id).sort());
     for (const item of ALL_ITEMS) expect(itemIconAppearance(item.id).parts.length, item.id).toBeGreaterThan(0);
+  });
+
+  it("covers every magic weapon, orb, and loose essence", () => {
+    const magicIds = [
+      "basic_wooden_wand", "basic_wooden_staff",
+      "palewood_wand", "palewood_staff",
+      "duskoak_wand", "duskoak_staff",
+      "cairnpine_wand", "cairnpine_staff",
+      "air_wand", "air_staff", "earth_wand", "earth_staff",
+      "water_wand", "water_staff",
+      "air_orb", "earth_orb", "water_orb",
+      "air_essence", "earth_essence", "water_essence",
+    ];
+    for (const id of magicIds) {
+      expect(ITEM_ICON_APPEARANCE_IDS, id).toContain(id);
+      expect(itemIconAppearance(id).parts.length, id).toBeGreaterThan(0);
+    }
   });
 
   it("only references GLBs present in the asset manifest", async () => {
@@ -31,7 +47,7 @@ describe("3D item icon catalog", () => {
     expect(itemIconAssetIds().filter((id) => !known.has(id) && !isProceduralGearAsset(id))).toEqual([]);
   });
 
-  it("uses compact handle geometry and the same procedural wands the character holds", () => {
+  it("uses compact handle geometry and the file-backed wand the character holds", () => {
     for (const id of ["palewood_handle", "duskoak_handle", "cairnpine_handle"] as const) {
       expect(itemIconAppearance(id).parts).toEqual([
         expect.objectContaining({ kind: "primitive", primitive: "handle" }),
@@ -41,7 +57,7 @@ describe("3D item icon catalog", () => {
       const parts = itemIconAppearance(id).parts;
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual(expect.objectContaining({ kind: "asset" }));
-      if (parts[0]?.kind === "asset") expect(isProceduralGearAsset(parts[0].assetId)).toBe(true);
+      if (parts[0]?.kind === "asset") expect(parts[0].assetId).toBe("rpg_weapon_wand");
     }
   });
 

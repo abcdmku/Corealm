@@ -17,7 +17,7 @@
  * mapping written down here rather than invented per row:
  *   - magic hood / boots / wraps  -> 2.5, the "Helm, boots, gloves" weight
  *   - magic leggings              -> 4.0, the "Leather body" weight (same hide count class)
- *   - off-hand focus              -> 2.8, the "Wooden shield" weight (same station, same shape)
+ *   - elemental weapon upgrade   -> the matching base weapon weight
  *
  * `reqLevel` equals the tier at every step. The PRD authors content at tiers 1, 5 and 10 and never
  * asks for an intra-tier stagger, so a flat mapping is the one that cannot surprise a test.
@@ -42,11 +42,10 @@ const W = {
   helmBootsGloves: { weight: 2.5, ms: 3000 },
   toolHead: { weight: 2.2, ms: 3000 },
   cookedFood: { weight: 1.5, ms: 2400 },
-  essenceShard: { weight: 1.2, ms: 2400 },
   amuletOrRing: { weight: 3.0, ms: 2400 },
   leatherBody: { weight: 4.0, ms: 2400 },
   staff: { weight: 3.2, ms: 1800 },
-  wand: { weight: 1.8, ms: 1800 },
+  wand: { weight: 2.4, ms: 1800 },
   toolHandle: { weight: 1.0, ms: 1800 },
   fishingRod: { weight: 1.8, ms: 1800 },
   woodenShield: { weight: 2.8, ms: 1800 },
@@ -55,7 +54,6 @@ const W = {
 /** Reused weights, spelled out so the mapping is auditable. */
 const W_HIDE_SMALL = W.helmBootsGloves;   // hood, magic boots, wraps: 2.5 at 2.4 s (crafting)
 const W_HIDE_LEGS = W.leatherBody;        // magic leggings: 4.0
-const W_FOCUS = W.woodenShield;           // off-hand focus: 2.8
 
 // ------------------------------------------------------------------------------- row builder
 
@@ -159,10 +157,14 @@ function recipesForTier(definition: GatheringProductionTierDef): RecipeDef[] {
 
     // ------------------------------------------------------------------ crafting (table)
     row(t, {
-      // PRD 2.7: "Essence shard (yields 5)". One shard, one cast, at every tier.
-      id: `craft_essence_shard_t${t}`, name: `Essence Shards (${definition.metalName})`,
-      kind: "craft", stations: ["crafting_table"],
-      weight: W.essenceShard, inputs: [q(m.gem, 1), q(m.log, 1)], output: q("essence_shard", 5),
+      id: `craft_${definition.magic.wand}`, name: nameOf(definition.magic.wand),
+      kind: "craft", stations: ["crafting_table"], weight: W.wand,
+      inputs: [q(m.wand, 1), q(definition.magic.orb, 1)], output: q(definition.magic.wand, 1),
+    }),
+    row(t, {
+      id: `craft_${definition.magic.staff}`, name: nameOf(definition.magic.staff),
+      kind: "craft", stations: ["crafting_table"], weight: W.staff,
+      inputs: [q(m.staff, 1), q(definition.magic.orb, 1)], output: q(definition.magic.staff, 1),
     }),
     row(t, {
       id: `craft_${m.meleeRing}`, name: nameOf(m.meleeRing), kind: "craft", stations: ["crafting_table"],
@@ -212,19 +214,15 @@ function recipesForTier(definition: GatheringProductionTierDef): RecipeDef[] {
     }),
     row(t, {
       id: `fletch_${m.staff}`, name: nameOf(m.staff), kind: "fletch", stations: ["fletching_bench"],
-      weight: W.staff, inputs: [q(m.shaft, 3), q(m.gem, 1)], output: q(m.staff, 1),
+      weight: W.staff, inputs: [q(m.shaft, 3)], output: q(m.staff, 1),
     }),
     row(t, {
       id: `fletch_${m.wand}`, name: nameOf(m.wand), kind: "fletch", stations: ["fletching_bench"],
-      weight: W.wand, inputs: [q(m.shaft, 1), q(m.gem, 1)], output: q(m.wand, 1),
+      weight: W.wand, inputs: [q(m.shaft, 2)], output: q(m.wand, 1),
     }),
     row(t, {
       id: `fletch_${m.shield}`, name: nameOf(m.shield), kind: "fletch", stations: ["fletching_bench"],
       weight: W.woodenShield, inputs: [q(m.log, 2), q(m.bar, 1)], output: q(m.shield, 1),
-    }),
-    row(t, {
-      id: `fletch_${m.focus}`, name: nameOf(m.focus), kind: "fletch", stations: ["fletching_bench"],
-      weight: W_FOCUS, inputs: [q(m.log, 1), q(m.gem, 1)], output: q(m.focus, 1),
     }),
     row(t, {
       id: `fletch_${m.rod}`, name: nameOf(m.rod), kind: "fletch", stations: ["fletching_bench"],
@@ -245,6 +243,28 @@ function nameOf(itemId: ItemId): string {
     .join(" ");
 }
 
-/** 28 recipes per tier across three tiers: 84 rows. */
-export const RECIPES: readonly RecipeDef[] =
-  GATHERING_PRODUCTION_TIERS.flatMap((definition) => recipesForTier(definition));
+function basicMagicRecipes(definition: GatheringProductionTierDef): RecipeDef[] {
+  const basicWand = definition.magic.basicWand;
+  const basicStaff = definition.magic.basicStaff;
+  if (!basicWand || !basicStaff) return [];
+  const q = (itemId: ItemId, quantity: number): { itemId: ItemId; quantity: number } =>
+    ({ itemId, quantity });
+  return [
+    row(definition.tier, {
+      id: `fletch_${basicWand}`, name: nameOf(basicWand), kind: "fletch",
+      stations: ["fletching_bench"], weight: W.wand,
+      inputs: [q(definition.items.shaft, 1)], output: q(basicWand, 1),
+    }),
+    row(definition.tier, {
+      id: `fletch_${basicStaff}`, name: nameOf(basicStaff), kind: "fletch",
+      stations: ["fletching_bench"], weight: W.staff,
+      inputs: [q(definition.items.shaft, 2)], output: q(basicStaff, 1),
+    }),
+  ];
+}
+
+/** Canonical production matrix plus the two replaceable starter-weapon recipes. */
+export const RECIPES: readonly RecipeDef[] = GATHERING_PRODUCTION_TIERS.flatMap((definition) => [
+  ...recipesForTier(definition),
+  ...basicMagicRecipes(definition),
+]);

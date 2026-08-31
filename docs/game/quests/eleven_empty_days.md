@@ -21,10 +21,10 @@ All four are route-graph nodes: `moveTo({ locationId })` reaches each one direct
 
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#blackwater-pools">Blackwater Pools</a><a href="../../regions/#gorge-head">Gorge Head</a><a href="../../regions/#the-thornline">The Thornline</a><a href="../../regions/#gorge-ford">Gorge Ford</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/blackwater_pools.webp" alt="Blackwater Pools in the running Corealm world" loading="lazy" /><figcaption><strong>Blackwater Pools</strong><span>Blackwater Pools, Gorge Head, The Thornline, Gorge Ford</span></figcaption></figure>
-<figure class="corealm-quest-scene"><img src="../../assets/captures/locations/gorge_head.webp" alt="Gorge Head in the running Corealm world" loading="lazy" /><figcaption><strong>Gorge Head</strong><span>Blackwater Pools, Gorge Head, The Thornline, Gorge Ford</span></figcaption></figure>
-<figure class="corealm-quest-scene"><img src="../../assets/captures/locations/thornline_camp.webp" alt="The Thornline in the running Corealm world" loading="lazy" /><figcaption><strong>The Thornline</strong><span>Blackwater Pools, Gorge Head, The Thornline, Gorge Ford</span></figcaption></figure>
-<figure class="corealm-quest-scene"><img src="../../assets/captures/locations/gorge_ford.webp" alt="Gorge Ford in the running Corealm world" loading="lazy" /><figcaption><strong>Gorge Ford</strong><span>Blackwater Pools, Gorge Head, The Thornline, Gorge Ford</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/blackwater_pools.webp" alt="Blackwater Pools in the running Corealm world" loading="lazy" /><figcaption><strong>Blackwater Pools</strong><span>Blackwater Pools, Vellenwood</span></figcaption></figure>
+<figure class="corealm-quest-scene"><img src="../../assets/captures/locations/gorge_head.webp" alt="Gorge Head in the running Corealm world" loading="lazy" /><figcaption><strong>Gorge Head</strong><span>Gorge Head, Vellenwood</span></figcaption></figure>
+<figure class="corealm-quest-scene"><img src="../../assets/captures/locations/thornline_camp.webp" alt="The Thornline in the running Corealm world" loading="lazy" /><figcaption><strong>The Thornline</strong><span>The Thornline, Vellenwood</span></figcaption></figure>
+<figure class="corealm-quest-scene"><img src="../../assets/captures/locations/gorge_ford.webp" alt="Gorge Ford in the running Corealm world" loading="lazy" /><figcaption><strong>Gorge Ford</strong><span>Gorge Ford, Vellenwood</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Eleven Empty Days, step 1">
 <div class="corealm-map-stage" data-map-stage>
@@ -58,7 +58,7 @@ They sit around (150, 128) and they are aggressive, so they will find you first.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#the-thornline">The Thornline</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/bramble_skitterlings.webp" alt="Bramble Skitterling in the running Corealm world" loading="lazy" /><figcaption><strong>Bramble Skitterling</strong><span>The Thornline</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/bramble_skitterlings.webp" alt="Bramble Skitterling in the running Corealm world" loading="lazy" /><figcaption><strong>Bramble Skitterling</strong><span>Blackwater Pools, Vellenwood</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Eleven Empty Days, step 2">
 <div class="corealm-map-stage" data-map-stage>
@@ -90,7 +90,7 @@ Both answers finish the quest. One of them changes what Mott says to you for the
 
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#rootfall">Rootfall</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_trapper_mott.webp" alt="Trapper Mott in the running Corealm world" loading="lazy" /><figcaption><strong>Trapper Mott</strong><span>Rootfall</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_trapper_mott.webp" alt="Trapper Mott in the running Corealm world" loading="lazy" /><figcaption><strong>Trapper Mott</strong><span>Rootfall, Vellenwood</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Eleven Empty Days, step 3">
 <div class="corealm-map-stage" data-map-stage>

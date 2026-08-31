@@ -40,10 +40,12 @@ description: "Karrow Reaver spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 70-270 | Always |
 | [Wight Shroud](../../items/#wight-shroud) | 1 | 30% |
 | [Kaldite Ore](../../items/#kaldite-ore) | 1-3 | 30% |
-| [Essence Shard](../../items/#essence-shard) | 1-3 | 20% |
+| [Water Essence](../../items/#water-essence) | 1-3 | 20% |
 | [Kaldite Dagger](../../items/#kaldite-dagger) | 1 | 3% |

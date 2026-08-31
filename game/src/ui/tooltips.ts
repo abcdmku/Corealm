@@ -11,7 +11,8 @@
  * never given pointer events, because it sits under the cursor.
  */
 import type {
-  EquipSlot, EquipmentBonuses, GameApi, ItemDef, ItemId, SkillId,
+  EquipSlot, EquipmentBonuses, EquippedMagicWeaponView, GameApi, ItemDef, ItemId, SkillId,
+  SpellElement,
 } from "../contracts.js";
 import { content } from "../content/index.js";
 import { SKILLS } from "../content/skills.js";
@@ -43,12 +44,39 @@ const EMPTY_BONUSES: EquipmentBonuses = {
   accuracy: 0, power: 0, armour: 0, magicAccuracy: 0, magicPower: 0, magicArmour: 0, vitality: 0,
 };
 
+const ELEMENT_LABELS: Readonly<Record<SpellElement, string>> = {
+  wind: "Air",
+  water: "Water",
+  earth: "Earth",
+  fire: "Fire",
+};
+
+export function liveWeaponChargeFor(
+  itemId: ItemId,
+  equipped: EquippedMagicWeaponView | null,
+): number | null {
+  return equipped?.itemId === itemId ? equipped.charges : null;
+}
+
+export function formatWeaponChargeLine(
+  element: SpellElement,
+  capacity: number,
+  charges: number | null,
+): string {
+  const name = ELEMENT_LABELS[element];
+  const maximum = Math.max(0, Math.floor(capacity)).toLocaleString("en-US");
+  if (charges === null) return `${name} weapon · ${maximum} charge capacity.`;
+  const current = Math.max(0, Math.min(capacity, Math.floor(charges))).toLocaleString("en-US");
+  return `${name} weapon · ${current} / ${maximum} charges remaining.`;
+}
+
 const EDGE_MARGIN_PX = 10;
 const ANCHOR_GAP_PX = 12;
 
 export class Tooltip {
   readonly element: HTMLElement;
   private anchor: HTMLElement | null = null;
+  private activeProvider: (() => TooltipContent | null) | null = null;
   private signature = "";
   private readonly detachers: (() => void)[] = [];
 
@@ -70,6 +98,7 @@ export class Tooltip {
    */
   attach(target: HTMLElement, provider: () => TooltipContent | null): void {
     const show = (): void => {
+      this.activeProvider = provider;
       const contentSpec = provider();
       if (contentSpec) this.show(contentSpec, target);
       else this.hide();
@@ -102,8 +131,19 @@ export class Tooltip {
     this.position(anchor);
   }
 
+  /** Repaints the open card from its provider without requiring the pointer to leave and re-enter. */
+  refresh(): void {
+    const anchor = this.anchor;
+    const provider = this.activeProvider;
+    if (!anchor || !provider) return;
+    const spec = provider();
+    if (spec) this.show(spec, anchor);
+    else this.hide();
+  }
+
   hide(): void {
     this.anchor = null;
+    this.activeProvider = null;
     this.element.hidden = true;
   }
 
@@ -121,9 +161,14 @@ export class Tooltip {
     const skills = this.api.getSkills();
     const levels = (Object.keys(skills) as SkillId[]).map((id) => skills[id].level).join(",");
     const worn = spec.compareEquipped ? this.equippedIn(this.slotOf(spec.itemId)) : null;
+    const weapon = content.item(spec.itemId)?.magicWeapon?.charge
+      ? this.api.getSpellbook().equippedWeapon
+      : null;
     return [
       "i", spec.itemId, spec.quantity ?? 1, spec.compareEquipped ? "cmp" : "-",
-      worn ?? "-", levels, (spec.footer ?? []).join("|"),
+      worn ?? "-", levels,
+      weapon ? `${weapon.itemId}/${weapon.charges}/${weapon.capacity}` : "weapon=-",
+      (spec.footer ?? []).join("|"),
     ].join(":");
   }
 
@@ -184,14 +229,59 @@ export class Tooltip {
       if (def.equip.attackSpeedMs !== undefined) {
         const speed = document.createElement("div");
         speed.className = "tooltip__body u-numeric";
-        speed.textContent = `Attack speed ${(def.equip.attackSpeedMs / 1000).toFixed(1)} s`;
+        speed.textContent = def.magicWeapon
+          ? `Cast cadence ${(def.equip.attackSpeedMs / 1000).toFixed(1)} s`
+          : `Attack speed ${(def.equip.attackSpeedMs / 1000).toFixed(1)} s`;
         nodes.push(speed);
+      }
+      if (def.magicWeapon) {
+        const role = document.createElement("div");
+        role.className = "tooltip__body";
+        role.textContent = def.magicWeapon.kind === "wand"
+          ? "Wand: one-handed, faster casts, weaker hits."
+          : "Staff: two-handed, slower casts, stronger hits.";
+        nodes.push(role);
+      }
+      const charge = def.magicWeapon?.charge;
+      if (charge) {
+        const live = liveWeaponChargeFor(def.id, this.api.getSpellbook().equippedWeapon);
+        const chargeLine = document.createElement("div");
+        chargeLine.className = "tooltip__body u-numeric";
+        chargeLine.textContent = formatWeaponChargeLine(charge.element, charge.capacity, live);
+        nodes.push(chargeLine);
+
+        const recharge = document.createElement("div");
+        recharge.className = "tooltip__body";
+        const essence = content.item(charge.rechargeItemId)?.name ?? charge.rechargeItemId;
+        recharge.textContent =
+          `${charge.rechargeCost.toLocaleString("en-US")} ${essence} at an Essence Altar refills it.`;
+        nodes.push(recharge);
       }
       if (worn) {
         const note = document.createElement("div");
         note.className = "tooltip__body u-faint";
         note.textContent = `Compared with your ${this.slotLabel(def.equip.slot)}.`;
         nodes.push(note);
+      }
+    }
+
+    if (def.orb) {
+      const element = ELEMENT_LABELS[def.orb.element];
+      const craftedCharge = content.allItems()
+        .find((candidate) => candidate.magicWeapon?.charge?.orbItemId === def.id)
+        ?.magicWeapon?.charge;
+      const firstDrop = document.createElement("div");
+      firstDrop.className = "tooltip__body";
+      firstDrop.textContent =
+        `Craft this into a ${element} wand or staff. The finished weapon starts with `
+        + `${(craftedCharge?.initialCharges ?? 1000).toLocaleString("en-US")} charges.`;
+      nodes.push(firstDrop);
+
+      if (!def.orb.released) {
+        const unreleased = document.createElement("div");
+        unreleased.className = "tooltip__requirement is-unmet";
+        unreleased.textContent = `Coming at tier ${def.tier}. This orb is not released.`;
+        nodes.push(unreleased);
       }
     }
 

@@ -1,5 +1,5 @@
 /**
- * The nine worn slots.
+ * The ten worn slots.
  *
  * Gear is never destroyed: a swap only completes if the displaced piece has somewhere to land, and
  * a failed swap rolls back to exactly the state it started in.
@@ -36,11 +36,11 @@ export function emptyEquipmentBonuses(): EquipmentBonuses {
 }
 
 /**
- * The seven-field sum over nine worn slots, from the slots alone.
+ * The seven-field sum over ten worn slots, from the slots alone.
  *
  * Pulled out of the class so a caller that has the slots but not the system can still get an
  * HONEST answer. `gameApi.getEquipment()` currently pairs the real worn slots with
- * `emptyBonuses()` when the equipment hook is missing, which renders as "9 of 9 slots worn" with
+ * `emptyBonuses()` when the equipment hook is missing, which renders as "10 of 10 slots worn" with
  * every total at 0 — a self-contradictory view that is indistinguishable from wearing nothing. Two
  * lines up, `getInventory()`'s fallback degrades honestly. This is the function that lets
  * `getEquipment()` do the same; it needs no system and no state beyond what it is handed.
@@ -105,6 +105,25 @@ export class EquipmentSystem {
     }
 
     const slot = equip.slot;
+    if (def.magicWeapon?.hands === 2) {
+      if (slot !== "mainHand") {
+        return err("REQUIREMENTS_NOT_MET", `${def.name} must be equipped in your main hand`);
+      }
+      const offHand = this.state.equipment.offHand;
+      if (offHand) {
+        const offHandName = content.item(offHand.itemId)?.name ?? offHand.itemId;
+        return err("REQUIREMENTS_NOT_MET", `Take off your ${offHandName} before equipping ${def.name}`);
+      }
+    }
+
+    if (slot === "offHand") {
+      const mainHand = this.state.equipment.mainHand;
+      const mainHandDef = mainHand ? content.item(mainHand.itemId) : undefined;
+      if (mainHandDef?.magicWeapon?.hands === 2) {
+        return err("REQUIREMENTS_NOT_MET", `Take off your ${mainHandDef.name} before equipping ${def.name}`);
+      }
+    }
+
     const previous = this.state.equipment[slot] ?? null;
 
     // Take the new piece out first: for a one-slot-per-item wearable that frees the slot the

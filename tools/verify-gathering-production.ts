@@ -701,7 +701,6 @@ async function verifyTierProduction(
   await produceAndCheck(driver, `fletch_${m.wand}`, 1, check);
   await produceAndCheck(driver, `fletch_${m.rod}`, 1, check);
   await produceAndCheck(driver, `fletch_${m.shield}`, 1, check);
-  await produceAndCheck(driver, `fletch_${m.focus}`, 1, check);
 
   await give(driver, m.ore, tier.smelting.orePerBar * 5);
   await give(driver, m.flux, tier.smelting.fluxPerBar * 5);
@@ -714,7 +713,7 @@ async function verifyTierProduction(
 
   const inventory = await inventoryView(driver);
   const expected = [
-    m.shaft, m.staff, m.wand, m.rod, m.shield, m.focus, m.dagger, m.helm, m.pickaxe,
+    m.shaft, m.staff, m.wand, m.rod, m.shield, m.dagger, m.helm, m.pickaxe,
   ];
   const missing = expected.filter((itemId) => countSlots(inventory.slots ?? [], itemId) < 1);
   check(

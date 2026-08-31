@@ -37,10 +37,12 @@ description: "Gorge Reaver spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 35-135 | Always |
 | [Bramble Hide](../../items/#bramble-hide) | 1-2 | 35% |
 | [Corven Ore](../../items/#corven-ore) | 1-2 | 25% |
-| [Essence Shard](../../items/#essence-shard) | 1-2 | 15% |
+| [Earth Essence](../../items/#earth-essence) | 1-2 | 15% |
 | [Corven Boots](../../items/#corven-boots) | 1 | 3% |

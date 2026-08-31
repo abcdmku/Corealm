@@ -432,10 +432,15 @@ export class OrbitCamera {
     this.freeTarget.z += (-deltaX * rightZ + deltaY * backZ) * metresPerPixel;
   }
 
-  setPose(yaw: number, pitch: number, distance: number): void {
+  setPose(
+    yaw: number,
+    pitch: number,
+    distance: number,
+    minDistance = CAMERA.minDistance,
+  ): void {
     this.yaw = yaw;
     this.pitch = clamp(pitch, CAMERA.minPitch, CAMERA.maxPitch);
-    this.distance = clamp(distance, CAMERA.minDistance, CAMERA.maxAuthoredDistance);
+    this.distance = clamp(distance, minDistance, CAMERA.maxAuthoredDistance);
   }
 
   /**

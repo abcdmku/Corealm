@@ -37,9 +37,12 @@ description: "Ordrun the Quarrykeeper spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+Elemental orbs are singleton crafting rewards. The boss drops its orb when no physical copy exists. Repeat kills do not create a duplicate while that orb is carried, banked, or waiting in loot or recovery. If the copy is lost before crafting, the boss can drop it again. Once consumed to make an elemental weapon, it never drops again.
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 900-1400 | Always |
+| [Water Orb](../../items/#water-orb) | 1 | First eligible acquisition |
 | [Kaldite Sword](../../items/#kaldite-sword) | 1 | 100% |
 | [Kaldite Bar](../../items/#kaldite-bar) | 3-6 | 100% |
 | [Cairn Garnet](../../items/#cairn-garnet) | 2-4 | 100% |

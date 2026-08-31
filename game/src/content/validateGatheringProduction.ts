@@ -73,6 +73,7 @@ export interface GatheringProductionValidationInput {
 
 const VALID_STATIONS = new Set<string>(GATHERING_PRODUCTION_STATION_KINDS);
 const LOWERCASE_SHA256 = /^[0-9a-f]{64}$/;
+const UNITY_ASSET_STORE_LICENSE = "Standard Unity Asset Store EULA";
 
 interface CanonicalTierRecipeExpectation {
   family: string;
@@ -153,8 +154,8 @@ function tierResourceReferences(
  * The complete production family derived from a tier's canonical item ids.
  *
  * Ingredient quantities remain owned by recipes.ts and its formula tests. Boot validation only
- * checks the material links that define a family: smelting inputs, handled metal equipment, the
- * wand bridge, and raw-to-cooked fish. This catches a missing or misclassified row without copying
+ * checks the material links that define a family: smelting inputs, handled metal equipment,
+ * elemental weapon upgrades, and raw-to-cooked fish. This catches a missing or misclassified row without copying
  * the full recipe table into the validator.
  */
 function canonicalTierRecipeExpectations(
@@ -214,7 +215,7 @@ function canonicalTierRecipeExpectations(
     requiredInputItemIds,
   });
 
-  return [
+  const expectations: CanonicalTierRecipeExpectation[] = [
     smelt("bar", m.bar, [m.ore, m.flux]),
     smith("dagger", m.dagger, true),
     smith("sword", m.sword, true),
@@ -234,7 +235,14 @@ function canonicalTierRecipeExpectations(
       requiredInputItemIds: [m.rawFish],
       burntItemId: m.burntFish,
     },
-    craft("essence shards", "essence_shard", `craft_essence_shard_t${tier.tier}`),
+    {
+      ...craft("elemental wand", tier.magic.wand),
+      requiredInputItemIds: [m.wand, tier.magic.orb],
+    },
+    {
+      ...craft("elemental staff", tier.magic.staff),
+      requiredInputItemIds: [m.staff, tier.magic.orb],
+    },
     craft("melee ring", m.meleeRing),
     craft("melee pendant", m.meleePendant),
     craft("magic ring", m.magicRing),
@@ -246,12 +254,18 @@ function canonicalTierRecipeExpectations(
     craft("wraps", m.wraps),
     fletch("shafts", m.shaft, [m.log]),
     fletch("handles", m.handle, [m.log]),
-    fletch("staff", m.staff, [m.shaft, m.gem]),
-    fletch("wand", m.wand, [m.shaft, m.gem]),
+    { ...fletch("staff", m.staff, [m.shaft]), forbiddenInputItemIds: [m.gem] },
+    { ...fletch("wand", m.wand, [m.shaft]), forbiddenInputItemIds: [m.gem] },
     fletch("wooden shield", m.shield, [m.log, m.bar]),
-    fletch("focus", m.focus, [m.log, m.gem]),
     fletch("fishing rod", m.rod, [m.shaft, m.hide]),
   ];
+  if (tier.magic.basicWand) {
+    expectations.push(fletch("basic wand", tier.magic.basicWand, [m.shaft]));
+  }
+  if (tier.magic.basicStaff) {
+    expectations.push(fletch("basic staff", tier.magic.basicStaff, [m.shaft]));
+  }
+  return expectations;
 }
 
 function hasSameStationKinds(
@@ -314,10 +328,12 @@ export function validateGatheringProduction(
     if (!isHttpSource(pack.source)) {
       problems.push(`manifest pack ${pack.id} has no reproducible HTTP(S) source`);
     }
-    if (pack.license !== "CC0-1.0") {
-      problems.push(`manifest pack ${pack.id} is not licensed CC0-1.0`);
+    const isCc0 = pack.license === "CC0-1.0";
+    const isUnityStoreAsset = pack.license.startsWith(UNITY_ASSET_STORE_LICENSE);
+    if (!isCc0 && !isUnityStoreAsset) {
+      problems.push(`manifest pack ${pack.id} has unsupported license "${pack.license}"`);
     }
-    if (!pack.archiveSha256 || !LOWERCASE_SHA256.test(pack.archiveSha256)) {
+    if (isCc0 && (!pack.archiveSha256 || !LOWERCASE_SHA256.test(pack.archiveSha256))) {
       problems.push(`manifest pack ${pack.id} has no valid lowercase archive SHA-256`);
     }
   }
@@ -350,6 +366,19 @@ export function validateGatheringProduction(
         }
       } else if (item.tier !== tier.tier) {
         problems.push(`${where} item ${role} has tier ${item.tier}; expected ${tier.tier}`);
+      }
+    }
+    for (const [role, itemId] of Object.entries(tier.magic)) {
+      if (role === "element") continue;
+      if (typeof itemId !== "string" || itemId.length === 0) {
+        problems.push(`${where} magic is missing item role "${role}"`);
+        continue;
+      }
+      const item = requireItem(itemId, `${where} magic item ${role}`);
+      if (!item) continue;
+      const expectedTier = role === "basicStaff" || role === "basicWand" ? 0 : tier.tier;
+      if (item.tier !== expectedTier) {
+        problems.push(`${where} magic item ${role} has tier ${item.tier}; expected ${expectedTier}`);
       }
     }
 

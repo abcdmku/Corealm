@@ -21,6 +21,8 @@ export class EventBus {
   private pending: GameEvent[] = [];
   private waiters = new Set<Waiter>();
   private nextSeq = 1;
+  /** Highest sequence number readers can actually observe in `buffer`. */
+  private publishedSeq = 0;
   private listeners = new Set<(event: GameEvent) => void>();
 
   /** Queues an event. It becomes visible to readers at the next flush. */
@@ -36,6 +38,7 @@ export class EventBus {
     if (this.pending.length === 0) return;
     for (const event of this.pending) {
       this.buffer.push(event);
+      this.publishedSeq = event.seq;
       for (const listener of this.listeners) listener(event);
     }
     this.pending.length = 0;
@@ -48,7 +51,10 @@ export class EventBus {
     const events = this.buffer.filter(
       (event) => event.seq > sinceSeq && (!filter || filter.length === 0 || filter.includes(event.type)),
     );
-    return { events, nextSeq: this.nextSeq - 1 };
+    // `nextSeq` must never include an event that is still pending. A caller commonly saves this
+    // cursor and asks again after the tick flush; advancing it to an unpublished sequence would
+    // make that event disappear from the caller's history.
+    return { events, nextSeq: this.publishedSeq };
   }
 
   /** Long-poll. Resolves as soon as a matching event lands, or empty at timeout. */
@@ -63,7 +69,7 @@ export class EventBus {
         resolve,
         timer: setTimeout(() => {
           this.waiters.delete(waiter);
-          resolve({ events: [], nextSeq: this.nextSeq - 1 });
+          resolve({ events: [], nextSeq: this.publishedSeq });
         }, Math.max(0, Math.min(timeoutMs, 120_000))),
       };
       this.waiters.add(waiter);
@@ -89,7 +95,7 @@ export class EventBus {
   }
 
   currentSeq(): number {
-    return this.nextSeq - 1;
+    return this.publishedSeq;
   }
 
   reset(): void {
@@ -101,5 +107,6 @@ export class EventBus {
     this.buffer.length = 0;
     this.pending.length = 0;
     this.nextSeq = 1;
+    this.publishedSeq = 0;
   }
 }

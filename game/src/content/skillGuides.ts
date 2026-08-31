@@ -128,7 +128,7 @@ function productionMaterialName(recipe: RecipeDef): string {
     if (input) return itemLabel(input.itemId);
   }
 
-  // Essence Shards carry their metal tier in parentheses, unlike the other recipe titles.
+  // A few legacy recipe titles carry their material in parentheses.
   const parenthetical = recipe.name.match(/\(([^)]+)\)/)?.[1];
   if (parenthetical) return parenthetical;
 
@@ -147,9 +147,14 @@ function addSpells(skill: SkillId, add: (unlock: SkillUnlock) => void): void {
       level: spell.reqLevel,
       kind: "spell",
       name: spell.name,
-      detail: `costs ${spell.cost.quantity}x ${itemLabel(spell.cost.itemId)}`,
+      detail: `costs ${spell.cost.charges} ${elementLabel(spell.cost.element)} Essence or weapon charge`,
     });
   }
+}
+
+function elementLabel(element: "wind" | "water" | "earth" | "fire"): string {
+  if (element === "wind") return "Air";
+  return element.charAt(0).toUpperCase() + element.slice(1);
 }
 
 function addGear(skill: SkillId, add: (unlock: SkillUnlock) => void): void {
@@ -165,10 +170,26 @@ function addGear(skill: SkillId, add: (unlock: SkillUnlock) => void): void {
   }
 
   for (const [level, items] of byLevel) {
+    if (skill === "magic") {
+      const weapons = items.filter((item) => item.magicWeapon !== undefined);
+      if (weapons.length > 0) {
+        const wood = weapons[0]?.name.replace(/ (Wand|Staff)$/, "") ?? "Wooden";
+        add({
+          level,
+          kind: "gear",
+          name: `${wood} Wand and Staff`,
+          detail: "wand 2.2s, one hand; staff 3.0s, two hands",
+        });
+      }
+
+      const body = items.find((item) => item.equip?.slot === "body");
+      if (body) add({ level, kind: "gear", name: body.name.split(/\s+/)[0] ?? "Magic gear" });
+      continue;
+    }
+
     const mainHand = items.find((item) => item.equip?.slot === "mainHand");
-    const representative = skill === "melee"
-      ? mainHand
-      : items.find((item) => item.equip?.slot === "body") ?? items[0];
+    const representative = skill === "melee" ? mainHand : items.find((item) =>
+      item.equip?.slot === "body") ?? items[0];
     const label = representative?.name.split(/\s+/)[0] ?? "Gear";
     add({
       level,

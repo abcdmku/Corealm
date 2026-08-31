@@ -15,6 +15,7 @@
  */
 import type { GameEvent, SkillId } from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
+import { content } from "../content/index.js";
 import { SKILLS } from "../content/skills.js";
 import { RECOVERY_CACHE_ID } from "../systems/death.js";
 import { reportResult } from "./contextMenu.js";
@@ -38,6 +39,25 @@ const MESSAGE_IDLE_MS = 14_000;
 const XP_DROP_LIMIT = 6;
 const XP_DROP_MS = 2_200;
 const EVENT_INTERVAL_MS = 250;
+
+/** Turns the canonical recharge payload into the one receipt shown to the player. */
+export function describeEssenceRecharge(data: GameEvent["data"]): string {
+  const weaponId = typeof data["weaponItemId"] === "string" ? data["weaponItemId"] : null;
+  const essenceId = typeof data["essenceItemId"] === "string" ? data["essenceItemId"] : null;
+  const after = typeof data["after"] === "number" ? data["after"] : null;
+  const spent = typeof data["essenceSpent"] === "number" ? data["essenceSpent"] : null;
+  const weaponName = weaponId ? content.item(weaponId)?.name ?? titleCase(weaponId) : "Weapon";
+  const essenceName = essenceId ? content.item(essenceId)?.name ?? titleCase(essenceId) : "essence";
+
+  const chargeReceipt = after === null
+    ? `${weaponName} recharged.`
+    : `${weaponName} recharged to ${formatQuantity(after)} charges.`;
+  return spent === null ? chargeReceipt : `${chargeReceipt} Spent ${formatQuantity(spent)} ${essenceName}.`;
+}
+
+export function eventChangesWeaponCharge(event: GameEvent): boolean {
+  return event.type === "spell.launched" || event.type === "essence.recharged";
+}
 
 export type AutoOpen = "bank" | "shop" | null;
 
@@ -193,7 +213,7 @@ export class Hud {
    * rejected `Result`, a described event — so anything that wants to talk to the player says it
    * once, in one place, and lands in this log. Nothing else should grow its own message strip.
    *
-   * Repeats are COLLAPSED rather than stacked. "You have no essence shards" fires on every combat
+   * Repeats are COLLAPSED rather than stacked. An out-of-fuel warning can fire on every combat
    * tick that tries to cast, and eight identical lines would push out the context that explains
    * them; a counter says the same thing and keeps the history.
    */
@@ -417,6 +437,13 @@ export class Hud {
   }
 
   private handleEvent(event: GameEvent): void {
+    if (eventChangesWeaponCharge(event)) {
+      // Casting and recharging mutate only the charge ledger. Its inventory stack does not change,
+      // so the equipment signature needs this event-driven refresh to repaint the number now.
+      this.ctx.refresh();
+      this.ctx.tooltip.refresh();
+    }
+
     const described = this.describeEvent(event);
     if (described) this.pushNotice(described.text, described.tone);
 
@@ -472,16 +499,18 @@ export class Hud {
       }
       case "navigation.failed":
         return { text: "There is no route to that place.", tone: "error" };
+      case "essence.recharged":
+        return { text: describeEssenceRecharge(data), tone: "success" };
       case "combat.ended": {
         // Only the endings the player did not ask for. A fight that ends because the target died,
         // or because they clicked something else, explains itself on screen — saying so in words is
         // noise. An engagement that stops on its own does NOT explain itself, and running dry of
-        // essence shards mid-fight was the worst of them: `systems/combat.ts` disengaged silently,
+        // running out of spell fuel mid-fight was the worst of them: `systems/combat.ts` disengaged silently,
         // so the character simply stopped attacking with nothing said anywhere.
         const reason = typeof data["reason"] === "string" ? data["reason"] : "";
-        if (reason === "out-of-essence") {
+        if (reason === "spell-blocked") {
           return {
-            text: "You are out of Essence Shards. Buy more at a general store, or craft them from a gem and a log.",
+            text: "Casting stopped. Carry matching Essence or recharge the equipped elemental weapon.",
             tone: "error",
           };
         }

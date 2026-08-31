@@ -144,6 +144,12 @@ export interface ResourceClusterDef {
   count: number;
   centre: Spot;
   radius: number;
+  /** Optional one-off centrepiece used by index 0; remaining nodes use the resource presentation. */
+  heroAssetId?: string;
+  /** Optional centrepiece scale; satellite size comes from the resource presentation. */
+  heroScale?: number;
+  /** Marks an essence cache for element-aware materials and inspection. */
+  essenceElement?: import("../contracts.js").SpellElement;
   /** The route-graph node a player banks against when working this cluster. */
   locationId: string;
 }
@@ -651,6 +657,47 @@ export const WALK_SPEED_MPS = 4.2;
 
 export const WORLD_BOUNDS: RegionBounds = { min: [-350, -200], max: [350, 200] };
 
+/**
+ * Settlement source files stay focused on their existing town layouts. The three altar additions
+ * are part of the magic-world amendment, so regions wire them in without mutating the imported
+ * settlement objects.
+ */
+const COLDBRACE_WITH_ESSENCE_ALTAR: SettlementDef = {
+  ...COLDBRACE,
+  stations: [
+    ...COLDBRACE.stations,
+    {
+      id: "coldbrace_essence_altar", name: "Essence Altar", kind: "essence_altar", skill: "magic",
+      position: [-150, -77.5], rotationY: 0, assetId: "ore_crystal_blue", scale: 0.65,
+      recipeIds: [],
+    },
+  ],
+};
+
+const ROOTFALL_WITH_ESSENCE_ALTAR: SettlementDef = {
+  ...ROOTFALL,
+  stations: [
+    ...ROOTFALL.stations,
+    {
+      id: "rootfall_essence_altar", name: "Essence Altar", kind: "essence_altar", skill: "magic",
+      position: [68, 123], rotationY: 0, assetId: "ore_crystal_blue", scale: 0.65,
+      recipeIds: [],
+    },
+  ],
+};
+
+const HIGHCAIRN_WITH_ESSENCE_ALTAR: SettlementDef = {
+  ...HIGHCAIRN,
+  stations: [
+    ...HIGHCAIRN.stations,
+    {
+      id: "highcairn_essence_altar", name: "Essence Altar", kind: "essence_altar", skill: "magic",
+      position: [144, -61.5], rotationY: 0, assetId: "ore_crystal_blue", scale: 0.65,
+      recipeIds: [],
+    },
+  ],
+};
+
 // =============================================================== FALLOWMARCH
 
 /**
@@ -716,6 +763,8 @@ const FALLOWMARCH: RegionDef = {
       blurb: "Where the copse track leaves the town road." },
     { id: "open_march_camp", name: "The Open March", position: [-250, 30], kind: "camp", routeNode: true,
       blurb: "Open tussock. Skitterlings in the wet, wolf pups on the rise." },
+    { id: "fallowmarch_air_cache", name: "Air Essence Cache", position: [-250, -150], kind: "landmark", routeNode: true,
+      blurb: "A wind-scoured stone cache far beyond the west track, bright with trapped air essence." },
     { id: "fallowmarch_north_gate", name: "North Gate", position: [-26, 118], kind: "gate", routeNode: true,
       blurb: "The top of the March Road, and the way into Vellenwood." },
   ],
@@ -736,6 +785,7 @@ const FALLOWMARCH: RegionDef = {
     { from: "town_center", to: "west_track" },
     { from: "west_track", to: "palewood_copse" },
     { from: "west_track", to: "open_march_camp" },
+    { from: "west_track", to: "fallowmarch_air_cache" },
     { from: "open_march_camp", to: "bracken_pit" },
   ],
 
@@ -777,9 +827,16 @@ const FALLOWMARCH: RegionDef = {
       // dirt quad and its fence border are render-layer geometry.
       locationId: "marchfield_farm",
     },
+    {
+      id: "fallowmarch_air_essence_cache", resourceId: "essence_air",
+      count: 5, centre: [-250, -150], radius: 8,
+      heroAssetId: "rocks_free_essence_cache", heroScale: 0.18,
+      essenceElement: "wind",
+      locationId: "fallowmarch_air_cache",
+    },
   ],
 
-  settlement: COLDBRACE,
+  settlement: COLDBRACE_WITH_ESSENCE_ALTAR,
 
   obstacles: [
     {
@@ -866,6 +923,14 @@ const FALLOWMARCH: RegionDef = {
       // 1.14 m against the Cairnwight's 1.37 m, and 340 m of world plus two tier palettes apart.
       assetId: "enemy_skull", scale: 0.85,
       level: 8, maxHealth: 9, aggroRadius: 7, behaviour: "territorial",
+    },
+    {
+      // West of the cache and well clear of its approach road. The four-metre hovering silhouette
+      // is visible over the plain before its territorial leash can pull a traveller into combat.
+      id: "tempest_roc", family: "tempest_roc", name: "Tempest Roc", tier: 1,
+      count: 1, centre: [-292, -156], radius: 0,
+      assetId: "enemy_bee", scale: 1.55,
+      level: 8, maxHealth: 80, aggroRadius: 20, behaviour: "territorial", boss: true,
     },
   ],
 
@@ -980,6 +1045,8 @@ const VELLENWOOD: RegionDef = {
       blurb: "Where the gorge peters out against the northern ridge." },
     { id: "thornline_camp", name: "The Thornline", position: [196, 152], kind: "camp", routeNode: true,
       blurb: "The edge the Thornbound keep to. They do not enter the clearings and nobody says why." },
+    { id: "vellenwood_earth_cache", name: "Earth Essence Cache", position: [262, 176], kind: "landmark", routeNode: true,
+      blurb: "An old stone heart under the eastern canopy, split through with earth essence." },
     { id: "vellenwood_east_gate", name: "Cairn Gate", position: [250, 24], kind: "gate", routeNode: true,
       blurb: "The east gate. On a clear day you can see the Karrowmoor ridge from it." },
   ],
@@ -996,6 +1063,7 @@ const VELLENWOOD: RegionDef = {
     { from: "gorge_ford", to: "vellenwood_east_gate" },
     { from: "rootfall_hamlet", to: "gorge_head" },
     { from: "gorge_head", to: "thornline_camp" },
+    { from: "thornline_camp", to: "vellenwood_earth_cache" },
     { from: "thornline_camp", to: "vellenwood_east_gate" },
   ],
 
@@ -1022,9 +1090,16 @@ const VELLENWOOD: RegionDef = {
       count: 5, centre: [128, 84], radius: 12,
       locationId: "blackwater_pools",
     },
+    {
+      id: "vellenwood_earth_essence_cache", resourceId: "essence_earth",
+      count: 5, centre: [262, 176], radius: 8,
+      heroAssetId: "rocks_free_essence_cache", heroScale: 0.18,
+      essenceElement: "earth",
+      locationId: "vellenwood_earth_cache",
+    },
   ],
 
-  settlement: ROOTFALL,
+  settlement: ROOTFALL_WITH_ESSENCE_ALTAR,
 
   obstacles: [
     {
@@ -1124,6 +1199,14 @@ const VELLENWOOD: RegionDef = {
       count: 4, centre: [30, 182], radius: 12,
       assetId: "enemy_skull", scale: 0.75,
       level: 17, maxHealth: 24, aggroRadius: 8, behaviour: "territorial",
+    },
+    {
+      // East of the cache, outside the cache ring and its Thornline approach. The scaled old-growth
+      // tree is a six-metre combat silhouette without placing its roots across the route.
+      id: "rootheart", family: "rootheart", name: "The Rootheart", tier: 5,
+      count: 1, centre: [304, 158], radius: 0,
+      assetId: "tree_twisted_2", scale: 0.35,
+      level: 16, maxHealth: 140, aggroRadius: 22, behaviour: "territorial", boss: true,
     },
   ],
 
@@ -1241,6 +1324,8 @@ const KARROWMOOR: RegionDef = {
       blurb: "Across the terrace three gap. Two more tarns, and nobody fishing them." },
     { id: "tarn_track", name: "Tarn Track", position: [300, -80], kind: "junction", routeNode: true,
       blurb: "The long way round the terrace three gap." },
+    { id: "karrowmoor_water_cache", name: "Water Essence Cache", position: [328, -176], kind: "landmark", routeNode: true,
+      blurb: "A blue-lit cache at the moor's far edge, where water essence beads on dry slate." },
   ],
 
   roads: [
@@ -1259,6 +1344,7 @@ const KARROWMOOR: RegionDef = {
     { from: "cairn_tarns", to: "ridge_pines" },
     { from: "ridge_pines", to: "tarn_track" },
     { from: "tarn_track", to: "far_tarn" },
+    { from: "far_tarn", to: "karrowmoor_water_cache" },
   ],
 
   clusters: [
@@ -1294,9 +1380,16 @@ const KARROWMOOR: RegionDef = {
       count: 4, centre: [128, -58], radius: 6,
       locationId: "highcairn_plots",
     },
+    {
+      id: "karrowmoor_water_essence_cache", resourceId: "essence_water",
+      count: 5, centre: [328, -176], radius: 8,
+      heroAssetId: "rocks_free_essence_cache", heroScale: 0.18,
+      essenceElement: "water",
+      locationId: "karrowmoor_water_cache",
+    },
   ],
 
-  settlement: HIGHCAIRN,
+  settlement: HIGHCAIRN_WITH_ESSENCE_ALTAR,
 
   obstacles: [
     {

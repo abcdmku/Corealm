@@ -67,12 +67,17 @@ export const GATHERING_PRODUCTION_TIERS: readonly GatheringProductionTierDef[] =
       dagger: "grithe_dagger", sword: "grithe_sword", helm: "grithe_helm", body: "grithe_cuirass",
       legs: "grithe_greaves", boots: "grithe_boots", gloves: "grithe_gloves",
       pickaxe: "grithe_pickaxe", hatchet: "grithe_hatchet",
-      staff: "palewood_staff", wand: "palewood_wand", focus: "quartz_focus",
+      staff: "palewood_staff", wand: "palewood_wand",
       rod: "palewood_rod", shield: "palewood_shield",
       meleeRing: "grithe_ring", meleePendant: "grithe_pendant",
       magicRing: "ember_ring", magicCharm: "ember_charm",
       hood: "marchhide_hood", robe: "marchhide_robe", magicLegs: "marchhide_leggings",
       magicBoots: "marchhide_boots", wraps: "marchhide_wraps",
+    },
+    magic: {
+      element: "wind", essence: "air_essence", orb: "air_orb",
+      staff: "air_staff", wand: "air_wand",
+      basicStaff: "basic_wooden_staff", basicWand: "basic_wooden_wand",
     },
     resourceDefs: [
       {
@@ -124,12 +129,16 @@ export const GATHERING_PRODUCTION_TIERS: readonly GatheringProductionTierDef[] =
       dagger: "corven_dagger", sword: "corven_sword", helm: "corven_helm", body: "corven_plate",
       legs: "corven_greaves", boots: "corven_boots", gloves: "corven_gauntlets",
       pickaxe: "corven_pickaxe", hatchet: "corven_hatchet",
-      staff: "duskoak_staff", wand: "duskoak_wand", focus: "amber_focus",
+      staff: "duskoak_staff", wand: "duskoak_wand",
       rod: "duskoak_rod", shield: "duskoak_shield",
       meleeRing: "corven_ring", meleePendant: "corven_pendant",
       magicRing: "stone_ring", magicCharm: "stone_charm",
       hood: "bramblehide_hood", robe: "bramblehide_robe", magicLegs: "bramblehide_leggings",
       magicBoots: "bramblehide_boots", wraps: "bramblehide_wraps",
+    },
+    magic: {
+      element: "earth", essence: "earth_essence", orb: "earth_orb",
+      staff: "earth_staff", wand: "earth_wand",
     },
     resourceDefs: [
       {
@@ -174,12 +183,16 @@ export const GATHERING_PRODUCTION_TIERS: readonly GatheringProductionTierDef[] =
       dagger: "kaldite_dagger", sword: "kaldite_sword", helm: "kaldite_helm", body: "kaldite_plate",
       legs: "kaldite_greaves", boots: "kaldite_boots", gloves: "kaldite_gauntlets",
       pickaxe: "kaldite_pickaxe", hatchet: "kaldite_hatchet",
-      staff: "cairnpine_staff", wand: "cairnpine_wand", focus: "garnet_focus",
+      staff: "cairnpine_staff", wand: "cairnpine_wand",
       rod: "cairnpine_rod", shield: "cairnpine_shield",
       meleeRing: "kaldite_ring", meleePendant: "kaldite_pendant",
       magicRing: "storm_ring", magicCharm: "storm_charm",
       hood: "wightshroud_hood", robe: "wightshroud_robe", magicLegs: "wightshroud_leggings",
       magicBoots: "wightshroud_boots", wraps: "wightshroud_wraps",
+    },
+    magic: {
+      element: "water", essence: "water_essence", orb: "water_orb",
+      staff: "water_staff", wand: "water_wand",
     },
     resourceDefs: [
       {

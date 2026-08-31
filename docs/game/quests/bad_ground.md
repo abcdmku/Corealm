@@ -22,7 +22,7 @@ Five Kaldite faces on terrace one, next to the Gravelmaw mouth. Mining 10 is the
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#lower-quarry">Lower Quarry</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 1"><span>Items</span><a href="../../items/#kaldite-ore">Kaldite Ore</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/karrowmoor_terraces.webp" alt="Lower Quarry in the running Corealm world" loading="lazy" /><figcaption><strong>Lower Quarry</strong><span>Lower Quarry</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/karrowmoor_terraces.webp" alt="Lower Quarry in the running Corealm world" loading="lazy" /><figcaption><strong>Lower Quarry</strong><span>Lower Quarry, Karrowmoor</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bad Ground, step 1">
 <div class="corealm-map-stage" data-map-stage>
@@ -53,7 +53,7 @@ It runs from the Highcairn bank at (170, -74) up to the Upper Karrow Seam and ne
 
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#highcairn-bank">Highcairn Bank</a><a href="../../regions/#upper-karrow-seam">Upper Karrow Seam</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/sunder_ledge.webp" alt="Sunder Ledge in the running Corealm world" loading="lazy" /><figcaption><strong>Sunder Ledge</strong><span>Highcairn Bank, Upper Karrow Seam</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/sunder_ledge.webp" alt="Sunder Ledge in the running Corealm world" loading="lazy" /><figcaption><strong>Sunder Ledge</strong><span>Highcairn Bank, Karrowmoor</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bad Ground, step 2">
 <div class="corealm-map-stage" data-map-stage>
@@ -86,7 +86,7 @@ The Upper Karrow Seam is only three nodes and genuinely runs dry above Mining 20
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#highcairn-bank">Highcairn Bank</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#kaldite-ore">Kaldite Ore</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/highcairn_bank_counter.webp" alt="Highcairn Bank in the running Corealm world" loading="lazy" /><figcaption><strong>Highcairn Bank</strong><span>Highcairn Bank</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/highcairn_bank_counter.webp" alt="Highcairn Bank in the running Corealm world" loading="lazy" /><figcaption><strong>Highcairn Bank</strong><span>Highcairn Bank, Karrowmoor</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bad Ground, step 3">
 <div class="corealm-map-stage" data-map-stage>
@@ -112,7 +112,7 @@ He is at the middle of the camp. He will have the figure already; he always does
 
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#highcairn">Highcairn</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_foreman_arden.webp" alt="Foreman Arden in the running Corealm world" loading="lazy" /><figcaption><strong>Foreman Arden</strong><span>Highcairn</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_foreman_arden.webp" alt="Foreman Arden in the running Corealm world" loading="lazy" /><figcaption><strong>Foreman Arden</strong><span>Highcairn Bank, Karrowmoor</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Bad Ground, step 4">
 <div class="corealm-map-stage" data-map-stage>

@@ -22,6 +22,7 @@ import type {
   EntityId, GameApi, GameEventType, InteractionId, ItemId, RecipeId, SpellId, Vec3,
   EquipSlot, OverlaySpec, Result,
 } from "../contracts.js";
+import { EQUIP_SLOTS } from "../contracts.js";
 import { SPELLS } from "../content/spells.js";
 
 /** JSON Schema fragment. Kept loose on purpose: WebMCP passes these through untouched. */
@@ -173,10 +174,14 @@ export function createTools(api: GameApi): ToolDef[] {
       name: "corealm_interact",
       description:
         "Perform an interaction on an entity: mine, chop, fish, rake, plant, harvest, talk, open, "
-        + "climb, vault, loot, take, produce, bank, trade, inspect. If the character is out of "
+        + "climb, vault, loot, take, produce, recharge, bank, trade, inspect. If the character is out of "
         + "range this walks them into range first, exactly as a human click does. Gathering "
-        + "interactions start a CONTINUING activity — one call keeps yielding until the node is "
-        + "depleted, the pack is full, or you stop it.",
+        + "interactions continue after one call until the node is depleted, the pack is full, or you stop. "
+        + "For recharge, target any Essence Altar while a charged Air, Earth, or Water wand or staff is "
+        + "equipped. The altar atomically spends exactly 100 matching essence and fills that weapon "
+        + "to 1000 charges. A full weapon or insufficient essence rejects without taking anything. If this "
+        + "call starts a walk, wait for navigation.completed and then for essence.recharged; routed "
+        + "failures are shown through the same game notice channel as in-range failures.",
       inputSchema: obj({
         entityId: STR("Entity id"),
         interaction: STR("One of the entity's listed interactions"),
@@ -202,13 +207,26 @@ export function createTools(api: GameApi): ToolDef[] {
       name: "corealm_equip",
       description:
         "Equip an inventory item, or unequip a worn slot. Equipping checks skill requirements and "
-        + "returns REQUIREMENTS_NOT_MET with the reason if the character does not qualify.",
+        + "returns REQUIREMENTS_NOT_MET with the reason if the character does not qualify. Wands and "
+        + "staffs occupy mainHand. Boss Orbs are crafting components and cannot be equipped.",
       inputSchema: obj({
         itemId: STR("Item to equip"),
-        unequipSlot: STR("Slot to clear: head, body, legs, feet, hands, mainHand, offHand, accessory1, accessory2"),
+        unequipSlot: {
+          type: "string",
+          enum: [...EQUIP_SLOTS],
+          description: `Slot to clear. Slots: ${EQUIP_SLOTS.join(", ")}`,
+        },
       }),
       execute: (args) => {
-        if (typeof args.unequipSlot === "string") return unwrap(api.unequipItem(args.unequipSlot as EquipSlot));
+        if (typeof args.unequipSlot === "string") {
+          if (!EQUIP_SLOTS.includes(args.unequipSlot as EquipSlot)) {
+            return {
+              error: "INVALID_ARGUMENT",
+              message: `Unknown equipment slot ${args.unequipSlot}. Use one of: ${EQUIP_SLOTS.join(", ")}`,
+            };
+          }
+          return unwrap(api.unequipItem(args.unequipSlot as EquipSlot));
+        }
         if (typeof args.itemId === "string") return unwrap(api.equipItem(args.itemId));
         return { error: "INVALID_ARGUMENT", message: "Give either itemId or unequipSlot" };
       },
@@ -246,17 +264,16 @@ export function createTools(api: GameApi): ToolDef[] {
     {
       name: "corealm_attack",
       description:
-        "Attack an enemy with whatever is in the main hand. A staff CASTS — the standing spell "
-        + "choice, or the strongest castable one — and reaches fifteen metres, so a caster opens fire "
-        + "from where they stand rather than closing; a blade or bare hands swing at 1.6 m and the "
-        + "character walks in first. A CAST DOES NOT DAMAGE ANYTHING UNTIL ITS BOLT ARRIVES: this "
-        + "returns as soon as the spell leaves, and the target's health moves 0.3 to 1.3 seconds "
-        + "later depending on the spell and the range. Do not read health straight after the call; "
-        + "the spell.launched event carries the exact flightMs. "
-        + "Pass spellId to force a specific spell instead of the standing "
-        + "choice. Attacking continues automatically on the weapon's cadence until the target dies, "
-        + "the character leaves range, you issue another command, or the character dies. Every cast "
-        + "consumes one essence shard.",
+        "Attack an enemy with the main-hand weapon. With a wand or staff and no spellId, this casts "
+        + "the selected spell when it is castable, otherwise it falls back to the highest-Magic-level "
+        + "castable spell. If none is castable, it returns "
+        + "REQUIREMENTS_NOT_MET and does not attack in melee. Pass spellId to require that exact spell. "
+        + "Magic reaches 15 metres; melee reaches 1.6 metres. One cast spends one matching Essence "
+        + "when the bolt launches. A matching charged weapon pays instead. Wands cast every 2200 ms "
+        + "and staffs every 3000 ms. "
+        + "Damage lands 0.3 to 1.3 seconds after launch. Read spell.launched.data.flightMs before checking "
+        + "target health. Attacking repeats on that cadence until the target dies, leaves pursuit range, "
+        + "another command replaces it, or the character dies.",
       inputSchema: obj({
         entityId: STR("Enemy entity id"),
         // Enumerated from the content table rather than typed out, because the ladder went from
@@ -267,10 +284,14 @@ export function createTools(api: GameApi): ToolDef[] {
           type: "string",
           enum: SPELLS.map((spell) => spell.id),
           description:
-            "Optional. Which spell to cast; omit for a melee attack. Each is one of four elements "
+            "Optional. With a wand or staff, this forces a spell; omit it to use the standing choice "
+            + "when castable or the strongest compatible spell automatically. With a non-magic weapon, "
+            + "omitting it attacks in melee; supplying it returns a loadout error. Each spell has one "
+            + "of four internal elements "
             + "(wind, water, earth, fire) and needs the Magic level listed here: "
             + SPELLS.map((spell) => `${spell.id} (${spell.element}, Magic ${spell.reqLevel})`).join(", ")
-            + ". Every cast costs one essence shard.",
+            + ". The player-facing Air Essence supplies wind spells. Every launch costs one matching "
+            + "Essence unless a matching charged weapon can pay instead.",
         },
       }, ["entityId"]),
       execute: (args) => {
@@ -291,11 +312,15 @@ export function createTools(api: GameApi): ToolDef[] {
     {
       name: "corealm_spellbook",
       description:
-        "Read the sixteen attack spells and which one a plain \"cast\" would throw, or set a "
-        + "standing choice. The four elements — wind, water, earth, fire — deal the same kind of "
-        + "damage and differ in when they unlock, so the strongest spell available rotates between "
-        + "them as Magic levels. Setting a spell above the current Magic level is allowed; the "
-        + "automatic pick stands in until it is reachable. Pass spellId null to go back to automatic.",
+        "Read the sixteen attack spells and the active automatic choice, or set the standing choice. "
+        + "Each spell row returns id, name, element, rung, reqLevel, maxHit, baseXp, castMs, "
+        + "requiredElement, fuelCost, unlocked, castable, blockedBy, and description. The top-level "
+        + "result returns preferredSpellId, activeSpellId, magicLevel, equippedWeapon, carried Essence by "
+        + "element, and releasedElements. equippedWeapon includes live charges, capacity, rechargeItemId, "
+        + "and rechargeCost. A cast requires a wand or staff plus matching Essence. Air, Earth, "
+        + "and Water are released. Fire stays visible as unreleased tier-15 content. Selecting a locked "
+        + "or currently incompatible spell is allowed; automatic selection stands in until it becomes "
+        + "castable. Pass an explicit null spellId to restore automatic selection.",
       inputSchema: obj({
         op: { type: "string", enum: ["read", "select"] },
         spellId: {
@@ -305,12 +330,20 @@ export function createTools(api: GameApi): ToolDef[] {
         },
       }, ["op"]),
       execute: (args) => {
-        if (asString(args.op) === "select") {
+        const op = asString(args.op);
+        if (op === "select") {
+          if (!("spellId" in args)) {
+            return { error: "INVALID_ARGUMENT", message: "spellId is required when op is select" };
+          }
           const raw = args.spellId;
+          if (raw !== null && typeof raw !== "string") {
+            return { error: "INVALID_ARGUMENT", message: "spellId must be a spell id or null" };
+          }
           const spellId = typeof raw === "string" ? (raw as SpellId) : null;
           return unwrap(api.setPreferredSpell(spellId));
         }
-        return api.getSpellbook();
+        if (op === "read") return api.getSpellbook();
+        return { error: "INVALID_ARGUMENT", message: 'op must be "read" or "select"' };
       },
     },
 
@@ -408,13 +441,22 @@ export function createTools(api: GameApi): ToolDef[] {
     {
       name: "corealm_events",
       description:
-        "Read game events since a cursor, optionally blocking until one arrives. THIS IS HOW YOU "
-        + "AVOID POLLING. Pass the `nextSeq` you got back as `sinceSeq` next time. With a timeoutMs "
-        + "this blocks until a matching event lands, so you can start a long gathering session and "
-        + "wait for inventory.full instead of asking repeatedly whether it is done.",
+        "Read game events since a cursor, optionally blocking until one arrives. Pass each returned "
+        + "nextSeq as the next sinceSeq. A timeout lets you wait for inventory.full or "
+        + "resource.depleted without polling. Magic payloads are exact: spell.launched has data "
+        + "{spellId,targetId,element,rung,flightMs,hit,fuelSource,weaponItemId,remainingCharges,essenceItemId,remainingEssence} and uses the target "
+        + "as entityId. essence.recharged has data "
+        + "{altarId,weaponItemId,element,before,after,essenceItemId,essenceSpent} and uses the altar as "
+        + "entityId. Element is wind for the player-facing Air element.",
       inputSchema: obj({
         sinceSeq: NUM("Cursor. Use 0 on the first call, then the nextSeq you were given."),
-        types: { type: "array", items: { type: "string" }, description: "Filter, e.g. [\"inventory.full\",\"resource.depleted\"]" },
+        types: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional event-type filter, for example [\"inventory.full\",\"resource.depleted\"] "
+            + "or [\"spell.launched\",\"essence.recharged\"].",
+        },
         timeoutMs: NUM("Block up to this long waiting for a matching event. Omit or 0 to return immediately."),
       }),
       execute: async (args) => api.events(

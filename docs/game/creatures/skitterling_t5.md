@@ -37,7 +37,9 @@ description: "Bramble Skitterling spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 15-55 | Always |
 | [Corven Ore](../../items/#corven-ore) | 1-2 | 35% |

@@ -1,5 +1,5 @@
 /**
- * Enemy stat blocks: nine families across nineteen blocks, plus Ordrun.
+ * Enemy stat blocks for every ordinary family and the three released region bosses.
  *
  * Owned by W-CONTENT.
  *
@@ -58,7 +58,7 @@
  *                                                          | maxHit 12, 3.0 s       | = 1.020 dmg/s
  *                                                          |                        | 164 s -> 167 damage
  *
- * MAGIC VS MELEE, the gate criterion in PRD 2.4. Voltrend at Magic 10 in the full tier 10 magic kit
+ * MAGIC VS MELEE, the gate criterion in PRD 2.4. Rimewash at Magic 10 in the full tier 10 magic kit
  * (magicPower 32 -> maxHit 15, magicAccuracy 47 -> attackRoll 32.12, styleFactor 1.15):
  *   vs Cairnwight  (magicArmour  10): defenceRoll 22.0 -> 59.3% -> 1.583 dmg/s -> 38/1.583 = 24.0 s
  *                                     melee at Melee 12 takes 32.7 s.  MAGIC WINS by 27%.  MATCHES PRD.
@@ -190,7 +190,7 @@ const BLOCKS: readonly EnemyDef[] = [
     drops: [
       { itemId: "coarse_hide", quantity: [1, 2], chance: 0.35 },
       { itemId: "grithe_ore", quantity: [1, 2], chance: 0.25 },
-      { itemId: "essence_shard", quantity: [1, 1], chance: 0.10 },
+      { itemId: "air_essence", quantity: [1, 1], chance: 0.10 },
       { itemId: "grithe_helm", quantity: [1, 1], chance: 0.03 },
     ],
   },
@@ -210,7 +210,21 @@ const BLOCKS: readonly EnemyDef[] = [
     drops: [
       { itemId: "palewood_log", quantity: [1, 2], chance: 0.30 },
       { itemId: "pale_quartz", quantity: [1, 1], chance: 0.20 },
-      { itemId: "essence_shard", quantity: [1, 1], chance: 0.08 },
+      { itemId: "air_essence", quantity: [1, 1], chance: 0.08 },
+    ],
+  },
+  {
+    id: "tempest_roc_t1", name: "Tempest Roc", family: "tempest_roc", tier: 1,
+    // Fallowmarch's region boss. Its slow heavy cadence leaves room to eat or disengage, while
+    // enough health separates the fight from the ordinary road enemies.
+    maxHealth: 80, attackLevel: 9, defenceLevel: 7,
+    accuracy: 10, armour: 18, magicArmour: 24,
+    maxHit: 6, attackSpeedMs: 3000, aggroRadius: 20, behaviour: "territorial",
+    marks: [80, 140],
+    drops: [
+      { itemId: "air_orb", quantity: [1, 1], chance: 1.00 },
+      { itemId: "palewood_log", quantity: [3, 5], chance: 1.00 },
+      { itemId: "pale_quartz", quantity: [1, 2], chance: 0.75 },
     ],
   },
 
@@ -285,7 +299,7 @@ const BLOCKS: readonly EnemyDef[] = [
     drops: [
       { itemId: "bramble_hide", quantity: [1, 2], chance: 0.35 },
       { itemId: "corven_ore", quantity: [1, 2], chance: 0.25 },
-      { itemId: "essence_shard", quantity: [1, 2], chance: 0.15 },
+      { itemId: "earth_essence", quantity: [1, 2], chance: 0.15 },
       { itemId: "corven_boots", quantity: [1, 1], chance: 0.03 },
     ],
   },
@@ -304,8 +318,23 @@ const BLOCKS: readonly EnemyDef[] = [
     drops: [
       { itemId: "duskoak_log", quantity: [1, 2], chance: 0.30 },
       { itemId: "vell_amber", quantity: [1, 1], chance: 0.15 },
-      { itemId: "essence_shard", quantity: [1, 2], chance: 0.12 },
-      { itemId: "amber_focus", quantity: [1, 1], chance: 0.02 },
+      { itemId: "earth_essence", quantity: [1, 2], chance: 0.12 },
+      { itemId: "duskoak_wand", quantity: [1, 1], chance: 0.02 },
+    ],
+  },
+  {
+    id: "rootheart_t5", name: "The Rootheart", family: "rootheart", tier: 5,
+    // Vellenwood's region boss. High physical armour favours the Earth Orb it guards once the
+    // player has earned that progression reward.
+    maxHealth: 140, attackLevel: 18, defenceLevel: 14,
+    accuracy: 16, armour: 48, magicArmour: 32,
+    maxHit: 9, attackSpeedMs: 3000, aggroRadius: 22, behaviour: "territorial",
+    marks: [350, 550],
+    drops: [
+      { itemId: "earth_orb", quantity: [1, 1], chance: 1.00 },
+      { itemId: "duskoak_log", quantity: [3, 6], chance: 1.00 },
+      { itemId: "vell_amber", quantity: [2, 3], chance: 0.75 },
+      { itemId: "bramble_hide", quantity: [1, 2], chance: 0.60 },
     ],
   },
 
@@ -356,7 +385,7 @@ const BLOCKS: readonly EnemyDef[] = [
   {
     id: "mudback_t10", name: "Terrace Mudback", family: "mudback", tier: 10,
     // Armour 78 is the highest in the game, boss included, and magicArmour 0 is the lowest. That
-    // pairing is the point: Melee 12 with a Kaldite sword needs 45.2 s, Voltrend at Magic 10 needs
+    // pairing is the point: Melee 12 with a Kaldite sword needs 45.2 s, Rimewash at Magic 10 needs
     // 29.1 s, so MAGIC WINS by 35% - the exact mirror of the Scree Skitterling standing 60 m away,
     // where melee wins by 10%. Between them, the two blocks make "which style do I bring" a question
     // about the target rather than a global answer.
@@ -385,7 +414,7 @@ const BLOCKS: readonly EnemyDef[] = [
     drops: [
       { itemId: "wight_shroud", quantity: [1, 1], chance: 0.30 },
       { itemId: "kaldite_ore", quantity: [1, 3], chance: 0.30 },
-      { itemId: "essence_shard", quantity: [1, 3], chance: 0.20 },
+      { itemId: "water_essence", quantity: [1, 3], chance: 0.20 },
       { itemId: "kaldite_dagger", quantity: [1, 1], chance: 0.03 },
     ],
   },
@@ -418,6 +447,7 @@ const BLOCKS: readonly EnemyDef[] = [
     maxHit: 12, attackSpeedMs: 3000, aggroRadius: 24, behaviour: "territorial",
     marks: [900, 1400],
     drops: [
+      { itemId: "water_orb", quantity: [1, 1], chance: 1.00 },
       // PRD 2.10: "900 to 1,400 plus a guaranteed Kaldite piece".
       { itemId: "kaldite_sword", quantity: [1, 1], chance: 1.00 },
       { itemId: "kaldite_bar", quantity: [3, 6], chance: 1.00 },
@@ -466,6 +496,7 @@ const GROUP_BLOCK: readonly (readonly [string, string])[] = [
   ["redsill_mudbacks", "mudback_t1"],
   ["march_road_reavers", "reaver_t1"],
   ["palewood_hollows", "hollow_t1"],
+  ["tempest_roc", "tempest_roc_t1"],
   // Vellenwood, tier 5
   ["thornbound_husks", "thornbound_t5"],
   ["bramble_skitterlings", "skitterling_t5"],
@@ -473,6 +504,7 @@ const GROUP_BLOCK: readonly (readonly [string, string])[] = [
   ["mire_fenmites", "fenmite_t5"],
   ["gorge_reavers", "reaver_t5"],
   ["canopy_hollows", "hollow_t5"],
+  ["rootheart", "rootheart_t5"],
   // Karrowmoor, tier 10
   ["cairnwights_fields", "cairnwight_t10"],
   ["scree_skitterlings", "skitterling_t10"],
@@ -497,8 +529,8 @@ const GROUP_ALIASES: readonly EnemyDef[] = GROUP_BLOCK.flatMap(([groupId, blockI
   return base === undefined ? [] : [{ ...base, id: groupId }];
 });
 
-/** Nineteen stat blocks plus twenty-four group aliases: 43 rows. */
+/** Twenty-one stat blocks plus twenty-six group aliases: 47 rows. */
 export const ENEMIES: readonly EnemyDef[] = [...BLOCKS, ...GROUP_ALIASES];
 
-/** The nineteen canonical stat blocks, without the group aliases. For docs and the bestiary. */
+/** The twenty-one canonical stat blocks, without the group aliases. For docs and the bestiary. */
 export const ENEMY_BLOCKS: readonly EnemyDef[] = BLOCKS;

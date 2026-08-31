@@ -13,7 +13,8 @@
  *
  * Combat is deliberately not an activity. It lives in `state.combat` so movement, targeting, and
  * enemy responses have their own lifecycle. Food rejects an active attack target, and the combat
- * tick also pauses while an already-started eating activity completes.
+ * tick also pauses while an already-started eating activity completes. Magic uses the 100 ms
+ * simulation tick so a 2.2 s wand stays a 2.2 s wand.
  *
  * Everything random goes through the seeded `combat` stream (hit rolls, damage rolls) and the
  * seeded `loot` stream (drop rolls), so a fight replays identically from a seed and a tick count.
@@ -36,6 +37,9 @@ import type { InteractionDispatcher } from "../world/interactions.js";
 import type { TickSystem } from "../app/loop.js";
 import type { EnemyDef, SpellDef } from "../content/index.js";
 import { content } from "../content/index.js";
+import {
+  magicLoadout, spellBlockReason, spendSpellFuel, type SpellFuelSpend,
+} from "./essence.js";
 
 // ------------------------------------------------------------------ tunables
 
@@ -110,8 +114,8 @@ export function magicMaxHit(magicLevel: number, gearMagicPower: number, spell: S
 }
 
 /**
- * A weapon's cadence in whole combat ticks. PRD 2.4: "a weapon with speed 2.4 s attacks every
- * 4 combat ticks", and a 3.0 s cast is 5 ticks.
+ * A melee or enemy weapon's cadence in whole combat ticks. Magic weapons keep their authored
+ * millisecond cadence and resolve on the 100 ms simulation tick instead.
  */
 export function attackIntervalMs(attackSpeedMs: number): number {
   const ticks = Math.max(1, Math.round(attackSpeedMs / COMBAT_TICK_MS));
@@ -286,10 +290,10 @@ export class CombatSystem implements TickSystem {
     this.combatRng = deps.rng.get("combat");
     this.lootRng = deps.rng.get("loot");
 
-    // ONE COMBAT VERB. "Attack" means "hit that with what I am holding": a staff casts, a blade
+    // ONE COMBAT VERB. "Attack" means "hit that with what I am holding": a wand or staff casts, a blade
     // swings. The menu used to offer "Attack" and "Cast at" side by side on every enemy, which asked
     // the player to re-state their weapon choice on every click — and got it wrong either way, since
-    // "Attack" with a staff in hand still swung the staff like a club.
+    // "Attack" with a magic weapon in hand still swung it like a club.
     //
     // `cast` stays registered, because it is not the same question. The menu no longer offers it
     // (`ui/contextMenu.ts`), but `GameApi.cast` names a SPECIFIC spell and an agent uses that to
@@ -304,7 +308,7 @@ export class CombatSystem implements TickSystem {
       if (!spellId) {
         return err(
           "REQUIREMENTS_NOT_MET",
-          "You have no spell you can cast: check your Magic level and your essence shards.",
+          "You have no castable spell. Check your Magic level, weapon, and matching Essence.",
           context.entity.id,
         );
       }
@@ -328,12 +332,12 @@ export class CombatSystem implements TickSystem {
   // -------------------------------------------------------------- commands
 
   /**
-   * Attack with whatever is in the main hand: a staff casts, a blade swings.
+   * Attack with whatever is in the main hand: a wand or staff casts, a blade swings.
    *
    * The weapon check lives HERE and not in the dispatcher handler, which is where it started. The
    * handler only covers `interact(entityId, "attack")` — a human clicking the menu — while
    * `GameApi.attack` is its own path used by `corealm_attack` and by anything else holding the API.
-   * With the logic in the handler alone, a click cast and an agent's attack swung the staff like a
+   * With the logic in the handler alone, a click cast and an agent's attack swung the magic weapon like a
    * club at the same target. Agent parity is a property this project claims architecturally
    * (`agent/tools.ts` header), so the two cannot be allowed to mean different things.
    */
@@ -347,7 +351,7 @@ export class CombatSystem implements TickSystem {
       if (!spellId) {
         return err(
           "REQUIREMENTS_NOT_MET",
-          "You have no spell you can cast: check your Magic level and your essence shards.",
+          "You have no castable spell. Check your Magic level, weapon, and matching Essence.",
           entityId,
         );
       }
@@ -385,11 +389,11 @@ export class CombatSystem implements TickSystem {
 
     const spell = content.spell(spellId);
     if (!spell) return err("NOT_FOUND", `No spell with id ${spellId}`);
-    if (state.skills.magic.level < spell.reqLevel) {
-      return err("REQUIREMENTS_NOT_MET", `${spell.name} needs Magic ${spell.reqLevel}.`);
-    }
-    if (this.deps.inventory.countItem(spell.cost.itemId) < spell.cost.quantity) {
-      return err("NOT_ENOUGH_ITEMS", `${spell.name} costs ${spell.cost.quantity} ${spell.cost.itemId}.`);
+    const blocked = spellBlockReason(state, spell);
+    if (blocked) return err("REQUIREMENTS_NOT_MET", blocked, entityId);
+    const loadout = magicLoadout(state);
+    if (!loadout) {
+      return err("REQUIREMENTS_NOT_MET", "Equip a wand or staff first.", entityId);
     }
 
     const entity = this.deps.entities.get(entityId);
@@ -409,7 +413,7 @@ export class CombatSystem implements TickSystem {
 
     this.engagePlayer(state, entity, spell.id, atMs);
     if (gap > SPELL_RANGE) this.pursue(state, entity, atMs);
-    return ok({ targetId: entity.id, castMs: attackIntervalMs(spell.castMs) });
+    return ok({ targetId: entity.id, castMs: loadout.castMs });
   }
 
   /** The player-facing disengage. `GameApi.stop()` has its own copy; both are safe. */
@@ -426,7 +430,7 @@ export class CombatSystem implements TickSystem {
 
   // ------------------------------------------------------------------ tick
 
-  tick(_deltaMs: number, atMs: number): void {
+  tick(deltaMs: number, atMs: number): void {
     this.lastAtMs = atMs;
     if (this.nextCombatTickAtMs < 0) this.nextCombatTickAtMs = atMs;
 
@@ -436,7 +440,16 @@ export class CombatSystem implements TickSystem {
     // on the combat tick made the damage up to 600 ms late — measured at 1300 ms against a 695 ms
     // flight — so the bolt visibly struck and the health bar moved half a second afterwards. On the
     // sim tick the worst case is 100 ms, which is under a frame at any playable rate.
-    this.landSpellHits(this.deps.store.get(), atMs);
+    const state = this.deps.store.get();
+    this.landSpellHits(state, atMs);
+
+    // Magic cannot share the 600 ms swing clock: 2200 ms rounds up to 2400 ms there. Both shipped
+    // magic cadences are exact multiples of the fixed 100 ms simulation step, so an active spell
+    // gets one due check per simulation tick. The combat-tick path below skips it to prevent a
+    // double launch on ticks where the two clocks coincide.
+    if (state.player.health > 0 && state.combat.activeSpellId !== null) {
+      this.resolvePlayerSwing(state, atMs, deltaMs);
+    }
 
     let guard = 0;
     while (atMs >= this.nextCombatTickAtMs && guard < MAX_CATCHUP_TICKS) {
@@ -454,13 +467,13 @@ export class CombatSystem implements TickSystem {
       if (state.combat.targetId) this.disengagePlayer("dead", atMs);
       return;
     }
-    this.resolvePlayerSwing(state, atMs);
+    if (state.combat.activeSpellId === null) this.resolvePlayerSwing(state, atMs, COMBAT_TICK_MS);
     this.resolveEnemySwings(state, atMs);
   }
 
   // --------------------------------------------------------- player swings
 
-  private resolvePlayerSwing(state: GameState, atMs: number): void {
+  private resolvePlayerSwing(state: GameState, atMs: number, turnDeltaMs: number): void {
     const targetId = state.combat.targetId;
     if (!targetId) return;
 
@@ -491,7 +504,7 @@ export class CombatSystem implements TickSystem {
     //
     // The `mode === "idle"` guard is the other half, and it matters more than it looks. While the
     // player is moving, `systems/movement.ts` is already turning them along their path; writing a
-    // second desired facing here every combat tick made the two fight each other, and a player
+    // second desired facing during attack checks made the two fight each other, and a player
     // running AWAY from something that was hitting them got spun back round to face it over and
     // over. Whoever is moving owns the facing: walk away and you look where you are going.
     //
@@ -503,7 +516,7 @@ export class CombatSystem implements TickSystem {
         state.player.facingRad,
         bearingXZ(state.player.position, entity.position),
         COMBAT_TURN_RATE,
-        COMBAT_TICK_MS,
+        turnDeltaMs,
       );
     }
 
@@ -518,20 +531,23 @@ export class CombatSystem implements TickSystem {
     let chance: number;
     let maxHit: number;
     let intervalMs: number;
+    let castFuel: SpellFuelSpend | null = null;
 
     if (spell) {
-      const paid = this.deps.inventory.removeItem(spell.cost.itemId, spell.cost.quantity);
-      if (!paid.ok || paid.value < spell.cost.quantity) {
-        this.disengagePlayer("out-of-essence", atMs);
+      const loadout = magicLoadout(state);
+      const paid = spendSpellFuel(state, spell, this.deps.inventory);
+      if (!loadout || !paid.ok) {
+        this.disengagePlayer("spell-blocked", atMs);
         return;
       }
+      castFuel = paid.value;
       skill = "magic";
       chance = hitChance(
         attackRoll(state.skills.magic.level, gear.magicAccuracy, MAGIC_STYLE_FACTOR),
         defenceRoll(def.defenceLevel, def.magicArmour),
       );
       maxHit = magicMaxHit(state.skills.magic.level, gear.magicPower, spell);
-      intervalMs = attackIntervalMs(spell.castMs);
+      intervalMs = loadout.castMs;
       // PRD 2.4: a cast awards its base XP hit or miss.
       this.awardXp(state, "magic", spell.baseXp, atMs);
     } else {
@@ -552,9 +568,9 @@ export class CombatSystem implements TickSystem {
 
     // A SPELL DOES NOT HURT ANYTHING UNTIL IT ARRIVES.
     //
-    // The roll happens here, at the cast, and so does everything the cast itself costs: the shard is
-    // spent, the base XP is paid, the next-cast timer starts. What waits is the part that belongs to
-    // the bolt - the damage, the death, the damage XP, the flinch and the number. Previously all of
+    // The roll happens here, at the cast, and so does everything the cast itself costs: weapon
+    // charge or carried Essence is spent, base XP is paid, and the next-cast timer starts. What waits is the part that
+    // belongs to the bolt: the damage, death, damage XP, flinch and number. Previously all of
     // it landed the instant the cast resolved and only the NUMBER was delayed by the render layer,
     // so a target could take the hit, die and drop its loot while the bolt was still crossing the
     // ground toward it.
@@ -583,6 +599,11 @@ export class CombatSystem implements TickSystem {
           rung: spell.rung,
           flightMs,
           hit: landed,
+          fuelSource: castFuel!.source,
+          weaponItemId: castFuel!.source === "weapon" ? castFuel!.weaponItemId : null,
+          remainingCharges: castFuel!.source === "weapon" ? castFuel!.remainingCharges : null,
+          essenceItemId: castFuel!.source === "essence" ? castFuel!.essenceItemId : null,
+          remainingEssence: castFuel!.source === "essence" ? castFuel!.remainingEssence : null,
         },
         entity.id,
         atMs,
@@ -856,6 +877,12 @@ export class CombatSystem implements TickSystem {
   private rollDrops(state: GameState, entity: SemanticEntity, def: EnemyDef, atMs: number): void {
     const items: ItemStack[] = [];
     for (const drop of def.drops) {
+      // A crafted Orb is permanently accounted for by `consumedOrbs`. Before crafting, custody in
+      // equipment, storage, inventory, recovery, or ground loot suppresses duplicate boss drops.
+      if (
+        content.item(drop.itemId)?.orb
+        && (state.magic.consumedOrbs[drop.itemId] || ownsPhysicalItem(state, drop.itemId, items))
+      ) continue;
       if (!this.lootRng.chance(drop.chance)) continue;
       const quantity = this.lootRng.int(drop.quantity[0], drop.quantity[1]);
       if (quantity > 0) items.push({ itemId: drop.itemId, quantity });
@@ -872,8 +899,14 @@ export class CombatSystem implements TickSystem {
 
     if (items.length === 0) return;
 
-    this.pileSequence += 1;
-    const pileId = `loot_${entity.id}_${this.pileSequence}`;
+    // A restored save can already contain this enemy's first pile. Sequence counters are runtime
+    // scratch, so advance until both canonical state and the semantic store agree the id is free.
+    // Otherwise the first post-load kill overwrites the saved pile and can erase a singleton orb.
+    let pileId: EntityId;
+    do {
+      this.pileSequence += 1;
+      pileId = `loot_${entity.id}_${this.pileSequence}`;
+    } while (state.world.lootPiles[pileId] || this.deps.entities.get(pileId));
     state.world.lootPiles[pileId] = {
       position: cloneVec3(entity.position),
       items,
@@ -1042,7 +1075,9 @@ export class CombatSystem implements TickSystem {
     const maxHit = spell
       ? magicMaxHit(state.skills.magic.level, gear.magicPower, spell)
       : meleeMaxHit(state.skills.melee.level, gear.power);
-    const intervalMs = attackIntervalMs(spell ? spell.castMs : this.weaponSpeedMs());
+    const intervalMs = spell
+      ? (magicLoadout(state)?.castMs ?? 3_000)
+      : attackIntervalMs(this.weaponSpeedMs());
     const health = entity.combat?.maxHealth ?? def.maxHealth;
 
     const enemyChance = hitChance(
@@ -1117,7 +1152,9 @@ export class CombatSystem implements TickSystem {
     spellId: SpellId | null,
     atMs: number,
   ): void {
-    // A new command replaces the old one; the previous target's `combat.ended` still fires.
+    // A new command replaces the old target; the previous target's `combat.ended` still fires.
+    // The attack timer belongs to the player and survives that replacement. Otherwise alternating
+    // two living targets turns every command into an immediately-due attack and bypasses cadence.
     if (state.combat.targetId && state.combat.targetId !== entity.id) {
       this.disengagePlayer("switched-target", atMs);
     }
@@ -1125,21 +1162,11 @@ export class CombatSystem implements TickSystem {
     const current = this.deps.activity?.current();
     if (current && current.kind !== "eating") this.deps.activity?.cancel(atMs);
 
-    const wasAlreadyFighting = state.combat.targetId === entity.id;
     state.combat.targetId = entity.id;
     state.combat.activeSpellId = spellId;
-    // Re-clicking the SAME target does not restart the cadence.
-    //
-    // This used to reset unconditionally, which made click-spam a damage multiplier: every fresh
-    // command let an attack resolve on the next 600 ms combat tick instead of waiting out the
-    // weapon's own 2.4 s or 3.0 s interval. Harmless-looking until spells stopped landing
-    // instantly — then it also put several bolts in the air at once, and the ones that arrived
-    // after the first kill were dropped in `landSpellHits` having already spent their shards, so an
-    // impatient player paid for casts the game then discarded in silence.
-    //
-    // Switching to a NEW target still resets, because that is a new decision and should feel
-    // immediate rather than inheriting the leftover timer of the thing you stopped attacking.
-    if (!wasAlreadyFighting) state.combat.nextAttackAtMs = atMs;
+    // Neither re-clicking nor switching targets restarts cadence. A fresh character has a due time
+    // of zero, and an idle character's old due time is already in the past, so a genuine first
+    // attack remains immediate without writing the timer here.
     this.runtimeFor(state, entity);
     this.markInCombat(state, atMs);
     this.deps.store.markDirty();
@@ -1165,16 +1192,14 @@ export class CombatSystem implements TickSystem {
   /**
    * True when the main hand is a magic weapon, which is what makes "attack" cast.
    *
-   * Read off `magicPower` rather than off an item id list or a name match. Every staff in
-   * `content/equipment.ts` carries magicPower (2 / 4 / 9 / 20 up the ladder) and no blade or shield
-   * carries any, so the discriminator is the stat the weapon exists for — and a future wand, orb or
-   * enchanted blade is classified correctly the moment it is authored, with nothing to remember to
-   * update here. Bare hands are melee: no main hand, no magic.
+   * Content marks magic weapons explicitly. That keeps a basic wand magical even when it grants no
+   * power, and it prevents an enchanted blade from silently changing Attack into Cast. Bare hands
+   * stay melee because there is no main-hand item.
    */
   private wieldingMagic(): boolean {
     const worn = this.deps.equipment.slots().mainHand;
     if (!worn) return false;
-    return (content.item(worn.itemId)?.equip?.bonuses.magicPower ?? 0) > 0;
+    return content.item(worn.itemId)?.magicWeapon !== undefined;
   }
 
   /** The equipped main-hand's cadence, or bare fists at 2.4 s. */
@@ -1215,9 +1240,8 @@ export class CombatSystem implements TickSystem {
    * Which spell a "cast" verb throws: the player's standing choice when they can pay for it,
    * otherwise the strongest thing they can.
    *
-   * Order matters. The standing choice is consulted BEFORE the live `activeSpellId`, because
-   * `setPreferredSpell` is a deliberate act and an engagement started ten seconds ago is not; the
-   * old code let a stale engagement outrank a fresh choice for the rest of the fight.
+   * The standing choice wins while it is castable. If it is not, automatic selection starts fresh
+   * instead of retaining a weaker spell from an old engagement.
    *
    * `tier` is no longer the ranking key. It was, and with sixteen spells it stopped working: the
    * ladder maps several reqLevels onto one `content/xp.ts` tier — Skirlbolt (17) and Sleetbolt (23)
@@ -1229,16 +1253,11 @@ export class CombatSystem implements TickSystem {
     const state = this.deps.store.get();
     const castable = (spell: SpellDef | undefined): spell is SpellDef =>
       spell !== undefined
-      && state.skills.magic.level >= spell.reqLevel
-      && this.deps.inventory.countItem(spell.cost.itemId) >= spell.cost.quantity;
+      && spellBlockReason(state, spell) === null;
 
     const chosenId = state.combat.preferredSpellId;
     const chosen = chosenId ? content.spell(chosenId) : undefined;
     if (castable(chosen)) return chosen.id;
-
-    const activeId = state.combat.activeSpellId;
-    const active = activeId ? content.spell(activeId) : undefined;
-    if (castable(active)) return active.id;
 
     let best: SpellDef | undefined;
     for (const spell of content.allSpells()) {
@@ -1269,6 +1288,15 @@ export class CombatSystem implements TickSystem {
 }
 
 // ---------------------------------------------------------------- helpers
+
+function ownsPhysicalItem(state: GameState, itemId: ItemId, pending: readonly ItemStack[]): boolean {
+  const contains = (stacks: readonly (ItemStack | null)[]): boolean =>
+    stacks.some((stack) => stack?.itemId === itemId && stack.quantity > 0);
+  if (contains(pending) || contains(state.inventory.slots) || contains(state.bank.slots)) return true;
+  if (contains(Object.values(state.equipment))) return true;
+  if (state.world.recoveryCache && contains(state.world.recoveryCache.items)) return true;
+  return Object.values(state.world.lootPiles).some((pile) => contains(pile.items));
+}
 
 function started(
   result: Result<{ targetId: EntityId }>,

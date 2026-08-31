@@ -26,7 +26,7 @@ export interface BankArgs {
   itemId?: ItemId;
   /** Omitted means "all of it", which is what the 1 / 5 / 10 / all / custom picker sends for "all". */
   quantity?: number;
-  /** Plain case-insensitive substring match over item names. Empty string clears it. */
+  /** Plain case-insensitive substring match for this list response. Empty string returns all rows. */
   filter?: string;
 }
 
@@ -54,14 +54,9 @@ export class BankSystem {
     if (!this.deps.inRangeOfBank()) {
       return err("OUT_OF_RANGE", "You need to be standing at a bank to use it");
     }
-    if (typeof args?.filter === "string") {
-      this.state.bank.filter = args.filter;
-      this.deps.store.markDirty();
-    }
-
     switch (op) {
       case "list":
-        return ok(this.view());
+        return ok(this.view(args?.filter));
       case "deposit":
         return this.deposit(args);
       case "withdraw":
@@ -76,11 +71,12 @@ export class BankSystem {
   // ------------------------------------------------------------------- views
 
   /**
-   * `slots` is filtered by the active name filter so the UI can bind straight to it; `usedSlots`
-   * and `capacity` always describe the whole bank, because a filter must never look like free space.
+   * `slots` can be filtered for this one response; `usedSlots` and `capacity` always describe the
+   * whole bank, because a filter must never look like free space. Filtering is request-scoped. An
+   * agent search must not change what the player sees later or what a bulk deposit moves.
    */
-  view(): BankView {
-    const filter = this.state.bank.filter.trim().toLowerCase();
+  view(requestFilter = ""): BankView {
+    const filter = requestFilter.trim().toLowerCase();
     const all = this.state.bank.slots;
     const visible = filter.length === 0
       ? all
@@ -124,14 +120,12 @@ export class BankSystem {
 
   private depositAll(): Result<BankView> {
     const ids = this.deps.inventory.distinctItemIds();
-    const filter = this.state.bank.filter.trim().toLowerCase();
     let movedAny = false;
     let blocked = false;
 
     for (const itemId of ids) {
       const def = content.item(itemId);
       if (!def || def.category === "currency") continue;
-      if (filter.length > 0 && !def.name.toLowerCase().includes(filter)) continue;
       const held = this.deps.inventory.countOf(itemId);
       if (held < 1) continue;
       const moved = this.moveIn(itemId, held);

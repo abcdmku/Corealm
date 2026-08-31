@@ -11,12 +11,12 @@
  *   Grithe ore   12 / 7     Corven ore    42 / 25    Kaldite ore    95 / 57
  *   Palewood log 10 / 6     Duskoak log   38 / 23*   Cairnpine log  88 / 53*
  *   Grithe sword 180 / 108  Corven sword 620 / 372   Kaldite sword 1450 / 870
- *   Essence shard  9 / 5    Seared Cragfin 70 / 42
+ *   Air Essence    9 / 5    Seared Cragfin 70 / 42
  *
  *   * The PRD quotes 22 and 52 for the two logs. `sellPrice()` rounds where the PRD floored:
  *     round(38 * 0.6) = 23 and round(88 * 0.6) = 53. The frozen formula wins.
  *
- * Division of labour, per the brief: general stores carry tools, food, seeds and shards; smiths
+ * Division of labour, per the brief: general stores carry tools, food, seeds and local essence; smiths
  * carry bars and low-tier gear. Nothing sells a full tier kit - armour is what Smithing and
  * Crafting are for, and a shop that sold it would flatten the material loop in PRD 1.
  */
@@ -40,7 +40,7 @@ export const SHOPS: readonly ShopDef[] = [
       { itemId: "palewood_rod", quantity: 5 },
       { itemId: "seared_minnow", quantity: 30 },
       { itemId: "bittergrain_seed", quantity: 50 },
-      { itemId: "essence_shard", quantity: 200 },
+      { itemId: "air_essence", quantity: 200 },
       { itemId: "palewood_shaft", quantity: 100 },
       { itemId: "coarse_hide", quantity: 15 },
     ],
@@ -73,7 +73,7 @@ export const SHOPS: readonly ShopDef[] = [
       { itemId: "seared_trout", quantity: 25 },
       { itemId: "seared_minnow", quantity: 20 },
       { itemId: "duskberry_seed", quantity: 30 },
-      { itemId: "essence_shard", quantity: 200 },
+      { itemId: "earth_essence", quantity: 200 },
       { itemId: "duskoak_shaft", quantity: 80 },
       { itemId: "bramble_hide", quantity: 12 },
       // Rootfall has an anvil but no furnace, so it sells the bar the anvil needs.
@@ -94,7 +94,7 @@ export const SHOPS: readonly ShopDef[] = [
       { itemId: "seared_cragfin", quantity: 40 },
       { itemId: "seared_trout", quantity: 20 },
       { itemId: "cairnleaf_seed", quantity: 30 },
-      { itemId: "essence_shard", quantity: 300 },
+      { itemId: "water_essence", quantity: 300 },
       { itemId: "cairnpine_shaft", quantity: 60 },
       { itemId: "wight_shroud", quantity: 8 },
     ],

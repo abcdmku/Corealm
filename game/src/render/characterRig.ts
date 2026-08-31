@@ -291,7 +291,26 @@ export interface GearAppearanceLike {
   attach: "bone" | "skin";
   tint?: number;
   scale?: number;
+  accent?: number;
+  orb?: GearOrbAppearanceLike;
 }
+
+export interface GearOrbAppearanceLike {
+  element: "wind" | "earth" | "water" | "fire";
+  charged: boolean;
+  colour: number;
+  emissive: number;
+  position: readonly [number, number, number];
+  radius: number;
+}
+
+/** Focus state affects the magic weapon attachment, never a hand slot of its own. */
+export interface GearFocusPresentationLike {
+  itemId: ItemId | null;
+  charged: boolean;
+}
+
+const NO_GEAR_FOCUS: GearFocusPresentationLike = { itemId: null, charged: false };
 
 export interface WeaponSocketLike {
   bone: string;
@@ -309,6 +328,11 @@ export interface GearVisualsPort {
    * so the silhouette grows with tier; `gearAppearance` returns only the first of them.
    */
   gearAppearanceParts?(itemId: ItemId): readonly GearAppearanceLike[];
+  /** Resolves the current magic weapon and its built-in elemental socket state. */
+  gearAppearancePartsWithFocus?(
+    itemId: ItemId,
+    focus: GearFocusPresentationLike,
+  ): readonly GearAppearanceLike[];
   /** `weaponSocket` with the grip offset corrected for `appearance.scale`. Prefer it when present. */
   weaponAttachment?(appearance: GearAppearanceLike): WeaponSocketLike | null;
   /** Applies tint and accent by CLONING each material. The rig disposes those clones. */
@@ -849,13 +873,16 @@ export class CharacterRig {
    * Bone slots resolve immediately; skin slots are collected and the layered set is rebuilt once,
    * so equipping a full kit is one rebuild rather than four.
    */
-  async applyEquipment(slots: Readonly<Partial<Record<EquipSlot, ItemStack | null>>>): Promise<void> {
+  async applyEquipment(
+    slots: Readonly<Partial<Record<EquipSlot, ItemStack | null>>>,
+    focus: GearFocusPresentationLike = NO_GEAR_FOCUS,
+  ): Promise<void> {
     const work: Promise<void>[] = [];
     let skinChanged = false;
 
     for (const slot of this.visibleSlots()) {
       const stack = slots[slot] ?? null;
-      const parts = stack ? this.appearanceParts(stack.itemId) : [];
+      const parts = stack ? this.appearanceParts(stack.itemId, focus) : [];
       const previous = this.gearBySlot.get(slot) ?? [];
       if (sameAppearances(previous, parts)) continue;
 
@@ -876,9 +903,14 @@ export class CharacterRig {
   }
 
   /** Every part an item shows, preferring the multi-part call so tier 5/10 keep their pauldron. */
-  private appearanceParts(itemId: ItemId): readonly GearAppearanceLike[] {
+  private appearanceParts(
+    itemId: ItemId,
+    focus: GearFocusPresentationLike = NO_GEAR_FOCUS,
+  ): readonly GearAppearanceLike[] {
     const port = this.gear;
     if (!port) return [];
+    const focused = port.gearAppearancePartsWithFocus?.(itemId, focus);
+    if (focused) return focused;
     const parts = port.gearAppearanceParts?.(itemId);
     if (parts) return parts;
     const single = port.gearAppearance(itemId);
@@ -903,7 +935,12 @@ export class CharacterRig {
   }
 
   /** Parents an already-built object onto a slot's bone. Pass null to clear. */
-  setSlot(slot: EquipSlot, object: THREE.Object3D | null, boneName?: string): void {
+  setSlot(
+    slot: EquipSlot,
+    object: THREE.Object3D | null,
+    boneName?: string,
+    ownedMaterials: readonly THREE.Material[] = [],
+  ): void {
     const existing = this.boneAttachments.get(slot);
     if (existing) {
       existing.removeFromParent();
@@ -915,9 +952,13 @@ export class CharacterRig {
     }
     if (!object) return;
     const bone = this.hostBones.get(boneName ?? BONE_FOR_SLOT[slot] ?? "");
-    if (!bone) return;
+    if (!bone) {
+      for (const material of ownedMaterials) material.dispose();
+      return;
+    }
     bone.add(object);
     this.boneAttachments.set(slot, object);
+    if (ownedMaterials.length > 0) this.boneAttachmentMaterials.set(slot, [...ownedMaterials]);
   }
 
   private async attachBoneSlot(slot: EquipSlot, appearance: GearAppearanceLike | null): Promise<void> {
@@ -1308,7 +1349,18 @@ function regionForSlot(slot: EquipSlot): string | null {
 /** Everything about an appearance that changes what is drawn. Also the layer-rebuild signature. */
 function appearanceKey(appearance: GearAppearanceLike | undefined): string {
   if (!appearance) return "-";
-  return `${appearance.assetId}/${appearance.attach}/${appearance.tint ?? "-"}/${appearance.scale ?? 1}`;
+  const orb = appearance.orb;
+  const orbKey = orb
+    ? `${orb.element}/${orb.charged ? 1 : 0}/${orb.colour}/${orb.emissive}/${orb.position.join(",")}/${orb.radius}`
+    : "-";
+  return [
+    appearance.assetId,
+    appearance.attach,
+    appearance.tint ?? "-",
+    appearance.scale ?? 1,
+    appearance.accent ?? "-",
+    orbKey,
+  ].join("/");
 }
 
 function sameAppearances(a: readonly GearAppearanceLike[], b: readonly GearAppearanceLike[]): boolean {
@@ -1398,21 +1450,21 @@ function meshesOf(root: THREE.Object3D): THREE.Mesh[] {
  * `AssetRegistry.load` hands the same cached GLTF scene to every caller and `Object3D.clone` shares
  * materials with it, so an untinted attachment's material belongs to the asset and disposing it
  * would strip the texture off every other copy of that mesh in the world.
- * `equipmentVisuals.applyGearAppearance` replaces the material with a clone when and only when
- * there is a tint or an accent, so identity against the source is the exact test for ownership.
+ * `equipmentVisuals.applyGearAppearance` clones tinted materials and creates the weapon socket's
+ * material. Identity against the source is the exact ownership test for both cases.
  */
 function clonedMaterialsOf(root: THREE.Object3D, source: THREE.Object3D): THREE.Material[] {
   const shared = new Set<THREE.Material>();
   for (const mesh of meshesOf(source)) {
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) shared.add(material);
   }
-  const owned: THREE.Material[] = [];
+  const owned = new Set<THREE.Material>();
   for (const mesh of meshesOf(root)) {
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-      if (!shared.has(material)) owned.push(material);
+      if (!shared.has(material)) owned.add(material);
     }
   }
-  return owned;
+  return [...owned];
 }
 
 /**

@@ -37,7 +37,9 @@ description: "Bracken Fenmite spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 3-11 | Always |
 | [Bittergrain Seed](../../items/#bittergrain-seed) | 1-2 | 30% |

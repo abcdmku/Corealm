@@ -47,6 +47,10 @@ export interface ResourceDef {
   itemId: ItemId;
   /** Secondary drops, rolled independently per successful gather. */
   bonus?: { itemId: ItemId; chance: number }[];
+  /** Optional authored capacity band for exceptional nodes such as essence caches. */
+  yieldRange?: readonly [number, number];
+  /** Optional exact depletion cooldown, in seconds. */
+  respawnSeconds?: number;
   presentation: ResourcePresentationDef;
 }
 
@@ -81,9 +85,20 @@ export interface GatheringProductionTierDef {
     rawFish: ItemId; cookedFish: ItemId; burntFish: ItemId;
     dagger: ItemId; sword: ItemId; helm: ItemId; body: ItemId; legs: ItemId;
     boots: ItemId; gloves: ItemId; pickaxe: ItemId; hatchet: ItemId;
-    staff: ItemId; wand: ItemId; focus: ItemId; rod: ItemId; shield: ItemId;
+    staff: ItemId; wand: ItemId; rod: ItemId; shield: ItemId;
     meleeRing: ItemId; meleePendant: ItemId; magicRing: ItemId; magicCharm: ItemId;
     hood: ItemId; robe: ItemId; magicLegs: ItemId; magicBoots: ItemId; wraps: ItemId;
+  }>;
+  /** The elemental upgrade unlocked alongside this production tier. */
+  magic: Readonly<{
+    element: SpellElement;
+    essence: ItemId;
+    orb: ItemId;
+    staff: ItemId;
+    wand: ItemId;
+    /** Tier-one fallback weapons; the wand is also granted to new characters. */
+    basicStaff?: ItemId;
+    basicWand?: ItemId;
   }>;
   smelting: Readonly<{ orePerBar: number; fluxPerBar: number }>;
   campfire: CampfireFuelDef;
@@ -126,8 +141,8 @@ export interface SpellDef {
   divisor: number;
   baseXp: number;
   castMs: number;
-  /** Essence shards consumed per cast. */
-  cost: { itemId: ItemId; quantity: number };
+  /** Matching elemental-weapon charge or carried Essence spent per cast. */
+  cost: { element: SpellElement; charges: number };
   description: string;
 }
 

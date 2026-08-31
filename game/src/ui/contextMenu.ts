@@ -93,7 +93,7 @@ export const INTERACTION_PRIORITY: readonly InteractionId[] = [
   // (`world/regionBuilder.ts`). The verb still exists in the contract for `GameApi.cast`, which
   // names a specific spell, so it keeps a label below — nothing routes it into a menu.
   "attack",
-  "talk", "trade", "bank", "produce",
+  "talk", "trade", "bank", "recharge", "produce",
   "mine", "chop", "fish", "harvest", "plant", "rake",
   "loot", "take",
   "open", "enter", "climb", "vault",
@@ -119,6 +119,7 @@ export const INTERACTION_LABELS: Record<InteractionId, string> = {
   loot: "Loot",
   take: "Take",
   produce: "Use",
+  recharge: "Recharge at",
   bank: "Bank",
   trade: "Trade with",
   equip: "Equip",

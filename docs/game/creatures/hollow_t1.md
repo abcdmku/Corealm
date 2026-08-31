@@ -37,9 +37,11 @@ description: "Palewood Hollow spawn locations, combat stats, and drops."
 
 ## Drops
 
-| Drop | Quantity | Chance |
+
+
+| Drop | Quantity | Chance or rule |
 | --- | --- | --- |
 | Marks | 3-11 | Always |
 | [Palewood Log](../../items/#palewood-log) | 1-2 | 30% |
 | [Pale Quartz](../../items/#pale-quartz) | 1 | 20% |
-| [Essence Shard](../../items/#essence-shard) | 1 | 8% |
+| [Air Essence](../../items/#air-essence) | 1 | 8% |
