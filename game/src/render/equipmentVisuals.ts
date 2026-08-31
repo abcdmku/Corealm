@@ -521,9 +521,9 @@ const SOCKET_PARTS: Readonly<Record<string, SocketParts>> = {
   pickaxe: { bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.150], rotation: [Math.PI / 2, Math.PI / 2, 0] },
   shield: { bone: "hand_l", fist: FIST_LEFT, grip: [0.022, 0, 0], rotation: [Math.PI / 2, -Math.PI / 2, 0] },
   rpg_weapon_staff: {
-    // Hand-local -Y points up the relaxed arm. A small turn past PI leans the crown away from the
-    // torso while keeping the 12%-of-height grip point fixed in the fist.
-    bone: "hand_r", fist: FIST_RIGHT, grip: [0, -1.036, -0.266], rotation: [Math.PI * 1.08, 0, 0],
+    // Hand-local -Y points up the relaxed arm. Keep the shaft on that axis and hold it at the
+    // measured 12%-of-height grip point so the crown stays upright instead of trailing behind.
+    bone: "hand_r", fist: FIST_RIGHT, grip: [0, -1.070, 0], rotation: [Math.PI, 0, 0],
   },
   rpg_weapon_wand: {
     bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.200], rotation: [Math.PI / 2, 0, 0],
