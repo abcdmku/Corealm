@@ -832,15 +832,23 @@ function playthroughSource(): string {
     const bindings = (dbg.getKeyBindings() || []).filter((b) => b.group === "Panels");
     const opened = [];
     const failed = [];
+    const waitForPanel = async (id, open, timeoutMs = 5000) => {
+      const deadline = performance.now() + timeoutMs;
+      while (performance.now() < deadline) {
+        const state = (dbg.getPanels() || []).find((panel) => panel.id === id);
+        if ((state?.open ?? false) === open) return state;
+        await sleep(50);
+      }
+      return (dbg.getPanels() || []).find((panel) => panel.id === id);
+    };
     for (const binding of bindings) {
       const key = binding.keys[0];
       const id = binding.id.replace(/^panel\\./, "");
       window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-      await sleep(120);
-      const state = (dbg.getPanels() || []).find((p) => p.id === id);
+      const state = await waitForPanel(id, true);
       if (state && state.open) opened.push(id); else failed.push(id);
       window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-      await sleep(120);
+      await waitForPanel(id, false);
     }
     const dock = document.querySelectorAll(".dock__btn").length;
     note("ui-panels", bindings.length >= 4 && failed.length === 0 && dock >= 4,

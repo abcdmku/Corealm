@@ -209,6 +209,7 @@ describe("generated world-map payloads", () => {
     expect(requested).toHaveLength(1);
     expect(requested[0]).toContain("/Corealm/generated/world-map-detail-4800.webp");
     expect(requested[0]).toContain(`v=${WORLD_MAP_DETAIL_RENDITIONS[0].sha256}`);
+    expect(context.fillText).toHaveBeenCalledWith("Loading detailed map…", 500, 300);
 
     map.resetView();
     map.render();

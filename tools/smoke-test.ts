@@ -81,7 +81,9 @@ export async function runSmokeTest(runCandidate: string): Promise<SmokeReport> {
     report.afterReset = await driver.snapshot();
     report.checks.resetWorks = samePosition(report.initial.playerPosition, report.afterReset.playerPosition)
       && JSON.stringify(report.initial.objectives) === JSON.stringify(report.afterReset.objectives);
-    report.checks.noFatalErrors = driver.consoleErrors.length === 0 && driver.pageErrors.length === 0;
+    report.checks.noFatalErrors = driver.consoleErrors.length === 0
+      && driver.pageErrors.length === 0
+      && driver.requestErrors.length === 0;
     report.passed = Object.values(report.checks).every(Boolean);
   } catch (error) {
     report.errors.page.push(error instanceof Error ? error.stack ?? error.message : String(error));

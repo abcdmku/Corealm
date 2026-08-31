@@ -303,7 +303,7 @@ export function installGameDebug(deps: DebugDeps): void {
     // ------------------------------------------------ additional test surface
 
     ready(): boolean {
-      return true;
+      return deps.isReady();
     },
 
     getVersion(): { build: string; contracts: string; content: string } {
