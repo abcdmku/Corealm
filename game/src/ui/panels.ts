@@ -32,18 +32,6 @@ import type { NoticeTone } from "./contextMenu.js";
 import { Tooltip } from "./tooltips.js";
 import { createItemIcon } from "./itemIcons.js";
 import { Hud } from "./hud.js";
-import { InventoryPanel } from "./inventoryPanel.js";
-import { SkillsPanel } from "./skillsPanel.js";
-import { SkillGuidePanel } from "./skillGuidePanel.js";
-import { EquipmentPanel } from "./equipmentPanel.js";
-import { BankPanel } from "./bankPanel.js";
-import { ShopPanel } from "./shopPanel.js";
-import { QuestPanel } from "./questPanel.js";
-import { DialoguePanel } from "./dialoguePanel.js";
-import { ControlsPanel } from "./controlsPanel.js";
-import { MapPanel } from "./mapPanel.js";
-import { SpellbookPanel } from "./spellbookPanel.js";
-import { FeatureLabPanel } from "./featureLabPanel.js";
 import { DeathScreen, type DeathDetail } from "./deathScreen.js";
 import { TitleScreen } from "./titleScreen.js";
 import { SettingsPanel } from "./settingsPanel.js";
@@ -51,6 +39,25 @@ import { SettingsStore } from "./settings.js";
 import { PanelDock } from "./dock.js";
 import { QuestTracker } from "./questTracker.js";
 import { Minimap } from "./minimap.js";
+import {
+  LazyPanel,
+  loadBankPanel,
+  loadControlsPanel,
+  loadDialoguePanel,
+  loadEquipmentPanel,
+  loadFeatureLabPanel,
+  loadInventoryPanel,
+  loadMapPanel,
+  loadQuestPanel,
+  loadShopPanel,
+  loadSkillGuidePanel,
+  loadSkillsPanel,
+  loadSpellbookPanel,
+  type BankPanelHandle,
+  type DialoguePanelHandle,
+  type ShopPanelHandle,
+  type SkillGuidePanelHandle,
+} from "./lazyPanelRegistry.js";
 
 /** The inventory is 28 slots, per PRD section 5. Panels that mirror it use this, never a literal. */
 export const INVENTORY_SLOTS = 28;
@@ -599,9 +606,19 @@ export interface UiContext {
   refresh(): void;
 }
 
+/** The lifecycle used by both a concrete `PanelFrame` and a deferred panel proxy. */
+export interface PanelHandle {
+  mount(parent: HTMLElement): void;
+  isOpen(): boolean;
+  open(): void;
+  close(): void;
+  toggle(): void;
+  dispose(): void;
+}
+
 /** Every panel this module manages looks like this. */
 export interface ManagedPanel {
-  readonly frame: PanelFrame;
+  readonly frame: PanelHandle;
   refresh(force?: boolean): void;
   dispose(): void;
 }
@@ -996,8 +1013,8 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     onProduction: (entityId) => production?.openFor(entityId),
   });
 
-  let bank: BankPanel | null = null;
-  let shop: ShopPanel | null = null;
+  let bank: LazyPanel<BankPanelHandle> | null = null;
+  let shop: LazyPanel<ShopPanelHandle> | null = null;
 
   const tracker = new QuestTracker(api);
 
@@ -1009,33 +1026,76 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     mapTerrain: options.mapTerrain,
     isBankOpen: () => bank?.frame.isOpen() ?? false,
     isShopOpen: () => shop?.frame.isOpen() ?? false,
-    deposit: (itemId, quantity) => { bank?.deposit(itemId, quantity); },
-    sell: (itemId, quantity) => { shop?.sell(itemId, quantity); },
+    deposit: (itemId, quantity) => { bank?.withPanel((panel) => panel.deposit(itemId, quantity)); },
+    sell: (itemId, quantity) => { shop?.withPanel((panel) => panel.sell(itemId, quantity)); },
     pinQuest: (questId) => { tracker.pin(questId); },
     pinnedQuestId: () => tracker.pinnedId(),
     refresh: () => refreshAll(true),
   };
 
+  const loadError = (title: string) => (error: unknown): void => {
+    console.error(`[ui] Could not load ${title}`, error);
+    notify(`Could not open ${title}. Try again.`, "error");
+  };
   const hud = new Hud(context, options);
-  const inventory = new InventoryPanel(context);
-  const skillGuide = new SkillGuidePanel(context);
-  const skills = new SkillsPanel(context, (skill) => skillGuide.openFor(skill));
-  const equipment = new EquipmentPanel(context, options.featureLab);
+  const inventory = new LazyPanel({
+    id: "inventory", title: "Inventory", key: "i", keyLabel: "Inventory", registry,
+    load: () => loadInventoryPanel(context), onError: loadError("Inventory"),
+  });
+  const skillGuide = new LazyPanel<SkillGuidePanelHandle>({
+    id: "skill-guide", title: "Skill guide", registry,
+    load: () => loadSkillGuidePanel(context), onError: loadError("Skill guide"),
+  });
+  const skills = new LazyPanel({
+    id: "skills", title: "Skills", key: "k", keyLabel: "Skills", registry,
+    load: () => loadSkillsPanel(context, (skill) => {
+      skillGuide.withPanel((panel) => panel.openFor(skill));
+    }),
+    onError: loadError("Skills"),
+  });
+  const equipment = new LazyPanel({
+    id: "equipment", title: "Equipment", key: "e", keyLabel: "Equipment", registry,
+    load: () => loadEquipmentPanel(context, options.featureLab), onError: loadError("Equipment"),
+  });
   production = new ProductionPanel(context);
-  const quests = new QuestPanel(context);
-  const dialogue = new DialoguePanel(context);
-  const controls = new ControlsPanel(context);
-  const map = new MapPanel(context);
-  const spellbook = new SpellbookPanel(context);
-  const featureLab = options.featureLab ? new FeatureLabPanel(context, options.featureLab) : null;
+  const quests = new LazyPanel({
+    id: "quests", title: "Quests", key: "j", keyLabel: "Quests", registry,
+    load: () => loadQuestPanel(context), onError: loadError("Quests"),
+  });
+  const dialogue = new LazyPanel<DialoguePanelHandle>({
+    id: "dialogue", title: "Conversation", registry,
+    load: () => loadDialoguePanel(context), onError: loadError("Conversation"),
+  });
+  const controls = new LazyPanel({
+    id: "controls", title: "Controls", key: "h", keyLabel: "Controls", registry,
+    load: () => loadControlsPanel(context), onError: loadError("Controls"),
+  });
+  const map = new LazyPanel({
+    id: "map", title: "Map", key: "m", keyLabel: "Map", registry,
+    load: () => loadMapPanel(context), onError: loadError("Map"),
+  });
+  const spellbook = new LazyPanel({
+    id: "spellbook", title: "Spellbook", key: "b", keyLabel: "Spellbook", registry,
+    load: () => loadSpellbookPanel(context), onError: loadError("Spellbook"),
+  });
+  const featureLab = options.featureLab ? new LazyPanel({
+    id: "feature-lab", title: "Feature lab", key: "l", keyLabel: "Feature lab", registry,
+    load: () => loadFeatureLabPanel(context, options.featureLab!), onError: loadError("Feature lab"),
+  }) : null;
   let titleCoveredBySettings = false;
   const settingsPanel = new SettingsPanel(context, settings, () => {
     if (!titleCoveredBySettings) return;
     titleCoveredBySettings = false;
     title.setCovered(false);
   });
-  bank = new BankPanel(context);
-  shop = new ShopPanel(context);
+  bank = new LazyPanel<BankPanelHandle>({
+    id: "bank", title: "Bank", registry,
+    load: () => loadBankPanel(context), onError: loadError("Bank"),
+  });
+  shop = new LazyPanel<ShopPanelHandle>({
+    id: "shop", title: "Shop", registry,
+    load: () => loadShopPanel(context), onError: loadError("Shop"),
+  });
   const panels: ManagedPanel[] = [
     inventory, skills, skillGuide, equipment, production, quests, map, controls, dialogue, settingsPanel,
     bank, shop, spellbook,
@@ -1148,8 +1208,8 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
         minimap?.update(now);
         // The world may open a bank or a shop through an interaction rather than through us.
         const wants = hud.takeAutoOpen();
-        if (wants === "bank") bank?.openFor(undefined);
-        else if (wants === "shop") shop?.openFor(undefined);
+        if (wants === "bank") bank?.withPanel((panel) => panel.openFor(undefined));
+        else if (wants === "shop") shop?.withPanel((panel) => panel.openFor(undefined));
       }
       if (now - lastPanelMs >= PANEL_INTERVAL_MS) {
         lastPanelMs = now;
@@ -1173,11 +1233,11 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     },
 
     openBank(entityId?: EntityId): void {
-      bank?.openFor(entityId);
+      bank?.withPanel((panel) => panel.openFor(entityId));
     },
 
     openShop(shopId?: EntityId): void {
-      shop?.openFor(shopId);
+      shop?.withPanel((panel) => panel.openFor(shopId));
     },
 
     openProduction(entityId: EntityId): void {
@@ -1185,7 +1245,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     },
 
     openDialogue(): void {
-      dialogue.openFor();
+      dialogue.withPanel((panel) => panel.openFor());
     },
 
     closeDialogue(): void {

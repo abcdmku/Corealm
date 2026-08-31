@@ -138,7 +138,7 @@ export function createTools(api: GameApi): ToolDef[] {
         "Search Corealm's public game documentation: XP tables, skill guides, recipes, item stats, "
         + "region information, enemies. This is documented public knowledge, not hidden state.",
       inputSchema: obj({ query: STR("Free text"), limit: NUM("Default 5, max 25") }, ["query"]),
-      execute: (args) => api.searchDocs(asString(args.query), asNumber(args.limit, 5)),
+      execute: async (args) => api.searchDocs(asString(args.query), asNumber(args.limit, 5)),
     },
 
     // ---------------------------------------------------------- movement

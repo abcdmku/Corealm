@@ -1,0 +1,235 @@
+/**
+ * Deferred panel construction and the import boundaries for optional UI.
+ *
+ * The small key proxy matters. A panel normally registers its shortcut in the
+ * `PanelFrame` constructor, but that constructor cannot run until its chunk has
+ * loaded. `LazyPanel` registers the same binding up front, then the real frame
+ * replaces it when construction finishes.
+ */
+import type { EntityId, FeatureLabApi, ItemId, SkillId } from "../contracts.js";
+import type { KeyBindingRegistry, Unregister } from "../input/keyboard.js";
+import type { ManagedPanel, PanelHandle, UiContext } from "./panels.js";
+
+export interface LazyPanelOptions<T extends ManagedPanel> {
+  readonly id: string;
+  readonly title: string;
+  readonly registry: KeyBindingRegistry;
+  readonly key?: string;
+  readonly keyLabel?: string;
+  load(): Promise<T>;
+  onError?(error: unknown): void;
+}
+
+/** A panel-shaped handle whose implementation arrives on first use. */
+export class LazyPanel<T extends ManagedPanel> implements ManagedPanel {
+  readonly frame: PanelHandle;
+
+  private panel: T | null = null;
+  private loading: Promise<T | null> | null = null;
+  private mountTarget: HTMLElement | null = null;
+  private desiredOpen: boolean | null = null;
+  private actionGeneration = 0;
+  private disposed = false;
+  private readonly unregister: Unregister | null;
+
+  constructor(private readonly options: LazyPanelOptions<T>) {
+    this.frame = {
+      mount: (parent) => { this.mount(parent); },
+      isOpen: () => this.isOpen(),
+      open: () => { this.open(); },
+      close: () => { this.close(); },
+      toggle: () => { this.toggle(); },
+      dispose: () => { this.dispose(); },
+    };
+
+    this.unregister = options.key
+      ? options.registry.register({
+          id: `panel.${options.id}`,
+          keys: [options.key],
+          label: options.keyLabel ?? `Toggle ${options.title}`,
+          group: "Panels",
+          onDown: () => {
+            this.toggle();
+            return true;
+          },
+        })
+      : null;
+  }
+
+  /** Runs a panel-specific operation now, or as soon as its module loads. */
+  withPanel(action: (panel: T) => void): void {
+    if (this.disposed) return;
+    if (this.panel) {
+      action(this.panel);
+      return;
+    }
+    const generation = this.actionGeneration;
+    void this.ensureLoaded().then((panel) => {
+      if (panel && !this.disposed && generation === this.actionGeneration) action(panel);
+    });
+  }
+
+  refresh(force = false): void {
+    if (this.panel?.frame.isOpen()) this.panel.refresh(force);
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.actionGeneration += 1;
+    this.desiredOpen = false;
+    this.panel?.dispose();
+    this.panel = null;
+    this.unregister?.();
+    this.mountTarget = null;
+  }
+
+  private mount(parent: HTMLElement): void {
+    if (this.disposed) return;
+    this.mountTarget = parent;
+    this.panel?.frame.mount(parent);
+  }
+
+  private isOpen(): boolean {
+    if (this.panel) return this.panel.frame.isOpen();
+    return this.desiredOpen === true;
+  }
+
+  private open(): void {
+    if (this.disposed) return;
+    if (this.panel) {
+      this.panel.frame.open();
+      return;
+    }
+    this.desiredOpen = true;
+    void this.ensureLoaded();
+  }
+
+  private close(): void {
+    this.actionGeneration += 1;
+    this.desiredOpen = false;
+    this.panel?.frame.close();
+  }
+
+  private toggle(): void {
+    if (this.isOpen()) this.close();
+    else this.open();
+  }
+
+  private ensureLoaded(): Promise<T | null> {
+    if (this.panel) return Promise.resolve(this.panel);
+    if (this.loading) return this.loading;
+
+    this.loading = this.options.load().then((panel) => {
+      if (this.disposed) {
+        panel.dispose();
+        return null;
+      }
+      this.panel = panel;
+      if (this.mountTarget) panel.frame.mount(this.mountTarget);
+      if (this.desiredOpen === true) panel.frame.open();
+      else if (this.desiredOpen === false) panel.frame.close();
+      this.desiredOpen = null;
+      return panel;
+    }).catch((error: unknown) => {
+      this.desiredOpen = null;
+      this.options.onError?.(error);
+      return null;
+    }).finally(() => {
+      this.loading = null;
+    });
+
+    return this.loading;
+  }
+}
+
+export interface SkillGuidePanelHandle extends ManagedPanel {
+  openFor(skill: SkillId): void;
+}
+
+export interface ProductionPanelHandle extends ManagedPanel {
+  openFor(entityId: EntityId): void;
+}
+
+export interface BankPanelHandle extends ManagedPanel {
+  openFor(entityId?: EntityId): void;
+  deposit(itemId: ItemId, quantity: number): void;
+}
+
+export interface ShopPanelHandle extends ManagedPanel {
+  openFor(shopId?: EntityId): void;
+  sell(itemId: ItemId, quantity: number): void;
+}
+
+export interface DialoguePanelHandle extends ManagedPanel {
+  openFor(): void;
+}
+
+export async function loadInventoryPanel(context: UiContext): Promise<ManagedPanel> {
+  const { InventoryPanel } = await import("./inventoryPanel.js");
+  return new InventoryPanel(context);
+}
+
+export async function loadSkillGuidePanel(context: UiContext): Promise<SkillGuidePanelHandle> {
+  const { SkillGuidePanel } = await import("./skillGuidePanel.js");
+  return new SkillGuidePanel(context);
+}
+
+export async function loadSkillsPanel(
+  context: UiContext,
+  openGuide: (skill: SkillId) => void,
+): Promise<ManagedPanel> {
+  const { SkillsPanel } = await import("./skillsPanel.js");
+  return new SkillsPanel(context, openGuide);
+}
+
+export async function loadEquipmentPanel(
+  context: UiContext,
+  featureLab?: FeatureLabApi,
+): Promise<ManagedPanel> {
+  const { EquipmentPanel } = await import("./equipmentPanel.js");
+  return new EquipmentPanel(context, featureLab);
+}
+
+export async function loadFeatureLabPanel(
+  context: UiContext,
+  featureLab: FeatureLabApi,
+): Promise<ManagedPanel> {
+  const { FeatureLabPanel } = await import("./featureLabPanel.js");
+  return new FeatureLabPanel(context, featureLab);
+}
+
+export async function loadBankPanel(context: UiContext): Promise<BankPanelHandle> {
+  const { BankPanel } = await import("./bankPanel.js");
+  return new BankPanel(context);
+}
+
+export async function loadShopPanel(context: UiContext): Promise<ShopPanelHandle> {
+  const { ShopPanel } = await import("./shopPanel.js");
+  return new ShopPanel(context);
+}
+
+export async function loadQuestPanel(context: UiContext): Promise<ManagedPanel> {
+  const { QuestPanel } = await import("./questPanel.js");
+  return new QuestPanel(context);
+}
+
+export async function loadDialoguePanel(context: UiContext): Promise<DialoguePanelHandle> {
+  const { DialoguePanel } = await import("./dialoguePanel.js");
+  return new DialoguePanel(context);
+}
+
+export async function loadControlsPanel(context: UiContext): Promise<ManagedPanel> {
+  const { ControlsPanel } = await import("./controlsPanel.js");
+  return new ControlsPanel(context);
+}
+
+export async function loadMapPanel(context: UiContext): Promise<ManagedPanel> {
+  const { MapPanel } = await import("./mapPanel.js");
+  return new MapPanel(context);
+}
+
+export async function loadSpellbookPanel(context: UiContext): Promise<ManagedPanel> {
+  const { SpellbookPanel } = await import("./spellbookPanel.js");
+  return new SpellbookPanel(context);
+}

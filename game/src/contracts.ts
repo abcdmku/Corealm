@@ -871,7 +871,7 @@ export interface GameApi {
   // observation
   observe(filter: ObserveFilter): ObservedEntity[];
   inspect(entityId: EntityId): Result<SemanticEntity>;
-  searchDocs(query: string, limit?: number): DocHit[];
+  searchDocs(query: string, limit?: number): Promise<DocHit[]>;
 
   // movement
   moveTo(target: MoveTarget): Result<{ pathLength: number; etaMs: number }>;

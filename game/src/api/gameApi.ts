@@ -102,7 +102,7 @@ export interface SystemHooks {
   };
   quests?: { summaries(): QuestSummary[] };
   overlays?: { set(spec: OverlaySpec): number; clear(id?: string): number };
-  docs?: { search(query: string, limit: number): DocHit[] };
+  docs?: { search(query: string, limit: number): Promise<DocHit[]> };
   activity?: { summary(): ActivitySummary | null };
   interactions?: {
     run(entityId: EntityId, interaction: InteractionId): Result<{ started: string }>;
@@ -265,7 +265,7 @@ export class CorealmGameApi implements GameApiContract {
     return ok(entity);
   }
 
-  searchDocs(query: string, limit = 5): DocHit[] {
+  async searchDocs(query: string, limit = 5): Promise<DocHit[]> {
     return this.hooks.docs?.search(query, Math.max(1, Math.min(limit, 25))) ?? [];
   }
 

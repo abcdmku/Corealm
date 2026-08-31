@@ -103,7 +103,6 @@ import {
 } from "../render/dungeon.js";
 import { Ambience, Vfx, type AmbienceEmitter, type AmbienceKind } from "../render/vfx.js";
 import { SpellVfx } from "../render/spellVfx.js";
-import { DocSearch, buildDocs } from "../api/docs.js";
 import { validateGatheringProduction } from "../content/validateGatheringProduction.js";
 import { ITEM_ICON_APPEARANCE_IDS, itemIconAppearance } from "../render/itemIconAppearances.js";
 import {
@@ -297,7 +296,16 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // across 33 m before this. worldSpec derives the pads from the authored settlement data.
   const terrainSpec = profile.terrain();
   bootTelemetry.measureSync(BOOT_SPANS.TERRAIN_BUILD, () => {
-    scene.buildWorld(terrainSpec);
+    scene.buildWorld(terrainSpec, profile.worldSurface
+      ? (preparedScene) => {
+          // The telemetry name stays stable for baseline comparison, but this is now preparation
+          // before the first chunk vertex is shaded.
+          bootTelemetry.measureSync(
+            BOOT_SPANS.TERRAIN_RESTAMP,
+            () => prepareWorldSurface(preparedScene, store.get().meta.seed),
+          );
+        }
+      : undefined);
     // One heightfield collider rather than 28 terrain trimeshes: same ground answers, 24 ms instead
     // of a per-chunk trimesh build, and a single collider for the ray queries to walk.
     physics.addHeightfield(scene.heightfieldSamples());
@@ -305,7 +313,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   const heightAt = (regionId: RegionId, x: number, z: number): number => scene.heightAt(regionId, x, z);
 
-  // 7b. Roads, paving and shorelines, stamped INTO the ground rather than laid on top of it.
+  // 7b. Roads, paving and shorelines are stamped INTO the ground rather than laid on top of it.
   //
   //     Roads used to be 42 transparent depth-write-off ribbons: the frame's largest overdraw
   //     source and its largest single draw-call block, with an unpainted hole at every junction
@@ -314,15 +322,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   //     weights the corridor is mip-correct, shadow-correct and z-fight-free by construction, and
   //     it costs nothing to draw. Paving and the wet band at a waterline ride the same mechanism.
   //
-  //     This runs AFTER `buildWorld` deliberately: `setGroundStamps` restamps every chunk that
-  //     already exists, and the water level has to be sampled off the finished terrain. Supplying
-  //     roads here also retires the ribbon path — `scene.buildRoad` returns null once stamps are
-  //     provided — so there is exactly one road in the world rather than two that disagree.
-  if (profile.worldSurface) {
-    bootTelemetry.measureSync(BOOT_SPANS.TERRAIN_RESTAMP, () => {
-      prepareWorldSurface(scene, store.get().meta.seed);
-    });
-  }
+  //     Surface preparation now runs inside `buildWorld`, after the shared height lattice resolves
+  //     roads and organic shorelines but before any chunk is shaded. Every vertex therefore consumes
+  //     the final surface exactly once; there is no post-build restamp or second height authority.
   bootTelemetry.milestone(BOOT_MILESTONES.TERRAIN_READY);
 
   // 7c. Water. Fishing spots were authored as interaction markers with a note that the water itself
@@ -488,13 +490,17 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   // 9. Navmesh over the walkable terrain, then the route graph above it.
   setStatus("mapping walkable ground…");
-  const navigationBuilt = bootTelemetry.measureSync(BOOT_SPANS.NAVIGATION_BUILD, () => nav.build([
+  const navigationInput = [
     ...scene.getWalkableMeshes(),
     ...(dungeon?.walkable ?? []),
     ...(dungeon?.blockers ?? []),
     ...structureNavigation.meshes,
     ...navCarves,
-  ]));
+  ];
+  const navigationBuilt = await bootTelemetry.measureAsync(
+    BOOT_SPANS.NAVIGATION_BUILD,
+    () => nav.buildOrImport(navigationInput, { worldSeed: store.get().meta.seed }),
+  );
   if (!navigationBuilt) {
     const failure = nav.snapshot(null, null, 0).error ?? "unknown";
     errors.push({ atMs: atMs(), source: "navigation", message: `Navmesh build failed: ${failure}` });
@@ -1153,11 +1159,26 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     else if (event.type === "navigation.failed") api.clearPending();
   });
 
-  // Documentation, generated from the same canonical content the runtime uses, so the docs cannot
-  // drift from the game. Public knowledge only — hidden quest state never reaches this index.
-  const docs = new DocSearch();
-  docs.build(buildDocs());
-  api.register("docs", { search: (query, limit) => docs.search(query, limit) });
+  // Documentation is generated from canonical runtime content on first use. Keeping the import and
+  // index behind this promise means a player who never searches docs never requests or builds it.
+  // Public knowledge only — hidden quest state never reaches this index.
+  let docsPromise: Promise<import("../api/docs.js").DocSearch | null> | null = null;
+  const loadDocs = (): Promise<import("../api/docs.js").DocSearch | null> => {
+    docsPromise ??= import("../api/docs.js")
+      .then(({ DocSearch, buildDocs }) => {
+        const docs = new DocSearch();
+        docs.build(buildDocs());
+        return docs;
+      })
+      .catch((cause) => {
+        errors.push({ atMs: atMs(), source: "docs", message: describeError(cause) });
+        return null;
+      });
+    return docsPromise;
+  };
+  api.register("docs", {
+    search: async (query, limit) => (await loadDocs())?.search(query, limit) ?? [],
+  });
 
   // 15. Input.
   const WALK_DESTINATION_HIGHLIGHT_ID = "ui:walk-destination";
