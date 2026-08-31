@@ -498,6 +498,23 @@ const SETTLED_TICKS_TO_IDLE = 1;
 const HUMANOID_JOG_IMPLIED_MPS = 5.92;
 
 /**
+ * Measured planted-foot speed of Walk_Loop, by the same method on the same rig
+ * (runs/corealm/audit/humanoid-stride-probe.ts, calibrated against the jog's recorded 5.92).
+ */
+const HUMANOID_WALK_IMPLIED_MPS = 1.15;
+
+/**
+ * The slowest a jog cycle may be played before it stops reading as a jog.
+ *
+ * Stricter than `WALK_RATE_MIN`'s 0.6, because a jog has an airborne phase and slowing it hangs
+ * the body in the air. Retiming the 5.92 m/s jog exactly to a reaver's authored 2.1 m/s pursuit
+ * asked for 0.35x, and every humanoid in the game ran in slow motion — the follow-up report to
+ * giving them exact retiming. Below this rate the locomotion prefers Walk_Loop SPED UP instead:
+ * 2.1 m/s on the 1.15 m/s walk is a 1.8x hurried march at 1.4 Hz, which reads as intent.
+ */
+const HUMANOID_JOG_MIN_RATE = 0.7;
+
+/**
  * One deterministic tempo for the AI's narrow 3.1..3.6 m/s band.
  *
  * The semantic view contract does not publish velocity, so the renderer cannot distinguish the
@@ -3948,7 +3965,9 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
 
     const assetId = this.groups.get(record.groupKey)?.assetId ?? "";
     const clip = this.firstFittingClip(
-      assetId, this.clipCandidates(assetId, record.entityId, motion), rig.root,
+      assetId,
+      this.clipCandidates(assetId, record.entityId, motion, gaitSpeed(record, motion)),
+      rig.root,
     );
     // Two motions can resolve to the same clip — enemy_bee has neither Idle nor Walk and answers
     // `Flying` to both. Crossfading an action from itself zeroes its weight; record the state change
@@ -4001,11 +4020,23 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     if (motion === "idle") return idleTimeScale;
     const entry = this.assets.entry(assetId);
     const own = entry?.animations ?? [];
-    if ((motion === "walk" || motion === "run") && own.length === 0 && clip.name === "Jog_Fwd_Loop") {
-      // The live gait speed reaches here through `gaitSpeed` now that the AI publishes one, so a
-      // jogging humanoid can be retimed exactly; the midpoint constant remains the fallback for a
-      // record that has never been stepped.
-      return moveSpeedMps ? moveSpeedMps / HUMANOID_JOG_IMPLIED_MPS : HUMANOID_AI_JOG_TIME_SCALE;
+    if ((motion === "walk" || motion === "run") && own.length === 0) {
+      // The shared humanoid library: each locomotion cycle retimed against its own measured
+      // stride, exactly as the animals are. The jog is floored at HUMANOID_JOG_MIN_RATE — the
+      // candidates already prefer Walk_Loop below it, so the floor only bites for a rig that
+      // genuinely lacks a walk, where a fast-ish jog beats a slow-motion one.
+      if (clip.name === "Jog_Fwd_Loop") {
+        return moveSpeedMps
+          ? Math.max(HUMANOID_JOG_MIN_RATE, moveSpeedMps / HUMANOID_JOG_IMPLIED_MPS)
+          : HUMANOID_AI_JOG_TIME_SCALE;
+      }
+      if (clip.name === "Walk_Loop" && moveSpeedMps) {
+        const rate = Math.min(
+          WALK_RATE_MAX,
+          Math.max(WALK_RATE_MIN, moveSpeedMps / HUMANOID_WALK_IMPLIED_MPS),
+        );
+        return clip.duration > 0 ? Math.min(rate, MAX_WALK_CADENCE_HZ * clip.duration) : rate;
+      }
     }
     // Match the gait to the ground it covers.
     //
@@ -4122,7 +4153,12 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
    * whatever clip happened to be first because a pack has no Walk would make a bee dance across the
    * meadow.
    */
-  private clipCandidates(assetId: string, varySeed: string, motion: CharacterMotion): string[] {
+  private clipCandidates(
+    assetId: string,
+    varySeed: string,
+    motion: CharacterMotion,
+    gaitSpeedMps?: number,
+  ): string[] {
     const own = this.assets.entry(assetId)?.animations ?? [];
     if (own.length > 0) {
       const picked: string[] = [];
@@ -4133,7 +4169,18 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
       for (const name of own) if (!picked.includes(name)) picked.push(name);
       return picked;
     }
-    if (motion !== "idle") return [...HUMANOID_CLIPS[motion]];
+    if (motion !== "idle") {
+      const candidates = [...HUMANOID_CLIPS[motion]];
+      // A "run" too slow for the jog prefers the walk cycle sped up — see HUMANOID_JOG_MIN_RATE.
+      // Reordered rather than filtered, so a rig somehow missing Walk_Loop still jogs.
+      if ((motion === "run" || motion === "walk")
+        && gaitSpeedMps !== undefined
+        && gaitSpeedMps < HUMANOID_JOG_IMPLIED_MPS * HUMANOID_JOG_MIN_RATE
+        && candidates.includes("Walk_Loop")) {
+        return ["Walk_Loop", ...candidates.filter((name) => name !== "Walk_Loop")];
+      }
+      return candidates;
+    }
     const start = new Rng(hashString(varySeed) ^ 0x51ed_27b1).int(0, HUMANOID_IDLES.length - 1);
     return [...HUMANOID_IDLES.slice(start), ...HUMANOID_IDLES.slice(0, start)];
   }
