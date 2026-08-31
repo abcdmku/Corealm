@@ -500,7 +500,7 @@ export class GameLoop {
 
     input.update();
     for (const interior of this.interiors) interior.group.visible = interior.visible();
-    this.syncEntityViews();
+    this.syncEntityViews(realDeltaMs);
     // Structure at 4 Hz, motion every frame. `sync` is throttled because rebuilding instance groups
     // is expensive, but `EnemyAiSystem.stepToward` writes a new position every 100 ms sim tick, so
     // at 4 Hz three of every four movement steps were invisible and the fourth was a 40 cm jump.
@@ -826,9 +826,18 @@ export class GameLoop {
   }
 
   /** Diffs semantic entities into the render layer a few times a second, not every frame. */
-  private syncEntityViews(): void {
+  private syncEntityViews(realDeltaMs: number): void {
     if (!this.entityViews || !this.entitySource) return;
-    this.viewSyncAccumulatorMs += SIM_TICK_MS;
+    // REAL elapsed time. This used to add SIM_TICK_MS per RENDER FRAME, which turns "every 250 ms"
+    // into "every third frame": at 150 fps the 4 Hz structural sync actually ran at ~50 Hz, so the
+    // two-sync walk-pose hold in `EntityViews.updateMoving` — designed as ~500 ms — decayed in
+    // ~40 ms, well inside the 100 ms between two AI movement steps. Every moving creature's walk
+    // pose therefore expired MID-STRIDE and re-latched on the next sim tick: walk-idle-walk at
+    // ~10 Hz, each flip a fresh 0.18 s crossfade, and the perpetual half-blended pose is the
+    // whole-body "rapid shaking" reported from play. The defect needs more render frames than sim
+    // ticks to appear, which is why every SwiftShader probe at 7 fps measured the same creatures
+    // as perfectly clean while a 154 fps desktop shook.
+    this.viewSyncAccumulatorMs += realDeltaMs;
     if (this.viewSyncAccumulatorMs < 250) return;
     this.viewSyncAccumulatorMs = 0;
     this.entityViews.sync(this.entitySource());
