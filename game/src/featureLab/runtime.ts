@@ -30,7 +30,7 @@ import { setSkillLevel } from "../state/store.js";
 import type { CombatSystem } from "../systems/combat.js";
 import type { EquipmentSystem } from "../systems/equipment.js";
 import type { InventorySystem } from "../systems/inventory.js";
-import { ESSENCE_BY_ELEMENT } from "../systems/essence.js";
+import { ESSENCE_BY_ELEMENT, type EssenceSystem } from "../systems/essence.js";
 import type { EntityStore } from "../world/entities.js";
 import { FEATURE_LAB_CATALOG, createFeatureLabEntity } from "./catalog.js";
 
@@ -48,6 +48,7 @@ export interface FeatureLabRuntimeDeps {
   readonly entityViews: EntityViews;
   readonly inventory: InventorySystem;
   readonly equipment: EquipmentSystem;
+  readonly essence: EssenceSystem;
   readonly combat: CombatSystem;
   readonly playerRig: CharacterRig;
   readonly playerRigReady: boolean;
@@ -120,6 +121,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
     if (!itemId) continue;
     requireOk(deps.inventory.addItem(itemId, LAB_ITEM_QUANTITY), `stock ${itemId}`);
   }
+  requireOk(deps.inventory.addItem("air_orb", 1), "stock the Air Orb");
   const initialSpellId = FEATURE_LAB_CATALOG.spells[0]?.id ?? null;
   if (initialSpellId) requireOk(deps.api.setPreferredSpell(initialSpellId), `select ${initialSpellId}`);
 
@@ -180,6 +182,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
           .then(async () => {
             try {
               const next = await deps.replaceStructure(selection);
+              deps.essence.hydrateAltars();
               structure = cloneStructureView(next);
               if (requestSequence === structureRequestSequence) {
                 requestedStructureSelection = { ...next.selection };
@@ -320,6 +323,14 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
           deps.resetPlayer();
           return getState();
         }
+        if (action === "awaken-altar") {
+          const altar = deps.entityStore.all().find((entity) => entity.meta?.essenceAltar === true);
+          if (!altar) throw new Error("Select the Essence Altar Ruins composition first");
+          if (altar.state !== "awakened") {
+            requireOk(deps.essence.awaken(altar.id), `awaken ${altar.name}`);
+          }
+          return getState();
+        }
         const live = requireCreatureTarget();
         if (action === "attack") {
           requireOk(deps.api.attack(live.entityId), `attack ${live.preset.label}`);
@@ -345,6 +356,20 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
     for (const slot of EQUIP_SLOTS) worn[slot] = equipment.slots[slot]?.itemId ?? null;
 
     const state = deps.store.get();
+    const altarEntity = deps.entityStore.all().find((candidate) => candidate.meta?.essenceAltar === true);
+    const altarElement = altarEntity?.meta?.essenceElement;
+    const altar: FeatureLabState["altar"] = altarEntity
+      && (altarElement === "wind" || altarElement === "earth" || altarElement === "water" || altarElement === "fire")
+      && (altarEntity.state === "dormant" || altarEntity.state === "awakened")
+      ? {
+          entityId: altarEntity.id,
+          state: altarEntity.state as "dormant" | "awakened",
+          element: altarElement,
+          interactions: [...altarEntity.interactions],
+          orbItemId: "air_orb",
+          orbConsumed: state.magic.consumedOrbs.air_orb === true,
+        }
+      : null;
     const entity = target ? deps.entityStore.get(target.entityId) : undefined;
     const playerMotion = deps.playerRigReady
       ? toPlayerMotion(deps.playerRig.motionSnapshot())
@@ -371,6 +396,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
       },
       selectedEntityId: deps.selectedEntityId(),
       structure: cloneStructureView(structure),
+      altar,
       target: entity && target ? {
         kind: target.preset.kind,
         presetId: target.preset.id,

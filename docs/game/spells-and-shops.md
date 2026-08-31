@@ -26,17 +26,17 @@ description: "Spell costs and shop inventories from the live economy tables."
 
 ## Elemental orbs
 
-Boss orbs are singleton crafting components, not equipment. Combine one with the matching wood-tier wand or staff to create an elemental weapon with 1,000 charges.
+Boss orbs are singleton altar keys, not equipment. Use one on the dormant altar at the matching Essence Cache. The awakened altar then makes both matching wood-tier wands and staffs as elemental weapons with 1,000 charges.
 
-| Orb | Tier | Element | Crafted weapon | Matching Essence | Status |
+| Orb | Tier | Element | Use | Matching Essence | Status |
 | --- | --- | --- | --- | --- | --- |
-| [Air Orb](./items/#air-orb) | 1 | Air | 1000 charges in the crafted weapon | Air Essence | Released |
-| [Earth Orb](./items/#earth-orb) | 5 | Earth | 1000 charges in the crafted weapon | Earth Essence | Released |
-| [Water Orb](./items/#water-orb) | 10 | Water | 1000 charges in the crafted weapon | Water Essence | Released |
+| [Air Orb](./items/#air-orb) | 1 | Air | Awakens the regional altar for both weapon types | Air Essence | Released |
+| [Earth Orb](./items/#earth-orb) | 5 | Earth | Awakens the regional altar for both weapon types | Earth Essence | Released |
+| [Water Orb](./items/#water-orb) | 10 | Water | Awakens the regional altar for both weapon types | Water Essence | Released |
 
 ## Charged elemental weapons
 
-A matching weapon charge pays for the cast first. At zero charge, the weapon keeps casting from carried matching Essence. An Essence Altar consumes 100 matching Essence to refill the equipped weapon to 1,000.
+A matching weapon charge pays for the cast first. At zero charge, the weapon keeps casting from carried matching Essence. The matching awakened Essence Altar consumes 100 Essence to refill the equipped weapon to 1,000.
 
 | Weapon | Element | Capacity | Full recharge | Status |
 | --- | --- | --- | --- | --- |

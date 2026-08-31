@@ -189,16 +189,22 @@ with the id of the piece that went back into the pack.
 
 A cast needs a wand or staff in `mainHand` and one unit of matching fuel. A matching elemental
 weapon spends one stored charge first, including on a miss. A plain or empty weapon spends one
-carried Essence instead. Boss-dropped Air, Earth, and Water Orbs are singleton crafting components,
-not equipment. Fire remains visible in the spellbook but is not released.
+carried Essence instead. Boss-dropped Air, Earth, and Water Orbs are singleton altar keys, not
+equipment. Carry the matching Orb to the dormant altar at that region's Essence Cache and use its
+`awaken` interaction. This consumes the Orb once, permanently lights the altar, and enables both
+matching wand and staff recipes. Fire remains visible in the spellbook but is not released.
 
-An Essence Altar refills the equipped elemental weapon to 1,000 for exactly 100 matching Essence.
+An awakened Essence Altar refills the equipped elemental weapon to 1,000 for exactly 100 matching Essence.
 The altar does not accept a plain weapon, a full weapon, the wrong Essence, or less than 100 Essence.
 
 ```js
 const before = await agent.call("corealm_spellbook", { op: "read" });
+await agent.call("corealm_interact", {
+  entityId: "fallowmarch_air_altar",
+  interaction: "awaken",
+});
 const result = await agent.call("corealm_interact", {
-  entityId: "coldbrace_essence_altar",
+  entityId: "fallowmarch_air_altar",
   interaction: "recharge",
 });
 if (result.error) throw new Error(result.message);

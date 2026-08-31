@@ -64,6 +64,7 @@ export class FeatureLabPanel implements ManagedPanel {
   private readonly spell = field(document.createElement("select"), "lab-spell");
   private readonly attack: HTMLButtonElement;
   private readonly cast: HTMLButtonElement;
+  private readonly awakenAltar: HTMLButtonElement;
 
   private readonly sourceKind = field(document.createElement("select"), "lab-source-kind");
   private readonly structureId = field(document.createElement("select"), "lab-structure-id");
@@ -208,6 +209,11 @@ export class FeatureLabPanel implements ManagedPanel {
       })),
       this.button("lab-fit-structure", "Fit structure", () => this.lab.fitStructure()),
     );
+    this.awakenAltar = this.button(
+      "lab-awaken-altar",
+      "Use Air Orb on altar",
+      () => this.lab.perform("awaken-altar"),
+    );
 
     this.playerVisible.id = "lab-player-visible";
     this.playerVisible.type = "checkbox";
@@ -241,6 +247,7 @@ export class FeatureLabPanel implements ManagedPanel {
       depthField,
       labelled("Variant seed", this.seed),
       structureActions,
+      this.awakenAltar,
       playerVisibleToggle,
       walkToggle,
       freeMoveToggle,
@@ -309,6 +316,7 @@ export class FeatureLabPanel implements ManagedPanel {
       && (state.target.health === null || state.target.health > 0);
     this.attack.disabled = !creatureReady;
     this.cast.disabled = !creatureReady;
+    this.awakenAltar.disabled = state.altar === null || state.altar.state === "awakened";
     this.status.textContent = status;
     this.frame.setSubtitle(`${state.mode} · production yard`);
   }
@@ -429,6 +437,10 @@ export class FeatureLabPanel implements ManagedPanel {
       `${state.counters.spellLaunched} spells`,
       `${state.counters.navigationStarted}/${state.counters.navigationCompleted} routes`,
     ].join("; ");
+    const altar = state.altar
+      ? `${state.altar.state}; ${state.altar.element}; interactions ${state.altar.interactions.join(", ")}; `
+        + `Orb ${state.altar.orbConsumed ? "consumed" : "ready"}`
+      : "not selected";
     const errors = state.errors.length === 0
       ? "none"
       : `${state.errors.length}: ${state.errors.slice(-3).join(" | ")}`;
@@ -438,6 +450,7 @@ export class FeatureLabPanel implements ManagedPanel {
       `Counts ${structureCounts}`,
       `Player ${player}`,
       `Target ${target}`,
+      `Altar ${altar}`,
       `Activity ${activity}`,
       `Errors ${errors}`,
     ].join("\n");
@@ -469,6 +482,8 @@ export class FeatureLabPanel implements ManagedPanel {
       selection.width,
       selection.depth,
       selection.seed,
+      state.altar?.state ?? "-",
+      state.altar?.orbConsumed ?? false,
     ].join("|");
   }
 }

@@ -7,19 +7,37 @@ using System.Threading.Tasks;
 using GLTFast;
 using GLTFast.Export;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
 namespace Corealm.EditorTools
 {
     /// <summary>
-    /// Converts the four licensed Unity Asset Store prefabs used by Corealm's
-    /// magic equipment and essence caches into self-contained binary glTF files.
+    /// Converts the licensed Unity Asset Store prefabs used by Corealm's magic
+    /// equipment, essence caches, and regional altars into self-contained binary glTF files.
     /// The PowerShell wrapper copies this file into a disposable Unity project.
     /// </summary>
     public static class CorealmMagicAssetExporter
     {
         private const string OutputEnvironmentVariable = "COREALM_MAGIC_ASSET_OUTPUT";
+        private const string AltarPrefab = "Assets/Altar_Ruins_FREE/Prefabs/Altar_2.prefab";
+        private const string AltarDemoScene = "Assets/Altar_Ruins_FREE/Demo_Scenes/DemoScene.unity";
+
+        private static readonly HashSet<string> AltarSitePrefabs = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Arch_1", "Arch_2", "Arch_3", "Arch_4", "Arch_5",
+            "Broken_column", "Column", "Column_broken_small",
+            "Flag_beam", "Gate", "Gate_broken", "Platform_circle",
+            "Rubble_1", "Rubble_2", "Rubble_3", "Rubble_4",
+            "Rubble_5", "Rubble_6", "Rubble_7", "Rubble_8",
+            "Stone_post_1", "Stone_post_2", "Stone_post_3", "Stone_post_4", "Stone_post_5",
+            "Stone_slab_1", "Stone_slab_2", "Stone_structure",
+            "Wall_broken_1", "Wall_broken_2",
+            "Wall_round_1", "Wall_round_2", "Wall_round_3", "Wall_round_4", "Wall_round_5",
+            "Wall_small",
+        };
 
         private sealed class Source
         {
@@ -91,6 +109,8 @@ namespace Corealm.EditorTools
                 {
                     await ExportOne(source, output);
                 }
+                await ExportAltar(output);
+                await ExportAltarSite(output);
 
                 Debug.Log($"CORealM magic asset export complete: {output}");
                 EditorApplication.Exit(0);
@@ -99,6 +119,97 @@ namespace Corealm.EditorTools
             {
                 Debug.LogException(exception);
                 EditorApplication.Exit(1);
+            }
+        }
+
+        private static async Task ExportAltar(string output)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AltarPrefab);
+            if (prefab == null)
+            {
+                throw new FileNotFoundException($"Unity prefab was not imported: {AltarPrefab}");
+            }
+
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (instance == null)
+            {
+                throw new InvalidOperationException($"Could not instantiate {AltarPrefab}");
+            }
+
+            try
+            {
+                instance.name = "altar_ruins_altar";
+                instance.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                instance.transform.localScale = Vector3.one;
+                DisableEmission(instance);
+                await ExportObject(instance, "altar_ruins_altar", output);
+            }
+            finally
+            {
+                Object.DestroyImmediate(instance);
+            }
+        }
+
+        /// <summary>
+        /// Reuses the pack author's demonstrated ruin layout, but exports only the stone kit around
+        /// the rectangular altar. Terrain, lights, sky, vegetation, particles, and the altar itself
+        /// stay out. The altar remains a separate semantic object so gameplay can light it without
+        /// turning every arch and column into an emissive mesh.
+        /// </summary>
+        private static async Task ExportAltarSite(string output)
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(AltarDemoScene) == null)
+            {
+                throw new FileNotFoundException($"Unity scene was not imported: {AltarDemoScene}");
+            }
+
+            var scene = EditorSceneManager.OpenScene(AltarDemoScene, OpenSceneMode.Single);
+            var prefabRoots = new HashSet<GameObject>();
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                foreach (var transform in root.GetComponentsInChildren<Transform>(true))
+                {
+                    var nearest = PrefabUtility.GetNearestPrefabInstanceRoot(transform.gameObject);
+                    if (nearest != null) prefabRoots.Add(nearest);
+                }
+            }
+
+            var altar = prefabRoots.FirstOrDefault(candidate =>
+                string.Equals(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(candidate), AltarPrefab, StringComparison.Ordinal));
+            if (altar == null)
+            {
+                throw new InvalidOperationException($"The demo scene has no instance of {AltarPrefab}");
+            }
+
+            var site = new GameObject("altar_ruins_site");
+            site.transform.SetPositionAndRotation(altar.transform.position, altar.transform.rotation);
+            try
+            {
+                var copied = 0;
+                foreach (var source in prefabRoots.OrderBy(candidate => candidate.name, StringComparer.Ordinal))
+                {
+                    var assetPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(source);
+                    if (string.IsNullOrWhiteSpace(assetPath)) continue;
+                    var stem = Path.GetFileNameWithoutExtension(assetPath);
+                    if (!AltarSitePrefabs.Contains(stem)) continue;
+
+                    var clone = Object.Instantiate(source);
+                    clone.name = $"{stem}_{copied:D2}";
+                    clone.transform.SetParent(site.transform, true);
+                    DisableEmission(clone);
+                    copied += 1;
+                }
+                if (copied < 8)
+                {
+                    throw new InvalidOperationException($"The altar site copied only {copied} ruin prefab instances");
+                }
+
+                site.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                await ExportObject(site, "altar_ruins_site", output);
+            }
+            finally
+            {
+                Object.DestroyImmediate(site);
             }
         }
 
@@ -169,35 +280,79 @@ namespace Corealm.EditorTools
                     $"vertices={vertices} triangles={triangles}"
                 );
 
-                var settings = new ExportSettings
-                {
-                    Format = GltfFormat.Binary,
-                    ImageDestination = ImageDestination.MainBuffer,
-                    FileConflictResolution = FileConflictResolution.Overwrite,
-                    Compression = Compression.Uncompressed,
-                    ComponentMask = ComponentType.Mesh,
-                    Deterministic = true,
-                    JpgQuality = 90,
-                };
-                var exporter = new GameObjectExport(settings);
-                if (!exporter.AddScene(new[] { instance }, source.Id))
-                {
-                    throw new InvalidOperationException($"glTFast rejected scene {source.Id}");
-                }
-
-                var destination = Path.Combine(output, $"{source.Id}.glb");
-                if (!await exporter.SaveToFileAndDispose(destination))
-                {
-                    throw new IOException($"glTFast could not write {destination}");
-                }
-
-                Debug.Log($"EXPORTED {source.Id} {new FileInfo(destination).Length} bytes -> {destination}");
+                await ExportObject(instance, source.Id, output);
             }
             finally
             {
                 Object.DestroyImmediate(instance);
                 if (material != null) Object.DestroyImmediate(material);
                 if (generatedAlbedo != null) Object.DestroyImmediate(generatedAlbedo);
+            }
+        }
+
+        private static async Task ExportObject(GameObject instance, string id, string output)
+        {
+            var renderers = instance.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                throw new InvalidOperationException($"Object has no renderers: {id}");
+            }
+            var bounds = CombinedBounds(renderers);
+            var meshes = instance.GetComponentsInChildren<MeshFilter>(true)
+                .Select(filter => filter.sharedMesh)
+                .Where(mesh => mesh != null)
+                .Distinct()
+                .ToArray();
+            var vertices = meshes.Sum(mesh => mesh.vertexCount);
+            var triangles = meshes.Sum(mesh => mesh.triangles.Length / 3);
+            Debug.Log(
+                $"SOURCE_METRICS {id} " +
+                $"size=({bounds.size.x:F6},{bounds.size.y:F6},{bounds.size.z:F6}) " +
+                $"min=({bounds.min.x:F6},{bounds.min.y:F6},{bounds.min.z:F6}) " +
+                $"vertices={vertices} triangles={triangles}"
+            );
+
+            var settings = new ExportSettings
+            {
+                Format = GltfFormat.Binary,
+                ImageDestination = ImageDestination.MainBuffer,
+                FileConflictResolution = FileConflictResolution.Overwrite,
+                Compression = Compression.Uncompressed,
+                ComponentMask = ComponentType.Mesh,
+                Deterministic = true,
+                JpgQuality = 90,
+            };
+            var exporter = new GameObjectExport(settings);
+            if (!exporter.AddScene(new[] { instance }, id))
+            {
+                throw new InvalidOperationException($"glTFast rejected scene {id}");
+            }
+
+            var destination = Path.Combine(output, $"{id}.glb");
+            if (!await exporter.SaveToFileAndDispose(destination))
+            {
+                throw new IOException($"glTFast could not write {destination}");
+            }
+
+            Debug.Log($"EXPORTED {id} {new FileInfo(destination).Length} bytes -> {destination}");
+        }
+
+        private static void DisableEmission(GameObject instance)
+        {
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                var materials = renderer.sharedMaterials;
+                for (var index = 0; index < materials.Length; index++)
+                {
+                    var source = materials[index];
+                    if (source == null) continue;
+                    var material = new Material(source) { name = source.name };
+                    if (material.HasProperty("_EmissionColor")) material.SetColor("_EmissionColor", Color.black);
+                    if (material.HasProperty("_EmissionMap")) material.SetTexture("_EmissionMap", null);
+                    material.DisableKeyword("_EMISSION");
+                    materials[index] = material;
+                }
+                renderer.sharedMaterials = materials;
             }
         }
 

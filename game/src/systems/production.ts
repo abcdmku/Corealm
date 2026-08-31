@@ -232,6 +232,9 @@ export class ProductionSystem implements TickSystem {
     const state = this.deps.store.get();
     const station = entity.station;
     if (!station) return err("INVALID_ARGUMENT", `${entity.name} is not a production station.`, entity.id);
+    if (!stationIsUsable(entity)) {
+      return err("UNAVAILABLE", `${entity.name} is dormant. Awaken it with its boss Orb first.`, entity.id);
+    }
 
     const candidates = station.recipeIds.length > 0
       ? station.recipeIds.map((id) => content.recipe(id)).filter(isRecipe)
@@ -434,7 +437,7 @@ export class ProductionSystem implements TickSystem {
     const state = this.deps.store.get();
     const entity = this.deps.entities.get(entityId);
     const station = entity?.station;
-    if (!station) return [];
+    if (!station || !entity || !stationIsUsable(entity)) return [];
     const rows = station.recipeIds.length > 0
       ? station.recipeIds.map((id) => content.recipe(id)).filter(isRecipe)
       : content.recipesForSkill(station.skill);
@@ -461,6 +464,7 @@ export class ProductionSystem implements TickSystem {
     for (const entity of this.deps.entities.all()) {
       if (entity.archetype !== "station" || !entity.station) continue;
       if (entity.regionId !== state.player.regionId) continue;
+      if (!stationIsUsable(entity)) continue;
 
       const kindMatches = recipe.stations.includes(entity.station.kind);
       const listed = entity.station.recipeIds.includes(recipe.id);
@@ -484,6 +488,9 @@ export class ProductionSystem implements TickSystem {
     const station = this.deps.entities.get(stationId);
     if (!station || station.archetype !== "station" || !station.station) {
       return err("NOT_FOUND", `No production station with id ${stationId}`, stationId);
+    }
+    if (!stationIsUsable(station)) {
+      return err("UNAVAILABLE", `${station.name} is dormant. Awaken it with its boss Orb first.`, stationId);
     }
     if (recipe.stations === null) {
       return err("INVALID_ARGUMENT", `${recipe.name} does not use a production station.`, stationId);
@@ -591,6 +598,10 @@ export class ProductionSystem implements TickSystem {
       );
     }
   }
+}
+
+function stationIsUsable(entity: SemanticEntity): boolean {
+  return entity.station?.kind !== "essence_altar" || entity.state === "awakened";
 }
 
 // ---------------------------------------------------------------- helpers

@@ -34,15 +34,12 @@ describe("magic weapon recipes", () => {
     ["air", "palewood", 1],
     ["earth", "duskoak", 5],
     ["water", "cairnpine", 10],
-  ] as const)("crafts the %s Orb into either matching weapon", (element, wood, level) => {
+  ] as const)("crafts either matching %s weapon at its awakened altar", (element, wood, level) => {
     for (const kind of ["wand", "staff"] as const) {
       const recipe = BY_ID.get(`craft_${element}_${kind}`);
       expect(recipe?.reqLevel).toBe(level);
-      expect(recipe?.stations).toEqual(["crafting_table"]);
-      expect(recipe?.inputs).toEqual([
-        { itemId: `${wood}_${kind}`, quantity: 1 },
-        { itemId: `${element}_orb`, quantity: 1 },
-      ]);
+      expect(recipe?.stations).toEqual(["essence_altar"]);
+      expect(recipe?.inputs).toEqual([{ itemId: `${wood}_${kind}`, quantity: 1 }]);
       expect(recipe?.output).toEqual({ itemId: `${element}_${kind}`, quantity: 1 });
     }
   });

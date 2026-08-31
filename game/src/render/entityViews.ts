@@ -173,6 +173,9 @@ const ESSENCE_CACHE_ASSETS: ReadonlySet<string> = new Set([
   "rocks_free_essence_node",
 ]);
 
+const ESSENCE_ALTAR_ASSET = "altar_ruins_altar";
+const ESSENCE_ALTAR_RUINS_ASSET = "altar_ruins_site";
+
 const ESSENCE_VEINS_MASK_URL = "/assets/textures/essence_veins_mask.png";
 
 /** Emissive colour and energy are element identity; the rock's authored albedo stays underneath. */
@@ -183,15 +186,39 @@ const ESSENCE_GLOW: Readonly<Record<EssenceElement, { colour: number; intensity:
   fire: { colour: 0xff521c, intensity: 2.3 },
 };
 
-/** Only explicit cache metadata on the two imported DEXSOFT rock assets activates this look. */
+/** Muted stone dyes keep the full ruin coloured without turning it into one saturated light. */
+const ESSENCE_STRUCTURE_COLOUR: Readonly<Record<EssenceElement, number>> = {
+  wind: 0xb8dce0,
+  earth: 0x98ae72,
+  water: 0x83a8cc,
+  fire: 0xc9896f,
+};
+
+/** The weathered stone beneath each element, keyed by the region that owns that element. */
+const ESSENCE_REGION_STONE: Readonly<Record<EssenceElement, number>> = {
+  wind: 0xf0dfc4,
+  earth: 0xb8c7a0,
+  water: 0xc2d0e2,
+  fire: 0xc5aaa0,
+};
+
+/** Explicit cache metadata or a regional altar complex supplies the element-colour identity. */
 function essenceElementFor(entity: SemanticEntity): EssenceElement | null {
   const assetId = entity.view?.assetId;
-  if (entity.archetype !== "ore"
-    || entity.meta?.essenceCache !== true
-    || !assetId
-    || !ESSENCE_CACHE_ASSETS.has(assetId)) return null;
+  const essenceCache = entity.archetype === "ore"
+    && entity.meta?.essenceCache === true
+    && !!assetId
+    && ESSENCE_CACHE_ASSETS.has(assetId);
+  const essenceAltar = entity.archetype === "station"
+    && entity.station?.kind === "essence_altar"
+    && entity.meta?.essenceAltar === true
+    && assetId === ESSENCE_ALTAR_ASSET;
+  const essenceRuins = entity.archetype === "landmark"
+    && entity.meta?.essenceAltarRuins === true
+    && assetId === ESSENCE_ALTAR_RUINS_ASSET;
+  if (!essenceCache && !essenceAltar && !essenceRuins) return null;
 
-  const element = entity.meta.essenceElement;
+  const element = entity.meta?.essenceElement;
   return element === "wind" || element === "earth" || element === "water" || element === "fire"
     ? element
     : null;
@@ -1199,8 +1226,14 @@ export class EntityViews {
   private resourceTimeSeconds = 0;
   /** Element/state clones owned here; their albedo maps remain shared with the imported GLB. */
   private readonly essenceMaterials = new Map<string, THREE.MeshStandardMaterial>();
+  /** Sparse under-top rails and emblem rings added to the awakened altar mesh. */
+  private readonly essenceAltarDetailMaterials = new Map<EssenceElement, THREE.MeshStandardMaterial>();
+  private essenceAltarLineGeometry: THREE.BufferGeometry | null = null;
+  private essenceAltarCircleGeometry: THREE.BufferGeometry | null = null;
   /** One browser-loaded mask shared by every elemental material variant. */
   private readonly essenceVeinsMask = loadEssenceVeinsMask();
+  /** A purpose-built sparse sigil for the altar, separate from the rocks' fracture pattern. */
+  private readonly essenceAltarLinesMask = loadEssenceAltarLinesMask();
   /** Per-entity dye clones for the non-instanced path, keyed (source material, tint hex). */
   private readonly tintedMaterials = new Map<string, THREE.Material>();
   private readonly bakedGeometries: THREE.BufferGeometry[] = [];
@@ -1542,7 +1575,10 @@ export class EntityViews {
     // Element is material identity, not instance colour. Keeping it in the group key prevents an
     // air cache and a water cache that share one rock asset from ever sharing the wrong parts.
     const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${regionId ?? "-"}|${entity.archetype}|essence:${essenceElement ?? "-"}|${clip}|${campfire ? "fire" : "-"}|${batchCell(entity.archetype, entity.position)}`;
-    const spent = SPENT_STATES.has(entity.state);
+    // Dormant altar complexes retain a quiet elemental hue but use the non-emissive material set.
+    // Awakening changes the same semantic entities to the fully lit material identity.
+    const spent = SPENT_STATES.has(entity.state)
+      || (essenceElement !== null && entity.state === "dormant");
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
     const scaleAxes = view.scaleAxes ?? NO_BUILD;
@@ -2224,7 +2260,46 @@ export class EntityViews {
         triangles: triangleCount(mesh.geometry),
       });
     });
+    if (assetId === ESSENCE_ALTAR_ASSET && essenceElement && !spent) {
+      parts.push(...this.essenceAltarDetailParts(essenceElement));
+    }
     return parts;
+  }
+
+  /** One clean line below the slab and one concentric emblem on each long face. */
+  private essenceAltarDetailParts(element: EssenceElement): SourcePart[] {
+    this.essenceAltarLineGeometry ??= new THREE.BoxGeometry(1.72, 0.026, 0.018);
+    this.essenceAltarCircleGeometry ??= new THREE.TorusGeometry(0.17, 0.018, 8, 32);
+    let material = this.essenceAltarDetailMaterials.get(element);
+    if (!material) {
+      const colour = new THREE.Color(ESSENCE_GLOW[element].colour);
+      material = new THREE.MeshStandardMaterial({
+        name: `altar-imbued-detail:${element}`,
+        color: colour.clone().multiplyScalar(0.22),
+        emissive: colour,
+        emissiveIntensity: 0.9,
+        roughness: 0.35,
+        metalness: 0.05,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+      });
+      this.essenceAltarDetailMaterials.set(element, material);
+    }
+    const part = (geometry: THREE.BufferGeometry, x: number, y: number, z: number): SourcePart => ({
+      geometry,
+      material,
+      matrix: new THREE.Matrix4().makeTranslation(x, y, z),
+      triangles: triangleCount(geometry),
+    });
+    return [
+      part(this.essenceAltarLineGeometry, 0, 0.765, 0.487),
+      part(this.essenceAltarLineGeometry, 0, 0.765, -0.487),
+      part(this.essenceAltarCircleGeometry, 0, 0.47, 0.488),
+      part(this.essenceAltarCircleGeometry, 0, 0.47, -0.488),
+    ];
   }
 
   /**
@@ -2457,7 +2532,16 @@ export class EntityViews {
   ): THREE.Material {
     if (regionId && ARCHITECTURE_ARCHETYPES.has(archetype)) {
       const architectureRole = architectureMaterialRoleForAsset(assetId, base.name);
-      if (architectureRole) return this.materials.architecture(base, regionId, architectureRole);
+      if (architectureRole) {
+        const architecture = this.materials.architecture(base, regionId, architectureRole);
+        if (!essenceElement) return architecture;
+        return this.essenceMaterial(
+          architecture,
+          essenceElement,
+          spent,
+          assetId === ESSENCE_ALTAR_RUINS_ASSET ? "structure" : "veins",
+        );
+      }
     }
 
     const look = this.appearanceFor(archetype, base);
@@ -2470,7 +2554,14 @@ export class EntityViews {
         strength: look.strength,
         swatch: look.swatch,
       });
-      return this.essenceMaterial(surface, essenceElement, spent);
+      return this.essenceMaterial(
+        surface,
+        essenceElement,
+        spent,
+        assetId === ESSENCE_ALTAR_ASSET
+          ? "altar"
+          : assetId === ESSENCE_ALTAR_RUINS_ASSET ? "structure" : "veins",
+      );
     }
     const variant = this.materials.variant(base, {
       tier,
@@ -2498,20 +2589,69 @@ export class EntityViews {
     surface: THREE.Material,
     element: EssenceElement,
     spent: boolean,
+    treatment: "veins" | "altar" | "structure" = "veins",
   ): THREE.Material {
     const standard = surface as THREE.MeshStandardMaterial;
     if (!standard.isMeshStandardMaterial) return surface;
 
-    const key = `${surface.uuid}|${element}|${spent ? "spent" : "live"}`;
+    const key = `${surface.uuid}|${element}|${spent ? "spent" : "live"}|${treatment}`;
     const cached = this.essenceMaterials.get(key);
     if (cached) return cached;
 
     const glow = ESSENCE_GLOW[element];
+    const structureColour = ESSENCE_STRUCTURE_COLOUR[element];
+    const regionStone = ESSENCE_REGION_STONE[element];
     const material = standard.clone();
     material.name = `${surface.name || "rock"}@essence:${element}:${spent ? "spent" : "live"}`;
-    material.emissiveMap = this.essenceVeinsMask;
-    material.emissive = new THREE.Color(spent ? 0x000000 : glow.colour);
-    material.emissiveIntensity = spent ? 0 : glow.intensity;
+    // The court receives a broad element-colour wash. The altar keeps its stone underneath a much
+    // brighter fissure mask, so awakening reads as imbued lines instead of a featureless light box.
+    material.emissiveMap = treatment === "structure"
+      ? standard.map
+      : treatment === "altar" ? this.essenceAltarLinesMask : this.essenceVeinsMask;
+    if (treatment === "structure") {
+      // The trim-sheet albedo supplies weathering while this multiplier supplies the region's base
+      // rock. Element colour is a second layer, quiet when dormant and stronger after activation.
+      material.color.copy(new THREE.Color(regionStone))
+        .lerp(new THREE.Color(structureColour), spent ? 0.1 : 0.32);
+    }
+    if (treatment === "altar") {
+      material.color.copy(new THREE.Color(regionStone))
+        .lerp(new THREE.Color(glow.colour), spent ? 0.08 : 0.26);
+    }
+    if (treatment === "structure" || treatment === "altar") {
+      // Altar Ruins Free ships with a near-black trim sheet. Multiplying that map by a pale tint
+      // cannot make it lighter, so remap its value into the regional stone range after sampling the
+      // texture. This remains diffuse stone: dormant ruins still have zero emissive output.
+      const stoneTint = material.color.clone();
+      const tintLuminance = Math.max(
+        1e-4,
+        stoneTint.r * 0.2126 + stoneTint.g * 0.7152 + stoneTint.b * 0.0722,
+      );
+      stoneTint.multiplyScalar(1 / tintLuminance);
+      const tintVector = `vec3(${stoneTint.r.toFixed(6)}, ${stoneTint.g.toFixed(6)}, ${stoneTint.b.toFixed(6)})`;
+      const sourceCompile = standard.onBeforeCompile;
+      const sourceProgramKey = standard.customProgramCacheKey();
+      material.onBeforeCompile = (shader, renderer) => {
+        sourceCompile.call(standard, shader, renderer);
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <map_fragment>",
+          /* glsl */ `#include <map_fragment>
+float gEssenceStoneLuminance = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+float gEssenceStoneValue = clamp( pow( max( gEssenceStoneLuminance, 0.001 ), 0.55 ) * 1.15 + 0.08, 0.0, 0.9 );
+vec3 gEssenceStoneTinted = clamp( gEssenceStoneValue * ${tintVector}, 0.0, 1.0 );
+diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
+        );
+      };
+      material.customProgramCacheKey = () => (
+        `${sourceProgramKey}|essence-stone-lift-v1:${element}:${spent ? "spent" : "live"}:${treatment}`
+      );
+    }
+    material.emissive = new THREE.Color(
+      spent ? 0x000000 : treatment === "structure" ? structureColour : glow.colour,
+    );
+    material.emissiveIntensity = spent
+      ? 0
+      : glow.intensity * (treatment === "structure" ? 0.38 : treatment === "altar" ? 0.5 : 1);
     material.needsUpdate = true;
     this.essenceMaterials.set(key, material);
     return material;
@@ -4220,7 +4360,14 @@ export class EntityViews {
     this.tintedMaterials.clear();
     for (const material of this.essenceMaterials.values()) material.dispose();
     this.essenceMaterials.clear();
+    for (const material of this.essenceAltarDetailMaterials.values()) material.dispose();
+    this.essenceAltarDetailMaterials.clear();
+    this.essenceAltarLineGeometry?.dispose();
+    this.essenceAltarCircleGeometry?.dispose();
+    this.essenceAltarLineGeometry = null;
+    this.essenceAltarCircleGeometry = null;
     this.essenceVeinsMask.dispose();
+    this.essenceAltarLinesMask.dispose();
     for (const geometry of this.seamGeometries.values()) geometry.dispose();
     for (const entry of this.workedOreGeometries.values()) {
       entry.scar.dispose();
@@ -4283,6 +4430,58 @@ function loadEssenceVeinsMask(): THREE.Texture {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(1.5, 1.5);
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  return texture;
+}
+
+/** One angular channel and one diamond keep the altar's emission deliberate and readable. */
+function loadEssenceAltarLinesMask(): THREE.Texture {
+  if (typeof document === "undefined") {
+    const texture = new THREE.Texture();
+    texture.name = "essence-altar-lines-mask";
+    return texture;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+  const context = canvas.getContext("2d");
+  if (!context) return new THREE.Texture();
+  context.fillStyle = "#000";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const paths: readonly (readonly [number, number])[][] = [
+    [[48, 336], [140, 336], [196, 256], [316, 256], [372, 176], [464, 176]],
+    [[220, 256], [256, 220], [292, 256], [256, 292], [220, 256]],
+  ];
+  const stroke = (width: number, colour: string): void => {
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.lineWidth = width;
+    context.strokeStyle = colour;
+    for (const path of paths) {
+      context.beginPath();
+      context.moveTo(path[0]![0], path[0]![1]);
+      for (let index = 1; index < path.length; index += 1) {
+        context.lineTo(path[index]![0], path[index]![1]);
+      }
+      context.stroke();
+    }
+  };
+  stroke(12, "#3a3a3a");
+  stroke(4, "#ffffff");
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.name = "essence-altar-lines-mask";
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.flipY = false;
+  // The Unity trim sheet uses tiled UVs. Repeat a large-scale sigil so those coordinates do not
+  // clamp to the black border while still keeping the line count low.
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(0.3, 0.3);
+  texture.offset.set(0.12, 0.18);
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.generateMipmaps = true;

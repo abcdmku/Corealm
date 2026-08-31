@@ -12,7 +12,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="worn-pickaxe"></span>![Worn Pickaxe](./assets/items/worn_pickaxe.png) **Worn Pickaxe** | 0 | tool | No | 8 | 5 | Mining +1 |
 | <span id="worn-rod"></span>![Worn Rod](./assets/items/worn_rod.png) **Worn Rod** | 0 | tool | No | 6 | 4 | Fishing +1 |
 | <span id="grithe-bar"></span>![Grithe Bar](./assets/items/grithe_bar.png) **Grithe Bar** | 1 | bar | No | 30 | 18 | - |
-| <span id="air-orb"></span>![Air Orb](./assets/items/air_orb.png) **Air Orb** | 1 | component | No | 0 | 0 | boss crafting component; makes a 1000-charge elemental weapon; released |
+| <span id="air-orb"></span>![Air Orb](./assets/items/air_orb.png) **Air Orb** | 1 | component | No | 0 | 0 | boss altar key; awakens its regional altar for 1000-charge weapons; released |
 | <span id="coarse-hide"></span>![Coarse Hide](./assets/items/coarse_hide.png) **Coarse Hide** | 1 | component | No | 16 | 10 | - |
 | <span id="pale-quartz"></span>![Pale Quartz](./assets/items/pale_quartz.png) **Pale Quartz** | 1 | component | Yes | 20 | 12 | - |
 | <span id="palewood-handle"></span>![Palewood Handle](./assets/items/palewood_handle.png) **Palewood Handle** | 1 | component | Yes | 6 | 4 | - |
@@ -55,7 +55,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="bramble-hide"></span>![Bramble Hide](./assets/items/bramble_hide.png) **Bramble Hide** | 5 | component | No | 55 | 33 | - |
 | <span id="duskoak-handle"></span>![Duskoak Handle](./assets/items/duskoak_handle.png) **Duskoak Handle** | 5 | component | Yes | 23 | 14 | - |
 | <span id="duskoak-shaft"></span>![Duskoak Shaft](./assets/items/duskoak_shaft.png) **Duskoak Shaft** | 5 | component | Yes | 14 | 8 | - |
-| <span id="earth-orb"></span>![Earth Orb](./assets/items/earth_orb.png) **Earth Orb** | 5 | component | No | 0 | 0 | boss crafting component; makes a 1000-charge elemental weapon; released |
+| <span id="earth-orb"></span>![Earth Orb](./assets/items/earth_orb.png) **Earth Orb** | 5 | component | No | 0 | 0 | boss altar key; awakens its regional altar for 1000-charge weapons; released |
 | <span id="vell-amber"></span>![Vell Amber](./assets/items/vell_amber.png) **Vell Amber** | 5 | component | Yes | 70 | 42 | - |
 | <span id="bramblehide-boots"></span>![Bramblehide Boots](./assets/items/bramblehide_boots.png) **Bramblehide Boots** | 5 | equipment | No | 220 | 132 | feet; Magic 5 |
 | <span id="bramblehide-hood"></span>![Bramblehide Hood](./assets/items/bramblehide_hood.png) **Bramblehide Hood** | 5 | equipment | No | 300 | 180 | head; Magic 5 |
@@ -93,7 +93,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="cairn-garnet"></span>![Cairn Garnet](./assets/items/cairn_garnet.png) **Cairn Garnet** | 10 | component | Yes | 160 | 96 | - |
 | <span id="cairnpine-handle"></span>![Cairnpine Handle](./assets/items/cairnpine_handle.png) **Cairnpine Handle** | 10 | component | Yes | 53 | 32 | - |
 | <span id="cairnpine-shaft"></span>![Cairnpine Shaft](./assets/items/cairnpine_shaft.png) **Cairnpine Shaft** | 10 | component | Yes | 32 | 19 | - |
-| <span id="water-orb"></span>![Water Orb](./assets/items/water_orb.png) **Water Orb** | 10 | component | No | 0 | 0 | boss crafting component; makes a 1000-charge elemental weapon; released |
+| <span id="water-orb"></span>![Water Orb](./assets/items/water_orb.png) **Water Orb** | 10 | component | No | 0 | 0 | boss altar key; awakens its regional altar for 1000-charge weapons; released |
 | <span id="wight-shroud"></span>![Wight Shroud](./assets/items/wight_shroud.png) **Wight Shroud** | 10 | component | No | 130 | 78 | - |
 | <span id="cairnpine-shield"></span>![Cairnpine Shield](./assets/items/cairnpine_shield.png) **Cairnpine Shield** | 10 | equipment | No | 560 | 336 | offHand; Melee 10 |
 | <span id="cairnpine-staff"></span>![Cairnpine Staff](./assets/items/cairnpine_staff.png) **Cairnpine Staff** | 10 | equipment | No | 1180 | 708 | mainHand; staff; 2-handed; 3.0 s cast cadence; Magic 10 |

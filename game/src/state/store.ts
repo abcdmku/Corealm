@@ -17,7 +17,7 @@ import { STARTING_EQUIPMENT, STARTING_INVENTORY } from "../content/items.js";
 
 export const INVENTORY_SLOTS = 28;
 export const BANK_CAPACITY = 400;
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export type ActivityState =
   | {
@@ -87,8 +87,10 @@ export interface GameState {
   magic: {
     /** Charge on crafted elemental weapons, keyed by the charged weapon item id. */
     weaponCharges: Record<ItemId, number>;
-    /** Boss Orbs already consumed by crafting, so repeat kills cannot replace them. */
+    /** Boss Orbs already consumed by altar awakening, so repeat kills cannot replace them. */
     consumedOrbs: Record<ItemId, boolean>;
+    /** Permanently awakened regional essence altars, keyed by semantic altar entity id. */
+    awakenedAltars: Record<EntityId, boolean>;
   };
   bank: { slots: ItemStack[]; filter: string };
   currency: number;
@@ -195,7 +197,7 @@ export function createInitialState(seed = 1337, nowMs = 0): GameState {
     skills,
     inventory: { slots: startingSlots },
     equipment,
-    magic: { weaponCharges: {}, consumedOrbs: {} },
+    magic: { weaponCharges: {}, consumedOrbs: {}, awakenedAltars: {} },
     bank: { slots: [], filter: "" },
     currency: 0,
     activity: null,

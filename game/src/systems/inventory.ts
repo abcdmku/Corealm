@@ -167,7 +167,7 @@ export class InventorySystem {
       return err("INVENTORY_FULL", `No room for ${def.name}: all ${INVENTORY_SLOTS} slots are full`);
     }
 
-    // Crafted elemental weapons get their boss Orb's initial charge once. Moving one through the
+    // Altar-crafted elemental weapons get their initial charge once. Moving one through the
     // inventory, bank, equipment, death recovery, or loot never refills it.
     if (def.magicWeapon?.charge) initialiseWeaponCharge(this.state, itemId);
 

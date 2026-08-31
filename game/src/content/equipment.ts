@@ -645,7 +645,7 @@ const WATER_CHARGE: ElementalWeaponChargeSpec = {
   element: "water", capacity: 1000, initialCharges: 1000,
   rechargeItemId: "water_essence", rechargeCost: 100, orbItemId: "water_orb", released: true,
 };
-/** Released Orb-crafted weapon outputs. Fire remains absent until its region ships. */
+/** Released awakened-altar weapon outputs. Fire remains absent until its region ships. */
 export const ELEMENTAL_MAGIC_WEAPONS: readonly ItemDef[] = [
   chargedWeapon(magicBase("palewood_wand"), "air_wand", "Air Wand", AIR_CHARGE,
     { magicAccuracy: 1, magicPower: 1, magicArmour: 2 }),

@@ -30,6 +30,7 @@ import { AssetRegistry } from "../render/assets.js";
 import { ALL_PROCEDURAL_GEAR_ASSETS, registerProceduralGear } from "../render/proceduralGear.js";
 import { WorldScene } from "../render/scene.js";
 import { EntityViews } from "../render/entityViews.js";
+import { buildStructureNavigationSources } from "../render/structureNavigation.js";
 import { STOREY_METRES } from "../render/buildings.js";
 import { Physics } from "../systems/physics.js";
 import { Navigation, solidObstacleMeshes } from "../systems/navigation.js";
@@ -72,7 +73,13 @@ import { DialogueSystem } from "../systems/dialogue.js";
 import { TravelSystem } from "../systems/travel.js";
 import { INTERACT_RANGE } from "./config.js";
 import { distanceXZ } from "../core/math.js";
-import { REGIONS, getRegion, validateRegions } from "../content/regions.js";
+import {
+  ESSENCE_ALTAR_CLEAR_RADIUS,
+  REGIONAL_ESSENCE_ALTARS,
+  REGIONS,
+  getRegion,
+  validateRegions,
+} from "../content/regions.js";
 import { content } from "../content/index.js";
 import { ALL_ITEMS } from "../content/items.js";
 import { GATHERING_PRODUCTION_TIERS } from "../content/gatheringProductionTiers.js";
@@ -243,7 +250,10 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     knownManifestAssetIds: knownAssetIds,
     assetManifest: manifest ?? { packs: [], assets: [] },
     clusters: REGIONS.flatMap((region) => region.clusters),
-    stations: REGIONS.flatMap((region) => region.settlement.stations),
+    stations: REGIONS.flatMap((region) => [
+      ...region.settlement.stations,
+      ...region.stations,
+    ]),
     itemAppearances: ITEM_ICON_APPEARANCE_IDS.map(itemIconAppearance),
   });
   for (const problem of gatheringProductionProblems) {
@@ -409,11 +419,22 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     addChamberLights(dungeonSpec, dungeon.group);
   }
 
+  // Imported altar ruins are not one solid box. Their authored triangles preserve the walkable
+  // circular platform and every arch opening while keeping columns, walls, and the central stone
+  // monument solid. Loading here also warms the same cached GLB EntityViews uses below.
+  let structureNavigation = { roots: [] as THREE.Group[], meshes: [] as THREE.Mesh[] };
+  try {
+    structureNavigation = await buildStructureNavigationSources(assets, built.entities);
+  } catch (cause) {
+    errors.push({ atMs: atMs(), source: "structure.navigation", message: describeError(cause) });
+  }
+
   // 8b. Buildings become solid before the navmesh is generated, so paths route around them
   //     instead of through a wall. Gatehouses emit two pier boxes with the gate gap left open.
   for (const box of built.buildings) {
     physics.addStaticBox(box.position, box.halfExtents as unknown as Vec3, box.rotationY);
   }
+  for (const mesh of structureNavigation.meshes) physics.addStaticMesh(mesh, "building");
   // Recast reads raw geometry, so the cheapest way to make something block a path is to hand the
   // navmesh an invisible carve for it.
   //
@@ -440,6 +461,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     ...scene.getWalkableMeshes(),
     ...(dungeon?.walkable ?? []),
     ...(dungeon?.blockers ?? []),
+    ...structureNavigation.meshes,
     ...navCarves,
   ])) {
     const failure = nav.snapshot(null, null, 0).error ?? "unknown";
@@ -688,8 +710,14 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // node semantics, and this second sync makes depleted rocks, stumps, and fishing recovery marks
   // visible before the loading screen is dismissed.
   entityViews.sync(entityStore.all());
-  new EssenceSystem({
-    store, events, inventory: inventorySystem, dispatcher: interactions, now,
+  const essenceSystem = new EssenceSystem({
+    store,
+    events,
+    inventory: inventorySystem,
+    dispatcher: interactions,
+    entities: entityStore,
+    syncViews: () => entityViews.sync(entityStore.all()),
+    now,
   });
   const farmingSystem = new FarmingSystem({
     store, events, clock, rng, entities: entityStore,
@@ -945,7 +973,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // cannot roll the transaction back. The regular ten-second autosave remains the general path.
   const persistCurrentState = (): void => { saves.save(store.get(), Date.now()); };
   events.subscribe((event) => {
-    if (event.type === "essence.recharged") persistCurrentState();
+    if (event.type === "essence.recharged" || event.type === "essence.altarAwakened") {
+      persistCurrentState();
+    }
   });
   window.addEventListener("pagehide", persistCurrentState);
 
@@ -1084,6 +1114,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   if (profile.kind === "feature-lab") {
     const structureOrigin: Vec3 = [-8, scene.meshHeightAt(-8, 12), 12];
     let activeStructure: FeatureLabStructureAssembly | null = null;
+    let activeStructureNavigation: THREE.Mesh[] = [];
     let structureRevision = 0;
     let labFreeCameraEnabled = false;
 
@@ -1108,6 +1139,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
     const replaceLabCollision = (
       structureSolids: readonly SolidVolume[],
+      structureMeshes: readonly THREE.Mesh[],
     ): void => {
       movement.stop(store.get(), clock.elapsedMs, "feature-lab-structure");
 
@@ -1117,12 +1149,22 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       for (const carve of previousCarves) carve.removeFromParent();
       for (const carve of candidateCarves) navCarveGroup.add(carve);
       navCarveGroup.updateMatrixWorld(true);
-      if (!nav.build([...scene.getWalkableMeshes(), ...candidateCarves])) {
+      if (!nav.build([
+        ...scene.getWalkableMeshes(),
+        ...structureNavigation.meshes,
+        ...structureMeshes,
+        ...candidateCarves,
+      ])) {
         const reason = nav.snapshot(null, null, 0).error ?? "unknown";
         for (const carve of candidateCarves) disposeCarve(carve);
         for (const carve of previousCarves) navCarveGroup.add(carve);
         navCarveGroup.updateMatrixWorld(true);
-        const restored = nav.build([...scene.getWalkableMeshes(), ...previousCarves]);
+        const restored = nav.build([
+          ...scene.getWalkableMeshes(),
+          ...structureNavigation.meshes,
+          ...activeStructureNavigation,
+          ...previousCarves,
+        ]);
         nav.setRouteGraph(built.routeNodes, built.routeEdges);
         if (!restored) {
           const rollbackReason = nav.snapshot(null, null, 0).error ?? "unknown";
@@ -1149,6 +1191,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
           physics.addStaticCylinder(solid.position, solid.radius, solid.height);
         }
       }
+      for (const mesh of [...structureNavigation.meshes, ...structureMeshes]) {
+        physics.addStaticMesh(mesh, "building");
+      }
       movement.setPorts({ solids: new Solids(allSolids), heightAt, entities: entityStore });
     };
 
@@ -1172,6 +1217,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       if (prepared.missing.length > 0) {
         throw new Error(`Missing production structure assets: ${prepared.missing.join(", ")}`);
       }
+      const nextStructureNavigation = await buildStructureNavigationSources(assets, next.entities);
 
       const previousEntities = activeStructure?.entities ?? [];
       const installEntities = (
@@ -1193,12 +1239,13 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
         throw cause;
       }
       try {
-        replaceLabCollision(next.solids);
+        replaceLabCollision(next.solids, nextStructureNavigation.meshes);
       } catch (cause) {
         installEntities(next.entities, previousEntities);
         throw cause;
       }
       activeStructure = next;
+      activeStructureNavigation = nextStructureNavigation.meshes;
       const structureUrl = new URL(window.location.href);
       structureUrl.searchParams.set("kind", next.selection.kind);
       structureUrl.searchParams.set("id", next.selection.id);
@@ -1301,6 +1348,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       entityViews,
       inventory: inventorySystem,
       equipment: equipmentSystem!,
+      essence: essenceSystem,
       combat: combatSystem,
       playerRig,
       playerRigReady: rigged,
@@ -2213,6 +2261,11 @@ function registerExclusions(scene: WorldScene): void {
     for (const cluster of region.clusters) {
       worldExclusions.addCircle(cluster.centre[0], cluster.centre[1], cluster.radius + 3, "cluster", cluster.id);
     }
+  }
+  for (const altar of Object.values(REGIONAL_ESSENCE_ALTARS)) {
+    worldExclusions.addCircle(
+      altar.position[0], altar.position[1], ESSENCE_ALTAR_CLEAR_RADIUS, "ritual", altar.id,
+    );
   }
   // Use the exact stamped centrelines, including gate controls and deterministic meander. A second
   // straight-line reconstruction lets scatter and clusters grow directly through the visible road.

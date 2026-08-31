@@ -85,7 +85,7 @@ do not conflate the two columns. Then `skirlbolt`@17 → 19,
 ## 3. Wands, staffs, and elemental upgrades
 
 Both weapon families follow the same wood ladder. Wands are one-handed, weaker, and cast every
-2200 ms. Staffs are two-handed, stronger, and cast every 3000 ms. Orbs are crafting components and
+2200 ms. Staffs are two-handed, stronger, and cast every 3000 ms. Orbs are one-use altar keys and
 there is no separate Orb equipment slot.
 
 | tier | wand | staff | wood | wood requirement |
@@ -100,10 +100,16 @@ Wands use two matching shafts and staffs use three. The fresh character starts w
 `basic_wooden_staff` is the tier-0 two-handed alternative. Legacy `worn_staff` saves migrate to
 `basic_wooden_staff` and safely displace any ordinary offhand item.
 
-Air, Earth, and Water Orbs release at tiers 1, 5, and 10. Each is consumed with the matching wood
-weapon to make `air_*`, `earth_*`, or `water_*`; the finished weapon starts at 1,000 charges and
-falls back to carried Essence when empty. Later boss kills do not replace an Orb already consumed
-in crafting. Fire outputs are authored at tier 15 but remain unavailable.
+Air, Earth, and Water Orbs release at tiers 1, 5, and 10. Each is consumed once to awaken the
+matching altar at its Essence Cache. Dormant altar ruins keep a subtle non-emissive elemental hue;
+awakening colours the full ruin structure and lights a sparse altar sigil, an under-top line, and
+the circular emblem. Each ruin stands on a fully leveled regional-stone court with no grass, plants,
+or loose litter inside the court perimeter. Its exact imported geometry is walkable and solid: open
+arches remain passable, platforms support the player, and paths route around walls and monuments. An
+awakened altar makes both matching wood weapon types into
+`air_*`, `earth_*`, or `water_*`; each finished weapon starts at 1,000 charges and falls back to
+carried Essence when empty. Later boss kills do not replace an Orb already used on its altar. Fire
+outputs are authored at tier 15 but remain unavailable.
 
 ## 4. Frozen module APIs
 

@@ -22,9 +22,9 @@
  * `reqLevel` equals the tier at every step. The PRD authors content at tiers 1, 5 and 10 and never
  * asks for an intra-tier stagger, so a flat mapping is the one that cannot surprise a test.
  *
- * Stations come from `content/regions.ts`, which places all five kinds in Coldbrace, a range and an
- * anvil in Rootfall, and a furnace / anvil / range in Highcairn. Crafting and fletching are
- * therefore Coldbrace-only in Phase 1; that is a world-layout fact, not a recipe fact.
+ * Stations come from `content/regions.ts`. Elemental weapon upgrades use only the awakened altar
+ * at their matching Essence Cache; the regional boss Orb is the one-time altar key, not a recipe
+ * ingredient. Ordinary crafting remains tied to crafting tables.
  */
 import type { ItemId } from "../contracts.js";
 import type { GatheringProductionTierDef, RecipeDef } from "./index.js";
@@ -155,17 +155,19 @@ function recipesForTier(definition: GatheringProductionTierDef): RecipeDef[] {
       burntItemId: m.burntFish,
     }),
 
-    // ------------------------------------------------------------------ crafting (table)
+    // --------------------------------------------------------- elemental crafting (awakened altar)
     row(t, {
       id: `craft_${definition.magic.wand}`, name: nameOf(definition.magic.wand),
-      kind: "craft", stations: ["crafting_table"], weight: W.wand,
-      inputs: [q(m.wand, 1), q(definition.magic.orb, 1)], output: q(definition.magic.wand, 1),
+      kind: "craft", stations: ["essence_altar"], weight: W.wand,
+      inputs: [q(m.wand, 1)], output: q(definition.magic.wand, 1),
     }),
     row(t, {
       id: `craft_${definition.magic.staff}`, name: nameOf(definition.magic.staff),
-      kind: "craft", stations: ["crafting_table"], weight: W.staff,
-      inputs: [q(m.staff, 1), q(definition.magic.orb, 1)], output: q(definition.magic.staff, 1),
+      kind: "craft", stations: ["essence_altar"], weight: W.staff,
+      inputs: [q(m.staff, 1)], output: q(definition.magic.staff, 1),
     }),
+
+    // ------------------------------------------------------------------ crafting (table)
     row(t, {
       id: `craft_${m.meleeRing}`, name: nameOf(m.meleeRing), kind: "craft", stations: ["crafting_table"],
       weight: W.amuletOrRing, inputs: [q(m.bar, 1), q(m.gem, 1)], output: q(m.meleeRing, 1),

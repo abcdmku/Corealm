@@ -3,6 +3,7 @@ param(
     [string] $UnityExe = 'C:\Program Files\Unity\Hub\Editor\6000.4.8f1\Editor\Unity.exe',
     [string] $WeaponPackage = 'C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\Blink\3D ModelsPropsWeapons\FREE - RPG Weapons.unitypackage',
     [string] $RockPackage = 'C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\DEXSOFT\3D ModelsPropsExterior\Rocks FREE pack.unitypackage',
+    [string] $AltarPackage = 'C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\Underhill Labz\3D ModelsEnvironmentsFantasy\Altar Ruins Free.unitypackage',
     [string] $GltfFastPackagePath = '',
     [string] $OutputDirectory = '',
     [switch] $KeepTemporaryProject
@@ -36,6 +37,10 @@ $expectedPackages = @(
     @{
         Path = $RockPackage
         Hash = 'A81E0968A134F1720B028A534634377784A84F72294A95590B8361A8D176F5D2'
+    },
+    @{
+        Path = $AltarPackage
+        Hash = 'FFFF7748CD1643D9A4F901E592836C7E09BACF3DB51B8C9BB7F704CF87D018D9'
     }
 )
 
@@ -154,6 +159,13 @@ try {
         '-projectPath', $projectPath,
         '-importPackage', $RockPackage,
         '-logFile', (Join-Path $logPath 'import-rocks.log')
+    )
+    Invoke-Unity -Step 'Altar Ruins Free import' -Arguments @(
+        '-batchmode',
+        '-quit',
+        '-projectPath', $projectPath,
+        '-importPackage', $AltarPackage,
+        '-logFile', (Join-Path $logPath 'import-altar-ruins.log')
     )
 
     $env:COREALM_MAGIC_ASSET_OUTPUT = $stagedOutputDirectory

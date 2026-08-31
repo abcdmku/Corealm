@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T01:34:28.848Z",
+  "generatedAt": "2026-08-31T02:44:04.705Z",
   "packs": [
     {
       "id": "stylized-nature-megakit",
@@ -93,6 +93,13 @@
       "name": "Rocks FREE pack",
       "author": "DEXSOFT",
       "source": "https://assetstore.unity.com/packages/3d/props/exterior/rocks-free-pack-98219",
+      "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
+    },
+    {
+      "id": "underhill-altar-ruins-free",
+      "name": "Altar Ruins Free",
+      "author": "Underhill Labz",
+      "source": "https://marketplace.unity.com/packages/3d/environments/fantasy/altar-ruins-free-109065",
       "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
     }
   ],
@@ -6889,6 +6896,131 @@
         "rocks_free_essence_node_material"
       ],
       "sha256": "C1C3C2AF9EAED4027D80C84ED64422C9FB261EABC8BC275334A6A834FB541A1D"
+    },
+    {
+      "id": "altar_ruins_altar",
+      "file": "models/magic/altar_ruins_altar.glb",
+      "pack": "underhill-altar-ruins-free",
+      "category": "building",
+      "is": "essence-altar",
+      "tags": [
+        "altar",
+        "ruin",
+        "station",
+        "essence",
+        "awakening",
+        "emissive-overlay-target",
+        "non-emissive-source"
+      ],
+      "bytes": 11951032,
+      "size": {
+        "x": 2.099449,
+        "y": 0.946015,
+        "z": 0.954679
+      },
+      "base": {
+        "x": -1.049726,
+        "y": 0.007741,
+        "z": -0.477339
+      },
+      "animations": [],
+      "materials": [
+        "Trim"
+      ],
+      "sha256": "821047016861542C1244638237BA634D32BAA5D2DF3C15F069E7B8109E2CDF18"
+    },
+    {
+      "id": "altar_ruins_site",
+      "file": "models/magic/altar_ruins_site.glb",
+      "pack": "underhill-altar-ruins-free",
+      "category": "building",
+      "is": "essence-altar-ruins",
+      "tags": [
+        "altar",
+        "ruin",
+        "landmark",
+        "essence",
+        "stone",
+        "non-emissive"
+      ],
+      "bytes": 13229416,
+      "size": {
+        "x": 20.169445,
+        "y": 9.601515,
+        "z": 19.854203
+      },
+      "base": {
+        "x": -10.271879,
+        "y": -2.27043,
+        "z": -9.288219
+      },
+      "animations": [],
+      "materials": [
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim",
+        "Trim"
+      ],
+      "sha256": "63BB98E1C5ED8714E5AEF1F282BBAD7DFC2B6642C978B891041DB38E71C288BA"
     }
   ]
 }

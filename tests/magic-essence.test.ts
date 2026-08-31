@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { ItemId, SkillId, SpellId } from "../game/src/contracts.js";
+import type { ItemId, SemanticEntity, SkillId, SpellId } from "../game/src/contracts.js";
 import { SKILL_IDS } from "../game/src/contracts.js";
 import { ALL_ITEMS } from "../game/src/content/items.js";
 import { content, type ContentTables, type SpellDef } from "../game/src/content/index.js";
@@ -41,13 +41,43 @@ function runtime() {
   const now = () => 12_345;
   const inventory = new InventorySystem({ store, events, now });
   const equipment = new EquipmentSystem({ store, events, inventory, now });
+  const altars: SemanticEntity[] = [
+    {
+      id: "fallowmarch_air_altar", archetype: "station", name: "Air Essence Altar", tier: 1,
+      regionId: "fallowmarch", position: [0, 0, 0], state: "dormant",
+      interactions: ["inspect", "awaken"],
+      station: { kind: "essence_altar", skill: "magic", recipeIds: ["craft_air_wand", "craft_air_staff"] },
+      meta: { essenceAltar: true, essenceElement: "wind" },
+    },
+    {
+      id: "vellenwood_earth_altar", archetype: "station", name: "Earth Essence Altar", tier: 5,
+      regionId: "vellenwood", position: [0, 0, 0], state: "dormant",
+      interactions: ["inspect", "awaken"],
+      station: { kind: "essence_altar", skill: "magic", recipeIds: ["craft_earth_wand", "craft_earth_staff"] },
+      meta: { essenceAltar: true, essenceElement: "earth" },
+    },
+    {
+      id: "fallowmarch_air_altar_ruins", archetype: "landmark", name: "Air Altar Ruins", tier: 1,
+      regionId: "fallowmarch", position: [0, 0, 0], state: "dormant", interactions: ["inspect"],
+      view: { assetId: "altar_ruins_site" },
+      meta: {
+        essenceAltarRuins: true,
+        essenceAltarId: "fallowmarch_air_altar",
+        essenceElement: "wind",
+      },
+    },
+  ];
+  const entities = {
+    get: (id: string) => altars.find((entity) => entity.id === id),
+    all: () => altars,
+  };
   const dispatcher = new InteractionDispatcher({
-    get: () => undefined,
+    get: entities.get,
     playerPosition: () => [0, 0, 0],
     skillLevels: () => currentSkillLevels(store),
   });
-  const essence = new EssenceSystem({ store, events, inventory, dispatcher, now });
-  return { store, events, inventory, equipment, essence };
+  const essence = new EssenceSystem({ store, events, inventory, dispatcher, entities, now });
+  return { store, events, inventory, equipment, essence, entities };
 }
 
 function equip(fixture: ReturnType<typeof runtime>, itemId: ItemId): void {
@@ -63,7 +93,7 @@ describe("starter casting", () => {
     expect(state.equipment.mainHand).toEqual({ itemId: "basic_wooden_wand", quantity: 1 });
     expect(state.inventory.slots.find((slot) => slot?.itemId === "air_essence"))
       .toMatchObject({ itemId: "air_essence", quantity: 50 });
-    expect(state.magic).toEqual({ weaponCharges: {}, consumedOrbs: {} });
+    expect(state.magic).toEqual({ weaponCharges: {}, consumedOrbs: {}, awakenedAltars: {} });
     expect(spellBlockReason(state, spell("voltrend"))).toBeNull();
   });
 
@@ -85,12 +115,12 @@ describe("starter casting", () => {
   });
 });
 
-describe("Orb-crafted weapons", () => {
-  it("starts a newly acquired elemental weapon at 1000 and marks its Orb consumed", () => {
+describe("altar-crafted weapons", () => {
+  it("starts a newly acquired elemental weapon at 1000 without consuming another Orb", () => {
     const fixture = runtime();
     expect(fixture.inventory.addItem("air_wand", 1).ok).toBe(true);
     expect(weaponCharge(fixture.store.get(), "air_wand")).toBe(1000);
-    expect(fixture.store.get().magic.consumedOrbs.air_orb).toBe(true);
+    expect(fixture.store.get().magic.consumedOrbs.air_orb).toBeUndefined();
   });
 
   it("spends matching weapon charge before carried Essence", () => {
@@ -116,14 +146,46 @@ describe("Orb-crafted weapons", () => {
 });
 
 describe("Essence Altar recharge", () => {
+  it("consumes the matching boss Orb once and permanently awakens the altar", () => {
+    const fixture = runtime();
+    expect(fixture.inventory.addItem("air_orb", 1).ok).toBe(true);
+    expect(fixture.essence.awaken("fallowmarch_air_altar")).toEqual({
+      ok: true,
+      value: { started: "awakened Air Essence Altar" },
+    });
+    expect(fixture.inventory.countOf("air_orb")).toBe(0);
+    expect(fixture.store.get().magic.consumedOrbs.air_orb).toBe(true);
+    expect(fixture.store.get().magic.awakenedAltars.fallowmarch_air_altar).toBe(true);
+    expect(fixture.entities.get("fallowmarch_air_altar")).toMatchObject({
+      state: "awakened", interactions: ["inspect", "produce", "recharge"],
+    });
+    expect(fixture.entities.get("fallowmarch_air_altar_ruins")).toMatchObject({
+      state: "awakened",
+    });
+  });
+
+  it("rejects the wrong boss Orb without consuming it", () => {
+    const fixture = runtime();
+    expect(fixture.inventory.addItem("earth_orb", 1).ok).toBe(true);
+
+    expect(fixture.essence.awaken("fallowmarch_air_altar")).toMatchObject({
+      ok: false,
+      error: { code: "NOT_ENOUGH_ITEMS" },
+    });
+    expect(fixture.inventory.countOf("earth_orb")).toBe(1);
+    expect(fixture.entities.get("fallowmarch_air_altar")).toMatchObject({ state: "dormant" });
+  });
+
   it("spends exactly 100 matching Essence and restores the equipped weapon to 1000", () => {
     const fixture = runtime();
+    expect(fixture.inventory.addItem("air_orb", 1).ok).toBe(true);
+    expect(fixture.essence.awaken("fallowmarch_air_altar").ok).toBe(true);
     equip(fixture, "air_staff");
     fixture.store.get().magic.weaponCharges.air_staff = 243;
     expect(fixture.inventory.addItem("air_essence", 100).ok).toBe(true);
     const before = fixture.inventory.countOf("air_essence");
 
-    expect(fixture.essence.recharge("coldbrace_essence_altar")).toEqual({
+    expect(fixture.essence.recharge("fallowmarch_air_altar")).toEqual({
       ok: true,
       value: { started: "recharged Air Staff to 1000" },
     });
@@ -134,9 +196,26 @@ describe("Essence Altar recharge", () => {
   it("requires a charged elemental weapon and never takes Essence on failure", () => {
     const fixture = runtime();
     const before = fixture.inventory.countOf("air_essence");
-    const result = fixture.essence.recharge("coldbrace_essence_altar");
+    const result = fixture.essence.recharge("fallowmarch_air_altar");
     expect(result.ok).toBe(false);
     expect(fixture.inventory.countOf("air_essence")).toBe(before);
+  });
+
+  it("only recharges a weapon matching the awakened altar", () => {
+    const fixture = runtime();
+    expect(fixture.inventory.addItem("air_orb", 1).ok).toBe(true);
+    expect(fixture.essence.awaken("fallowmarch_air_altar").ok).toBe(true);
+    setSkillLevel(fixture.store.get(), "magic", 5);
+    equip(fixture, "earth_wand");
+    fixture.store.get().magic.weaponCharges.earth_wand = 200;
+    const before = fixture.inventory.countOf("air_essence");
+
+    expect(fixture.essence.recharge("fallowmarch_air_altar")).toMatchObject({
+      ok: false,
+      error: { code: "REQUIREMENTS_NOT_MET" },
+    });
+    expect(fixture.inventory.countOf("air_essence")).toBe(before);
+    expect(weaponCharge(fixture.store.get(), "earth_wand")).toBe(200);
   });
 });
 
@@ -153,10 +232,25 @@ describe("v3 focus migration", () => {
     old.magic = { orbCharges: { air_orb: 417 } };
 
     const migrated = migrate(legacy).state;
-    expect(migrated?.meta.saveVersion).toBe(5);
+    expect(migrated?.meta.saveVersion).toBe(6);
     expect(migrated?.equipment.mainHand).toEqual({ itemId: "air_wand", quantity: 1 });
     expect((migrated?.equipment as unknown as Record<string, unknown>).focus).toBeUndefined();
     expect(migrated?.magic.weaponCharges.air_wand).toBe(417);
     expect(migrated?.magic.consumedOrbs.air_orb).toBe(true);
+    expect(migrated?.magic.awakenedAltars.fallowmarch_air_altar).toBe(true);
+  });
+
+  it("turns every pre-v6 consumed Orb into its permanently awakened altar", () => {
+    const legacy = createInitialState(908, 0);
+    legacy.meta.saveVersion = 5;
+    legacy.magic.consumedOrbs = { earth_orb: true, water_orb: true };
+    const old = legacy as unknown as { magic: { awakenedAltars?: Record<string, boolean> } };
+    delete old.magic.awakenedAltars;
+
+    const migrated = migrate(legacy).state;
+    expect(migrated?.magic.awakenedAltars).toEqual({
+      vellenwood_earth_altar: true,
+      karrowmoor_water_altar: true,
+    });
   });
 });

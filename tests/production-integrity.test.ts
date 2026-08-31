@@ -37,6 +37,23 @@ const RANGE: SemanticEntity = {
   station: { kind: "range", skill: "cooking", recipeIds: [] },
 };
 
+const AIR_ALTAR: SemanticEntity = {
+  id: "fallowmarch_air_altar",
+  archetype: "station",
+  name: "Air Essence Altar",
+  tier: 1,
+  regionId: "fallowmarch",
+  position: [0, 0, 0],
+  state: "dormant",
+  interactions: ["inspect", "awaken"],
+  station: {
+    kind: "essence_altar",
+    skill: "magic",
+    recipeIds: ["craft_air_wand", "craft_air_staff"],
+  },
+  meta: { essenceAltar: true, essenceElement: "wind" },
+};
+
 const CUSTOM_ITEMS: readonly ItemDef[] = [
   {
     id: "test_raw_stack", name: "Test Raw Stack", tier: 1,
@@ -244,6 +261,27 @@ describe("ProductionSystem inventory transactions", () => {
 });
 
 describe("ProductionSystem exact station selection", () => {
+  it("exposes no recipes and refuses crafting until the Essence Altar is awakened", () => {
+    const h = harness([AIR_ALTAR]);
+    h.inventory.addItem("palewood_wand", 1);
+
+    expect(h.production.availableAt(AIR_ALTAR.id)).toEqual([]);
+    expect(h.production.produceAt(AIR_ALTAR.id, "craft_air_wand", 1)).toMatchObject({
+      ok: false,
+      error: { code: "UNAVAILABLE", entityId: AIR_ALTAR.id },
+    });
+    expect(h.inventory.countItem("palewood_wand")).toBe(1);
+
+    const altar = h.entities.find((entity) => entity.id === AIR_ALTAR.id)!;
+    altar.state = "awakened";
+    altar.interactions = ["inspect", "produce", "recharge"];
+    expect(h.production.availableAt(AIR_ALTAR.id).map((recipe) => recipe.id)).toEqual([
+      "craft_air_wand",
+      "craft_air_staff",
+    ]);
+    expect(h.production.produceAt(AIR_ALTAR.id, "craft_air_wand", 1)).toMatchObject({ ok: true });
+  });
+
   it("uses the selected station and rejects a different region or vertical out-of-range position", () => {
     const otherRegion: SemanticEntity = {
       ...BENCH,

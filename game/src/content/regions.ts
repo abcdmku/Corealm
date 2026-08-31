@@ -144,6 +144,8 @@ export interface ResourceClusterDef {
   count: number;
   centre: Spot;
   radius: number;
+  /** Places every node on this ring instead of the filled spiral. Used around altar courts. */
+  ringRadius?: number;
   /** Optional one-off centrepiece used by index 0; remaining nodes use the resource presentation. */
   heroAssetId?: string;
   /** Optional centrepiece scale; satellite size comes from the resource presentation. */
@@ -209,6 +211,8 @@ export interface StationDef {
   scale?: number;
   /** Filled in by round 3's `content/recipes.ts`. Empty here on purpose. */
   recipeIds: RecipeId[];
+  /** Present only on a regional Essence Altar. */
+  essenceElement?: import("../contracts.js").SpellElement;
   /**
    * The `BuildingDef.id`, `WallRunDef.id` or `PropDef.id` in the same settlement that this station
    * is part of: the forge it stands inside, the lean-to it stands under, the counter it stands
@@ -526,6 +530,10 @@ export interface LandmarkDef {
    * a small authored composition instead.
    */
   composition?: CompositionId;
+  /** False for broad, walkable compositions whose central interactable owns collision. */
+  solid?: boolean;
+  /** Keep the imported origin on terrain instead of lifting the asset's lowest buried detail. */
+  originOnGround?: boolean;
 }
 
 /** A region gate. Two of these, one per side, make a crossing. */
@@ -643,6 +651,8 @@ export interface RegionDef {
   locations: LocationDef[];
   roads: RoadDef[];
   clusters: ResourceClusterDef[];
+  /** Production stations outside the settlement, such as regional Essence Altars. */
+  stations: StationDef[];
   settlement: SettlementDef;
   obstacles: ObstacleDef[];
   enemyGroups: EnemyGroupDef[];
@@ -657,46 +667,29 @@ export const WALK_SPEED_MPS = 4.2;
 
 export const WORLD_BOUNDS: RegionBounds = { min: [-350, -200], max: [350, 200] };
 
-/**
- * Settlement source files stay focused on their existing town layouts. The three altar additions
- * are part of the magic-world amendment, so regions wire them in without mutating the imported
- * settlement objects.
- */
-const COLDBRACE_WITH_ESSENCE_ALTAR: SettlementDef = {
-  ...COLDBRACE,
-  stations: [
-    ...COLDBRACE.stations,
-    {
-      id: "coldbrace_essence_altar", name: "Essence Altar", kind: "essence_altar", skill: "magic",
-      position: [-150, -77.5], rotationY: 0, assetId: "ore_crystal_blue", scale: 0.65,
-      recipeIds: [],
-    },
-  ],
-};
+/** One boss-keyed crafting altar at each matching Essence Cache. */
+export const ESSENCE_ALTAR_COURT_RADIUS = 16;
+export const ESSENCE_ALTAR_COURT_BLEND = 14;
+/** Keeps trees, shrubs, grass, flowers and loose litter outside the finished ritual court. */
+export const ESSENCE_ALTAR_CLEAR_RADIUS = 19;
 
-const ROOTFALL_WITH_ESSENCE_ALTAR: SettlementDef = {
-  ...ROOTFALL,
-  stations: [
-    ...ROOTFALL.stations,
-    {
-      id: "rootfall_essence_altar", name: "Essence Altar", kind: "essence_altar", skill: "magic",
-      position: [68, 123], rotationY: 0, assetId: "ore_crystal_blue", scale: 0.65,
-      recipeIds: [],
-    },
-  ],
-};
-
-const HIGHCAIRN_WITH_ESSENCE_ALTAR: SettlementDef = {
-  ...HIGHCAIRN,
-  stations: [
-    ...HIGHCAIRN.stations,
-    {
-      id: "highcairn_essence_altar", name: "Essence Altar", kind: "essence_altar", skill: "magic",
-      position: [144, -61.5], rotationY: 0, assetId: "ore_crystal_blue", scale: 0.65,
-      recipeIds: [],
-    },
-  ],
-};
+export const REGIONAL_ESSENCE_ALTARS = {
+  fallowmarch: {
+    id: "fallowmarch_air_altar", name: "Air Essence Altar", kind: "essence_altar", skill: "magic",
+    position: [-250, -150], rotationY: 0, assetId: "altar_ruins_altar", scale: 1,
+    recipeIds: ["craft_air_wand", "craft_air_staff"], essenceElement: "wind",
+  },
+  vellenwood: {
+    id: "vellenwood_earth_altar", name: "Earth Essence Altar", kind: "essence_altar", skill: "magic",
+    position: [262, 176], rotationY: 0, assetId: "altar_ruins_altar", scale: 1,
+    recipeIds: ["craft_earth_wand", "craft_earth_staff"], essenceElement: "earth",
+  },
+  karrowmoor: {
+    id: "karrowmoor_water_altar", name: "Water Essence Altar", kind: "essence_altar", skill: "magic",
+    position: [328, -176], rotationY: 0, assetId: "altar_ruins_altar", scale: 1,
+    recipeIds: ["craft_water_wand", "craft_water_staff"], essenceElement: "water",
+  },
+} as const satisfies Readonly<Record<Exclude<RegionId, "gravelmaw">, StationDef>>;
 
 // =============================================================== FALLOWMARCH
 
@@ -829,14 +822,14 @@ const FALLOWMARCH: RegionDef = {
     },
     {
       id: "fallowmarch_air_essence_cache", resourceId: "essence_air",
-      count: 5, centre: [-250, -150], radius: 8,
-      heroAssetId: "rocks_free_essence_cache", heroScale: 0.18,
+      count: 5, centre: [-250, -150], radius: 12, ringRadius: 12,
       essenceElement: "wind",
       locationId: "fallowmarch_air_cache",
     },
   ],
 
-  settlement: COLDBRACE_WITH_ESSENCE_ALTAR,
+  stations: [REGIONAL_ESSENCE_ALTARS.fallowmarch],
+  settlement: COLDBRACE,
 
   obstacles: [
     {
@@ -935,6 +928,11 @@ const FALLOWMARCH: RegionDef = {
   ],
 
   landmarks: [
+    {
+      id: "fallowmarch_air_altar_ruins", name: "Air Altar Ruins", position: [-250, -150],
+      assetId: "altar_ruins_site", scale: 1, rotationY: 0, solid: false, originOnGround: true,
+      blurb: "A dormant stone court ringed by Air Essence. The Tempest Roc's Orb is its missing light.",
+    },
     {
       // Round-1 critique finding 8: this was a bare `roof_tower` cone standing on the grass - the
       // "floating red cone" in r1-town-center. The tower's mass now comes from the `coldbrace_vault`
@@ -1092,14 +1090,14 @@ const VELLENWOOD: RegionDef = {
     },
     {
       id: "vellenwood_earth_essence_cache", resourceId: "essence_earth",
-      count: 5, centre: [262, 176], radius: 8,
-      heroAssetId: "rocks_free_essence_cache", heroScale: 0.18,
+      count: 5, centre: [262, 176], radius: 12, ringRadius: 12,
       essenceElement: "earth",
       locationId: "vellenwood_earth_cache",
     },
   ],
 
-  settlement: ROOTFALL_WITH_ESSENCE_ALTAR,
+  stations: [REGIONAL_ESSENCE_ALTARS.vellenwood],
+  settlement: ROOTFALL,
 
   obstacles: [
     {
@@ -1211,6 +1209,11 @@ const VELLENWOOD: RegionDef = {
   ],
 
   landmarks: [
+    {
+      id: "vellenwood_earth_altar_ruins", name: "Earth Altar Ruins", position: [262, 176],
+      assetId: "altar_ruins_site", scale: 1, rotationY: 0, solid: false, originOnGround: true,
+      blurb: "A root-bound stone court ringed by Earth Essence. The Rootheart's Orb can wake it.",
+    },
     {
       id: "rootfall_stump", name: "The Rootfall Stump", position: [60, 120],
       // A real Duskoak, cut off just above the flare of its roots. The library ships no stump, and
@@ -1382,14 +1385,14 @@ const KARROWMOOR: RegionDef = {
     },
     {
       id: "karrowmoor_water_essence_cache", resourceId: "essence_water",
-      count: 5, centre: [328, -176], radius: 8,
-      heroAssetId: "rocks_free_essence_cache", heroScale: 0.18,
+      count: 5, centre: [328, -176], radius: 12, ringRadius: 12,
       essenceElement: "water",
       locationId: "karrowmoor_water_cache",
     },
   ],
 
-  settlement: HIGHCAIRN_WITH_ESSENCE_ALTAR,
+  stations: [REGIONAL_ESSENCE_ALTARS.karrowmoor],
+  settlement: HIGHCAIRN,
 
   obstacles: [
     {
@@ -1489,6 +1492,11 @@ const KARROWMOOR: RegionDef = {
   ],
 
   landmarks: [
+    {
+      id: "karrowmoor_water_altar_ruins", name: "Water Altar Ruins", position: [328, -176],
+      assetId: "altar_ruins_site", scale: 1, rotationY: 0, solid: false, originOnGround: true,
+      blurb: "A rain-cut stone court ringed by Water Essence. Ordrun's Orb can wake it.",
+    },
     {
       // North shoulder of the long Moor Road descent, 4.5 m from its centreline and outside the
       // Kaldite cluster. A slate post over a cairn foot now reads as part of the quarry arrival.
@@ -1796,6 +1804,18 @@ export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
       }
       if (!inBounds(region.bounds, cluster.centre)) {
         problems.push(`${region.id}: cluster ${cluster.id} is outside the region bounds`);
+      }
+    }
+
+    for (const station of region.stations) {
+      if (seenIds.has(station.id)) problems.push(`duplicate regional station id ${station.id}`);
+      seenIds.add(station.id);
+      if (!inBounds(region.bounds, station.position)) {
+        problems.push(`${region.id}: regional station ${station.id} is outside the region bounds`);
+      }
+      checkAsset(`${region.id}: regional station ${station.id}`, station.assetId);
+      if (station.kind === "essence_altar" && station.essenceElement === undefined) {
+        problems.push(`${region.id}: Essence Altar ${station.id} has no essenceElement`);
       }
     }
 

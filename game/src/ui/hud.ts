@@ -501,6 +501,13 @@ export class Hud {
         return { text: "There is no route to that place.", tone: "error" };
       case "essence.recharged":
         return { text: describeEssenceRecharge(data), tone: "success" };
+      case "essence.altarAwakened": {
+        const name = this.entityName(event) ?? "Essence Altar";
+        return {
+          text: `${name} awakened. Its matching staffs and wands can now be made and recharged here.`,
+          tone: "success",
+        };
+      }
       case "combat.ended": {
         // Only the endings the player did not ask for. A fight that ends because the target died,
         // or because they clicked something else, explains itself on screen — saying so in words is

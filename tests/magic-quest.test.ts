@@ -180,9 +180,10 @@ describe("The Sparking Stone Air Orb route", () => {
     expect(text).toMatch(/fallowmarch_air_cache/);
     expect(text).toMatch(/loot the Air Orb/i);
     expect(text).toMatch(/craft_air_staff/);
-    expect(text).toMatch(/coldbrace_essence_altar/);
+    expect(text).toMatch(/fallowmarch_air_altar/);
+    expect(text).toMatch(/awaken/i);
     expect(text).toMatch(/1000/);
-    expect(text).toMatch(/exactly 100 Air Essence/);
+    expect(text).toMatch(/100 Air Essence/);
 
     const reminder = root?.options.find((option) => option.id === "vess_root#roc_route");
     expect(reminder?.next).toBe("vess_stone_accepted");

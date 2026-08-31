@@ -12,7 +12,13 @@
  * FROZEN. Only the root edits this file.
  */
 import type { RegionId } from "../contracts.js";
-import { REGIONS, type RegionDef, type SettlementDef } from "../content/regions.js";
+import {
+  ESSENCE_ALTAR_COURT_BLEND,
+  ESSENCE_ALTAR_COURT_RADIUS,
+  REGIONS,
+  type RegionDef,
+  type SettlementDef,
+} from "../content/regions.js";
 import { resourceDef } from "../content/resources.js";
 import type { FlatSpot, RegionTerrainSpec, WorldTerrainSpec, Rect } from "../render/scene.js";
 import { seedFromText, type OrganicBiomeSpec } from "../world/organicFields.js";
@@ -95,12 +101,30 @@ function flatSpotsFor(region: RegionDef): FlatSpot[] {
         });
   }
 
+  // Altar Ruins Free spans just over 20 m across. Its elemental court gets one authored plane
+  // beneath the complete ruin, the five-node Essence ring, and the player's approach. The wide
+  // collar hands that plane back to the regional terrain without leaving an exposed cut edge.
+  const essenceAltars = region.stations.filter((station) => station.kind === "essence_altar");
+  for (const altar of essenceAltars) {
+    flats.push({
+      x: altar.position[0],
+      z: altar.position[1],
+      radius: ESSENCE_ALTAR_COURT_RADIUS,
+      blend: ESSENCE_ALTAR_COURT_BLEND,
+    });
+  }
+
   // Named locations are where the player stands still: banks, seams, camps, gates. A 7 m pad keeps
   // an interaction from happening on a slope steep enough to look broken. Water owns a separate
   // basin applied after every ordinary pad, so a generic location pad must not pull its floor back
   // toward the dry terrain.
   for (const location of region.locations) {
     if (location.kind === "water") continue;
+    // The regional Essence Cache and its altar share a centre. Keep the purpose-built 12.5 m court
+    // above instead of layering the generic seven-metre interaction pad over the same ground.
+    if (essenceAltars.some((altar) => (
+      altar.position[0] === location.position[0] && altar.position[1] === location.position[1]
+    ))) continue;
     flats.push({ x: location.position[0], z: location.position[1], radius: 7, blend: 9 });
   }
 

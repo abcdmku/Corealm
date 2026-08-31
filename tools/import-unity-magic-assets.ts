@@ -1,5 +1,5 @@
 /**
- * Validates the four GLBs written by import-unity-magic-assets.ps1 and merges
+ * Validates the six GLBs written by import-unity-magic-assets.ps1 and merges
  * their measured metadata into game/public/assets/manifest.json.
  *
  * Usage:
@@ -13,15 +13,17 @@ import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { getBounds, Logger, NodeIO } from "@gltf-transform/core";
 import { KHRONOS_EXTENSIONS } from "@gltf-transform/extensions";
+import { textureCompress } from "@gltf-transform/functions";
+import sharp from "sharp";
 
 interface CatalogEntry {
   id: string;
   pack: string;
-  category: "weapon" | "rock";
+  category: "weapon" | "rock" | "building";
   is: string;
   tags: string[];
   expectedLongestAxis: [number, number];
-  expectedSha256: string;
+  expectedSha256?: string;
 }
 
 interface ManifestPack {
@@ -107,6 +109,24 @@ const catalog: CatalogEntry[] = [
     expectedLongestAxis: [4.7, 5.8],
     expectedSha256: "C1C3C2AF9EAED4027D80C84ED64422C9FB261EABC8BC275334A6A834FB541A1D",
   },
+  {
+    id: "altar_ruins_altar",
+    pack: "underhill-altar-ruins-free",
+    category: "building",
+    is: "essence-altar",
+    tags: ["altar", "ruin", "station", "essence", "awakening", "emissive-overlay-target", "non-emissive-source"],
+    expectedLongestAxis: [1, 12],
+    expectedSha256: "821047016861542C1244638237BA634D32BAA5D2DF3C15F069E7B8109E2CDF18",
+  },
+  {
+    id: "altar_ruins_site",
+    pack: "underhill-altar-ruins-free",
+    category: "building",
+    is: "essence-altar-ruins",
+    tags: ["altar", "ruin", "landmark", "essence", "stone", "non-emissive"],
+    expectedLongestAxis: [10, 120],
+    expectedSha256: "63BB98E1C5ED8714E5AEF1F282BBAD7DFC2B6642C978B891041DB38E71C288BA",
+  },
 ];
 
 const packs: ManifestPack[] = [
@@ -122,6 +142,13 @@ const packs: ManifestPack[] = [
     name: "Rocks FREE pack",
     author: "DEXSOFT",
     source: "https://assetstore.unity.com/packages/3d/props/exterior/rocks-free-pack-98219",
+    license: "Standard Unity Asset Store EULA; project owner must confirm entitlement",
+  },
+  {
+    id: "underhill-altar-ruins-free",
+    name: "Altar Ruins Free",
+    author: "Underhill Labz",
+    source: "https://marketplace.unity.com/packages/3d/environments/fantasy/altar-ruins-free-109065",
     license: "Standard Unity Asset Store EULA; project owner must confirm entitlement",
   },
 ];
@@ -153,7 +180,9 @@ async function inspect(entry: CatalogEntry, output: string, io: NodeIO): Promise
   const bytes = new Uint8Array(await readFile(absoluteFile));
   validateHeader(bytes, entry.id);
   const digest = createHash("sha256").update(bytes).digest("hex").toUpperCase();
-  assert(digest === entry.expectedSha256, `${entry.id}: SHA-256 ${digest}; expected ${entry.expectedSha256}`);
+  if (entry.expectedSha256) {
+    assert(digest === entry.expectedSha256, `${entry.id}: SHA-256 ${digest}; expected ${entry.expectedSha256}`);
+  }
 
   const document = await io.readBinary(bytes);
   const root = document.getRoot();
@@ -221,6 +250,22 @@ async function inspect(entry: CatalogEntry, output: string, io: NodeIO): Promise
   return asset;
 }
 
+async function normalizeAltarTextures(entry: CatalogEntry, output: string, io: NodeIO): Promise<void> {
+  if (entry.pack !== "underhill-altar-ruins-free") return;
+  const absoluteFile = path.join(output, `${entry.id}.glb`);
+  const document = await io.read(absoluteFile);
+  const requiresResize = document.getRoot().listTextures().some((texture) => {
+    const size = texture.getSize();
+    if (!size) return false;
+    const [width, height] = size;
+    return width > 2048 || height > 2048;
+  });
+  if (!requiresResize) return;
+  await document.transform(textureCompress({ encoder: sharp, resize: [2048, 2048] }));
+  await io.write(absoluteFile, document);
+  console.log(`${entry.id}: normalized authored textures to a 2048 px maximum`);
+}
+
 async function writeTextAtomically(file: string, contents: string): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.tmp-${process.pid}-${randomUUID()}`;
@@ -265,7 +310,10 @@ async function main(): Promise<void> {
   const output = path.resolve(option("--output") ?? defaultOutput);
   const io = new NodeIO().registerExtensions(KHRONOS_EXTENSIONS).setLogger(new Logger(Logger.Verbosity.ERROR));
   const assets: ManifestAsset[] = [];
-  for (const entry of catalog) assets.push(await inspect(entry, output, io));
+  for (const entry of catalog) {
+    await normalizeAltarTextures(entry, output, io);
+    assets.push(await inspect(entry, output, io));
+  }
 
   if (process.argv.includes("--write-manifest")) {
     const inputManifest = path.resolve(option("--manifest-input") ?? manifestPath);
@@ -280,7 +328,7 @@ async function main(): Promise<void> {
     await writeManifest(assets, inputManifest, outputManifest);
   } else {
     if (output === path.resolve(defaultOutput)) await verifyManifestRows(assets);
-    console.log("validation: all four GLBs match recorded hashes, structure, bounds, textures, and zero emission");
+    console.log("validation: all six GLBs match recorded hashes, structure, bounds, textures, and zero emission");
   }
 }
 

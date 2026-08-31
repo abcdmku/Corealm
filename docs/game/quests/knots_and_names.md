@@ -121,4 +121,4 @@ She works the trade post side of the Rootfall stump. The handover takes both.
 | [Bramblehide Wraps](../../items/#bramblehide-wraps) | 1 |
 | [Air Essence](../../items/#air-essence) | 10 |
 | Marks | 300 |
-| Unlock | Juno will explain how a boss Orb can be crafted into an elemental weapon. |
+| Unlock | Juno will explain how a boss Orb awakens a regional altar for elemental weapons. |

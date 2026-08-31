@@ -877,7 +877,7 @@ export class CombatSystem implements TickSystem {
   private rollDrops(state: GameState, entity: SemanticEntity, def: EnemyDef, atMs: number): void {
     const items: ItemStack[] = [];
     for (const drop of def.drops) {
-      // A crafted Orb is permanently accounted for by `consumedOrbs`. Before crafting, custody in
+      // An Orb used to awaken its altar is permanently accounted for by `consumedOrbs`. Before use, custody in
       // equipment, storage, inventory, recovery, or ground loot suppresses duplicate boss drops.
       if (
         content.item(drop.itemId)?.orb

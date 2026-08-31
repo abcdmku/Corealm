@@ -76,19 +76,19 @@ The guaranteed Air Orb remains in the Tempest Roc's loot pile after the kill. Us
 </div>
 
 
-### 3. Fletch Vess's palewood into a staff, craft it with the Air Orb, then equip it.
+### 3. Awaken the cache altar with the Air Orb, make an Air Staff there, then equip it.
 
-At a fletching bench, use fletch_palewood_shaft, then fletch_palewood_staff. At a crafting table, make craft_air_staff from that Palewood Staff and the Air Orb. Equip the finished Air Staff. It starts with 1000 charges. Once partly spent, entity coldbrace_essence_altar restores it to 1000 for exactly 100 Air Essence.
+Use interaction awaken on entity fallowmarch_air_altar while carrying the Air Orb. At a fletching bench, use fletch_palewood_shaft, then fletch_palewood_staff. Make craft_air_staff at the awakened altar and equip it. Once partly spent, the same altar restores it to 1000 for exactly 100 Air Essence.
 
-<nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
+<nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#air-essence-cache">Air Essence Cache</a></nav>
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#palewood-log">Palewood Log</a><a href="../../items/#palewood-shaft">Palewood Shaft</a><a href="../../items/#palewood-staff">Palewood Staff</a><a href="../../items/#air-orb">Air Orb</a><a href="../../items/#air-staff">Air Staff</a></nav>
 <div class="corealm-quest-step-evidence">
-<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_essence_altar.webp" alt="Essence Altar in the running Corealm world" loading="lazy" /><figcaption><strong>Essence Altar</strong><span>Coldbrace Square, Fallowmarch</span></figcaption></figure></div>
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/fallowmarch_air_altar.webp" alt="Fallowmarch Air Altar in the running Corealm world" loading="lazy" /><figcaption><strong>Fallowmarch Air Altar</strong><span>Air Essence Cache</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 3">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:37.5000%;--map-y:56.4583%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Essence Altar, Fallowmarch" title="Essence Altar, Fallowmarch"><span>Essence Altar<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:62.5000%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -98,25 +98,24 @@ At a fletching bench, use fletch_palewood_shaft, then fletch_palewood_staff. At 
 </div>
 <button class="corealm-map-expand" type="button" data-map-action="expand" aria-label="Expand map" aria-pressed="false" title="Expand map">&#x26F6;</button>
 </div>
-<figcaption>Coldbrace Square.</figcaption>
+<figcaption>Air Essence Cache.</figcaption>
 </figure>
 </div>
 
 
 ### 4. Raise Magic to level 5 by casting Voltrend at something that will hold still for it.
 
-The Air Staff spends its charge before carried Air Essence. Rill Skitterlings near locationId redsill_shallows are cheap targets. Recharge at entity coldbrace_essence_altar with 100 Air Essence when needed.
+The Air Staff spends its charge before carried Air Essence. Rill Skitterlings near locationId redsill_shallows are cheap targets. Recharge at entity fallowmarch_air_altar with 100 Air Essence when needed.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#redsill-shallows">Redsill Shallows</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/rill_skitterlings.webp" alt="Rill Skitterling in the running Corealm world" loading="lazy" /><figcaption><strong>Rill Skitterling</strong><span>Coldbrace East Gate, Fallowmarch</span></figcaption></figure>
-<figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_essence_altar.webp" alt="Essence Altar in the running Corealm world" loading="lazy" /><figcaption><strong>Essence Altar</strong><span>Coldbrace Square, Fallowmarch</span></figcaption></figure></div>
+<figure class="corealm-quest-scene"><img src="../../assets/captures/entities/fallowmarch_air_altar.webp" alt="Fallowmarch Air Altar in the running Corealm world" loading="lazy" /><figcaption><strong>Fallowmarch Air Altar</strong><span>Redsill Shallows</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 4">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
 <a class="corealm-map-marker" href="../../creatures/skitterling_t1/" style="--map-x:42.6667%;--map-y:55.8333%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Rill Skitterling, Fallowmarch" title="Rill Skitterling, Fallowmarch"><span>Rill Skitterling<small>Fallowmarch</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:37.5000%;--map-y:56.4583%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Essence Altar, Fallowmarch" title="Essence Altar, Fallowmarch"><span>Essence Altar<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#redsill-shallows" style="--map-x:46.6667%;--map-y:55.0000%" data-map-side="right" data-map-kind="water" data-map-marker aria-label="Redsill Shallows, Fallowmarch" title="Redsill Shallows, Fallowmarch"><span>Redsill Shallows<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>

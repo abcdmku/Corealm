@@ -378,7 +378,7 @@ export const CURRENCY_ITEM_ID = "marks";
  *
  * The Basic Wooden Wand starts in `mainHand`; the Worn Shortsword stays in the pack so both combat
  * styles remain available. The 50 Air Essence powers the starter Air spell directly. The wand
- * stays plain brown until the player later crafts an Orb into an elemental weapon.
+ * stays plain brown until the player later awakens an altar and crafts an elemental weapon there.
  */
 export const STARTING_INVENTORY: readonly ItemStack[] = [
   { itemId: "worn_sword", quantity: 1 },

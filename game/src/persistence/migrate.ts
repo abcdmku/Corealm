@@ -11,6 +11,12 @@ type LooseStack = { itemId: string; quantity: number; slotIndex?: number };
 type TransitionalEquipment = GameState["equipment"] & { focus?: LooseStack | null };
 type TransitionalMagic = Partial<GameState["magic"]> & { orbCharges?: Record<string, number> };
 
+const ALTAR_BY_ORB: Readonly<Record<string, string>> = {
+  air_orb: "fallowmarch_air_altar",
+  earth_orb: "vellenwood_earth_altar",
+  water_orb: "karrowmoor_water_altar",
+};
+
 const LEGACY_ITEM_REPLACEMENTS: Readonly<Record<string, string>> = {
   essence_shard: "air_essence",
   worn_staff: "basic_wooden_staff",
@@ -99,6 +105,7 @@ function migrateMagicItems(state: GameState): void {
   const transitional = (state.magic ?? {}) as TransitionalMagic;
   const weaponCharges: Record<string, number> = { ...(transitional.weaponCharges ?? {}) };
   const consumedOrbs: Record<string, boolean> = { ...(transitional.consumedOrbs ?? {}) };
+  const awakenedAltars: Record<string, boolean> = { ...(transitional.awakenedAltars ?? {}) };
 
   const offHand = equipment.offHand;
   if (offHand && isReleasedOrb(offHand.itemId)) {
@@ -128,10 +135,17 @@ function migrateMagicItems(state: GameState): void {
   }
   delete equipment.focus;
 
+  // Before v6 an Orb was consumed by the first elemental weapon craft. Preserve that progress by
+  // treating every previously consumed Orb as the key that awakened its matching regional altar.
+  for (const [orbItemId, altarId] of Object.entries(ALTAR_BY_ORB)) {
+    if (consumedOrbs[orbItemId]) awakenedAltars[altarId] = true;
+  }
+
   state.equipment = equipment;
   state.magic = {
     weaponCharges: weaponCharges as GameState["magic"]["weaponCharges"],
     consumedOrbs: consumedOrbs as GameState["magic"]["consumedOrbs"],
+    awakenedAltars: awakenedAltars as GameState["magic"]["awakenedAltars"],
   };
 }
 
@@ -150,7 +164,7 @@ function migrateProductionWorld(state: GameState, sourceVersion: number): void {
 }
 
 /**
- * Migrates both the production foundation and the elemental-weapon branch into the shared v5
+ * Migrates the production foundation, elemental weapons, and regional altar rites into v6.
  * shape. V3 existed independently on both branches, so field presence is normalized as well as
  * the numeric version; that keeps either ancestry loadable after the rebase.
  */

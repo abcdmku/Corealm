@@ -143,8 +143,10 @@ export function buildDocs(): DocEntry[] {
       + "equipped charged weapon, carried Essence, and released elements. Each spell row includes castMs, "
       + "requiredElement, fuelCost, castable, and blockedBy. The equippedWeapon row includes "
       + "itemId, element, charges, capacity, rechargeItemId, and rechargeCost. To refill it, equip a "
-      + "charged elemental wand or staff and call corealm_interact with interaction recharge on an "
-      + "Essence Altar. A successful refill emits essence.recharged with altarId, weaponItemId, element, "
+      + "charged elemental wand or staff and call corealm_interact with interaction recharge on its "
+      + "awakened Essence Altar. A dormant altar first needs interaction awaken while its matching boss "
+      + "Orb is carried. Awakening consumes that Orb once and emits essence.altarAwakened. A successful "
+      + "refill emits essence.recharged with altarId, weaponItemId, element, "
       + "before, after, essenceItemId, and essenceSpent. spell.launched reports whether weapon charge or "
       + "carried Essence paid for the cast.",
     keywords: [
@@ -227,8 +229,8 @@ export function buildDocs(): DocEntry[] {
         .find((candidate) => candidate.magicWeapon?.charge?.orbItemId === item.id)
         ?.magicWeapon?.charge;
       parts.push(
-        `Crafting component for a ${element} wand or staff. The finished weapon starts with `
-        + `${craftedCharge?.initialCharges ?? 1000} stored charges. `
+        `Boss key that permanently awakens the ${element} Essence Altar. That altar makes both `
+        + `${element} wands and staffs with ${craftedCharge?.initialCharges ?? 1000} stored charges. `
         + `${item.orb.released ? "This orb is released." : "This orb is future content and cannot be obtained yet."}`,
       );
     }

@@ -1,6 +1,7 @@
 /** Essence casting, elemental-weapon charge, and altar recharge rules. */
 import type {
-  ElementalWeaponChargeSpec, EquippedMagicWeaponView, ItemDef, ItemId, Result, SpellElement,
+  ElementalWeaponChargeSpec, EquippedMagicWeaponView, ItemDef, ItemId, Result, SemanticEntity,
+  SpellElement,
 } from "../contracts.js";
 import { err, ok } from "../contracts.js";
 import type { SpellDef } from "../content/index.js";
@@ -22,6 +23,12 @@ export const ESSENCE_BY_ELEMENT: Readonly<Partial<Record<SpellElement, ItemId>>>
   wind: "air_essence",
   earth: "earth_essence",
   water: "water_essence",
+};
+
+export const ORB_BY_ELEMENT: Readonly<Partial<Record<SpellElement, ItemId>>> = {
+  wind: "air_orb",
+  earth: "earth_orb",
+  water: "water_orb",
 };
 
 export interface MagicLoadout {
@@ -57,7 +64,7 @@ export function weaponCharge(state: GameState, weaponItemId: ItemId): number {
   return Math.max(0, Math.min(charge.capacity, Math.floor(raw)));
 }
 
-/** A newly crafted elemental weapon receives its Orb's starting charge exactly once. */
+/** A newly crafted elemental weapon receives its authored starting charge exactly once. */
 export function initialiseWeaponCharge(state: GameState, weaponItemId: ItemId): number | null {
   const charge = content.item(weaponItemId)?.magicWeapon?.charge;
   if (!charge) return null;
@@ -65,7 +72,6 @@ export function initialiseWeaponCharge(state: GameState, weaponItemId: ItemId): 
   if (Number.isFinite(existing)) return weaponCharge(state, weaponItemId);
   const initial = Math.max(0, Math.min(charge.capacity, Math.floor(charge.initialCharges)));
   state.magic.weaponCharges[weaponItemId] = initial;
-  state.magic.consumedOrbs[charge.orbItemId] = true;
   return initial;
 }
 
@@ -170,26 +176,92 @@ interface EssenceInventory {
   ): Result<number>;
 }
 
+interface EssenceAltarEntities {
+  get(id: string): SemanticEntity | undefined;
+  all(): SemanticEntity[];
+}
+
 export interface EssenceSystemDeps {
   store: Store;
   events: EventBus;
   inventory: EssenceInventory;
   dispatcher: InteractionDispatcher;
+  entities: EssenceAltarEntities;
+  /** Rebuilds entity presentation after a dormant/awakened material identity change. */
+  syncViews?: () => void;
   now: () => number;
 }
 
-/** Owns Essence Altar recharge. Casting remains CombatSystem's responsibility. */
+/** Owns persistent Essence Altar awakening and recharge. Casting remains CombatSystem's responsibility. */
 export class EssenceSystem {
   constructor(private readonly deps: EssenceSystemDeps) {
+    deps.dispatcher.registerHandler("awaken", (context) => this.awaken(context.entity.id));
     deps.dispatcher.registerHandler("recharge", (context) => this.recharge(context.entity.id));
+    this.hydrateAltars();
+    deps.store.subscribe(() => this.hydrateAltars());
+  }
+
+  awaken(altarId: string): Result<{ started: string }> {
+    const state = this.deps.store.get();
+    const altar = this.deps.entities.get(altarId);
+    const element = altarElement(altar);
+    if (!altar || !element) {
+      return err("INVALID_ARGUMENT", `${altarId} is not a regional Essence Altar.`, altarId);
+    }
+    if (state.magic.awakenedAltars[altarId]) {
+      this.applyAltarState(altar, true);
+      return err("UNAVAILABLE", `${altar.name} is already awakened.`, altarId);
+    }
+
+    const orbItemId = ORB_BY_ELEMENT[element];
+    if (!orbItemId) return err("UNAVAILABLE", `${ELEMENT_LABELS[element]} altars are not released yet.`, altarId);
+    if (this.deps.inventory.countItem(orbItemId) < 1) {
+      const orbName = content.item(orbItemId)?.name ?? orbItemId;
+      return err("NOT_ENOUGH_ITEMS", `${altar.name} needs the ${orbName} carried by this region's boss.`, altarId);
+    }
+
+    const paid = this.deps.inventory.removeItem(
+      orbItemId,
+      1,
+      { eventData: { reason: "consumed", source: "altar_awakening", altarId, element } },
+    );
+    if (!paid.ok) return paid;
+
+    state.magic.consumedOrbs[orbItemId] = true;
+    state.magic.awakenedAltars[altarId] = true;
+    this.applyAltarState(altar, true);
+    this.deps.store.markDirty();
+    this.deps.syncViews?.();
+    this.deps.events.emit(
+      "essence.altarAwakened",
+      { altarId, element, orbItemId },
+      altarId,
+      this.deps.now(),
+    );
+    return ok({ started: `awakened ${altar.name}` });
   }
 
   recharge(altarId: string): Result<{ started: string }> {
     const state = this.deps.store.get();
+    const altar = this.deps.entities.get(altarId);
+    const element = altarElement(altar);
+    if (!altar || !element) {
+      return err("INVALID_ARGUMENT", `${altarId} is not a regional Essence Altar.`, altarId);
+    }
+    if (!state.magic.awakenedAltars[altarId]) {
+      return err("UNAVAILABLE", `${altar.name} is dormant. Awaken it with its boss Orb first.`, altarId);
+    }
     const loadout = magicLoadout(state);
     const charge = loadout?.charge;
     if (!loadout || !charge || !charge.released) {
       return err("REQUIREMENTS_NOT_MET", "Equip a charged elemental wand or staff first.", altarId);
+    }
+    if (charge.element !== element) {
+      return err(
+        "REQUIREMENTS_NOT_MET",
+        `${altar.name} can recharge only ${ELEMENT_LABELS[element]} weapons.`,
+        altarId,
+      );
     }
 
     const before = loadout.charges;
@@ -230,4 +302,44 @@ export class EssenceSystem {
     );
     return ok({ started: `recharged ${loadout.weapon.name} to ${charge.capacity}` });
   }
+
+  /** Applies saved altar state to semantic entities after boot, load, or debug reset. */
+  hydrateAltars(): void {
+    const state = this.deps.store.get();
+    let changed = false;
+    for (const entity of this.deps.entities.all()) {
+      if (!altarElement(entity)) continue;
+      changed = this.applyAltarState(entity, state.magic.awakenedAltars[entity.id] === true) || changed;
+    }
+    if (changed) this.deps.syncViews?.();
+  }
+
+  private applyAltarState(altar: SemanticEntity, awakened: boolean): boolean {
+    const state = awakened ? "awakened" : "dormant";
+    const interactions = awakened
+      ? (["inspect", "produce", "recharge"] as const)
+      : (["inspect", "awaken"] as const);
+    let changed = altar.state !== state
+      || altar.interactions.length !== interactions.length
+      || altar.interactions.some((interaction, index) => interaction !== interactions[index]);
+    altar.state = state;
+    altar.interactions = [...interactions];
+    for (const entity of this.deps.entities.all()) {
+      if (entity.meta?.essenceAltarRuins !== true || entity.meta.essenceAltarId !== altar.id) continue;
+      if (entity.state !== state) changed = true;
+      entity.state = state;
+    }
+    return changed;
+  }
+}
+
+function altarElement(entity: SemanticEntity | undefined): SpellElement | null {
+  if (!entity
+    || entity.archetype !== "station"
+    || entity.station?.kind !== "essence_altar"
+    || entity.meta?.essenceAltar !== true) return null;
+  const element = entity.meta.essenceElement;
+  return element === "wind" || element === "earth" || element === "water" || element === "fire"
+    ? element
+    : null;
 }

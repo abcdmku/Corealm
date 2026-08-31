@@ -24,7 +24,7 @@ describe("magic save migrations", () => {
     delete old.equipment.focus;
 
     const state = migrate(legacy).state;
-    expect(state?.meta.saveVersion).toBe(5);
+    expect(state?.meta.saveVersion).toBe(6);
     expect(state?.world.recoveryCache).toMatchObject({
       position: [1, 2, 3], items: [{ itemId: "air_orb", quantity: 1 }], expiresAtMs: 50_000,
     });
@@ -50,6 +50,7 @@ describe("magic save migrations", () => {
     expect((state?.equipment as unknown as Record<string, unknown>).focus).toBeUndefined();
     expect(state?.magic.weaponCharges.water_staff).toBe(219);
     expect(state?.magic.consumedOrbs.water_orb).toBe(true);
+    expect(state?.magic.awakenedAltars.karrowmoor_water_altar).toBe(true);
   });
 
   it("returns a v3 focus Orb to storage when no wand or staff is equipped", () => {

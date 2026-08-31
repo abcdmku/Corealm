@@ -152,7 +152,7 @@ export type Archetype =
 export type InteractionId =
   | "inspect" | "mine" | "chop" | "fish" | "rake" | "plant" | "harvest"
   | "attack" | "cast" | "talk" | "open" | "enter" | "climb" | "vault"
-  | "loot" | "take" | "produce" | "recharge" | "bank" | "trade" | "equip" | "unequip";
+  | "loot" | "take" | "awaken" | "produce" | "recharge" | "bank" | "trade" | "equip" | "unequip";
 
 /** A production station category. Recipes may accept more than one category. */
 export type StationKind =
@@ -216,7 +216,7 @@ export interface ElementalWeaponChargeSpec {
   initialCharges: number;
   rechargeItemId: ItemId;
   rechargeCost: number;
-  /** The singleton boss drop consumed to craft this charged weapon. */
+  /** The singleton boss drop consumed to awaken this element's altar. */
   orbItemId: ItemId;
   /** False for authored future content such as Fire weapons. */
   released: boolean;
@@ -226,7 +226,7 @@ export interface MagicWeaponSpec {
   kind: MagicWeaponKind;
   /** Wands leave the off hand free. Staffs require it to be empty. */
   hands: 1 | 2;
-  /** Present only after a boss Orb has been crafted into this weapon type. */
+  /** Present only on elemental weapons crafted at an awakened regional altar. */
   charge?: ElementalWeaponChargeSpec;
 }
 
@@ -253,7 +253,7 @@ export interface ItemDef {
   };
   /** Present only on main-hand magic weapons. */
   magicWeapon?: MagicWeaponSpec;
-  /** Present only on boss-drop Orbs used to craft charged elemental weapons. */
+  /** Present only on boss-drop Orbs used to awaken their matching regional altar. */
   orb?: EssenceOrbSpec;
   food?: { healAmount: number };
   tool?: { skill: SkillId; gatherBonus: number };
@@ -494,6 +494,10 @@ export type GameEventType =
    * fizzles short, and this is a single-player simulation where the client already owns the world.
    */
   | "spell.launched"
+  /**
+   * One regional altar awakening. `data` names the altar, element and consumed Orb.
+   */
+  | "essence.altarAwakened"
   /**
    * One completed altar transaction. `data` names the altar, weapon, element and essence item and
    * includes `before`, `after`, and `essenceSpent` so consumers can reconcile the exact change.
@@ -785,6 +789,14 @@ export interface FeatureLabState {
   };
   selectedEntityId: EntityId | null;
   structure: FeatureLabStructureView;
+  altar: {
+    entityId: EntityId;
+    state: "dormant" | "awakened";
+    element: SpellElement;
+    interactions: InteractionId[];
+    orbItemId: ItemId;
+    orbConsumed: boolean;
+  } | null;
   target: {
     kind: FeatureLabTargetKind;
     presetId: string;
@@ -825,7 +837,7 @@ export interface FeatureLabApi {
   setLevel(skillId: SkillId, level: number): FeatureLabState;
   equipPlayer(slot: EquipSlot, itemId: ItemId | null): Promise<FeatureLabState>;
   setSpell(spellId: SpellId): FeatureLabState;
-  perform(action: "attack" | "cast" | "reset-player"): Promise<FeatureLabState>;
+  perform(action: "attack" | "cast" | "reset-player" | "awaken-altar"): Promise<FeatureLabState>;
 }
 
 declare global {

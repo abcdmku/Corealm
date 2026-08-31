@@ -171,6 +171,39 @@ export function assembleFeatureLabStructure(
       structureId: sanitized.id,
     },
   });
+  if (sanitized.kind === "composition" && sanitized.id === "essence_altar_ruins") {
+    for (const entity of entities) {
+      if (entity.view?.assetId === "altar_ruins_site") {
+        entity.state = "dormant";
+        entity.meta = {
+          ...(entity.meta ?? {}),
+          essenceAltarRuins: true,
+          essenceAltarId: STRUCTURE_OWNER_ID,
+          essenceElement: "wind",
+        };
+        continue;
+      }
+      if (entity.view?.assetId !== "rocks_free_essence_node") continue;
+      entity.archetype = "ore";
+      entity.name = "Air Essence";
+      entity.state = "available";
+      entity.interactions = ["inspect", "mine"];
+      entity.requirements = { mining: 1 };
+      entity.resource = {
+        remaining: 12,
+        maxYields: 12,
+        respawnSeconds: 60,
+        itemId: "air_essence",
+      };
+      entity.meta = {
+        ...(entity.meta ?? {}),
+        resourceId: "essence_air",
+        essenceElement: "wind",
+        essenceCache: true,
+        featureLab: true,
+      };
+    }
+  }
   const hero = sanitized.kind === "composition" ? compositionHero(sanitized) : null;
   if (hero) {
     entities.unshift(compositionHeroEntity(hero, sanitized, origin, context.regionId, context.tier, name, measurements));
@@ -297,6 +330,37 @@ function compositionHeroEntity(
     labelHeight: 3.4,
   };
   if (hero.clipFraction !== undefined) view.clipFraction = hero.clipFraction;
+  if (selection.id === "essence_altar_ruins") {
+    return {
+      id: STRUCTURE_OWNER_ID,
+      archetype: "station",
+      name: "Air Essence Altar",
+      tier: 1,
+      regionId: "fallowmarch",
+      position: [
+        origin[0],
+        round2(origin[1] - (measurements?.baseY(hero.assetId) ?? 0) * hero.scale),
+        origin[2],
+      ],
+      state: "dormant",
+      interactions: ["inspect", "awaken"],
+      station: {
+        kind: "essence_altar",
+        skill: "magic",
+        recipeIds: ["craft_air_wand", "craft_air_staff"],
+      },
+      view: { ...view, labelHeight: 1.6, materialTier: 1 },
+      meta: {
+        featureLab: true,
+        compositionHero: true,
+        structureKind: selection.kind,
+        structureId: selection.id,
+        essenceAltar: true,
+        essenceElement: "wind",
+        stationKind: "essence_altar",
+      },
+    };
+  }
   return {
     id: STRUCTURE_OWNER_ID,
     archetype: "landmark",
@@ -324,6 +388,7 @@ function compositionHeroEntity(
 /** The actual semantic anchor paired with each production dressing recipe. */
 export function compositionHero(selection: FeatureLabStructureSelection): CompositionHero | null {
   const fixed: Partial<Record<CompositionId, CompositionHero>> = {
+    essence_altar_ruins: { assetId: "altar_ruins_altar", scale: 1, solid: true },
     vault_door: { assetId: "door_frame_round", scale: 1.5, solid: true },
     milestone: { assetId: "wall_brick_straight", scale: 0.7, solid: true },
     highcairn_crane: { assetId: "corner_wood", scale: 3.2, solid: true },

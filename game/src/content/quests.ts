@@ -614,7 +614,7 @@ const KNOTS_AND_NAMES: QuestDef = {
       { itemId: "air_essence", quantity: 10 },
     ],
     currency: 300,
-    unlocks: ["Juno will explain how a boss Orb can be crafted into an elemental weapon."],
+    unlocks: ["Juno will explain how a boss Orb awakens a regional altar for elemental weapons."],
   },
 };
 
@@ -781,8 +781,8 @@ const BAD_GROUND: QuestDef = {
 
 /**
  * The Magic introduction. Essence powers the starter wand directly. Vess supplies raw palewood,
- * then the production recipes turn it into a Palewood Staff and finally a charged Air Staff using
- * the Tempest Roc's boss-dropped Air Orb.
+ * then the Tempest Roc's boss-dropped Air Orb wakes the cache altar. The awakened altar turns the
+ * Palewood Staff into a charged Air Staff.
  */
 const SPARKING_STONE: QuestDef = {
   id: "sparking_stone",
@@ -831,21 +831,21 @@ const SPARKING_STONE: QuestDef = {
     },
     {
       index: 2,
-      objective: "Fletch Vess's palewood into a staff, craft it with the Air Orb, then equip it.",
+      objective: "Awaken the cache altar with the Air Orb, make an Air Staff there, then equip it.",
       refs: [
         { kind: "item", id: "palewood_log" },
         { kind: "item", id: "palewood_shaft" },
         { kind: "item", id: "palewood_staff" },
         { kind: "item", id: "air_orb" },
         { kind: "item", id: "air_staff" },
-        { kind: "entity", id: "coldbrace_essence_altar" },
-        { kind: "location", id: "town_center" },
+        { kind: "entity", id: "fallowmarch_air_altar" },
+        { kind: "location", id: "fallowmarch_air_cache" },
       ],
       hint:
-        "At a fletching bench, use fletch_palewood_shaft, then fletch_palewood_staff. At a "
-        + "crafting table, make craft_air_staff from that Palewood Staff and the Air Orb. "
-        + "Equip the finished Air Staff. It starts with 1000 charges. Once partly spent, entity "
-        + "coldbrace_essence_altar restores it to 1000 for exactly 100 Air Essence.",
+        "Use interaction awaken on entity fallowmarch_air_altar while carrying the Air Orb. At a "
+        + "fletching bench, use fletch_palewood_shaft, then fletch_palewood_staff. Make "
+        + "craft_air_staff at the awakened altar and equip it. Once partly spent, the same altar "
+        + "restores it to 1000 for exactly 100 Air Essence.",
       completion: { kind: "equipped", itemId: "air_staff" },
     },
     {
@@ -855,12 +855,12 @@ const SPARKING_STONE: QuestDef = {
         { kind: "spell", id: "voltrend" },
         { kind: "enemyFamily", id: "skitterling" },
         { kind: "location", id: "redsill_shallows" },
-        { kind: "entity", id: "coldbrace_essence_altar" },
+        { kind: "entity", id: "fallowmarch_air_altar" },
       ],
       hint:
         "The Air Staff spends its charge before carried Air Essence. Rill Skitterlings near "
         + "locationId redsill_shallows are cheap targets. Recharge at entity "
-        + "coldbrace_essence_altar with 100 Air Essence when needed.",
+        + "fallowmarch_air_altar with 100 Air Essence when needed.",
       completion: { kind: "skill", skill: "magic", level: 5 },
       grants: { xp: { magic: 60 } },
     },

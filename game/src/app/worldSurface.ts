@@ -5,7 +5,11 @@
  * heightfield, while water asks the render scene to solve its exact shoreline.
  */
 import type { Vec3 } from "../contracts.js";
-import { REGIONS, type PavingAssetId } from "../content/regions.js";
+import {
+  ESSENCE_ALTAR_COURT_RADIUS,
+  REGIONS,
+  type PavingAssetId,
+} from "../content/regions.js";
 import { resourceDef } from "../content/resources.js";
 import {
   WorldScene, pavingStampFromRect,
@@ -125,6 +129,18 @@ export function collectPavingStamps(): PavingStamp[] {
         surface: PAVING_SURFACES[paving.assetId],
         kerb: paving.kerb,
       }));
+    }
+    for (const altar of region.stations.filter((station) => station.kind === "essence_altar")) {
+      // The ruin court is the ground itself, not a second plane laid over it. `stone` resolves
+      // through the region palette, so each site uses its local limestone, forest stone, or slate
+      // and the unkerbed edge wears naturally back into the surrounding biome.
+      stamps.push({
+        centre: altar.position,
+        halfExtents: [ESSENCE_ALTAR_COURT_RADIUS, ESSENCE_ALTAR_COURT_RADIUS],
+        rotationY: altar.rotationY,
+        surface: "stone",
+        kerb: false,
+      });
     }
   }
   return stamps;

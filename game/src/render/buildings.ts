@@ -231,6 +231,7 @@ export function isPrefabId(value: string): value is PrefabId {
  * landmark's own hero mesh.
  */
 export type CompositionId =
+  | "essence_altar_ruins"
   | "vault_door"
   | "milestone"
   | "highcairn_crane"
@@ -251,7 +252,7 @@ export type CompositionId =
   | "farm_yard";
 
 export const COMPOSITION_IDS: readonly CompositionId[] = [
-  "vault_door", "milestone", "highcairn_crane", "gravelmaw_mouth", "gravelmaw_exit",
+  "essence_altar_ruins", "vault_door", "milestone", "highcairn_crane", "gravelmaw_mouth", "gravelmaw_exit",
   "great_cairn", "standing_stones", "rootfall_stump", "region_gate", "path_waypoint",
   "root_tunnel_entrance", "canopy_walk_entrance",
   "bank_counter", "forge_yard", "market_pitch", "wood_pile", "garden", "farm_yard",
@@ -2554,6 +2555,7 @@ export function buildComposition(
   const rng = new Rng(seed);
   const kit = BUILDING_KITS[kitId];
   switch (id) {
+    case "essence_altar_ruins": return essenceAltarRuins();
     case "vault_door": return vaultDoor();
     case "milestone": return milestone();
     case "highcairn_crane": return highcairnCrane();
@@ -2573,6 +2575,28 @@ export function buildComposition(
     case "garden": return garden(rng);
     case "farm_yard": return farmYard(rng, kit);
   }
+}
+
+/** Imported altar court with five mineable Essence positions surrounding its semantic altar. */
+function essenceAltarRuins(): PartPlacement[] {
+  const parts: PartPlacement[] = [
+    loose("ruin_site", "altar_ruins_site", 0, 0, 0, 0, 1),
+  ];
+  const count = 5;
+  const radius = 12;
+  for (let index = 0; index < count; index += 1) {
+    const angle = index / count * Math.PI * 2;
+    parts.push(loose(
+      `essence_${index + 1}`,
+      "rocks_free_essence_node",
+      r3(Math.cos(angle) * radius),
+      1.06,
+      r3(Math.sin(angle) * radius),
+      angle + 0.4,
+      0.42,
+    ));
+  }
+  return parts;
 }
 
 /**

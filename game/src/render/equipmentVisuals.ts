@@ -2,7 +2,7 @@
  * Item-to-model mappings, hand sockets, and per-item material treatment for worn gear.
  *
  * Magic weapons use the staff and wand meshes from Blink's FREE - RPG Weapons pack. Every wood
- * tier keeps the same silhouette and changes only its unlit base colour. Orb-crafted elemental
+ * tier keeps the same silhouette and changes only its unlit base colour. Altar-crafted elemental
  * weapons add one small faceted mesh at the crown.
  */
 import * as THREE from "three";

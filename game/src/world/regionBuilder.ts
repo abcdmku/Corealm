@@ -1080,9 +1080,10 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
     pushAssetSolid(ctx, shop.id, position, shop.assetId, scale, shop.rotationY, true);
   }
 
-  for (const station of settlement.stations) {
+  const emitStation = (station: import("../content/regions.js").StationDef, settlementId?: string): void => {
     const scale = drawnScale("station", station.scale, tier);
     const position = place(station.position, station.assetId, scale);
+    const essenceAltar = station.kind === "essence_altar" && station.essenceElement !== undefined;
     ctx.out.push({
       id: station.id,
       archetype: "station",
@@ -1090,8 +1091,8 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
       tier,
       regionId,
       position,
-      state: "idle",
-      interactions: ["inspect", "produce"],
+      state: essenceAltar ? "dormant" : "idle",
+      interactions: essenceAltar ? ["inspect", "awaken"] : ["inspect", "produce"],
       station: { kind: station.kind, skill: station.skill, recipeIds: station.recipeIds },
       view: {
         assetId: station.assetId,
@@ -1099,9 +1100,22 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
         scale: station.scale,
         labelHeight: 1.6,
       },
-      meta: { stationKind: station.kind, settlementId: settlement.id },
+      meta: {
+        stationKind: station.kind,
+        ...(settlementId ? { settlementId } : {}),
+        ...(essenceAltar
+          ? { essenceAltar: true, essenceElement: station.essenceElement }
+          : {}),
+      },
     });
     pushAssetSolid(ctx, station.id, position, station.assetId, scale, station.rotationY, true);
+  };
+
+  for (const station of settlement.stations) {
+    emitStation(station, settlement.id);
+  }
+  for (const station of region.stations) {
+    emitStation(station);
   }
 
   for (const npc of settlement.npcs) {
@@ -1167,7 +1181,17 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
     // the hero mesh moves when its bbox floor is put on the ground.
     const origin = ground(landmark.position);
     const scale = drawnScale("landmark", trueScale(landmark.scale, tier), tier);
-    const position = place(landmark.position, landmark.assetId, scale);
+    const position = landmark.originOnGround
+      ? origin
+      : place(landmark.position, landmark.assetId, scale);
+    const essenceAltar = landmark.assetId === "altar_ruins_site"
+      ? region.stations.find((station) => (
+          station.kind === "essence_altar"
+          && station.essenceElement !== undefined
+          && station.position[0] === landmark.position[0]
+          && station.position[1] === landmark.position[1]
+        ))
+      : undefined;
     ctx.out.push({
       id: landmark.id,
       archetype: "landmark",
@@ -1175,7 +1199,7 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
       tier,
       regionId,
       position,
-      state: "present",
+      state: essenceAltar ? "dormant" : "present",
       interactions: ["inspect"],
       view: {
         assetId: landmark.assetId,
@@ -1183,14 +1207,24 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
         rotationY: landmark.rotationY,
         clipFraction: landmark.clipFraction,
         labelHeight: 4,
-        groundNormal: normal(landmark.position),
-        tiltStrength: TILT_STRENGTH.landmark,
+        ...(landmark.originOnGround
+          ? {}
+          : { groundNormal: normal(landmark.position), tiltStrength: TILT_STRENGTH.landmark }),
       },
-      meta: { blurb: landmark.blurb },
+      meta: {
+        blurb: landmark.blurb,
+        ...(essenceAltar
+          ? {
+              essenceAltarRuins: true,
+              essenceAltarId: essenceAltar.id,
+              essenceElement: essenceAltar.essenceElement!,
+            }
+          : {}),
+      },
     });
     // A landmark clipped to a fraction of its own height is a stump, not a mass; sizing a collider
     // off the uncut bbox would wall off a 7 m circle around a 2 m stub.
-    if (landmark.clipFraction === undefined) {
+    if (landmark.clipFraction === undefined && landmark.solid !== false) {
       pushAssetSolid(ctx, landmark.id, position, landmark.assetId, scale, landmark.rotationY ?? 0, true);
     }
     ctx.locationEntity.set(landmark.id, landmark.id);
@@ -1756,8 +1790,13 @@ function buildCluster(
       ? cluster.heroScale
       : presentationScale(ctx, resource, assetId, id);
     const scale = drawnScale(resource.archetype, viewScale, resource.tier);
-    let spot = spiralSpot(cluster.centre, cluster.radius, index, cluster.count, rng);
-    if (resource.archetype === "tree" || resource.archetype === "ore") {
+    let spot = cluster.ringRadius === undefined
+      ? spiralSpot(cluster.centre, cluster.radius, index, cluster.count, rng)
+      : ringSpot(cluster.centre, cluster.ringRadius, index, cluster.count, rng);
+    // A ritual ring is one authored arrangement. Moving its slots independently to dodge a road
+    // can stack two stones together, so only free-form clusters use the road-clearance retry.
+    if ((resource.archetype === "tree" || resource.archetype === "ore")
+      && cluster.ringRadius === undefined) {
       // Resource clusters are semantic content rather than procedural scatter, so the scatter
       // exclusion registry cannot move them. Retry the same deterministic spiral at finer phases
       // until the solid node clears the worn road and its shoulders.
@@ -2041,6 +2080,16 @@ function spiralSpot(centre: Spot, radius: number, index: number, count: number, 
   const angle = index * goldenAngle + rng.float(-0.22, 0.22);
   const spread = Math.sqrt((index + 0.5) / Math.max(1, count));
   const distance = radius * spread * rng.float(0.82, 1.0);
+  return [
+    round2(centre[0] + Math.cos(angle) * distance),
+    round2(centre[1] + Math.sin(angle) * distance),
+  ];
+}
+
+/** Evenly spaced cache nodes around an altar court, with a small seeded natural wobble. */
+function ringSpot(centre: Spot, radius: number, index: number, count: number, rng: Rng): Spot {
+  const angle = (index / Math.max(1, count)) * Math.PI * 2 + rng.float(-0.1, 0.1);
+  const distance = radius * rng.float(0.94, 1.06);
   return [
     round2(centre[0] + Math.cos(angle) * distance),
     round2(centre[1] + Math.sin(angle) * distance),

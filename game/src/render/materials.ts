@@ -672,22 +672,23 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
 
   // LAID GROUND.
   //
-  // A settlement is paved by stamping the terrain, so the courses have to be drawn rather than
-  // modelled. All three surfaces are the same figure - a grid of units, offset row by row, with a
-  // dark joint between them and a tone per unit - so they cost one code path and the weights below
-  // simply pick its numbers. Drawn in world XZ, so a course is a fixed size in METRES: it runs
+  // A settlement is paved by stamping the terrain, so brick courses and plank runs have to be drawn
+  // rather than modelled. They share a grid of units, offset row by row, with a dark joint between
+  // them and a tone per unit. Gathered cobble keeps the atlas detail underneath. Drawn in world XZ,
+  // so a course is a fixed size in METRES: it runs
   // unbroken across a chunk seam, it does not stretch on a slope, and it costs no texture fetch.
   //
   // Joint width is the authored width PLUS the texel footprint, and it is not clamped, so as the
   // surface recedes the joints widen into the unit tone instead of aliasing into a moire the way a
   // 2 m slab mesh did. Past about 35 m only the vertex swatch is left, which is what should be.
   float paved = vSplatB.z;
-  if ( paved > 0.004 ) {
-    // Three weights summing to 1 across the 0 / 0.5 / 1 codes. Two rects of different surfaces
-    // never touch in the authored settlements, so in practice one of these is 1 and two are 0.
-    float wStone = max( 0.0, 1.0 - vPaved * 2.0 );
-    float wPlank = max( 0.0, vPaved * 2.0 - 1.0 );
-    float wBrick = 1.0 - wStone - wPlank;
+  // Gathered cobble keeps the original ground detail. Only authored brick and plank surfaces draw
+  // unit lines; applying that grid to stone made the altar courts look like fake square bricks.
+  float wStone = max( 0.0, 1.0 - vPaved * 2.0 );
+  float wPlank = max( 0.0, vPaved * 2.0 - 1.0 );
+  float wBrick = 1.0 - wStone - wPlank;
+  float laid = paved * ( 1.0 - wStone );
+  if ( laid > 0.004 ) {
 
     // Unit size in metres. Gathered stone is nearly square and hand sized; a dressed block is a
     // long shallow course; a plank is 2.4 m of sawmill run, 30 cm wide.
@@ -696,15 +697,11 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
     float toneVar = 0.30 * wStone + 0.15 * wBrick + 0.22 * wPlank;
     float jointDark = 0.52 * wStone + 0.60 * wBrick + 0.66 * wPlank;
 
-    // Laid stone is set by eye, so its courses bow; a block course and a deck are laid to a line.
-    // Each sine is PHASE MODULATED by the other axis. A plain sin(x), sin(z) pair warps the grid
-    // into a wave whose own period is legible from three metres up - the square reads as scales -
-    // and one more sine per axis is enough that the eye stops finding the rhythm.
+    // Keep every course on a mason's line. The former stone-only sine warp turned the whole paved
+    // field into broad repeating waves and made an altar court read like scales. Random bond,
+    // per-stone tone, variable joints, and the detail atlas already supply enough irregularity.
     vec2 p = vGroundWorld.xz;
-    vec2 q = p + wStone * 0.10 * vec2(
-      sin( p.y * 3.1 + sin( p.x * 1.7 ) * 1.6 ),
-      sin( p.x * 2.7 + sin( p.y * 1.3 ) * 1.9 )
-    );
+    vec2 q = p;
 
     // Bond. A block wall is a running bond, half a unit per course; stone and plank are staggered
     // at random, because a random stagger is what a mason and a sawyer both actually produce.
@@ -731,13 +728,13 @@ const GROUND_FRAGMENT_BODY = /* glsl */ `
 
     float pavedShade = ( 1.0 - toneVar * 0.5 + toneVar * tone )
       * mix( jointDark, 1.0, face ) * grain * bed;
-    shade = mix( shade, clamp( pavedShade * macroShade, 0.42, 1.46 ), paved );
+    shade = mix( shade, clamp( pavedShade * macroShade, 0.42, 1.46 ), laid );
     // Joints as relief, through the screen-space bump the macro reads already drive. It fades out
     // with the joint, so the grooves are there underfoot and gone by the time they would shimmer.
-    gMacroShade = mix( gMacroShade, macroShade * mix( 0.78, 1.0, face ), paved );
+    gMacroShade = mix( gMacroShade, macroShade * mix( 0.78, 1.0, face ), laid );
     // The gravel channel's warm tint is the bed a slab was set in. The paving IS the ground now,
     // and its hue is the swatch the vertex already carries.
-    tint = mix( tint, vec3( 1.0 ), paved );
+    tint = mix( tint, vec3( 1.0 ), laid );
   }
 
   diffuseColor.rgb *= shade * tint;

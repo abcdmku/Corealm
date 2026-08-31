@@ -5,7 +5,7 @@
 - [x] Root PRD review — approved with corrections R1-R6 (`architecture.md`)
 - [x] Stack de-risked before writing game code (`stack-findings.md`)
 - [x] WebMCP researched before building the adapter (`webmcp-research.md`)
-- [x] Asset pipeline — 213 CC0 GLBs, four Unity-derived magic GLBs, and one Unity-derived VFX atlas (`asset-report.md`)
+- [x] Asset pipeline — 222 CC0 GLBs, six Unity-derived magic GLBs, and one Unity-derived VFX atlas (`asset-report.md`)
 - [x] Round 0 — foundation passes the Chromium smoke test
 - [x] Round 1 — world, movement, navigation
 - [x] Round 1 critique and fix round (`critique-round1.md`)
@@ -16,7 +16,7 @@
 - [x] Round 4 — every High and Medium issue in that report
 - [x] Round 5 — the screens a human needs, built by six parallel workers
 - [x] **Historical Phase 1 gate 27/27, agent proofs 2/2, perf 18/18**
-- [x] Magic amendment: direct Essence casting, Orb-crafted elemental weapons, live weapon charges
+- [x] Magic amendment: exact Altar Ruins Free sites at the three Essence mines, boss-Orb awakening, altar-crafted elemental weapons, live weapon charges, leveled vegetation-free regional-stone courts, and exact ruin collision/navigation
 
 Phase 1 is closed and playable end to end by a human. What remains is Phase 2 content depth,
 listed under "Still open" in the report.

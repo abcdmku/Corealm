@@ -1051,7 +1051,7 @@ function itemsDoc(): string {
             + (item.magicWeapon.charge ? `; ${item.magicWeapon.charge.capacity} ${elementName(item.magicWeapon.charge.element)} charges` : "")
           : "",
         item.orb
-          ? `boss crafting component; makes a ${craftedCharge?.initialCharges ?? 1000}-charge elemental weapon; ${item.orb.released ? "released" : "unreleased"}`
+          ? `boss altar key; awakens its regional altar for ${craftedCharge?.initialCharges ?? 1000}-charge weapons; ${item.orb.released ? "released" : "unreleased"}`
           : "",
         item.food ? `Heals ${item.food.healAmount}` : "",
         item.tool ? `${skillName(item.tool.skill)} +${item.tool.gatherBonus}` : "",
@@ -1367,7 +1367,7 @@ function creatureDoc(creature: EnemyDef): string {
     "## Drops",
     "",
     hasOrbDrop
-      ? "Elemental orbs are singleton crafting rewards. The boss drops its orb when no physical copy exists. Repeat kills do not create a duplicate while that orb is carried, banked, or waiting in loot or recovery. If the copy is lost before crafting, the boss can drop it again. Once consumed to make an elemental weapon, it never drops again."
+      ? "Elemental orbs are singleton altar keys. The boss drops its orb when no physical copy exists. Repeat kills do not create a duplicate while that orb is carried, banked, or waiting in loot or recovery. If the copy is lost before awakening its altar, the boss can drop it again. Once consumed to awaken that altar, it never drops again."
       : "",
     "",
     table(["Drop", "Quantity", "Chance or rule"], dropRows),
@@ -1581,7 +1581,7 @@ function spellsAndShopsDoc(): string {
       itemLink(item.id),
       item.tier,
       elementName(orb.element),
-      `${charge?.initialCharges ?? 1000} charges in the crafted weapon`,
+      "Awakens the regional altar for both weapon types",
       charge ? itemName(charge.rechargeItemId) : "-",
       orb.released ? "Released" : "Future content",
     ];
@@ -1610,13 +1610,13 @@ function spellsAndShopsDoc(): string {
     "",
     "## Elemental orbs",
     "",
-    "Boss orbs are singleton crafting components, not equipment. Combine one with the matching wood-tier wand or staff to create an elemental weapon with 1,000 charges.",
+    "Boss orbs are singleton altar keys, not equipment. Use one on the dormant altar at the matching Essence Cache. The awakened altar then makes both matching wood-tier wands and staffs as elemental weapons with 1,000 charges.",
     "",
-    table(["Orb", "Tier", "Element", "Crafted weapon", "Matching Essence", "Status"], orbRows),
+    table(["Orb", "Tier", "Element", "Use", "Matching Essence", "Status"], orbRows),
     "",
     "## Charged elemental weapons",
     "",
-    "A matching weapon charge pays for the cast first. At zero charge, the weapon keeps casting from carried matching Essence. An Essence Altar consumes 100 matching Essence to refill the equipped weapon to 1,000.",
+    "A matching weapon charge pays for the cast first. At zero charge, the weapon keeps casting from carried matching Essence. The matching awakened Essence Altar consumes 100 Essence to refill the equipped weapon to 1,000.",
     "",
     table(["Weapon", "Element", "Capacity", "Full recharge", "Status"], chargedWeaponRows),
     "",

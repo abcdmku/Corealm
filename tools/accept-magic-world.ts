@@ -398,7 +398,7 @@ try {
       }
       const acquired = itemCount(afterLoot, boss.orbId) === 1;
       if (acquired) acquiredOrbs.add(boss.orbId);
-      else failures.push(`${boss.bossName} reward did not remain as one crafting component`);
+      else failures.push(`${boss.bossName} reward did not remain as one altar key`);
     }
 
     // Use the boss's real 180-second AI respawn timer. No force-respawn debug path participates.
@@ -419,7 +419,7 @@ try {
       failures.push(`repeat ${boss.bossName} kill did not suppress duplicate ${boss.orbName}: ${JSON.stringify({ secondBoss, physicalOrbs })}`);
       if (!secondBoss.killed) await tool("corealm_stop", {});
     }
-    evidence.push(`${boss.bossName}: first drop ${firstOrbDrop.map((row) => `${row.quantity} ${row.itemId}`).join(", ")}; repeat drop omitted ${boss.orbName} while one crafting component remained`);
+    evidence.push(`${boss.bossName}: first drop ${firstOrbDrop.map((row) => `${row.quantity} ${row.itemId}`).join(", ")}; repeat drop omitted ${boss.orbName} while one altar key remained`);
   }
 
   // ---------------------------------------- real crafting, launch spend, save, and browser reload
@@ -429,7 +429,7 @@ try {
   if (bossPathReady) {
     // Six boss kills can legitimately fill all 28 slots. Bank the loot through the public tool,
     // then withdraw only what the remaining acceptance path needs. This also leaves enough room
-    // to unequip the shield for a two-handed staff and craft the boss Orb into a weapon.
+    // to unequip the shield for a two-handed staff, awaken the altar, and craft there.
     await call("teleport", [{ entityId: "coldbrace_bank" }]);
     const bankLoot = await tool("corealm_bank", { op: "depositAll" });
     const withdrawWand = await tool("corealm_bank", {
@@ -481,8 +481,28 @@ try {
     const restoreWand = await tool("corealm_equip", { itemId: "basic_wooden_wand" });
     if (toolError(restoreWand)) failures.push(`could not restore wand after the staff comparison: ${JSON.stringify(restoreWand)}`);
 
+    await call("teleport", [{ entityId: "fallowmarch_air_altar" }]);
+    const awakenCursor = (await getEvents()).nextSeq;
+    const awaken = await tool("corealm_interact", {
+      entityId: "fallowmarch_air_altar",
+      interaction: "awaken",
+    });
+    await driver.wait(150);
+    const afterAwakenInventory = await tool("corealm_inventory", {}) as InventoryView;
+    const awakenedEntities = await call("listEntities", [{ archetype: "station", regionId: "fallowmarch" }]) as EntityView[];
+    const awakenEvents = await getEvents(awakenCursor);
+    const awakenEvent = awakenEvents.events.find((event) => event.type === "essence.altarAwakened");
+    const awakenedAltar = awakenedEntities.find((entity) => entity.id === "fallowmarch_air_altar");
+    if (toolError(awaken) || itemCount(afterAwakenInventory, "air_orb") !== 0
+      || awakenEvent?.data["orbItemId"] !== "air_orb" || awakenedAltar?.state !== "awakened") {
+      failures.push(`Air Altar awakening did not consume one Air Orb and persist semantic state: ${JSON.stringify({
+        awaken, awakenEvent, awakenedAltar,
+      })}`);
+    } else {
+      evidence.push("Air Orb: consumed once to awaken the Air Essence Altar at its cache");
+    }
+
     await call("giveItem", ["palewood_wand", 1, "inventory"]);
-    await call("teleport", [{ entityId: "coldbrace_crafting" }]);
     const craft = await tool("corealm_produce", { recipeId: "craft_air_wand", quantity: 1 });
     await call("setTimeScale", [10]);
     await call("setPaused", [false]);
@@ -492,7 +512,7 @@ try {
     const afterCraft = await tool("corealm_inventory", {}) as InventoryView;
     if (toolError(craft) || itemCount(afterCraft, "air_wand") !== 1
       || itemCount(afterCraft, "air_orb") !== 0 || itemCount(afterCraft, "palewood_wand") !== 0) {
-      failures.push(`Air Wand crafting did not consume one Palewood Wand and Air Orb: ${JSON.stringify({ craft, afterCraft })}`);
+      failures.push(`Awakened Air Altar did not turn one Palewood Wand into one Air Wand: ${JSON.stringify({ craft, afterCraft })}`);
     }
     const equipAirWand = await tool("corealm_equip", { itemId: "air_wand" });
     const craftedBook = await tool("corealm_spellbook", { op: "read" }) as SpellbookView;
@@ -500,7 +520,7 @@ try {
       || craftedBook.equippedWeapon.charges !== 1_000 || craftedBook.equippedWeapon.capacity !== 1_000) {
       failures.push(`crafted Air Wand did not equip at 1000/1000: ${JSON.stringify({ equipAirWand, weapon: craftedBook.equippedWeapon })}`);
     } else {
-      evidence.push("Air Orb + Palewood Wand: crafted and equipped Air Wand at 1000/1000");
+      evidence.push("Awakened Air Altar + Palewood Wand: crafted and equipped Air Wand at 1000/1000");
     }
 
     const enemies = await call("listEntities", [{ archetype: "enemy", regionId: "fallowmarch" }]) as EntityView[];
@@ -568,11 +588,11 @@ try {
 
       // --------------------------- altar rejections, exact payment, immediate save, full refusal
 
-      await call("teleport", [{ entityId: "coldbrace_essence_altar" }]);
+      await call("teleport", [{ entityId: "fallowmarch_air_altar" }]);
       const inventoryWithMinedAir = await tool("corealm_inventory", {}) as InventoryView;
       const minedAir = itemCount(inventoryWithMinedAir, "air_essence");
       const insufficient = await tool("corealm_interact", {
-        entityId: "coldbrace_essence_altar",
+        entityId: "fallowmarch_air_altar",
         interaction: "recharge",
       });
       const afterInsufficient = await tool("corealm_inventory", {}) as InventoryView;
@@ -588,7 +608,7 @@ try {
       await call("giveItem", ["earth_essence", 100, "inventory"]);
       const beforeWrongEssence = await tool("corealm_inventory", {}) as InventoryView;
       const wrongEssence = await tool("corealm_interact", {
-        entityId: "coldbrace_essence_altar",
+        entityId: "fallowmarch_air_altar",
         interaction: "recharge",
       });
       const afterWrongEssence = await tool("corealm_inventory", {}) as InventoryView;
@@ -600,7 +620,7 @@ try {
 
       const equipPlainWand = await tool("corealm_equip", { itemId: "basic_wooden_wand" });
       const plainWeapon = await tool("corealm_interact", {
-        entityId: "coldbrace_essence_altar",
+        entityId: "fallowmarch_air_altar",
         interaction: "recharge",
       });
       const restoreAirWand = await tool("corealm_equip", { itemId: "air_wand" });
@@ -613,7 +633,7 @@ try {
       const rechargeCursor = (await getEvents()).nextSeq;
       const beforeRechargeInventory = await tool("corealm_inventory", {}) as InventoryView;
       const recharge = await tool("corealm_interact", {
-        entityId: "coldbrace_essence_altar",
+        entityId: "fallowmarch_air_altar",
         interaction: "recharge",
       });
       await driver.wait(150);
@@ -655,7 +675,7 @@ try {
       }
 
       const fullRetry = await tool("corealm_interact", {
-        entityId: "coldbrace_essence_altar",
+        entityId: "fallowmarch_air_altar",
         interaction: "recharge",
       });
       const afterRetryInventory = await tool("corealm_inventory", {}) as InventoryView;
@@ -668,10 +688,49 @@ try {
     failures.push("spell, persistence, and altar checks skipped because all three boss orbs were not acquired");
   }
 
+  // The exact imported ruin mesh is part of Recast. A route aimed through the central monument
+  // must bend around it at all three sites, while the surrounding court remains ordinary navmesh.
+  for (const altarId of [
+    "fallowmarch_air_altar",
+    "vellenwood_earth_altar",
+    "karrowmoor_water_altar",
+  ]) {
+    const altar = await call("getEntity", [altarId]) as EntityView | null;
+    if (!altar) {
+      failures.push(`${altarId}: missing while checking ruin collision`);
+      continue;
+    }
+    const [x, y, z] = altar.position;
+    const path = await call("getNavPath", [
+      [x + 0.2, y, z - 7],
+      [x + 0.2, y, z + 2],
+    ]) as Array<{ x: number; y: number; z: number }> | null;
+    const pathLength = path?.slice(1).reduce((sum, point, index) => {
+      const previous = path[index]!;
+      return sum + Math.hypot(point.x - previous.x, point.z - previous.z);
+    }, 0) ?? 0;
+    if (!path || path.length < 3 || pathLength <= 9.4) {
+      failures.push(`${altarId}: navigation did not route around the imported central stone (${pathLength.toFixed(2)} m)`);
+    } else {
+      evidence.push(`${altarId}: imported ruin collision bends a 9.00 m crossing into ${pathLength.toFixed(2)} m over ${path.length} path points`);
+    }
+  }
+
   if (capture) {
-    await call("focusEntity", ["coldbrace_essence_altar"]);
-    await driver.wait(1_000);
-    await driver.screenshot(screenshotDir, "magic-07-essence-altar");
+    for (const site of [
+      { id: "fallowmarch_air_altar", shot: "magic-07-air-altar-court" },
+      { id: "vellenwood_earth_altar", shot: "magic-08-earth-altar-court" },
+      { id: "karrowmoor_water_altar", shot: "magic-09-water-altar-court" },
+    ]) {
+      const altar = await call("getEntity", [site.id]) as EntityView | null;
+      if (altar?.state === "dormant") {
+        await call("teleport", [{ entityId: site.id }]);
+        await tool("corealm_interact", { entityId: site.id, interaction: "awaken" });
+      }
+      await call("focusEntity", [site.id]);
+      await driver.wait(1_000);
+      await driver.screenshot(screenshotDir, site.shot);
+    }
     await call("seedMagic", [10, 150]);
     await closePlayerShot("magic-02-water-staff-charged");
     await driver.press("b");

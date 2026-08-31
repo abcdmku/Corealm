@@ -1001,10 +1001,10 @@ const JUNO: DialogueNodeDef[] = [
   {
     id: "juno_shards",
     text:
-      "Essence powers a plain wand or staff directly. A boss orb is a crafting part: combine it "
-      + "with the matching wooden weapon to make an elemental weapon with a thousand charges. That "
-      + "weapon spends its charge first, then falls back to carried Essence. An Essence Altar uses "
-      + "a hundred matching Essence to refill the weapon.",
+      "Essence powers a plain wand or staff directly. A boss orb wakes the matching altar at that "
+      + "region's Essence Cache. Once it is lit, the altar can turn either matching wooden weapon "
+      + "into an elemental one with a thousand charges. That weapon spends its charge first, then "
+      + "falls back to carried Essence. The same altar uses a hundred matching Essence to refill it.",
     options: [
       { id: "juno_shards#back", text: "Something else.", next: "juno_root" },
       LEAVE("juno_shards#bye"),
@@ -1318,8 +1318,9 @@ const VESS: DialogueNodeDef[] = [
           { kind: "questStage", questId: "sparking_stone", min: 2, max: 2, reason: "" },
         ],
         text:
-          "Fletch the palewood into shafts and a staff, then take that staff and the Air Orb to a "
-          + "crafting table. Make the Air Staff, then put that in your main hand.",
+          "Take the Air Orb to the ruined altar at the Air Essence Cache and wake it. Then fletch "
+          + "the palewood into shafts and a staff, use the awakened altar to make the Air Staff, "
+          + "and put it in your main hand.",
       },
       {
         when: [
@@ -1327,8 +1328,8 @@ const VESS: DialogueNodeDef[] = [
           { kind: "questStage", questId: "sparking_stone", min: 3, max: 3, reason: "" },
         ],
         text:
-          "Now Voltrend. Get Magic to five. Use Rill Skitterlings, and use the Coldbrace altar if "
-          + "you somehow chew through a thousand charges.",
+          "Now Voltrend. Get Magic to five. Use Rill Skitterlings, and return to the awakened Air "
+          + "Altar if you somehow chew through a thousand charges.",
       },
       {
         when: [
@@ -1359,7 +1360,7 @@ const VESS: DialogueNodeDef[] = [
           {
             kind: "questStage", questId: "sparking_stone", min: 4,
             reason:
-              "Kill the Tempest Roc, loot its Air Orb, craft and equip the Air Staff, and get Magic to 5 first.",
+              "Kill the Tempest Roc, loot its Air Orb, awaken the Air Altar, make and equip the Air Staff, and get Magic to 5 first.",
           },
           {
             kind: "item", itemId: "kaldite_ore", quantity: 6,
@@ -1387,8 +1388,9 @@ const VESS: DialogueNodeDef[] = [
       + "looking. I want somebody to put something in it on purpose so I can stop imagining what "
       + "it is holding. Here. Palewood from my brother's stock and 100 Air Essence. The Air Orb is "
       + "not mine to give. Go back to Fallowmarch, kill the Tempest Roc west of the Air Essence Cache, and "
-      + "take its orb. Fletch the wood into a staff, craft the orb and staff into an Air Staff, "
-      + "get Magic to five, and bring me six ore.",
+      + "take its orb. Use it on the ruined altar at the cache, then fletch the wood into a staff "
+      + "and make an Air Staff at the awakened altar. "
+      + "Get Magic to five, and bring me six ore.",
     options: [
       {
         id: "vess_stone_offer#accept",
@@ -1414,9 +1416,9 @@ const VESS: DialogueNodeDef[] = [
       + "The Tempest Roc, entity tempest_roc, nests about 42 metres west of the Air Essence Cache. "
       + "Loot the Air Orb from the pile it leaves. The drop is guaranteed, but it does not jump "
       + "into your bag. At a fletching bench, use fletch_palewood_shaft and "
-      + "fletch_palewood_staff. At a crafting table, combine that staff with the orb using recipe "
-      + "craft_air_staff. Equip the Air Staff. It starts with 1000 charges and spends those before "
-      + "carried Air Essence. Entity coldbrace_essence_altar fills it back to 1000 for exactly 100 "
+      + "fletch_palewood_staff. Use the Air Orb on entity fallowmarch_air_altar to awaken it, then "
+      + "use recipe craft_air_staff at that altar. Equip the Air Staff. It starts with 1000 charges "
+      + "and spends those before carried Air Essence. The same altar fills it back to 1000 for 100 "
       + "Air Essence. Then use Voltrend on Rill Skitterlings near locationId "
       + "redsill_shallows. Do not practise on Cairnwights.",
     options: [

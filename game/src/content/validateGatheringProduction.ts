@@ -91,7 +91,7 @@ const RECIPE_COMPATIBILITY = {
   smelt: { skill: "smithing", stations: ["furnace"] },
   smith: { skill: "smithing", stations: ["anvil"] },
   cook: { skill: "cooking", stations: ["range", "campfire"] },
-  craft: { skill: "crafting", stations: ["crafting_table"] },
+  craft: { skill: "crafting", stations: ["crafting_table", "essence_altar"] },
   fletch: { skill: "fletching", stations: ["fletching_bench"] },
 } as const satisfies Readonly<Record<
   RecipeDef["kind"],
@@ -238,11 +238,15 @@ function canonicalTierRecipeExpectations(
     },
     {
       ...craft("elemental wand", tier.magic.wand),
-      requiredInputItemIds: [m.wand, tier.magic.orb],
+      stations: ["essence_altar"],
+      requiredInputItemIds: [m.wand],
+      forbiddenInputItemIds: [tier.magic.orb],
     },
     {
       ...craft("elemental staff", tier.magic.staff),
-      requiredInputItemIds: [m.staff, tier.magic.orb],
+      stations: ["essence_altar"],
+      requiredInputItemIds: [m.staff],
+      forbiddenInputItemIds: [tier.magic.orb],
     },
     craft("melee ring", m.meleeRing),
     craft("melee pendant", m.meleePendant),
@@ -630,10 +634,14 @@ export function validateGatheringProduction(
         problems.push(`recipe ${recipe.id} references invalid station kind "${station}"`);
       }
     }
-    if (compatibility && (stations.length !== compatibility.stations.length
-      || compatibility.stations.some((station) => !stations.includes(station)))) {
+    if (compatibility && stations.some((station) => (
+      !(compatibility.stations as readonly string[]).includes(station)
+    ))) {
+      const expectedStations = compatibility.stations.length === 1
+        ? compatibility.stations[0]
+        : `one of ${compatibility.stations.join(" or ")}`;
       problems.push(
-        `recipe ${recipe.id} kind ${recipe.kind} must use ${compatibility.stations.join(" and ")}`,
+        `recipe ${recipe.id} kind ${recipe.kind} must use ${expectedStations}`,
       );
     }
     if (recipe.kind === "cook") {

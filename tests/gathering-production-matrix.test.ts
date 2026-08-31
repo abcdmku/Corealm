@@ -129,14 +129,12 @@ describe("generated gathering and production matrix", () => {
       expect(inputQuantities(recipeProducing(items.wand, tier))).toEqual({ [items.shaft]: 2 });
       expect(inputQuantities(recipeProducing(items.rod, tier))).toEqual({ [items.shaft]: 2, [items.hide]: 1 });
       expect(inputQuantities(recipeProducing(items.shield, tier))).toEqual({ [items.log]: 2, [items.bar]: 1 });
-      expect(inputQuantities(recipeProducing(definition.magic.wand, tier))).toEqual({
-        [items.wand]: 1,
-        [definition.magic.orb]: 1,
-      });
-      expect(inputQuantities(recipeProducing(definition.magic.staff, tier))).toEqual({
-        [items.staff]: 1,
-        [definition.magic.orb]: 1,
-      });
+      const elementalWand = recipeProducing(definition.magic.wand, tier);
+      expect(elementalWand.stations).toEqual(["essence_altar"]);
+      expect(inputQuantities(elementalWand)).toEqual({ [items.wand]: 1 });
+      const elementalStaff = recipeProducing(definition.magic.staff, tier);
+      expect(elementalStaff.stations).toEqual(["essence_altar"]);
+      expect(inputQuantities(elementalStaff)).toEqual({ [items.staff]: 1 });
     }
   });
 

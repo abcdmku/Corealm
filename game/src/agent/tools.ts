@@ -174,10 +174,12 @@ export function createTools(api: GameApi): ToolDef[] {
       name: "corealm_interact",
       description:
         "Perform an interaction on an entity: mine, chop, fish, rake, plant, harvest, talk, open, "
-        + "climb, vault, loot, take, produce, recharge, bank, trade, inspect. If the character is out of "
+        + "climb, vault, loot, take, awaken, produce, recharge, bank, trade, inspect. If the character is out of "
         + "range this walks them into range first, exactly as a human click does. Gathering "
         + "interactions continue after one call until the node is depleted, the pack is full, or you stop. "
-        + "For recharge, target any Essence Altar while a charged Air, Earth, or Water wand or staff is "
+        + "Use awaken on a dormant regional Essence Altar while carrying its matching boss Orb. The Orb is "
+        + "consumed once and the altar remains active. For recharge, target that awakened altar while a "
+        + "matching charged Air, Earth, or Water wand or staff is "
         + "equipped. The altar atomically spends exactly 100 matching essence and fills that weapon "
         + "to 1000 charges. A full weapon or insufficient essence rejects without taking anything. If this "
         + "call starts a walk, wait for navigation.completed and then for essence.recharged; routed "
@@ -208,7 +210,7 @@ export function createTools(api: GameApi): ToolDef[] {
       description:
         "Equip an inventory item, or unequip a worn slot. Equipping checks skill requirements and "
         + "returns REQUIREMENTS_NOT_MET with the reason if the character does not qualify. Wands and "
-        + "staffs occupy mainHand. Boss Orbs are crafting components and cannot be equipped.",
+        + "staffs occupy mainHand. Boss Orbs are altar keys and cannot be equipped.",
       inputSchema: obj({
         itemId: STR("Item to equip"),
         unequipSlot: {

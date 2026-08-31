@@ -50,8 +50,8 @@ description: "Production recipes generated from the live game tables."
 
 | Recipe | Level | Station | Ingredients | Makes | Time | XP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Air Wand | 1 | crafting_table | 1× Palewood Wand + 1× Air Orb | 1× Air Wand | 1.8 s | 24 |
-| Air Staff | 1 | crafting_table | 1× Palewood Staff + 1× Air Orb | 1× Air Staff | 1.8 s | 32 |
+| Air Wand | 1 | essence_altar | 1× Palewood Wand | 1× Air Wand | 1.8 s | 24 |
+| Air Staff | 1 | essence_altar | 1× Palewood Staff | 1× Air Staff | 1.8 s | 32 |
 | Grithe Ring | 1 | crafting_table | 1× Grithe Bar + 1× Pale Quartz | 1× Grithe Ring | 2.4 s | 30 |
 | Grithe Pendant | 1 | crafting_table | 1× Grithe Bar + 1× Pale Quartz | 1× Grithe Pendant | 2.4 s | 30 |
 | Ember Ring | 1 | crafting_table | 1× Grithe Bar + 2× Pale Quartz | 1× Ember Ring | 2.4 s | 30 |
@@ -61,8 +61,8 @@ description: "Production recipes generated from the live game tables."
 | Marchhide Hood | 1 | crafting_table | 1× Coarse Hide | 1× Marchhide Hood | 3.0 s | 25 |
 | Marchhide Boots | 1 | crafting_table | 1× Coarse Hide | 1× Marchhide Boots | 3.0 s | 25 |
 | Marchhide Wraps | 1 | crafting_table | 1× Coarse Hide | 1× Marchhide Wraps | 3.0 s | 25 |
-| Earth Wand | 5 | crafting_table | 1× Duskoak Wand + 1× Earth Orb | 1× Earth Wand | 1.8 s | 58 |
-| Earth Staff | 5 | crafting_table | 1× Duskoak Staff + 1× Earth Orb | 1× Earth Staff | 1.8 s | 77 |
+| Earth Wand | 5 | essence_altar | 1× Duskoak Wand | 1× Earth Wand | 1.8 s | 58 |
+| Earth Staff | 5 | essence_altar | 1× Duskoak Staff | 1× Earth Staff | 1.8 s | 77 |
 | Corven Ring | 5 | crafting_table | 1× Corven Bar + 1× Vell Amber | 1× Corven Ring | 2.4 s | 72 |
 | Corven Pendant | 5 | crafting_table | 1× Corven Bar + 1× Vell Amber | 1× Corven Pendant | 2.4 s | 72 |
 | Stone Ring | 5 | crafting_table | 1× Corven Bar + 2× Vell Amber | 1× Stone Ring | 2.4 s | 72 |
@@ -72,8 +72,8 @@ description: "Production recipes generated from the live game tables."
 | Bramblehide Hood | 5 | crafting_table | 1× Bramble Hide | 1× Bramblehide Hood | 3.0 s | 60 |
 | Bramblehide Boots | 5 | crafting_table | 1× Bramble Hide | 1× Bramblehide Boots | 3.0 s | 60 |
 | Bramblehide Wraps | 5 | crafting_table | 1× Bramble Hide | 1× Bramblehide Wraps | 3.0 s | 60 |
-| Water Wand | 10 | crafting_table | 1× Cairnpine Wand + 1× Water Orb | 1× Water Wand | 1.8 s | 84 |
-| Water Staff | 10 | crafting_table | 1× Cairnpine Staff + 1× Water Orb | 1× Water Staff | 1.8 s | 112 |
+| Water Wand | 10 | essence_altar | 1× Cairnpine Wand | 1× Water Wand | 1.8 s | 84 |
+| Water Staff | 10 | essence_altar | 1× Cairnpine Staff | 1× Water Staff | 1.8 s | 112 |
 | Kaldite Ring | 10 | crafting_table | 1× Kaldite Bar + 1× Cairn Garnet | 1× Kaldite Ring | 2.4 s | 105 |
 | Kaldite Pendant | 10 | crafting_table | 1× Kaldite Bar + 1× Cairn Garnet | 1× Kaldite Pendant | 2.4 s | 105 |
 | Storm Ring | 10 | crafting_table | 1× Kaldite Bar + 2× Cairn Garnet | 1× Storm Ring | 2.4 s | 105 |

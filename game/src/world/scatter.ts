@@ -94,7 +94,15 @@ import {
 
 // ------------------------------------------------------------- exclusions
 
-export type ExclusionKind = "building" | "settlement" | "road" | "cluster" | "spawn" | "water" | "custom";
+export type ExclusionKind =
+  | "building"
+  | "settlement"
+  | "road"
+  | "cluster"
+  | "spawn"
+  | "water"
+  | "ritual"
+  | "custom";
 
 interface CircleZone { kind: ExclusionKind; id: string; x: number; z: number; radius: number }
 interface RectZone {
@@ -1560,6 +1568,7 @@ const TREE_EXCLUSION: ExclusionProfile = {
     road: { hard: 5, fade: 12 },
     cluster: { hard: 5, fade: 10 },
     spawn: { hard: 9, fade: 20 },
+    ritual: { hard: 1, fade: 8 },
   },
   authored: { hard: 6, fade: 12 },
 };
@@ -1579,6 +1588,7 @@ const SHRUB_EXCLUSION: ExclusionProfile = {
     road: { hard: 3, fade: 6 },
     cluster: { hard: -6, fade: 8 },
     spawn: { hard: 4, fade: 12 },
+    ritual: { hard: 1, fade: 6 },
   },
   authored: { hard: 2.5, fade: 6 },
 };
@@ -1606,6 +1616,7 @@ const COVER_EXCLUSION: ExclusionProfile = {
     road: { hard: 1.4, fade: 2.6 },
     cluster: { hard: -30, fade: 4 },
     spawn: { hard: 1, fade: 6 },
+    ritual: { hard: 0.75, fade: 4 },
   },
   authored: { hard: 0.8, fade: 2.5 },
   // Only structural footprints use this close band. Paving, walls, doors/roads, stations and
@@ -1622,6 +1633,7 @@ const LITTER_EXCLUSION: ExclusionProfile = {
     road: { hard: -1, fade: 2 },
     cluster: { hard: -30, fade: 3 },
     spawn: { hard: 0.5, fade: 4 },
+    ritual: { hard: 0.5, fade: 3 },
   },
   authored: { hard: 0.5, fade: 2 },
 };

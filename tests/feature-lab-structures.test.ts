@@ -141,6 +141,54 @@ describe("feature-lab structure selection", () => {
 });
 
 describe("feature-lab structure assembly", () => {
+  it("builds a dormant production altar inside the imported ruins with five mineable Essence nodes", () => {
+    const selection: FeatureLabStructureSelection = {
+      kind: "composition",
+      id: "essence_altar_ruins",
+      kit: "plaster",
+      width: 6,
+      depth: 4,
+      seed: 0,
+    };
+    const assembly = assembleFeatureLabStructure(selection, [0, 0, 0]);
+    const altar = assembly.entities.find((entity) => entity.id === OWNER_ID);
+    const ruins = assembly.entities.find((entity) => entity.view?.assetId === "altar_ruins_site");
+    const nodes = assembly.entities.filter((entity) => entity.meta?.essenceCache === true);
+
+    expect(altar).toMatchObject({
+      archetype: "station",
+      name: "Air Essence Altar",
+      state: "dormant",
+      interactions: ["inspect", "awaken"],
+      station: {
+        kind: "essence_altar",
+        recipeIds: ["craft_air_wand", "craft_air_staff"],
+      },
+      view: { assetId: "altar_ruins_altar", scale: 1 },
+      meta: { essenceAltar: true, essenceElement: "wind" },
+    });
+    expect(ruins).toMatchObject({
+      state: "dormant",
+      view: { assetId: "altar_ruins_site", scale: 1 },
+      meta: {
+        essenceAltarRuins: true,
+        essenceAltarId: OWNER_ID,
+        essenceElement: "wind",
+      },
+    });
+    expect(nodes).toHaveLength(5);
+    for (const node of nodes) {
+      expect(node).toMatchObject({
+        archetype: "ore",
+        state: "available",
+        interactions: ["inspect", "mine"],
+        resource: { itemId: "air_essence" },
+        view: { assetId: "rocks_free_essence_node" },
+      });
+      expect(Math.hypot(node.position[0], node.position[2])).toBeCloseTo(12, 2);
+    }
+  });
+
   it("dispatches prefabs through production parts and collision", () => {
     const selection: FeatureLabStructureSelection = {
       kind: "prefab",

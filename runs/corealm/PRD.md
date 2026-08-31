@@ -8,6 +8,26 @@ Everything here is meant to be implemented literally. Where a number appears, it
 
 ---
 
+## Approved amendment: regional essence altar rites
+
+The project owner approved this amendment on August 30, 2026 by directing the altar move, the Altar Ruins Free art swap, and the boss-Orb activation loop. It replaces the earlier rule that town altars only recharge weapons and that a crafting table consumes one Orb per elemental weapon.
+
+- Fallowmarch, Vellenwood, and Karrowmoor each have one Essence Altar at their Air, Earth, or Water Essence Cache. The three town altars are removed.
+- Each site uses the locally cached Altar Ruins Free package. The rectangular altar is the interactable station. A ruined stone court surrounds it, and the matching mineable Essence nodes ring the court.
+- An altar starts dormant and emits no elemental light. The altar and full ruined court retain their authored stone detail with a readable region-appropriate base: worn pale limestone in Fallowmarch, light mossed forest stone in Vellenwood, and pale cold slate in Karrowmoor. A subtle hue shift still identifies the matching element.
+- Every ruin sits on a fully leveled, locally paved stone court. The court clears trees, shrubs, grass, flowers, and loose litter beyond the structure and node ring; it never exposes a grass or dirt floor beneath the ruin.
+- The imported ruin triangles participate in both physics and navigation. Players can walk on the circular platforms and through open arches, while columns, walls, debris, and the central monument remain solid and route paths around them.
+- The matching region boss keeps its guaranteed Orb drop: the Tempest Roc drops Air, the Rootheart drops Earth, and Ordrun drops Water.
+- Using the matching Orb on a dormant altar consumes the Orb, permanently awakens that altar in the save, and emits an `essence.altarAwakened` event. This boss, loot, travel, and awakening sequence is the region's altar mini quest.
+- An awakened altar makes both matching elemental weapon types from their wooden base weapon. The Orb is the altar's one-time key and is not an input to each weapon. Air accepts Palewood, Earth accepts Duskoak, and Water accepts Cairnpine.
+- Only an awakened altar can open its two weapon recipes or recharge a weapon. Recharge keeps the existing cost of 100 matching Essence and restores the weapon to 1,000 charges.
+- Awakening deepens the full structure's element colour: pale cyan for Air, green for Earth, and slate blue for Water. The altar gains a sparse emissive channel, a second line below the tabletop, and a glowing circular emblem while the surrounding court keeps its weathered-stone texture under the stronger colour wash.
+- Existing saves that already consumed an Orb awaken the matching altar during migration, so the amendment does not take progress away.
+
+Acceptance requires focused state and migration tests, a production-backed feature-lab fixture proving dormant and awakened visuals plus the Orb interaction, and final-world Chromium proof at all three authored cache sites.
+
+---
+
 ## Approved amendment: gathering and production foundation
 
 This amendment replaces conflicting Phase 1 gathering, production, resource-presentation, and asset decisions elsewhere in this document. It keeps the current level 1, 5, and 10 materials, formulas, regions, node ids, quests, inventory rules, and production timings.

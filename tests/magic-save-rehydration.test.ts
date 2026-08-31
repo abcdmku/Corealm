@@ -47,7 +47,7 @@ describe("save migration and runtime container rehydration", () => {
     const loaded = new SaveService().deserialize(JSON.stringify(legacy));
 
     expect(loaded.status).toBe("loaded");
-    expect(loaded.state?.meta.saveVersion).toBe(5);
+    expect(loaded.state?.meta.saveVersion).toBe(6);
     expect(loaded.state?.skills.magic).toEqual({ xp: 0, level: 1 });
     expect(loaded.state?.equipment.mainHand).toEqual({ itemId: "air_wand", quantity: 1 });
     expect((loaded.state?.equipment as unknown as Record<string, unknown>).focus).toBeUndefined();

@@ -4,16 +4,16 @@ Owner: asset-pipeline specialist. Files: `tools/fetch-assets.ts`, `tools/build-a
 `game/public/assets/**`, this report.
 
 The original 213-asset Quaternius set is **CC0-1.0**. The current asset tree is not all CC0.
-It also contains four GLBs imported from two packages in the user's Unity Asset Store cache. Those
+It also contains six GLBs imported from three packages in the user's Unity Asset Store cache. Those
 files remain subject to the Unity Asset Store EULA; a local cache does not prove entitlement, so the
 project owner must confirm it before shipping. Do not redistribute the source packages or describe
 the Unity-derived files as CC0. Package hashes and conversion details
 live in `game/public/assets/UNITY_ASSET_SOURCES.md`.
 
-Current manifest total: 217 GLBs across 11 packs, plus one recorded VFX atlas artifact. Of those,
-213 GLBs across eight packs are the historical Quaternius output described by the legacy pipeline
-sections below. The four Unity-derived magic assets add 14,662,376 bytes, bringing the models tree
-to 52,243,424 bytes; the eleventh pack is Hovl Studio's atlas source.
+Current manifest total: 228 GLBs across 13 packs, plus one recorded VFX atlas artifact. Of those,
+222 GLBs are CC0 Quaternius outputs, including the 213 historical assets described by the legacy
+pipeline sections below. The six Unity-derived magic assets total 39,842,824 bytes and bring the
+models tree to 77,613,808 bytes. Hovl Studio's atlas is recorded separately.
 
 ## Commands
 
@@ -22,9 +22,9 @@ npx tsx tools/fetch-assets.ts <itch-slug> [...]   # download packs into .asset-c
 npx tsx tools/build-assets.ts                     # incremental build -> game/public/assets/
 npx tsx tools/build-assets.ts --force             # rebuild everything
 npx tsx tools/build-assets.ts --check             # check the legacy Quaternius catalogue
-npx tsx tools/build-assets.ts --verify            # verify all 217 GLBs and the recorded atlas
+npx tsx tools/build-assets.ts --verify            # verify all 228 GLBs and the recorded atlas
 npx tsx tools/build-assets.ts --preservation-check # prove a legacy rebuild retains imported rows
-npx tsx tools/import-unity-magic-assets.ts         # audit the four Unity-derived magic GLBs
+npx tsx tools/import-unity-magic-assets.ts         # audit the six Unity-derived magic GLBs
 ```
 
 ## Packs used
@@ -81,8 +81,8 @@ existing modern packs.
 
 ## Legacy Quaternius pipeline size
 
-The table below covers the original 213 Quaternius GLBs only. The four Unity-derived outputs add
-14,662,376 bytes, bringing the current models tree to 52,243,424 bytes.
+The table below covers the original 213 Quaternius GLBs only. Nine later CC0 rig and animation
+outputs plus the six Unity-derived magic assets bring the current models tree to 77,613,808 bytes.
 
 | | bytes |
 |---|---|
@@ -227,9 +227,9 @@ scale at instantiation.
 
 ## Manifest
 
-`game/public/assets/manifest.json`, 217 GLB assets, one atlas artifact, and 11 packs. Eight packs and
-213 assets are CC0 Quaternius imports. Three source packs cover the four Unity-derived GLBs and the
-one Unity-derived VFX atlas described above.
+`game/public/assets/manifest.json`, 228 GLB assets, one atlas artifact, and 13 packs. Ten packs and
+222 assets are CC0 Quaternius imports. Three source packs cover the six Unity-derived GLBs; the
+Unity-derived VFX atlas is described above.
 The manifest shape matches the frozen contract
 exactly: `generatedAt`, `packs[{id,name,author,source,license}]`,
 `assets[{id,file,pack,category,is,tags,bytes,size:{x,y,z},animations,materials}]`.
@@ -362,7 +362,7 @@ Ordered by how much they hurt Phase 1.
    `training_dummy` (a post with a stuffed torso — reads correctly at distance).
 6. **The physical weapon set now includes a wand and staff.** Blink's `FREE - RPG Weapons`
    supplies `rpg_weapon_wand` and `rpg_weapon_staff`; the torch substitute is retired. Runtime
-   materials produce the four solid wood bases. Orb-crafted elemental weapon variants add the
+   materials produce the four solid wood bases. Altar-crafted elemental weapon variants add the
    glowing socket; the Orb itself is never equipped. The Quaternius set still has no bow, hammer,
    or fishing rod. Hammer can reuse the
    axe mesh; fishing can keep the empty-hand `Idle_Rail_Loop`; bow still has no suitable substitute.

@@ -37,7 +37,7 @@ description: "The Rootheart spawn locations, combat stats, and drops."
 
 ## Drops
 
-Elemental orbs are singleton crafting rewards. The boss drops its orb when no physical copy exists. Repeat kills do not create a duplicate while that orb is carried, banked, or waiting in loot or recovery. If the copy is lost before crafting, the boss can drop it again. Once consumed to make an elemental weapon, it never drops again.
+Elemental orbs are singleton altar keys. The boss drops its orb when no physical copy exists. Repeat kills do not create a duplicate while that orb is carried, banked, or waiting in loot or recovery. If the copy is lost before awakening its altar, the boss can drop it again. Once consumed to awaken that altar, it never drops again.
 
 | Drop | Quantity | Chance or rule |
 | --- | --- | --- |
