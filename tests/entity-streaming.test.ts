@@ -183,9 +183,66 @@ describe("EntityActiveSet", () => {
     expect(ids(active.selected())).toEqual(["far", "near"]);
     expect(active.stats()).toMatchObject({ selected: 2, fullResidency: true });
   });
+
+  it("keeps static structures in a wider ring without retaining distant actors", () => {
+    const nearActor = { ...entity("near-actor", "fallowmarch", [10, 0, 0]), archetype: "npc" as const };
+    const farActor = { ...entity("far-actor", "fallowmarch", [90, 0, 0]), archetype: "npc" as const };
+    const farStructure = entity("far-structure", "fallowmarch", [90, 0, 0]);
+    const outsideStructure = entity("outside-structure", "fallowmarch", [130, 0, 0]);
+    const active = new EntityActiveSet({ cellSize: 16 });
+
+    active.replace([outsideStructure, farActor, nearActor, farStructure]);
+    active.setArea([0, 0, 0], 20, 110);
+
+    expect(ids(active.selected())).toEqual(["far-structure", "near-actor"]);
+    expect(active.stats()).toMatchObject({
+      radius: 20,
+      structureRadius: 110,
+      selected: 2,
+    });
+
+    active.setDynamicRadius(100);
+    expect(ids(active.selected())).toEqual(["far-actor", "far-structure", "near-actor"]);
+
+    active.setStructureRadius(70);
+    expect(ids(active.selected())).toEqual(["far-actor", "near-actor"]);
+  });
 });
 
 describe("EntityViews streaming", () => {
+  it("hydrates structures through their draw-distance ring while actors use the smaller radius", async () => {
+    const structure = entity("structure", "fallowmarch", [100, 0, 0], "structure-asset");
+    const actor = {
+      ...entity("actor", "fallowmarch", [100, 0, 0], "actor-asset"),
+      archetype: "npc" as const,
+    };
+    const assets = new FakeEntityAssets(["structure-asset", "actor-asset"]);
+    const { views, materials } = entityViews(assets);
+
+    await views.prepare([structure, actor]);
+    views.updateActiveArea([0, 0, 0], 30, 120);
+    views.sync([structure, actor]);
+
+    expect(views.residencyStats()).toMatchObject({
+      radius: 30,
+      structureRadius: 120,
+      selected: 1,
+      resident: 1,
+      residentIds: ["structure"],
+    });
+
+    views.updateActivePosition([75, 0, 0]);
+    expect(views.residencyStats()).toMatchObject({
+      selected: 2,
+      resident: 2,
+      residentIds: ["actor", "structure"],
+    });
+
+    views.dispose();
+    materials.dispose();
+    assets.dispose();
+  });
+
   it("preloads a cold region without creating records, then hydrates it on travel", async () => {
     const semantic = [
       entity("warm", "fallowmarch", [0, 0, 0], "warm-asset"),

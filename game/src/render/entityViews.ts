@@ -1130,6 +1130,7 @@ export interface EntityResidencyStats {
   missing: number;
   failed: number;
   radius: number;
+  structureRadius: number;
   fullResidency: boolean;
   residentIds: EntityId[];
   pendingIds: EntityId[];
@@ -1366,8 +1367,12 @@ export class EntityViews {
   }
 
   /** Moves and resizes the visual working set without changing the semantic store. */
-  updateActiveArea(position: Vec3 | THREE.Vector3, radius: number): EntityResidencyStats {
-    this.activeSet.setArea(vec3Of(position), radius);
+  updateActiveArea(
+    position: Vec3 | THREE.Vector3,
+    radius: number,
+    structureRadius = radius,
+  ): EntityResidencyStats {
+    this.activeSet.setArea(vec3Of(position), radius, structureRadius);
     this.reconcileActiveSet();
     return this.residencyStats();
   }
@@ -1379,9 +1384,16 @@ export class EntityViews {
     return this.residencyStats();
   }
 
-  /** Changes the visual working radius around its current position. */
+  /** Changes the actor/resource radius while static architecture keeps its draw-distance radius. */
   updateActiveRadius(radius: number): EntityResidencyStats {
-    this.activeSet.setRadius(radius);
+    this.activeSet.setDynamicRadius(radius);
+    this.reconcileActiveSet();
+    return this.residencyStats();
+  }
+
+  /** Keeps static architecture resident through the selected camera draw distance. */
+  updateStructureRadius(radius: number): EntityResidencyStats {
+    this.activeSet.setStructureRadius(radius);
     this.reconcileActiveSet();
     return this.residencyStats();
   }
@@ -1460,6 +1472,7 @@ export class EntityViews {
       missing: missingIds.length,
       failed: failedIds.length,
       radius: activeStats.radius,
+      structureRadius: activeStats.structureRadius,
       fullResidency: activeStats.fullResidency,
       residentIds,
       pendingIds,

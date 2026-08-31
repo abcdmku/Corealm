@@ -24,7 +24,7 @@ import { Store, addSkillXp, computeMaxHealth } from "../state/store.js";
 import { EventBus } from "../core/events.js";
 import { SimClock } from "../core/time.js";
 import { RngStreams } from "../core/rng.js";
-import { Renderer } from "../render/renderer.js";
+import { drawDistanceMetres, Renderer } from "../render/renderer.js";
 import { OrbitCamera } from "../render/camera.js";
 import { AssetRegistry } from "../render/assets.js";
 import { ALL_PROCEDURAL_GEAR_ASSETS, registerProceduralGear } from "../render/proceduralGear.js";
@@ -32,6 +32,7 @@ import { WorldScene } from "../render/scene.js";
 import { EntityViews } from "../render/entityViews.js";
 import { buildStructureNavigationSources } from "../render/structureNavigation.js";
 import { STOREY_METRES } from "../render/buildings.js";
+import { isStructureEntity } from "../render/entityActiveSet.js";
 import { Physics } from "../systems/physics.js";
 import { Navigation, solidObstacleMeshes } from "../systems/navigation.js";
 import { Movement } from "../systems/movement.js";
@@ -45,6 +46,7 @@ import {
 } from "../persistence/worldContainers.js";
 import { installBootPlaceholder, installGameDebug, type RecordedError } from "../debug/gameDebug.js";
 import { GameLoop } from "./loop.js";
+import { formatBootAssetProgress } from "./bootStatus.js";
 import { InputController } from "../input/mouse.js";
 import { prepareWorldSurface } from "./worldSurface.js";
 import { CAMERA } from "./config.js";
@@ -129,6 +131,13 @@ export interface BootResult {
 const ENTITY_BOOT_RADIUS = 12;
 const ENTITY_ACTIVE_RADIUS = 64;
 const ENTITY_ACTIVE_REPOSITION_DISTANCE = 8;
+// The active-set centre may trail the player by 8 m and the camera may sit another 11 m away.
+// Four more metres cover a structure part whose pivot is just outside the clip while its wall is in.
+const STRUCTURE_RESIDENCY_MARGIN = ENTITY_ACTIVE_REPOSITION_DISTANCE + CAMERA.maxDistance + 4;
+
+function structureResidencyRadius(distance: UiSettings["drawDistance"]): number {
+  return drawDistanceMetres(distance) + STRUCTURE_RESIDENCY_MARGIN;
+}
 
 export interface BootOptions {
   profile?: BootProfile;
@@ -158,13 +167,12 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   let statusPhase = "waking the frontier…";
   let statusAssets: AssetRegistry | null = null;
+  let statusAssetTarget: number | null = null;
   const refreshStatus = (): void => {
     const node = document.querySelector(".boot-status");
     if (!node) return;
     const stats = statusAssets?.getLoadStats();
-    const assetProgress = stats && stats.total > 0
-      ? ` · assets ${stats.loaded}/${stats.requested} ready (${stats.total} catalogued${stats.failed > 0 ? `, ${stats.failed} failed` : ""})`
-      : "";
+    const assetProgress = stats ? formatBootAssetProgress(stats, statusAssetTarget) : "";
     node.textContent = `${statusPhase}${assetProgress}`;
   };
   const setStatus = (message: string): void => {
@@ -583,25 +591,46 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   });
   const spawnPosition: Vec3 = [spawnSpec.x, 0, spawnSpec.z];
   const surfaceEntities = entityStore.all().filter((entity) => entity.regionId !== "gravelmaw");
-  entityViews.updateActiveArea(spawnPosition, ENTITY_BOOT_RADIUS);
+  entityViews.updateActiveArea(
+    spawnPosition,
+    ENTITY_BOOT_RADIUS,
+    structureResidencyRadius(initialSettings.drawDistance),
+  );
+  setStatus("preloading structures…");
   await bootTelemetry.measureAsync(
     BOOT_SPANS.ENTITY_PRELOAD,
     async () => {
       if (worldMapCapture) {
         entityViews.sync(surfaceEntities);
-        await entityViews.forceFullResidency(true);
+        const residency = entityViews.forceFullResidency(true);
+        // `forceFullResidency` queues every source before its first await, so this is the complete
+        // batch rather than the moving request count that used to render as 8/8, then 10/10.
+        statusAssetTarget = assets.getLoadStats().requested;
+        refreshStatus();
+        await residency;
         return;
       }
       const activeRadius = entityViews.residencyStats().radius;
       const spawnVisible = surfaceEntities.filter(
         (entity) => distanceXZ(entity.position, spawnPosition) <= activeRadius,
       );
-      const prepared = await entityViews.prepare(spawnVisible);
+      // Structural sources are shared across the island. Load them once behind the boot screen so
+      // moving the residency ring only allocates already-decoded meshes and never builds a town a
+      // few walls at a time. Actors and resources keep the smaller working set above.
+      const structures = entityStore.all().filter(isStructureEntity);
+      const preparation = entityViews.prepare([...structures, ...spawnVisible]);
+      // `prepare` queues the full list synchronously. Freeze its size once so only the completed
+      // side advances while the boot screen is visible.
+      statusAssetTarget = assets.getLoadStats().requested;
+      refreshStatus();
+      const prepared = await preparation;
       for (const missing of prepared.missing) {
         errors.push({ atMs: atMs(), source: "entityViews", message: `Missing asset "${missing}"` });
       }
     },
   );
+  statusAssetTarget = null;
+  setStatus("preparing the player…");
   try {
     bootTelemetry.measureSync(BOOT_SPANS.FIRST_ENTITY_SYNC, () => entityViews.sync(surfaceEntities));
   } catch (cause) {
@@ -1651,6 +1680,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     }
     if (!previous || previous.drawDistance !== preferences.drawDistance) {
       renderer.setDrawDistance(preferences.drawDistance);
+      entityViews.updateStructureRadius(structureResidencyRadius(preferences.drawDistance));
     }
     if (!previous || previous.invertCameraY !== preferences.invertCameraY) {
       camera.invertPitch = preferences.invertCameraY;

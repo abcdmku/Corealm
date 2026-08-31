@@ -1,4 +1,4 @@
-import type { EntityId, RegionId, SemanticEntity, Vec3 } from "../contracts.js";
+import type { Archetype, EntityId, RegionId, SemanticEntity, Vec3 } from "../contracts.js";
 
 const DEFAULT_CELL_SIZE = 64;
 const DEFAULT_ACTIVE_RADIUS = 160;
@@ -8,6 +8,8 @@ export interface EntityActiveSetOptions {
   cellSize?: number;
   /** Radius used by `setPosition` before a caller supplies one explicitly. */
   radius?: number;
+  /** Radius for static architecture. Defaults to `radius`. */
+  structureRadius?: number;
 }
 
 export interface EntityActiveSetStats {
@@ -17,7 +19,10 @@ export interface EntityActiveSetStats {
   eligible: number;
   /** Eligible rows selected by the current area, full-residency mode, or capture pin. */
   selected: number;
+  /** Radius for actors, resources, and other changing views. */
   radius: number;
+  /** Radius for static architecture. */
+  structureRadius: number;
   fullResidency: boolean;
   pinnedEntityId: EntityId | null;
 }
@@ -32,6 +37,7 @@ export interface EntityActiveSetStats {
 export class EntityActiveSet {
   private readonly cellSize: number;
   private radius: number;
+  private structureRadius: number;
   private position: Vec3 = [0, 0, 0];
   private fullResidency = true;
   private pinnedEntityId: EntityId | null = null;
@@ -44,6 +50,10 @@ export class EntityActiveSet {
   constructor(options: EntityActiveSetOptions = {}) {
     this.cellSize = positiveFinite(options.cellSize ?? DEFAULT_CELL_SIZE, "cellSize");
     this.radius = nonNegativeFinite(options.radius ?? DEFAULT_ACTIVE_RADIUS, "radius");
+    this.structureRadius = nonNegativeFinite(
+      options.structureRadius ?? this.radius,
+      "structureRadius",
+    );
   }
 
   /** Replaces the read-only semantic snapshot and rebuilds the spatial lookup. */
@@ -71,9 +81,10 @@ export class EntityActiveSet {
   }
 
   /** Activates radius selection around one world position. */
-  setArea(position: Vec3, radius: number): void {
+  setArea(position: Vec3, radius: number, structureRadius = radius): void {
     this.position = copyPosition(position);
     this.radius = nonNegativeFinite(radius, "radius");
+    this.structureRadius = nonNegativeFinite(structureRadius, "structureRadius");
     this.fullResidency = false;
     this.selectedCache = null;
   }
@@ -88,6 +99,21 @@ export class EntityActiveSet {
   /** Changes the active radius while keeping its centre. */
   setRadius(radius: number): void {
     this.radius = nonNegativeFinite(radius, "radius");
+    this.structureRadius = this.radius;
+    this.fullResidency = false;
+    this.selectedCache = null;
+  }
+
+  /** Changes only actors and resources while leaving static architecture resident farther out. */
+  setDynamicRadius(radius: number): void {
+    this.radius = nonNegativeFinite(radius, "radius");
+    this.fullResidency = false;
+    this.selectedCache = null;
+  }
+
+  /** Changes the static-architecture radius without pulling actors and resources into it. */
+  setStructureRadius(radius: number): void {
+    this.structureRadius = nonNegativeFinite(radius, "structureRadius");
     this.fullResidency = false;
     this.selectedCache = null;
   }
@@ -152,6 +178,7 @@ export class EntityActiveSet {
       eligible,
       selected: this.selected().length,
       radius: this.radius,
+      structureRadius: this.structureRadius,
       fullResidency: this.fullResidency,
       pinnedEntityId: this.pinnedEntityId,
     };
@@ -165,11 +192,11 @@ export class EntityActiveSet {
 
   private idsInsideArea(): Set<EntityId> {
     const ids = new Set<EntityId>();
-    const minX = Math.floor((this.position[0] - this.radius) / this.cellSize);
-    const maxX = Math.floor((this.position[0] + this.radius) / this.cellSize);
-    const minZ = Math.floor((this.position[2] - this.radius) / this.cellSize);
-    const maxZ = Math.floor((this.position[2] + this.radius) / this.cellSize);
-    const radiusSq = this.radius * this.radius;
+    const queryRadius = Math.max(this.radius, this.structureRadius);
+    const minX = Math.floor((this.position[0] - queryRadius) / this.cellSize);
+    const maxX = Math.floor((this.position[0] + queryRadius) / this.cellSize);
+    const minZ = Math.floor((this.position[2] - queryRadius) / this.cellSize);
+    const maxZ = Math.floor((this.position[2] + queryRadius) / this.cellSize);
 
     for (let cellX = minX; cellX <= maxX; cellX += 1) {
       for (let cellZ = minZ; cellZ <= maxZ; cellZ += 1) {
@@ -181,12 +208,28 @@ export class EntityActiveSet {
           if (!entity?.view || !position) continue;
           const dx = position[0] - this.position[0];
           const dz = position[2] - this.position[2];
-          if (dx * dx + dz * dz <= radiusSq) ids.add(entityId);
+          const radius = isStructureEntity(entity) ? this.structureRadius : this.radius;
+          if (dx * dx + dz * dz <= radius * radius) ids.add(entityId);
         }
       }
     }
     return ids;
   }
+}
+
+const STRUCTURE_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>([
+  "bank",
+  "door",
+  "landmark",
+  "obstacle",
+  "portal",
+  "shop",
+  "station",
+]);
+
+/** Static world geometry that must already exist before it crosses the camera's far clip. */
+export function isStructureEntity(entity: SemanticEntity): boolean {
+  return entity.meta?.["scenery"] === true || STRUCTURE_ARCHETYPES.has(entity.archetype);
 }
 
 function cellKey(position: Vec3, cellSize: number): string {
