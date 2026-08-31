@@ -66,9 +66,10 @@
     "verify:gathering-production": "tsx tools/verify-gathering-production.ts --run runs/corealm"
   },
   "dependencies": {
-    "@dimforge/rapier3d-compat": "0.20.0",
+    "@dimforge/rapier3d": "0.20.0",
     "@recast-navigation/core": "0.43.1",
     "@recast-navigation/three": "0.43.1",
+    "@recast-navigation/wasm": "0.43.1",
     "recast-navigation": "0.43.1",
     "three": "0.185.1"
   },

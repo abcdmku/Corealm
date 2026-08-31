@@ -7,9 +7,38 @@
  * two would disagree within a minute of play. Physics here answers two questions only: "what is the
  * ground height under this point" and "does this box overlap a building".
  */
-import RAPIER from "@dimforge/rapier3d-compat";
+import type { RigidBody, World as RapierWorld } from "@dimforge/rapier3d";
 import * as THREE from "three";
 import type { Vec3 } from "../contracts.js";
+
+type RapierModule = typeof import("@dimforge/rapier3d");
+type RapierRuntime = Pick<RapierModule, "ColliderDesc" | "Ray" | "RigidBodyDesc" | "World">;
+
+let rapierRuntime: RapierRuntime | null = null;
+let rapierImport: Promise<RapierRuntime> | null = null;
+
+function importRapier(): Promise<RapierRuntime> {
+  if (rapierRuntime) return Promise.resolve(rapierRuntime);
+  if (!rapierImport) {
+    rapierImport = import("@dimforge/rapier3d")
+      .then(({ ColliderDesc, Ray, RigidBodyDesc, World }) => {
+        rapierRuntime = { ColliderDesc, Ray, RigidBodyDesc, World };
+        return rapierRuntime;
+      })
+      .catch((error: unknown) => {
+        rapierImport = null;
+        throw error;
+      });
+  }
+  return rapierImport;
+}
+
+function getRapier(): RapierRuntime {
+  if (!rapierRuntime) {
+    throw new Error("Rapier is not initialized. Await Physics.initLibrary() before creating a world.");
+  }
+  return rapierRuntime;
+}
 
 export interface HeightfieldInput {
   /** Column-major, (nrows + 1) * (ncols + 1) entries. `WorldScene.heightfieldSamples` produces it. */
@@ -37,20 +66,21 @@ export interface PhysicsStats {
 }
 
 export class Physics {
-  world: RAPIER.World | null = null;
+  world: RapierWorld | null = null;
   private ready = false;
-  private staticBodies: RAPIER.RigidBody[] = [];
+  private staticBodies: RigidBody[] = [];
   /** Colliders were added since the last step, so the query pipeline is stale. */
   private queriesDirty = false;
   private terrainColliders = 0;
   private buildingColliders = 0;
 
   static async initLibrary(): Promise<void> {
-    await RAPIER.init();
+    await importRapier();
   }
 
   create(): void {
-    this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    const { World } = getRapier();
+    this.world = new World({ x: 0, y: -9.81, z: 0 });
     this.ready = true;
   }
 
@@ -69,10 +99,11 @@ export class Physics {
    */
   addHeightfield(field: HeightfieldInput): boolean {
     if (!this.world) return false;
+    const { ColliderDesc, RigidBodyDesc } = getRapier();
     const body = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(field.centre.x, field.centre.y, field.centre.z),
+      RigidBodyDesc.fixed().setTranslation(field.centre.x, field.centre.y, field.centre.z),
     );
-    const desc = RAPIER.ColliderDesc.heightfield(
+    const desc = ColliderDesc.heightfield(
       field.nrows,
       field.ncols,
       field.heights,
@@ -88,6 +119,7 @@ export class Physics {
   /** Static trimesh collider from a Three.js mesh. Used for terrain chunks and buildings. */
   addStaticMesh(mesh: THREE.Mesh, kind: "terrain" | "building" = "terrain"): boolean {
     if (!this.world) return false;
+    const { ColliderDesc, RigidBodyDesc } = getRapier();
     const geometry = mesh.geometry;
     const position = geometry.getAttribute("position");
     if (!position) return false;
@@ -107,8 +139,8 @@ export class Physics {
       ? new Uint32Array(index.array)
       : new Uint32Array(Array.from({ length: position.count }, (_, i) => i));
 
-    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    this.world.createCollider(RAPIER.ColliderDesc.trimesh(vertices, indices), body);
+    const body = this.world.createRigidBody(RigidBodyDesc.fixed());
+    this.world.createCollider(ColliderDesc.trimesh(vertices, indices), body);
     this.staticBodies.push(body);
     if (kind === "terrain") this.terrainColliders += 1;
     else this.buildingColliders += 1;
@@ -134,14 +166,15 @@ export class Physics {
    */
   addStaticBox(centre: Vec3, halfExtents: Vec3, rotationY = 0): boolean {
     if (!this.world) return false;
+    const { ColliderDesc, RigidBodyDesc } = getRapier();
     const quaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
     const body = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed()
+      RigidBodyDesc.fixed()
         .setTranslation(centre[0], centre[1], centre[2])
         .setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w }),
     );
     this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(halfExtents[0], halfExtents[1], halfExtents[2]),
+      ColliderDesc.cuboid(halfExtents[0], halfExtents[1], halfExtents[2]),
       body,
     );
     this.staticBodies.push(body);
@@ -153,10 +186,11 @@ export class Physics {
   /** A static upright cylinder. Pillars, tree trunks the player should not clip through. */
   addStaticCylinder(centre: Vec3, radius: number, height: number): boolean {
     if (!this.world) return false;
+    const { ColliderDesc, RigidBodyDesc } = getRapier();
     const body = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(centre[0], centre[1] + height / 2, centre[2]),
+      RigidBodyDesc.fixed().setTranslation(centre[0], centre[1] + height / 2, centre[2]),
     );
-    this.world.createCollider(RAPIER.ColliderDesc.cylinder(height / 2, radius), body);
+    this.world.createCollider(ColliderDesc.cylinder(height / 2, radius), body);
     this.staticBodies.push(body);
     this.buildingColliders += 1;
     this.queriesDirty = true;
@@ -214,9 +248,10 @@ export class Physics {
   ): { y: number; normal?: Vec3 } | null {
     if (!this.world) return null;
     this.ensureQueryable();
+    const { Ray } = getRapier();
 
     for (const [offsetX, offsetZ] of CELL_SEAM_OFFSETS) {
-      const ray = new RAPIER.Ray({ x: x + offsetX, y: fromY, z: z + offsetZ }, { x: 0, y: -1, z: 0 });
+      const ray = new Ray({ x: x + offsetX, y: fromY, z: z + offsetZ }, { x: 0, y: -1, z: 0 });
       if (withNormal) {
         const hit = this.world.castRayAndGetNormal(ray, maxDrop, true);
         if (hit) return { y: fromY - hit.timeOfImpact, normal: [hit.normal.x, hit.normal.y, hit.normal.z] };
@@ -232,8 +267,9 @@ export class Physics {
   raycast(origin: Vec3, direction: Vec3, maxDistance = 100): number | null {
     if (!this.world) return null;
     this.ensureQueryable();
+    const { Ray } = getRapier();
     const length = Math.hypot(direction[0], direction[1], direction[2]) || 1;
-    const ray = new RAPIER.Ray(
+    const ray = new Ray(
       { x: origin[0], y: origin[1], z: origin[2] },
       { x: direction[0] / length, y: direction[1] / length, z: direction[2] / length },
     );
