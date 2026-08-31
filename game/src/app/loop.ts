@@ -34,7 +34,7 @@ import type {
   CharacterMotionEvent,
   CharacterRig,
   CharacterPose,
-  GearFocusPresentationLike,
+  GearWeaponChargePresentationLike,
 } from "../render/characterRig.js";
 import type { Vfx } from "../render/vfx.js";
 import type { SpellVfx } from "../render/spellVfx.js";
@@ -221,8 +221,8 @@ export class GameLoop {
    * id strings.
    */
   private wornItemIds: (string | null)[] = [];
-  /** Focus id plus charged/empty state from the last rig sync. */
-  private wornFocusSignature: string | null = null;
+  /** Charged weapon id plus charged/empty state from the last rig sync. */
+  private wornWeaponChargeSignature: string | null = null;
   private archetypeOf: ((entityId: EntityId) => string | null) | null = null;
   /** Set by the event subscription, drained by the next render frame. */
   private pendingRigPose: CharacterPose | null = null;
@@ -613,11 +613,13 @@ export class GameLoop {
     const slots = rig.visibleSlots();
     const mainHandId = worn.mainHand?.itemId ?? null;
     const chargeSpec = mainHandId ? content.item(mainHandId)?.magicWeapon?.charge : undefined;
-    const focusItemId = chargeSpec ? mainHandId : null;
-    const focusCharged = focusItemId !== null && (state.magic.weaponCharges[focusItemId] ?? 0) > 0;
-    const focusSignature = `${focusItemId ?? "-"}/${focusCharged ? "charged" : "empty"}`;
+    const chargedWeaponItemId = chargeSpec ? mainHandId : null;
+    const weaponCharged = chargedWeaponItemId !== null
+      && (state.magic.weaponCharges[chargedWeaponItemId] ?? 0) > 0;
+    const chargeSignature = `${chargedWeaponItemId ?? "-"}/${weaponCharged ? "charged" : "empty"}`;
 
-    let changed = this.wornItemIds.length !== slots.length || this.wornFocusSignature !== focusSignature;
+    let changed = this.wornItemIds.length !== slots.length
+      || this.wornWeaponChargeSignature !== chargeSignature;
     for (let index = 0; index < slots.length; index += 1) {
       const slot = slots[index];
       const itemId = (slot ? worn[slot]?.itemId : null) ?? null;
@@ -628,9 +630,12 @@ export class GameLoop {
     }
     if (!changed) return;
     this.wornItemIds.length = slots.length;
-    this.wornFocusSignature = focusSignature;
-    const focus: GearFocusPresentationLike = { itemId: focusItemId, charged: focusCharged };
-    void rig.applyEquipment(worn, focus);
+    this.wornWeaponChargeSignature = chargeSignature;
+    const charge: GearWeaponChargePresentationLike = {
+      itemId: chargedWeaponItemId,
+      charged: weaponCharged,
+    };
+    void rig.applyEquipment(worn, charge);
   }
 
   /**

@@ -208,7 +208,7 @@ function buildPrimitive(part: ItemIconPrimitivePart): THREE.Group {
       eye.position.set(0.62, 0.18, 0.39);
       group.add(eye);
     },
-    focus: () => {
+    orb: () => {
       const stone = ownedMesh(new THREE.DodecahedronGeometry(0.68, 1), luminousMaterial(part.colour, 0.34));
       stone.rotation.set(0.2, 0.35, 0.1);
       group.add(stone);

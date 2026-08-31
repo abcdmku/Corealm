@@ -16,11 +16,11 @@ export type ItemIconPrimitive =
   | "dagger"
   | "essence"
   | "fish"
-  | "focus"
   | "handle"
   | "hide"
   | "ingot"
   | "log"
+  | "orb"
   | "ring"
   | "rod"
   | "seed"
@@ -160,10 +160,9 @@ const ELEMENT_COLOURS = {
   air: { body: 0x78cce8, glow: 0xd8f7ff },
   earth: { body: 0x668c43, glow: 0xb9d66b },
   water: { body: 0x327fc2, glow: 0xa9e6ff },
-  fire: { body: 0xb9472b, glow: 0xffa33d },
 } as const;
 
-for (const element of ["air", "earth", "water", "fire"] as const) {
+for (const element of ["air", "earth", "water"] as const) {
   const colours = ELEMENT_COLOURS[element];
   put(`${element}_essence`, [primitive("essence", colours.body, colours.glow)], { frameScale: 1.2 });
 }
@@ -192,8 +191,11 @@ for (const id of ["worn_rod", "palewood_rod", "duskoak_rod", "cairnpine_rod"] as
 
 for (const item of ALL_ITEMS.filter((entry) => entry.orb !== undefined)) {
   const element = item.orb!.element === "wind" ? "air" : item.orb!.element;
-  const colours = ELEMENT_COLOURS[element];
-  put(item.id, [primitive("focus", colours.body, colours.glow)], {
+  if (!(element in ELEMENT_COLOURS)) {
+    throw new Error(`Released orb ${item.id} has no icon palette for ${element}`);
+  }
+  const colours = ELEMENT_COLOURS[element as keyof typeof ELEMENT_COLOURS];
+  put(item.id, [primitive("orb", colours.body, colours.glow)], {
     frameScale: item.orb!.released ? 1 : 1.06,
   });
 }

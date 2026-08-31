@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { ENEMIES } from "../game/src/content/enemies.js";
+import { GATHERING_PRODUCTION_TIERS } from "../game/src/content/gatheringProductionTiers.js";
+import { QUESTS } from "../game/src/content/quests.js";
 import { RECIPES } from "../game/src/content/recipes.js";
+import { SHOPS } from "../game/src/content/shops.js";
 
 const BY_ID = new Map(RECIPES.map((recipe) => [recipe.id, recipe]));
 
@@ -50,5 +54,28 @@ describe("magic weapon recipes", () => {
     expect(BY_ID.get("fletch_basic_wooden_staff")?.inputs).toEqual([
       { itemId: "palewood_shaft", quantity: 2 },
     ]);
+  });
+
+  it("does not bypass production with finished weapon drops, quest grants, or shop stock", () => {
+    const weaponIds = new Set(GATHERING_PRODUCTION_TIERS.flatMap((tier) => [
+      tier.items.wand,
+      tier.items.staff,
+      tier.magic.wand,
+      tier.magic.staff,
+      ...(tier.magic.basicWand ? [tier.magic.basicWand] : []),
+      ...(tier.magic.basicStaff ? [tier.magic.basicStaff] : []),
+    ]));
+
+    const enemyDrops = ENEMIES.flatMap((enemy) => enemy.drops.map((drop) => drop.itemId));
+    const shopStock = SHOPS.flatMap((shop) => shop.stock.map((stock) => stock.itemId));
+    const questGrants = QUESTS.flatMap((quest) => [
+      ...(quest.onStart?.items ?? []).map((item) => item.itemId),
+      ...quest.rewards.items.map((item) => item.itemId),
+      ...quest.stages.flatMap((stage) => (stage.grants?.items ?? []).map((item) => item.itemId)),
+    ]);
+
+    expect(enemyDrops.filter((itemId) => weaponIds.has(itemId))).toEqual([]);
+    expect(shopStock.filter((itemId) => weaponIds.has(itemId))).toEqual([]);
+    expect(questGrants.filter((itemId) => weaponIds.has(itemId))).toEqual([]);
   });
 });

@@ -153,7 +153,7 @@ describe("v3 focus migration", () => {
     old.magic = { orbCharges: { air_orb: 417 } };
 
     const migrated = migrate(legacy).state;
-    expect(migrated?.meta.saveVersion).toBe(4);
+    expect(migrated?.meta.saveVersion).toBe(5);
     expect(migrated?.equipment.mainHand).toEqual({ itemId: "air_wand", quantity: 1 });
     expect((migrated?.equipment as unknown as Record<string, unknown>).focus).toBeUndefined();
     expect(migrated?.magic.weaponCharges.air_wand).toBe(417);

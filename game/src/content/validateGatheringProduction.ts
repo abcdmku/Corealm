@@ -15,6 +15,7 @@ export const GATHERING_PRODUCTION_STATION_KINDS = [
   "campfire",
   "crafting_table",
   "fletching_bench",
+  "essence_altar",
 ] as const satisfies readonly StationKind[];
 
 export interface GatheringProductionClusterRef {

@@ -39,7 +39,7 @@ describe("generated gathering asset provenance", () => {
     expect(generated.endsWith("\n\n")).toBe(false);
   });
 
-  it("records every canonical resource and campfire asset with complete CC0 pack metadata", async () => {
+  it("records every canonical resource and campfire asset with complete provenance", async () => {
     const manifest = await liveManifest();
     const generated = gatheringAssetProvenanceDoc(manifest);
 
@@ -56,11 +56,15 @@ describe("generated gathering asset provenance", () => {
     }
 
     for (const pack of manifest.packs) {
-      expect(pack.license).toBe("CC0-1.0");
-      expect(pack.archiveSha256).toMatch(/^[a-f0-9]{64}$/);
+      const isCc0 = pack.license === "CC0-1.0";
+      const isUnityStoreAsset = pack.license.startsWith("Standard Unity Asset Store EULA");
+      expect(isCc0 || isUnityStoreAsset).toBe(true);
+      if (isCc0) expect(pack.archiveSha256).toMatch(/^[a-f0-9]{64}$/);
       expect(generated).toContain(`\`${pack.id}\``);
       expect(generated).toContain(`(${pack.source})`);
-      expect(generated).toContain(`\`${pack.archiveSha256}\``);
+      expect(generated).toContain(
+        pack.archiveSha256 ? `\`${pack.archiveSha256}\`` : "Per-file SHA-256 audit",
+      );
     }
   });
 
@@ -74,6 +78,6 @@ describe("generated gathering asset provenance", () => {
     expect(() => gatheringAssetProvenanceDoc({
       ...manifest,
       packs: manifest.packs.map((pack, index) => index === 0 ? { ...pack, license: "Unknown" } : pack),
-    })).toThrow("expected CC0-1.0");
+    })).toThrow("unsupported license Unknown");
   });
 });

@@ -15,9 +15,9 @@ Quarrier Vess has been cutting Kaldite for nine years and she has never liked wh
 
 | Item | Amount |
 | --- | --- |
-| [Palewood Staff](../../items/#palewood-staff) | 1 |
+| [Palewood Log](../../items/#palewood-log) | 1 |
 | [Air Essence](../../items/#air-essence) | 100 |
-| Unlock | Vess lends you her brother's old staff and 100 measures of Air Essence. |
+| Unlock | Vess gives you one palewood log and 100 measures of Air Essence. |
 
 ## Walkthrough
 
@@ -76,12 +76,12 @@ The guaranteed Air Orb remains in the Tempest Roc's loot pile after the kill. Us
 </div>
 
 
-### 3. Craft an Air Staff from Vess's Palewood Staff and the Air Orb, then equip it.
+### 3. Fletch Vess's palewood into a staff, craft it with the Air Orb, then equip it.
 
-At a crafting table, make recipe craft_air_staff from the Palewood Staff and Air Orb. Equip the finished Air Staff. It starts with 1000 charges. Once partly spent, entity coldbrace_essence_altar restores it to 1000 for exactly 100 Air Essence.
+At a fletching bench, use fletch_palewood_shaft, then fletch_palewood_staff. At a crafting table, make craft_air_staff from that Palewood Staff and the Air Orb. Equip the finished Air Staff. It starts with 1000 charges. Once partly spent, entity coldbrace_essence_altar restores it to 1000 for exactly 100 Air Essence.
 
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
-<nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#palewood-staff">Palewood Staff</a><a href="../../items/#air-orb">Air Orb</a><a href="../../items/#air-staff">Air Staff</a></nav>
+<nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#palewood-log">Palewood Log</a><a href="../../items/#palewood-shaft">Palewood Shaft</a><a href="../../items/#palewood-staff">Palewood Staff</a><a href="../../items/#air-orb">Air Orb</a><a href="../../items/#air-staff">Air Staff</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_essence_altar.webp" alt="Essence Altar in the running Corealm world" loading="lazy" /><figcaption><strong>Essence Altar</strong><span>Coldbrace Square, Fallowmarch</span></figcaption></figure></div>
 <figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">

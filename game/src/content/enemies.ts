@@ -319,7 +319,6 @@ const BLOCKS: readonly EnemyDef[] = [
       { itemId: "duskoak_log", quantity: [1, 2], chance: 0.30 },
       { itemId: "vell_amber", quantity: [1, 1], chance: 0.15 },
       { itemId: "earth_essence", quantity: [1, 2], chance: 0.12 },
-      { itemId: "duskoak_wand", quantity: [1, 1], chance: 0.02 },
     ],
   },
   {
@@ -379,7 +378,6 @@ const BLOCKS: readonly EnemyDef[] = [
       { itemId: "wight_shroud", quantity: [1, 1], chance: 0.35 },
       { itemId: "cairnleaf_seed", quantity: [1, 2], chance: 0.15 },
       { itemId: "cairn_garnet", quantity: [1, 1], chance: 0.12 },
-      { itemId: "cairnpine_staff", quantity: [1, 1], chance: 0.02 },
     ],
   },
   {

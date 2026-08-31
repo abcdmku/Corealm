@@ -780,8 +780,9 @@ const BAD_GROUND: QuestDef = {
 // ------------------------------------------------------------------ quest 9
 
 /**
- * The Magic introduction. Essence powers the staff directly. The Tempest Roc's Air Orb is a later
- * crafting upgrade that turns the Palewood Staff into a charged Air Staff.
+ * The Magic introduction. Essence powers the starter wand directly. Vess supplies raw palewood,
+ * then the production recipes turn it into a Palewood Staff and finally a charged Air Staff using
+ * the Tempest Roc's boss-dropped Air Orb.
  */
 const SPARKING_STONE: QuestDef = {
   id: "sparking_stone",
@@ -796,10 +797,10 @@ const SPARKING_STONE: QuestDef = {
   prerequisiteQuestIds: [],
   onStart: {
     items: [
-      { itemId: "palewood_staff", quantity: 1 },
+      { itemId: "palewood_log", quantity: 1 },
       { itemId: "air_essence", quantity: 100 },
     ],
-    unlocks: ["Vess lends you her brother's old staff and 100 measures of Air Essence."],
+    unlocks: ["Vess gives you one palewood log and 100 measures of Air Essence."],
   },
   stages: [
     {
@@ -830,8 +831,10 @@ const SPARKING_STONE: QuestDef = {
     },
     {
       index: 2,
-      objective: "Craft an Air Staff from Vess's Palewood Staff and the Air Orb, then equip it.",
+      objective: "Fletch Vess's palewood into a staff, craft it with the Air Orb, then equip it.",
       refs: [
+        { kind: "item", id: "palewood_log" },
+        { kind: "item", id: "palewood_shaft" },
         { kind: "item", id: "palewood_staff" },
         { kind: "item", id: "air_orb" },
         { kind: "item", id: "air_staff" },
@@ -839,7 +842,8 @@ const SPARKING_STONE: QuestDef = {
         { kind: "location", id: "town_center" },
       ],
       hint:
-        "At a crafting table, make recipe craft_air_staff from the Palewood Staff and Air Orb. "
+        "At a fletching bench, use fletch_palewood_shaft, then fletch_palewood_staff. At a "
+        + "crafting table, make craft_air_staff from that Palewood Staff and the Air Orb. "
         + "Equip the finished Air Staff. It starts with 1000 charges. Once partly spent, entity "
         + "coldbrace_essence_altar restores it to 1000 for exactly 100 Air Essence.",
       completion: { kind: "equipped", itemId: "air_staff" },

@@ -170,7 +170,9 @@ export function migrate(raw: unknown): MigrationResult {
     };
   }
 
-  const state = candidate as GameState;
+  // Migration rewrites nested stacks and world records. Clone first so validation/import callers
+  // can safely retain the raw save for diagnostics or retry it with a newer build.
+  const state = structuredClone(candidate) as GameState;
   if (version < 2) {
     state.combat = { ...state.combat, preferredSpellId: state.combat?.preferredSpellId ?? null };
   }

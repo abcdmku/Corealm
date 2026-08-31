@@ -7,7 +7,7 @@ import { EQUIPMENT, KITS, MAGIC_ORBS } from "../game/src/content/equipment.js";
 import { computeMaxHealth, createInitialState, setSkillLevel } from "../game/src/state/store.js";
 import {
   GEAR_APPEARANCE_IDS, GEAR_ASSET_GAPS, VISIBLE_EQUIP_SLOTS,
-  applyGearAppearance, gearAppearance, gearAppearanceParts, gearAppearancePartsWithFocus,
+  applyGearAppearance, gearAppearance, gearAppearanceParts, gearAppearancePartsWithCharge,
   weaponAttachment, weaponSocket,
 } from "../game/src/render/equipmentVisuals.js";
 import { iconShapeFor } from "../game/src/ui/itemIcons.js";
@@ -215,10 +215,10 @@ describe("gear appearance", () => {
 
   it("renders the crafted elemental core on the weapon", () => {
     expect(gearAppearanceParts("air_orb")).toHaveLength(0);
-    const wand = gearAppearancePartsWithFocus("air_wand", { itemId: "air_wand", charged: true });
+    const wand = gearAppearancePartsWithCharge("air_wand", { itemId: "air_wand", charged: true });
     expect(wand).toHaveLength(1);
     expect(wand[0]?.orb).toMatchObject({ element: "wind", charged: true });
-    const uncharged = gearAppearancePartsWithFocus("water_staff", { itemId: "water_staff", charged: false });
+    const uncharged = gearAppearancePartsWithCharge("water_staff", { itemId: "water_staff", charged: false });
     expect(uncharged[0]?.orb).toMatchObject({ element: "water", charged: false });
   });
 

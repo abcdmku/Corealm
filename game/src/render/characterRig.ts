@@ -304,13 +304,13 @@ export interface GearOrbAppearanceLike {
   radius: number;
 }
 
-/** Focus state affects the magic weapon attachment, never a hand slot of its own. */
-export interface GearFocusPresentationLike {
+/** Charge state affects the magic weapon's built-in orb, never a hand slot of its own. */
+export interface GearWeaponChargePresentationLike {
   itemId: ItemId | null;
   charged: boolean;
 }
 
-const NO_GEAR_FOCUS: GearFocusPresentationLike = { itemId: null, charged: false };
+const NO_WEAPON_CHARGE: GearWeaponChargePresentationLike = { itemId: null, charged: false };
 
 export interface WeaponSocketLike {
   bone: string;
@@ -329,9 +329,9 @@ export interface GearVisualsPort {
    */
   gearAppearanceParts?(itemId: ItemId): readonly GearAppearanceLike[];
   /** Resolves the current magic weapon and its built-in elemental socket state. */
-  gearAppearancePartsWithFocus?(
+  gearAppearancePartsWithCharge?(
     itemId: ItemId,
-    focus: GearFocusPresentationLike,
+    charge: GearWeaponChargePresentationLike,
   ): readonly GearAppearanceLike[];
   /** `weaponSocket` with the grip offset corrected for `appearance.scale`. Prefer it when present. */
   weaponAttachment?(appearance: GearAppearanceLike): WeaponSocketLike | null;
@@ -875,14 +875,14 @@ export class CharacterRig {
    */
   async applyEquipment(
     slots: Readonly<Partial<Record<EquipSlot, ItemStack | null>>>,
-    focus: GearFocusPresentationLike = NO_GEAR_FOCUS,
+    charge: GearWeaponChargePresentationLike = NO_WEAPON_CHARGE,
   ): Promise<void> {
     const work: Promise<void>[] = [];
     let skinChanged = false;
 
     for (const slot of this.visibleSlots()) {
       const stack = slots[slot] ?? null;
-      const parts = stack ? this.appearanceParts(stack.itemId, focus) : [];
+      const parts = stack ? this.appearanceParts(stack.itemId, charge) : [];
       const previous = this.gearBySlot.get(slot) ?? [];
       if (sameAppearances(previous, parts)) continue;
 
@@ -905,12 +905,12 @@ export class CharacterRig {
   /** Every part an item shows, preferring the multi-part call so tier 5/10 keep their pauldron. */
   private appearanceParts(
     itemId: ItemId,
-    focus: GearFocusPresentationLike = NO_GEAR_FOCUS,
+    charge: GearWeaponChargePresentationLike = NO_WEAPON_CHARGE,
   ): readonly GearAppearanceLike[] {
     const port = this.gear;
     if (!port) return [];
-    const focused = port.gearAppearancePartsWithFocus?.(itemId, focus);
-    if (focused) return focused;
+    const charged = port.gearAppearancePartsWithCharge?.(itemId, charge);
+    if (charged) return charged;
     const parts = port.gearAppearanceParts?.(itemId);
     if (parts) return parts;
     const single = port.gearAppearance(itemId);

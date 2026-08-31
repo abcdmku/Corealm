@@ -75,9 +75,9 @@ describe("resource presentation stability", () => {
     }
   });
 
-  it("keeps the legacy placement and yield stream aligned", () => {
+  it("keeps the authored placement and yield stream aligned", () => {
     expect(placementAndYieldFingerprint(buildWorld(SEED, FLAT_GROUND))).toBe(
-      "76ae84b69777db8fa74ee8380ff549b23b72758a626027f9cf5f6c7f20058dff",
+      "77130dd470c322af60fac221f996b86b8c82535a3ebe1dac4facd2d6db177069",
     );
   });
 });

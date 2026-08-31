@@ -1301,7 +1301,7 @@ const VESS: DialogueNodeDef[] = [
         ],
         text:
           "Tempest Roc first. Back to Fallowmarch, west of the Air Essence Cache. Kill it without "
-          + "waiting for me. The Essence I gave you already lets the staff cast.",
+          + "waiting for me. The Essence I gave you already lets your starter wand cast.",
       },
       {
         when: [
@@ -1318,8 +1318,8 @@ const VESS: DialogueNodeDef[] = [
           { kind: "questStage", questId: "sparking_stone", min: 2, max: 2, reason: "" },
         ],
         text:
-          "Take the Palewood Staff and Air Orb to a crafting table. Make the Air Staff, then put "
-          + "that in your main hand.",
+          "Fletch the palewood into shafts and a staff, then take that staff and the Air Orb to a "
+          + "crafting table. Make the Air Staff, then put that in your main hand.",
       },
       {
         when: [
@@ -1385,9 +1385,10 @@ const VESS: DialogueNodeDef[] = [
     text:
       "It holds. Whatever you put in it, it holds it, and it gives it back later when nobody is "
       + "looking. I want somebody to put something in it on purpose so I can stop imagining what "
-      + "it is holding. Here. My brother's staff and 100 Air Essence. The Air Orb is not mine to "
-      + "give. Go back to Fallowmarch, kill the Tempest Roc west of the Air Essence Cache, and "
-      + "take its orb. Craft the orb and staff into an Air Staff, get Magic to five, and bring me six ore.",
+      + "it is holding. Here. Palewood from my brother's stock and 100 Air Essence. The Air Orb is "
+      + "not mine to give. Go back to Fallowmarch, kill the Tempest Roc west of the Air Essence Cache, and "
+      + "take its orb. Fletch the wood into a staff, craft the orb and staff into an Air Staff, "
+      + "get Magic to five, and bring me six ore.",
     options: [
       {
         id: "vess_stone_offer#accept",
@@ -1412,7 +1413,8 @@ const VESS: DialogueNodeDef[] = [
       "Go south through Vellenwood to Coldbrace, then west to locationId fallowmarch_air_cache. "
       + "The Tempest Roc, entity tempest_roc, nests about 42 metres west of the Air Essence Cache. "
       + "Loot the Air Orb from the pile it leaves. The drop is guaranteed, but it does not jump "
-      + "into your bag. At a crafting table, combine it with my Palewood Staff using recipe "
+      + "into your bag. At a fletching bench, use fletch_palewood_shaft and "
+      + "fletch_palewood_staff. At a crafting table, combine that staff with the orb using recipe "
       + "craft_air_staff. Equip the Air Staff. It starts with 1000 charges and spends those before "
       + "carried Air Essence. Entity coldbrace_essence_altar fills it back to 1000 for exactly 100 "
       + "Air Essence. Then use Voltrend on Rill Skitterlings near locationId "
@@ -1427,8 +1429,8 @@ const VESS: DialogueNodeDef[] = [
     text:
       "Go on. ... There. It took it. It took the whole cast and the fracture line went white and "
       + "then it just, sat there, being a rock. Nine years. It is a rock that likes magic. That "
-      + "is all it ever was. Take the essence, and take my brother's staff off my "
-      + "hands, I never liked looking at it.",
+      + "is all it ever was. Take the essence. Keep the staff you made; I never liked what the "
+      + "wood reminded me of.",
     options: [
       { id: "vess_stone_tested#cairns", text: "Then who is stacking the cairns?", next: "vess_cairns" },
       LEAVE("vess_stone_tested#bye"),

@@ -33,7 +33,6 @@ Boss orbs are singleton crafting components, not equipment. Combine one with the
 | [Air Orb](./items/#air-orb) | 1 | Air | 1000 charges in the crafted weapon | Air Essence | Released |
 | [Earth Orb](./items/#earth-orb) | 5 | Earth | 1000 charges in the crafted weapon | Earth Essence | Released |
 | [Water Orb](./items/#water-orb) | 10 | Water | 1000 charges in the crafted weapon | Water Essence | Released |
-| [Fire Orb](./items/#fire-orb) | 15 | Fire | 1000 charges in the crafted weapon | Fire Essence | Future content |
 
 ## Charged elemental weapons
 
@@ -47,8 +46,6 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Earth Staff](./items/#earth-staff) | Earth | 1000 | 100× Earth Essence | Released |
 | [Water Wand](./items/#water-wand) | Water | 1000 | 100× Water Essence | Released |
 | [Water Staff](./items/#water-staff) | Water | 1000 | 100× Water Essence | Released |
-| [Fire Wand](./items/#fire-wand) | Fire | 1000 | 100× Fire Essence | Future content |
-| [Fire Staff](./items/#fire-staff) | Fire | 1000 | 100× Fire Essence | Future content |
 
 ## Shops
 
@@ -62,8 +59,6 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Seared Minnow](./items/#seared-minnow) | 30 | 22 |
 | [Bittergrain Seed](./items/#bittergrain-seed) | 50 | 6 |
 | [Air Essence](./items/#air-essence) | 200 | 9 |
-| [Basic Wooden Wand](./items/#basic-wooden-wand) | 5 | 12 |
-| [Basic Wooden Staff](./items/#basic-wooden-staff) | 5 | 20 |
 | [Palewood Shaft](./items/#palewood-shaft) | 100 | 4 |
 | [Coarse Hide](./items/#coarse-hide) | 15 | 16 |
 

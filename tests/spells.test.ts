@@ -94,11 +94,17 @@ describe("the spell ladder", () => {
     }
   });
 
-  it("has an Orb, matching Essence, and charged weapon output for every spell element", () => {
+  it("has complete item support for released elements and no Fire placeholders", () => {
     for (const element of SPELL_ELEMENTS) {
       const orb = ALL_ITEMS.find((item) => item.orb?.element === element);
-      expect(orb, `${element} has no orb`).toBeDefined();
       const essenceItemId = ESSENCE_BY_ELEMENT[element];
+      if (!essenceItemId) {
+        expect(element).toBe("fire");
+        expect(orb).toBeUndefined();
+        expect(ALL_ITEMS.some((item) => item.magicWeapon?.charge?.element === element)).toBe(false);
+        continue;
+      }
+      expect(orb, `${element} has no orb`).toBeDefined();
       expect(ALL_ITEMS.some((item) => item.id === essenceItemId), `${element} essence`).toBe(true);
       expect(ALL_ITEMS.some((item) => {
         const charge = item.magicWeapon?.charge;

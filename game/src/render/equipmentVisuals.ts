@@ -47,8 +47,8 @@ export interface GearOrbAppearance {
   radius: number;
 }
 
-/** The render-only focus state passed from the loop. Exact charge count does not change the mesh. */
-export interface GearFocusPresentation {
+/** Render-only weapon charge state. Exact charge count does not change the mesh. */
+export interface GearWeaponChargePresentation {
   itemId: ItemId | null;
   charged: boolean;
 }
@@ -101,11 +101,6 @@ const BRAMBLEHIDE = 0x6a5943;
 /** Wightshroud: shroud cloth that "does not take dye" — so the tint is close to a no-op, correctly. */
 const WIGHTSHROUD = 0xa9a89c;
 
-/** The three off-hand stones, so the magic line's shield-proxy focus is not three grey discs. */
-const QUARTZ = 0xd8d4cc;
-const AMBER = 0xc98a2a;
-const GARNET = 0x7a1a2c;
-
 /** Magic tiers share geometry. Their unlit wood colour is the only tier-specific treatment. */
 const BASIC_WOOD = 0x8a5a32;
 const PALEWOOD = 0xd7bd8e;
@@ -146,8 +141,8 @@ interface LadderTier {
   /** Tint for the main-hand weapon. */
   weapon: number;
   weaponAccent?: number;
-  /** Tint for the off-hand shield or focus. */
-  offHandTint: number;
+  /** Tint for the off-hand shield. */
+  offHandTint?: number;
   /**
    * `sword` covers both dagger and sword geometry. Magic variants use the pack staff or wand.
    */
@@ -202,7 +197,7 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["kaldite_ring", "kaldite_pendant"],
   },
   {
-    tier: 1, kit: "peasant", cloth: MARCHHIDE, weapon: PALEWOOD, offHandTint: QUARTZ,
+    tier: 1, kit: "peasant", cloth: MARCHHIDE, weapon: PALEWOOD,
     mainHand: [
       { id: "palewood_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
       { id: "palewood_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
@@ -214,7 +209,7 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["ember_ring", "ember_charm"],
   },
   {
-    tier: 5, kit: "peasant", cloth: BRAMBLEHIDE, weapon: DUSKOAK, offHandTint: AMBER,
+    tier: 5, kit: "peasant", cloth: BRAMBLEHIDE, weapon: DUSKOAK,
     mainHand: [
       { id: "duskoak_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
       { id: "duskoak_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
@@ -226,7 +221,7 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["stone_ring", "stone_charm"],
   },
   {
-    tier: 10, kit: "peasant", cloth: WIGHTSHROUD, weapon: CAIRNPINE, offHandTint: GARNET,
+    tier: 10, kit: "peasant", cloth: WIGHTSHROUD, weapon: CAIRNPINE,
     mainHand: [
       { id: "cairnpine_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
       { id: "cairnpine_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
@@ -239,7 +234,7 @@ const LADDER: readonly LadderTier[] = [
   },
 ];
 
-/** Visible-slot ids that still lack a mesh. Focus orbs and accessories are intentionally indirect. */
+/** Visible-slot ids that still lack a mesh. Accessories are intentionally indirect. */
 export const GEAR_ASSET_GAPS: Readonly<Record<ItemId, string>> = {};
 
 function outfitPart(kit: OutfitKit, part: OutfitPart, tint: number, accent?: number): PartSpec {
@@ -293,7 +288,7 @@ function buildTable(): Map<ItemId, GearVisual> {
     if (row.offHand) {
       table.set(row.offHand.id, {
         slot: "offHand",
-        parts: [weaponPart("shield", row.offHandTint, row.offHand.scale * silhouette)],
+        parts: [weaponPart("shield", row.offHandTint ?? row.weapon, row.offHand.scale * silhouette)],
       });
     }
 
@@ -385,7 +380,7 @@ function round3(value: number): number {
 }
 
 /**
- * The appearance for an item, or null when it has no mesh (staffs and accessories — see
+ * The appearance for an item, or null when it has no mesh (accessories — see
  * `GEAR_ASSET_GAPS`) or is not equipment at all.
  *
  * `body` is optional so the frozen one-argument call site keeps working; it defaults to male
@@ -436,13 +431,13 @@ const ORB_SOCKETS: Readonly<Record<string, {
 };
 
 /** Adds the crafted elemental core to a magic weapon. */
-export function gearAppearancePartsWithFocus(
+export function gearAppearancePartsWithCharge(
   itemId: ItemId,
-  focus: GearFocusPresentation,
+  charge: GearWeaponChargePresentation,
   body: CharacterBody = "male",
 ): readonly GearAppearance[] {
   const parts = gearAppearanceParts(itemId, body);
-  const palette = focus.itemId ? ORB_PALETTES[focus.itemId] : undefined;
+  const palette = charge.itemId ? ORB_PALETTES[charge.itemId] : undefined;
   if (!palette) return parts;
   return parts.map((part) => {
     const socket = ORB_SOCKETS[part.assetId];
@@ -451,7 +446,7 @@ export function gearAppearancePartsWithFocus(
       ...part,
       orb: {
         ...palette,
-        charged: focus.charged,
+        charged: charge.charged,
         position: socket.position,
         radius: socket.radius,
       },
@@ -585,7 +580,7 @@ export function applyGearAppearance(object: THREE.Object3D, appearance: GearAppe
         : tintedMaterial(mesh.material, appearance);
     });
   }
-  if (appearance.orb) object.add(focusOrbMesh(appearance.orb));
+  if (appearance.orb) object.add(magicOrbMesh(appearance.orb));
 }
 
 function tintedMaterial(material: THREE.Material, appearance: GearAppearance): THREE.Material {
@@ -623,9 +618,9 @@ function isMagicWeaponAsset(assetId: string): boolean {
 }
 
 /** One shared 20-triangle shape. Each attachment owns only its tiny material. */
-const FOCUS_ORB_GEOMETRY = new THREE.IcosahedronGeometry(1, 0);
+const MAGIC_ORB_GEOMETRY = new THREE.IcosahedronGeometry(1, 0);
 
-function focusOrbMesh(appearance: GearOrbAppearance): THREE.Mesh {
+function magicOrbMesh(appearance: GearOrbAppearance): THREE.Mesh {
   const charged = appearance.charged;
   const material = new THREE.MeshStandardMaterial({
     color: charged ? appearance.colour : 0x181b1c,
@@ -637,7 +632,7 @@ function focusOrbMesh(appearance: GearOrbAppearance): THREE.Mesh {
     opacity: charged ? 0.94 : 0.42,
     depthWrite: charged,
   });
-  const orb = new THREE.Mesh(FOCUS_ORB_GEOMETRY, material);
+  const orb = new THREE.Mesh(MAGIC_ORB_GEOMETRY, material);
   orb.name = `magic-weapon-socket-${appearance.element}-${charged ? "charged" : "empty"}`;
   orb.position.set(...appearance.position);
   orb.rotation.set(0.34, 0.51, 0.18);

@@ -24,7 +24,7 @@ describe("magic save migrations", () => {
     delete old.equipment.focus;
 
     const state = migrate(legacy).state;
-    expect(state?.meta.saveVersion).toBe(4);
+    expect(state?.meta.saveVersion).toBe(5);
     expect(state?.world.recoveryCache).toMatchObject({
       position: [1, 2, 3], items: [{ itemId: "air_orb", quantity: 1 }], expiresAtMs: 50_000,
     });

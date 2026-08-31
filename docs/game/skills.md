@@ -84,17 +84,17 @@ The unlock rows below come from the same tier, resource, recipe, and item tables
 
 | Level | Unlocks |
 | --- | --- |
-| 1 | 4× Palewood Shaft, 2× Palewood Handle, 1× Palewood Staff, 1× Palewood Wand, 1× Palewood Shield, 1× Quartz Focus, 1× Palewood Rod |
-| 5 | 4× Duskoak Shaft, 2× Duskoak Handle, 1× Duskoak Staff, 1× Duskoak Wand, 1× Duskoak Shield, 1× Amber Focus, 1× Duskoak Rod |
-| 10 | 4× Cairnpine Shaft, 2× Cairnpine Handle, 1× Cairnpine Staff, 1× Cairnpine Wand, 1× Cairnpine Shield, 1× Garnet Focus, 1× Cairnpine Rod |
+| 1 | 4× Palewood Shaft, 2× Palewood Handle, 1× Palewood Staff, 1× Palewood Wand, 1× Palewood Shield, 1× Palewood Rod, 1× Basic Wooden Wand, 1× Basic Wooden Staff |
+| 5 | 4× Duskoak Shaft, 2× Duskoak Handle, 1× Duskoak Staff, 1× Duskoak Wand, 1× Duskoak Shield, 1× Duskoak Rod |
+| 10 | 4× Cairnpine Shaft, 2× Cairnpine Handle, 1× Cairnpine Staff, 1× Cairnpine Wand, 1× Cairnpine Shield, 1× Cairnpine Rod |
 
 ### Crafting
 
 | Level | Unlocks |
 | --- | --- |
-| 1 | 5× Essence Shard, 1× Grithe Ring, 1× Grithe Pendant, 1× Ember Ring, 1× Ember Charm, 1× Marchhide Robe, 1× Marchhide Leggings, 1× Marchhide Hood, 1× Marchhide Boots, 1× Marchhide Wraps |
-| 5 | 5× Essence Shard, 1× Corven Ring, 1× Corven Pendant, 1× Stone Ring, 1× Stone Charm, 1× Bramblehide Robe, 1× Bramblehide Leggings, 1× Bramblehide Hood, 1× Bramblehide Boots, 1× Bramblehide Wraps |
-| 10 | 5× Essence Shard, 1× Kaldite Ring, 1× Kaldite Pendant, 1× Storm Ring, 1× Storm Charm, 1× Wightshroud Robe, 1× Wightshroud Leggings, 1× Wightshroud Hood, 1× Wightshroud Boots, 1× Wightshroud Wraps |
+| 1 | 1× Air Wand, 1× Air Staff, 1× Grithe Ring, 1× Grithe Pendant, 1× Ember Ring, 1× Ember Charm, 1× Marchhide Robe, 1× Marchhide Leggings, 1× Marchhide Hood, 1× Marchhide Boots, 1× Marchhide Wraps |
+| 5 | 1× Earth Wand, 1× Earth Staff, 1× Corven Ring, 1× Corven Pendant, 1× Stone Ring, 1× Stone Charm, 1× Bramblehide Robe, 1× Bramblehide Leggings, 1× Bramblehide Hood, 1× Bramblehide Boots, 1× Bramblehide Wraps |
+| 10 | 1× Water Wand, 1× Water Staff, 1× Kaldite Ring, 1× Kaldite Pendant, 1× Storm Ring, 1× Storm Charm, 1× Wightshroud Robe, 1× Wightshroud Leggings, 1× Wightshroud Hood, 1× Wightshroud Boots, 1× Wightshroud Wraps |
 
 ## Combat
 

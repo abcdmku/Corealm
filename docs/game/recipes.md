@@ -50,7 +50,8 @@ description: "Production recipes generated from the live game tables."
 
 | Recipe | Level | Station | Ingredients | Makes | Time | XP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Essence Shards (Grithe) | 1 | crafting_table | 1× Pale Quartz + 1× Palewood Log | 5× Essence Shard | 2.4 s | 12 |
+| Air Wand | 1 | crafting_table | 1× Palewood Wand + 1× Air Orb | 1× Air Wand | 1.8 s | 24 |
+| Air Staff | 1 | crafting_table | 1× Palewood Staff + 1× Air Orb | 1× Air Staff | 1.8 s | 32 |
 | Grithe Ring | 1 | crafting_table | 1× Grithe Bar + 1× Pale Quartz | 1× Grithe Ring | 2.4 s | 30 |
 | Grithe Pendant | 1 | crafting_table | 1× Grithe Bar + 1× Pale Quartz | 1× Grithe Pendant | 2.4 s | 30 |
 | Ember Ring | 1 | crafting_table | 1× Grithe Bar + 2× Pale Quartz | 1× Ember Ring | 2.4 s | 30 |
@@ -60,7 +61,8 @@ description: "Production recipes generated from the live game tables."
 | Marchhide Hood | 1 | crafting_table | 1× Coarse Hide | 1× Marchhide Hood | 3.0 s | 25 |
 | Marchhide Boots | 1 | crafting_table | 1× Coarse Hide | 1× Marchhide Boots | 3.0 s | 25 |
 | Marchhide Wraps | 1 | crafting_table | 1× Coarse Hide | 1× Marchhide Wraps | 3.0 s | 25 |
-| Essence Shards (Corven) | 5 | crafting_table | 1× Vell Amber + 1× Duskoak Log | 5× Essence Shard | 2.4 s | 29 |
+| Earth Wand | 5 | crafting_table | 1× Duskoak Wand + 1× Earth Orb | 1× Earth Wand | 1.8 s | 58 |
+| Earth Staff | 5 | crafting_table | 1× Duskoak Staff + 1× Earth Orb | 1× Earth Staff | 1.8 s | 77 |
 | Corven Ring | 5 | crafting_table | 1× Corven Bar + 1× Vell Amber | 1× Corven Ring | 2.4 s | 72 |
 | Corven Pendant | 5 | crafting_table | 1× Corven Bar + 1× Vell Amber | 1× Corven Pendant | 2.4 s | 72 |
 | Stone Ring | 5 | crafting_table | 1× Corven Bar + 2× Vell Amber | 1× Stone Ring | 2.4 s | 72 |
@@ -70,7 +72,8 @@ description: "Production recipes generated from the live game tables."
 | Bramblehide Hood | 5 | crafting_table | 1× Bramble Hide | 1× Bramblehide Hood | 3.0 s | 60 |
 | Bramblehide Boots | 5 | crafting_table | 1× Bramble Hide | 1× Bramblehide Boots | 3.0 s | 60 |
 | Bramblehide Wraps | 5 | crafting_table | 1× Bramble Hide | 1× Bramblehide Wraps | 3.0 s | 60 |
-| Essence Shards (Kaldite) | 10 | crafting_table | 1× Cairn Garnet + 1× Cairnpine Log | 5× Essence Shard | 2.4 s | 42 |
+| Water Wand | 10 | crafting_table | 1× Cairnpine Wand + 1× Water Orb | 1× Water Wand | 1.8 s | 84 |
+| Water Staff | 10 | crafting_table | 1× Cairnpine Staff + 1× Water Orb | 1× Water Staff | 1.8 s | 112 |
 | Kaldite Ring | 10 | crafting_table | 1× Kaldite Bar + 1× Cairn Garnet | 1× Kaldite Ring | 2.4 s | 105 |
 | Kaldite Pendant | 10 | crafting_table | 1× Kaldite Bar + 1× Cairn Garnet | 1× Kaldite Pendant | 2.4 s | 105 |
 | Storm Ring | 10 | crafting_table | 1× Kaldite Bar + 2× Cairn Garnet | 1× Storm Ring | 2.4 s | 105 |
@@ -87,22 +90,21 @@ description: "Production recipes generated from the live game tables."
 | --- | --- | --- | --- | --- | --- | --- |
 | Palewood Shafts | 1 | fletching_bench | 1× Palewood Log | 4× Palewood Shaft | 1.8 s | 10 |
 | Palewood Handles | 1 | fletching_bench | 1× Palewood Log | 2× Palewood Handle | 1.8 s | 10 |
-| Palewood Staff | 1 | fletching_bench | 3× Palewood Shaft + 1× Pale Quartz | 1× Palewood Staff | 1.8 s | 32 |
-| Palewood Wand | 1 | fletching_bench | 1× Palewood Shaft + 1× Pale Quartz | 1× Palewood Wand | 1.8 s | 18 |
+| Palewood Staff | 1 | fletching_bench | 3× Palewood Shaft | 1× Palewood Staff | 1.8 s | 32 |
+| Palewood Wand | 1 | fletching_bench | 2× Palewood Shaft | 1× Palewood Wand | 1.8 s | 24 |
 | Palewood Shield | 1 | fletching_bench | 2× Palewood Log + 1× Grithe Bar | 1× Palewood Shield | 1.8 s | 28 |
-| Quartz Focus | 1 | fletching_bench | 1× Palewood Log + 1× Pale Quartz | 1× Quartz Focus | 1.8 s | 28 |
 | Palewood Rod | 1 | fletching_bench | 2× Palewood Shaft + 1× Coarse Hide | 1× Palewood Rod | 1.8 s | 18 |
+| Basic Wooden Wand | 1 | fletching_bench | 1× Palewood Shaft | 1× Basic Wooden Wand | 1.8 s | 24 |
+| Basic Wooden Staff | 1 | fletching_bench | 2× Palewood Shaft | 1× Basic Wooden Staff | 1.8 s | 32 |
 | Duskoak Shafts | 5 | fletching_bench | 1× Duskoak Log | 4× Duskoak Shaft | 1.8 s | 24 |
 | Duskoak Handles | 5 | fletching_bench | 1× Duskoak Log | 2× Duskoak Handle | 1.8 s | 24 |
-| Duskoak Staff | 5 | fletching_bench | 3× Duskoak Shaft + 1× Vell Amber | 1× Duskoak Staff | 1.8 s | 77 |
-| Duskoak Wand | 5 | fletching_bench | 1× Duskoak Shaft + 1× Vell Amber | 1× Duskoak Wand | 1.8 s | 43 |
+| Duskoak Staff | 5 | fletching_bench | 3× Duskoak Shaft | 1× Duskoak Staff | 1.8 s | 77 |
+| Duskoak Wand | 5 | fletching_bench | 2× Duskoak Shaft | 1× Duskoak Wand | 1.8 s | 58 |
 | Duskoak Shield | 5 | fletching_bench | 2× Duskoak Log + 1× Corven Bar | 1× Duskoak Shield | 1.8 s | 67 |
-| Amber Focus | 5 | fletching_bench | 1× Duskoak Log + 1× Vell Amber | 1× Amber Focus | 1.8 s | 67 |
 | Duskoak Rod | 5 | fletching_bench | 2× Duskoak Shaft + 1× Bramble Hide | 1× Duskoak Rod | 1.8 s | 43 |
 | Cairnpine Shafts | 10 | fletching_bench | 1× Cairnpine Log | 4× Cairnpine Shaft | 1.8 s | 35 |
 | Cairnpine Handles | 10 | fletching_bench | 1× Cairnpine Log | 2× Cairnpine Handle | 1.8 s | 35 |
-| Cairnpine Staff | 10 | fletching_bench | 3× Cairnpine Shaft + 1× Cairn Garnet | 1× Cairnpine Staff | 1.8 s | 112 |
-| Cairnpine Wand | 10 | fletching_bench | 1× Cairnpine Shaft + 1× Cairn Garnet | 1× Cairnpine Wand | 1.8 s | 63 |
+| Cairnpine Staff | 10 | fletching_bench | 3× Cairnpine Shaft | 1× Cairnpine Staff | 1.8 s | 112 |
+| Cairnpine Wand | 10 | fletching_bench | 2× Cairnpine Shaft | 1× Cairnpine Wand | 1.8 s | 84 |
 | Cairnpine Shield | 10 | fletching_bench | 2× Cairnpine Log + 1× Kaldite Bar | 1× Cairnpine Shield | 1.8 s | 98 |
-| Garnet Focus | 10 | fletching_bench | 1× Cairnpine Log + 1× Cairn Garnet | 1× Garnet Focus | 1.8 s | 98 |
 | Cairnpine Rod | 10 | fletching_bench | 2× Cairnpine Shaft + 1× Wight Shroud | 1× Cairnpine Rod | 1.8 s | 63 |

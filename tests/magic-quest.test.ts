@@ -99,7 +99,7 @@ describe("The Sparking Stone Air Orb route", () => {
 
     const def = sparkingStone();
     expect(def.onStart?.items).toEqual([
-      { itemId: "palewood_staff", quantity: 1 },
+      { itemId: "palewood_log", quantity: 1 },
       { itemId: "air_essence", quantity: 100 },
     ]);
     expect(def.onStart?.items).not.toContainEqual({ itemId: "air_orb", quantity: 1 });
@@ -131,7 +131,8 @@ describe("The Sparking Stone Air Orb route", () => {
 
     expect(quests.start("sparking_stone").ok).toBe(true);
     expect(quests.stage("sparking_stone")).toBe(0);
-    expect(bag.get("palewood_staff")).toBe(1);
+    expect(bag.get("palewood_log")).toBe(1);
+    expect(bag.has("palewood_staff")).toBe(false);
     expect(bag.get("air_essence")).toBe(100);
     expect(bag.has("air_orb")).toBe(false);
 

@@ -49,4 +49,3 @@ description: "Thornbound Elder spawn locations, combat stats, and drops."
 | [Wight Shroud](../../items/#wight-shroud) | 1 | 35% |
 | [Cairnleaf Seed](../../items/#cairnleaf-seed) | 1-2 | 15% |
 | [Cairn Garnet](../../items/#cairn-garnet) | 1 | 12% |
-| [Cairnpine Staff](../../items/#cairnpine-staff) | 1 | 2% |

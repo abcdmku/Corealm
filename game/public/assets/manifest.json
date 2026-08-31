@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T20:41:23.918Z",
+  "generatedAt": "2026-08-31T01:34:28.848Z",
   "packs": [
     {
       "id": "stylized-nature-megakit",
@@ -80,6 +80,20 @@
       "source": "https://quaternius.com/packs/animatedfish.html",
       "license": "CC0-1.0",
       "archiveSha256": "1fc56d63ae16497add1c187d8bafb430f4d0a1e6d89e04396d23f4b58519ac1c"
+    },
+    {
+      "id": "blink-free-rpg-weapons",
+      "name": "FREE - RPG Weapons",
+      "author": "Blink",
+      "source": "https://assetstore.unity.com/packages/3d/props/weapons/free-rpg-weapons-199738",
+      "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
+    },
+    {
+      "id": "dexsoft-rocks-free",
+      "name": "Rocks FREE pack",
+      "author": "DEXSOFT",
+      "source": "https://assetstore.unity.com/packages/3d/props/exterior/rocks-free-pack-98219",
+      "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
     }
   ],
   "assets": [
@@ -6747,6 +6761,134 @@
       "materials": [
         "MI_Trim_Props_Vertex"
       ]
+    },
+    {
+      "id": "rpg_weapon_staff",
+      "file": "models/magic/rpg_weapon_staff.glb",
+      "pack": "blink-free-rpg-weapons",
+      "category": "weapon",
+      "is": "staff",
+      "tags": [
+        "staff",
+        "magic",
+        "two-handed",
+        "equip",
+        "wood-variant",
+        "orb-socket",
+        "non-emissive"
+      ],
+      "bytes": 5529124,
+      "size": {
+        "x": 0.219174,
+        "y": 2.211488,
+        "z": 0.219174
+      },
+      "base": {
+        "x": -0.109587,
+        "y": -1.334934,
+        "z": -0.109587
+      },
+      "animations": [],
+      "materials": [
+        "rpg_weapon_staff_material"
+      ],
+      "sha256": "989156E7BC8A8269E0848C40A15AD7C4D92A4E53370C2A831BF49099EB4ED31A"
+    },
+    {
+      "id": "rpg_weapon_wand",
+      "file": "models/magic/rpg_weapon_wand.glb",
+      "pack": "blink-free-rpg-weapons",
+      "category": "weapon",
+      "is": "wand",
+      "tags": [
+        "wand",
+        "magic",
+        "one-handed",
+        "equip",
+        "wood-variant",
+        "orb-socket",
+        "non-emissive"
+      ],
+      "bytes": 5287112,
+      "size": {
+        "x": 0.1765,
+        "y": 0.984895,
+        "z": 0.145459
+      },
+      "base": {
+        "x": -0.140763,
+        "y": -0.318648,
+        "z": -0.074656
+      },
+      "animations": [],
+      "materials": [
+        "rpg_weapon_wand_material"
+      ],
+      "sha256": "BBC7BC761773E658C4A0C8CCF30F175ADE391A11A87D85CC8E4866056328B929"
+    },
+    {
+      "id": "rocks_free_essence_cache",
+      "file": "models/magic/rocks_free_essence_cache.glb",
+      "pack": "dexsoft-rocks-free",
+      "category": "rock",
+      "is": "essence-cache",
+      "tags": [
+        "rock",
+        "essence",
+        "cache",
+        "minable",
+        "large",
+        "lod0",
+        "emissive-overlay-target"
+      ],
+      "bytes": 1866916,
+      "size": {
+        "x": 30.604338,
+        "y": 10.672737,
+        "z": 17.552934
+      },
+      "base": {
+        "x": -15.516834,
+        "y": -1.861926,
+        "z": -9.417816
+      },
+      "animations": [],
+      "materials": [
+        "rocks_free_essence_cache_material"
+      ],
+      "sha256": "AC63B7F26CD8E7A489223275193409507521DCF27234CC74A225766ECD4EEEC9"
+    },
+    {
+      "id": "rocks_free_essence_node",
+      "file": "models/magic/rocks_free_essence_node.glb",
+      "pack": "dexsoft-rocks-free",
+      "category": "rock",
+      "is": "essence-node",
+      "tags": [
+        "rock",
+        "essence",
+        "node",
+        "minable",
+        "satellite",
+        "lod0",
+        "emissive-overlay-target"
+      ],
+      "bytes": 1979224,
+      "size": {
+        "x": 5.283702,
+        "y": 5.158862,
+        "z": 5.287107
+      },
+      "base": {
+        "x": -2.462837,
+        "y": -2.50891,
+        "z": -2.477444
+      },
+      "animations": [],
+      "materials": [
+        "rocks_free_essence_node_material"
+      ],
+      "sha256": "C1C3C2AF9EAED4027D80C84ED64422C9FB261EABC8BC275334A6A834FB541A1D"
     }
   ]
 }

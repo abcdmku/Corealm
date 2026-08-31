@@ -45,4 +45,3 @@ description: "Canopy Hollow spawn locations, combat stats, and drops."
 | [Duskoak Log](../../items/#duskoak-log) | 1-2 | 30% |
 | [Vell Amber](../../items/#vell-amber) | 1 | 15% |
 | [Earth Essence](../../items/#earth-essence) | 1-2 | 12% |
-| [Duskoak Wand](../../items/#duskoak-wand) | 1 | 2% |
