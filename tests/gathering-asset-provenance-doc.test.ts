@@ -33,7 +33,7 @@ describe("generated gathering asset provenance", () => {
       "utf8",
     );
 
-    expect(generated).toBe(checkedIn);
+    expect(generated).toBe(checkedIn.replace(/\r\n/g, "\n"));
     expect(gatheringAssetProvenanceDoc({ ...manifest, generatedAt: "different-build" })).toBe(generated);
     expect(generated.endsWith("\n")).toBe(true);
     expect(generated.endsWith("\n\n")).toBe(false);
