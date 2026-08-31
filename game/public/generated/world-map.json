@@ -1,9 +1,6 @@
 {
-  "version": 3,
-  "source": "actual-game-scene",
   "width": 4800,
   "height": 3600,
-  "metresPerPixel": 0.25,
   "playableBounds": {
     "minX": -350,
     "maxX": 350,
@@ -17,16 +14,79 @@
     "maxZ": 450
   },
   "imagePaddingMetres": 250,
-  "north": "+z",
   "seed": 1337,
-  "sha256": "ee00b3d1fdb6e7f455718c8eac4a155cf9b1c48ef03c51a5a34e7397fee3b729",
-  "renderFingerprint": "ee00b3d1fdb6e7f455718c8eac4a155cf9b1c48ef03c51a5a34e7397fee3b729",
   "tiles": {
     "columns": 24,
     "rows": 18,
     "metres": 50,
     "pixels": 200,
     "bleedPixels": 128
+  },
+  "version": 4,
+  "source": "actual-game-scene",
+  "metresPerPixel": 0.25,
+  "north": "+z",
+  "sourceImage": {
+    "path": "generated/world-map.png",
+    "format": "png",
+    "width": 4800,
+    "height": 3600,
+    "bytes": 8634260,
+    "sha256": "ee00b3d1fdb6e7f455718c8eac4a155cf9b1c48ef03c51a5a34e7397fee3b729"
+  },
+  "sha256": "ee00b3d1fdb6e7f455718c8eac4a155cf9b1c48ef03c51a5a34e7397fee3b729",
+  "renderFingerprint": "6af96e20a2666e85b718f1330dd171a31e5895933a487295e5f0b1ae752e4e70",
+  "renditions": {
+    "minimap": {
+      "id": "minimap",
+      "role": "minimap",
+      "path": "generated/world-map-minimap.webp",
+      "format": "webp",
+      "width": 800,
+      "height": 600,
+      "metresPerPixel": 1.5,
+      "bytes": 100678,
+      "sha256": "62a7d2573fcf6181eb7e87d53cca9eb2a3720fd39a203003af302569ee651019",
+      "quality": 92
+    },
+    "detail": [
+      {
+        "id": "detail-4800",
+        "role": "detail",
+        "path": "generated/world-map-detail-4800.webp",
+        "format": "webp",
+        "width": 4800,
+        "height": 3600,
+        "metresPerPixel": 0.25,
+        "bytes": 727022,
+        "sha256": "5288276f83b567ce34d8823cb519022bb23676a4a218333c1163aab09fbbe939",
+        "quality": 60
+      },
+      {
+        "id": "detail-2400",
+        "role": "detail",
+        "path": "generated/world-map-detail-2400.webp",
+        "format": "webp",
+        "width": 2400,
+        "height": 1800,
+        "metresPerPixel": 0.5,
+        "bytes": 381712,
+        "sha256": "b81e97d82e37672250e4cab8eab2630077212f00fdd038d5cb35c3282f39de31",
+        "quality": 82
+      },
+      {
+        "id": "detail-1200",
+        "role": "detail",
+        "path": "generated/world-map-detail-1200.webp",
+        "format": "webp",
+        "width": 1200,
+        "height": 900,
+        "metresPerPixel": 1,
+        "bytes": 140236,
+        "sha256": "09cb4e14cfe081520d1ac2051d252d68bc63cb1c03a69d703025c5f62657c230",
+        "quality": 86
+      }
+    ]
   },
   "layers": [
     "terrain",

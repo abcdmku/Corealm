@@ -9,9 +9,9 @@
  *   - where am I walking (a gold marker on the destination, clamped to the rim when off-map)
  *   - clicking a point walks there, through the same `moveTo({ position })` a world click uses.
  *
- * Rendering is one image blit plus a handful of dots at the HUD cadence (10 Hz), against the same
- * pre-rendered PNG the map panel blits — no live terrain work. Entity positions come from
- * `observe()` at a slower cadence, because path-distance observation is the expensive half.
+ * Rendering is one image blit plus a handful of dots at the HUD cadence (10 Hz), against the small
+ * baked minimap rendition. The detailed map stays unloaded until its panel opens. Entity positions
+ * come from `observe()` at a slower cadence, because path-distance observation is the expensive half.
  *
  * The cluster root is `.is-passive` (the square's open corners must not eat world clicks); the
  * disc and the corner buttons opt back in individually.
@@ -19,7 +19,7 @@
 import type { GameApi, ObservedEntity, Vec3 } from "../contracts.js";
 import {
   WORLD_MAP_IMAGE_BOUNDS,
-  WORLD_MAP_RENDER_FINGERPRINT,
+  WORLD_MAP_MINIMAP_RENDITION,
 } from "../generated/worldMapFingerprint.js";
 import type { MapTerrainSource } from "./panels.js";
 import { reportResult } from "./contextMenu.js";
@@ -31,6 +31,8 @@ const VIEW_RADIUS_M = 55;
 /** How often the entity dots re-observe. Observation prices rows by path distance, so slower
  * is cheaper for the whole game, and dots that move a metre between polls are imperceptible. */
 const ENTITY_POLL_MS = 800;
+const IMAGE_RETRY_BASE_MS = 1_000;
+const IMAGE_RETRY_MAX_MS = 30_000;
 
 const ACTOR_ARCHETYPES = new Set(["enemy", "boss", "npc"]);
 
@@ -40,6 +42,7 @@ const ACTOR_ARCHETYPES = new Set(["enemy", "boss", "npc"]);
  * to the world. North-lock stays one compass click away. */
 const MODE_KEY = "corealm.minimap.mode.v2";
 type MinimapMode = "north" | "view";
+type MinimapImageState = "idle" | "loading" | "retrying" | "ready";
 
 interface Dot {
   x: number;
@@ -61,8 +64,12 @@ export class Minimap {
   private readonly compassButton: HTMLButtonElement;
   private readonly context: CanvasRenderingContext2D | null;
   private image: HTMLImageElement | null = null;
-  private imageFailed = false;
   private imageLoading = false;
+  private imageFailures = 0;
+  private imageRetryAtMs = 0;
+  private imageState: MinimapImageState = "idle";
+  private lastUpdateMs = 0;
+  private disposed = false;
   private dots: Dot[] = [];
   private lastPollMs = -Infinity;
   private mode: MinimapMode = "view";
@@ -144,6 +151,7 @@ export class Minimap {
     this.disc = disc;
     this.compassNeedle = needle;
     this.compassButton = compassButton;
+    this.setImageState("idle");
     this.applyMode();
   }
 
@@ -177,16 +185,19 @@ export class Minimap {
   }
 
   update(nowMs: number): void {
+    this.lastUpdateMs = nowMs;
     if (nowMs - this.lastPollMs >= ENTITY_POLL_MS) {
       this.lastPollMs = nowMs;
       this.pollEntities();
     }
-    this.draw();
+    this.draw(nowMs);
   }
 
   dispose(): void {
+    this.disposed = true;
     this.root.remove();
     this.image = null;
+    this.imageLoading = false;
   }
 
   // ------------------------------------------------------------------ input
@@ -245,10 +256,10 @@ export class Minimap {
     }));
   }
 
-  private draw(): void {
+  private draw(nowMs: number): void {
     const context = this.context;
     if (!context) return;
-    this.prepareImage();
+    this.prepareImage(nowMs);
 
     const player = this.api.getPlayer();
     const px = player.position[0];
@@ -286,7 +297,19 @@ export class Minimap {
     this.drawPlayer(context, half, player.facingRad);
 
     context.restore();
+    this.drawImageState(context, half);
     this.updateNeedle(rotation);
+  }
+
+  private drawImageState(context: CanvasRenderingContext2D, half: number): void {
+    if (this.imageState === "ready") return;
+    context.save();
+    context.font = "10px system-ui, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillStyle = "rgba(255, 248, 232, 0.72)";
+    context.fillText(this.imageState === "retrying" ? "Map retrying" : "Loading map", half, SIZE - 17);
+    context.restore();
   }
 
   /** The N on the compass button turns to keep pointing at true north on screen. */
@@ -305,12 +328,14 @@ export class Minimap {
   private blitTerrain(context: CanvasRenderingContext2D, px: number, pz: number, scale: number): void {
     const image = this.image;
     if (!image) return;
-    // The PNG covers the padded IMAGE bounds from the generator, not the playable terrain
+    // The rendition covers the padded IMAGE bounds from the generator, not the playable terrain
     // bounds — mapping it to the wrong rect is a constant offset and scale error everywhere.
     const bounds = WORLD_MAP_IMAGE_BOUNDS;
     // Projection matches WorldMapCanvas: u = x, v = -z, image spans the projected image bounds.
-    const imgScaleX = image.naturalWidth / Math.max(1e-6, bounds.maxX - bounds.minX);
-    const imgScaleY = image.naturalHeight / Math.max(1e-6, (-bounds.minZ) - (-bounds.maxZ));
+    const sourceWidth = WORLD_MAP_MINIMAP_RENDITION.width;
+    const sourceHeight = WORLD_MAP_MINIMAP_RENDITION.height;
+    const imgScaleX = sourceWidth / Math.max(1e-6, bounds.maxX - bounds.minX);
+    const imgScaleY = sourceHeight / Math.max(1e-6, (-bounds.minZ) - (-bounds.maxZ));
     const centreSx = (px - bounds.minX) * imgScaleX;
     const centreSy = ((-pz) - (-bounds.maxZ)) * imgScaleY;
     const viewM = (SIZE / 2) / scale; // metres from centre to canvas edge = VIEW_RADIUS_M
@@ -326,13 +351,13 @@ export class Minimap {
 
     if (sx < 0) { dx -= (sx / sw) * dw; dw += (sx / sw) * dw; sw += sx; sx = 0; }
     if (sy < 0) { dy -= (sy / sh) * dh; dh += (sy / sh) * dh; sh += sy; sy = 0; }
-    if (sx + sw > image.naturalWidth) { const over = sx + sw - image.naturalWidth; dw -= (over / sw) * dw; sw -= over; }
-    if (sy + sh > image.naturalHeight) { const over = sy + sh - image.naturalHeight; dh -= (over / sh) * dh; sh -= over; }
+    if (sx + sw > sourceWidth) { const over = sx + sw - sourceWidth; dw -= (over / sw) * dw; sw -= over; }
+    if (sy + sh > sourceHeight) { const over = sy + sh - sourceHeight; dh -= (over / sh) * dh; sh -= over; }
     if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
 
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "medium";
-    // The PNG is stored +x-rightward; the disc, like the big map, displays +x leftward.
+    // The baked image is stored +x-rightward; the disc, like the big map, displays +x leftward.
     context.save();
     context.translate(SIZE, 0);
     context.scale(-1, 1);
@@ -402,22 +427,44 @@ export class Minimap {
     context.restore();
   }
 
-  private prepareImage(): void {
-    if (this.image || this.imageLoading || this.imageFailed) return;
+  private prepareImage(nowMs: number): void {
+    if (this.image || this.imageLoading || this.disposed || nowMs < this.imageRetryAtMs) return;
     this.imageLoading = true;
+    this.setImageState(this.imageFailures === 0 ? "loading" : "retrying");
     const image = new Image();
     image.decoding = "async";
     image.onload = () => {
+      if (this.disposed) return;
       this.image = image;
       this.imageLoading = false;
+      this.imageFailures = 0;
+      this.setImageState("ready");
     };
     image.onerror = () => {
-      // The dark disc, the dots and the player arrow still work without terrain under them.
-      this.imageFailed = true;
+      if (this.disposed) return;
       this.imageLoading = false;
+      this.imageFailures += 1;
+      const retryDelay = Math.min(
+        IMAGE_RETRY_BASE_MS * (2 ** Math.min(this.imageFailures - 1, 5)),
+        IMAGE_RETRY_MAX_MS,
+      );
+      this.imageRetryAtMs = this.lastUpdateMs + retryDelay;
+      this.setImageState("retrying");
     };
-    const imageUrl = new URL("generated/world-map.png", document.baseURI);
-    imageUrl.searchParams.set("v", WORLD_MAP_RENDER_FINGERPRINT);
+    const imageUrl = new URL(WORLD_MAP_MINIMAP_RENDITION.path, document.baseURI);
+    imageUrl.searchParams.set("v", WORLD_MAP_MINIMAP_RENDITION.sha256);
     image.src = imageUrl.href;
+  }
+
+  private setImageState(state: MinimapImageState): void {
+    this.imageState = state;
+    this.disc.dataset.mapState = state;
+    this.disc.setAttribute("aria-busy", state === "ready" ? "false" : "true");
+    const status = state === "loading" || state === "idle"
+      ? "Map terrain loading."
+      : state === "retrying"
+        ? "Map terrain unavailable. Retrying."
+        : "Minimap.";
+    this.disc.setAttribute("aria-label", `${status} Click a point to walk there.`);
   }
 }

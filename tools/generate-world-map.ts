@@ -1,11 +1,12 @@
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "playwright";
 import sharp, { type OverlayOptions } from "sharp";
 import { buildWorldTerrainSpec } from "../game/src/app/worldSpec.js";
 import { DEFAULT_WORLD_SEED } from "../game/src/app/worldSurface.js";
+import type {} from "./lib/debug-api.js";
 import { gameRoot } from "./lib/paths.js";
 import { startGameServer } from "./lib/server.js";
 
@@ -15,6 +16,62 @@ const TILE_PIXELS = TILE_METRES / METRES_PER_PIXEL;
 // Thirty-two metres of guard keeps tree crowns and the lower daytime sun's longer shadows away
 // from tile edges. Sharp still crops every tile back to the same 50 m, 200 px core.
 const TILE_BLEED_PIXELS = 128;
+const SOURCE_IMAGE_FILE = "world-map.png";
+const METADATA_FILE = "world-map.json";
+const MINIMAP_MAX_BYTES = 150_000;
+const DETAIL_MAX_BYTES = 750_000;
+
+interface RenditionSpec {
+  id: string;
+  role: "minimap" | "detail";
+  file: string;
+  width: number;
+  height: number;
+  quality: number;
+  maxBytes: number;
+}
+
+const MINIMAP_RENDITION: RenditionSpec = {
+  id: "minimap",
+  role: "minimap",
+  file: "world-map-minimap.webp",
+  width: 800,
+  height: 600,
+  quality: 92,
+  maxBytes: MINIMAP_MAX_BYTES,
+};
+
+// Largest first, matching WorldMapCanvas' level picker. Each file is encoded directly from the
+// canonical capture, never from another rendition, so changing generation order cannot change it.
+const DETAIL_RENDITIONS: readonly RenditionSpec[] = [
+  {
+    id: "detail-4800",
+    role: "detail",
+    file: "world-map-detail-4800.webp",
+    width: 4800,
+    height: 3600,
+    quality: 60,
+    maxBytes: DETAIL_MAX_BYTES,
+  },
+  {
+    id: "detail-2400",
+    role: "detail",
+    file: "world-map-detail-2400.webp",
+    width: 2400,
+    height: 1800,
+    quality: 82,
+    maxBytes: DETAIL_MAX_BYTES,
+  },
+  {
+    id: "detail-1200",
+    role: "detail",
+    file: "world-map-detail-1200.webp",
+    width: 1200,
+    height: 900,
+    quality: 86,
+    maxBytes: DETAIL_MAX_BYTES,
+  },
+];
 
 const GPU_ARGS = [
   "--use-angle=d3d11",
@@ -32,29 +89,53 @@ interface MapBounds {
   maxZ: number;
 }
 
-interface MapMetadata {
-  version: 3;
-  source: "actual-game-scene";
+interface MapRenditionMetadata {
+  id: string;
+  role: "minimap" | "detail";
+  path: string;
+  format: "webp";
   width: number;
   height: number;
   metresPerPixel: number;
+  bytes: number;
+  sha256: string;
+  quality: number;
+}
+
+interface MapLayout {
+  width: number;
+  height: number;
   playableBounds: MapBounds;
   imageBounds: MapBounds;
   imagePaddingMetres: number;
-  north: "+z";
   seed: number;
+  tiles: { columns: number; rows: number; metres: number; pixels: number; bleedPixels: number };
+}
+
+export interface MapMetadata extends MapLayout {
+  version: 4;
+  source: "actual-game-scene";
+  metresPerPixel: number;
+  north: "+z";
+  sourceImage: {
+    path: string;
+    format: "png";
+    width: number;
+    height: number;
+    bytes: number;
+    sha256: string;
+  };
   sha256: string;
   renderFingerprint: string;
-  tiles: { columns: number; rows: number; metres: number; pixels: number; bleedPixels: number };
+  renditions: {
+    minimap: MapRenditionMetadata;
+    detail: MapRenditionMetadata[];
+  };
   layers: readonly ["terrain", "stamped-ground", "water", "buildings", "props", "trees", "grass", "entities"];
   overlays: "none";
 }
 
-/**
- * Captures the actual Three scene in north-up orthographic tiles and stitches them into the map.
- * Nothing is reconstructed in Sharp: it only crops tile bleed, joins pixels, and compresses PNG.
- */
-export async function generateWorldMap(): Promise<MapMetadata> {
+function buildMapLayout(): MapLayout {
   const spec = buildWorldTerrainSpec();
   const coast = spec.coast;
   if (!coast || coast.collar <= 0) {
@@ -74,10 +155,149 @@ export async function generateWorldMap(): Promise<MapMetadata> {
   if (!Number.isInteger(columnCount) || !Number.isInteger(rowCount)) {
     throw new Error("Padded world-map bounds must tile exactly at the configured tile size.");
   }
-  const columns = columnCount;
-  const rows = rowCount;
-  const outputWidth = columns * TILE_PIXELS;
-  const outputHeight = rows * TILE_PIXELS;
+  return {
+    width: columnCount * TILE_PIXELS,
+    height: rowCount * TILE_PIXELS,
+    playableBounds: { ...spec.bounds },
+    imageBounds,
+    imagePaddingMetres,
+    seed: DEFAULT_WORLD_SEED,
+    tiles: {
+      columns: columnCount,
+      rows: rowCount,
+      metres: TILE_METRES,
+      pixels: TILE_PIXELS,
+      bleedPixels: TILE_BLEED_PIXELS,
+    },
+  };
+}
+
+function exactMetresPerPixel(layout: MapLayout, width: number, height: number): number {
+  const horizontal = (layout.imageBounds.maxX - layout.imageBounds.minX) / width;
+  const vertical = (layout.imageBounds.maxZ - layout.imageBounds.minZ) / height;
+  if (Math.abs(horizontal - vertical) > 1e-9) {
+    throw new Error(`Map rendition ${width}x${height} distorts the canonical image bounds.`);
+  }
+  return horizontal;
+}
+
+async function renderRendition(
+  sourceImage: Buffer,
+  outputDir: string,
+  layout: MapLayout,
+  spec: RenditionSpec,
+): Promise<MapRenditionMetadata> {
+  const image = await sharp(sourceImage)
+    .resize({ width: spec.width, height: spec.height, fit: "fill", kernel: "lanczos3" })
+    .webp({ quality: spec.quality, effort: 6, smartSubsample: true })
+    .toBuffer();
+  if (image.byteLength > spec.maxBytes) {
+    throw new Error(
+      `${spec.file} is ${image.byteLength} bytes; its budget is ${spec.maxBytes} bytes. `
+        + "Review the capture before lowering rendition quality.",
+    );
+  }
+  await writeFile(path.join(outputDir, spec.file), image);
+  return {
+    id: spec.id,
+    role: spec.role,
+    path: `generated/${spec.file}`,
+    format: "webp",
+    width: spec.width,
+    height: spec.height,
+    metresPerPixel: exactMetresPerPixel(layout, spec.width, spec.height),
+    bytes: image.byteLength,
+    sha256: createHash("sha256").update(image).digest("hex"),
+    quality: spec.quality,
+  };
+}
+
+async function writeWorldMapArtifacts(layout: MapLayout, sourceImage: Buffer): Promise<MapMetadata> {
+  const imageInfo = await sharp(sourceImage).metadata();
+  if (imageInfo.width !== layout.width || imageInfo.height !== layout.height) {
+    throw new Error(
+      `Canonical world map is ${imageInfo.width ?? "?"}x${imageInfo.height ?? "?"}; `
+        + `expected ${layout.width}x${layout.height} from the authored bounds.`,
+    );
+  }
+
+  const outputDir = path.join(gameRoot, "public", "generated");
+  const generatedSourceDir = path.join(gameRoot, "src", "generated");
+  await Promise.all([
+    mkdir(outputDir, { recursive: true }),
+    mkdir(generatedSourceDir, { recursive: true }),
+  ]);
+  await writeFile(path.join(outputDir, SOURCE_IMAGE_FILE), sourceImage);
+
+  const minimap = await renderRendition(sourceImage, outputDir, layout, MINIMAP_RENDITION);
+  const detail: MapRenditionMetadata[] = [];
+  for (const rendition of DETAIL_RENDITIONS) {
+    detail.push(await renderRendition(sourceImage, outputDir, layout, rendition));
+  }
+
+  const sourceSha256 = createHash("sha256").update(sourceImage).digest("hex");
+  const renderFingerprint = createHash("sha256")
+    .update(JSON.stringify({
+      schemaVersion: 4,
+      sourceSha256,
+      playableBounds: layout.playableBounds,
+      imageBounds: layout.imageBounds,
+      renditions: { minimap, detail },
+    }))
+    .digest("hex");
+  const metadata: MapMetadata = {
+    ...layout,
+    version: 4,
+    source: "actual-game-scene",
+    metresPerPixel: exactMetresPerPixel(layout, layout.width, layout.height),
+    north: "+z",
+    sourceImage: {
+      path: `generated/${SOURCE_IMAGE_FILE}`,
+      format: "png",
+      width: layout.width,
+      height: layout.height,
+      bytes: sourceImage.byteLength,
+      sha256: sourceSha256,
+    },
+    // Kept for consumers of the v3 metadata. The source capture is still the canonical map image.
+    sha256: sourceSha256,
+    renderFingerprint,
+    renditions: { minimap, detail },
+    layers: ["terrain", "stamped-ground", "water", "buildings", "props", "trees", "grass", "entities"],
+    overlays: "none",
+  };
+  const fingerprintSource = [
+    "/** Generated by tools/generate-world-map.ts. Do not edit. */",
+    `export const WORLD_MAP_SOURCE_SHA256 = ${JSON.stringify(sourceSha256)};`,
+    `export const WORLD_MAP_RENDITION_SET_FINGERPRINT = ${JSON.stringify(renderFingerprint)};`,
+    "export const WORLD_MAP_RENDER_FINGERPRINT = WORLD_MAP_RENDITION_SET_FINGERPRINT;",
+    `export const WORLD_MAP_IMAGE_BOUNDS = ${JSON.stringify(layout.imageBounds)} as const;`,
+    `export const WORLD_MAP_PLAYABLE_BOUNDS = ${JSON.stringify(layout.playableBounds)} as const;`,
+    `export const WORLD_MAP_MINIMAP_RENDITION = ${JSON.stringify(minimap, null, 2)} as const;`,
+    `export const WORLD_MAP_DETAIL_RENDITIONS = ${JSON.stringify(detail, null, 2)} as const;`,
+    "",
+  ].join("\n");
+  await Promise.all([
+    writeFile(path.join(outputDir, METADATA_FILE), `${JSON.stringify(metadata, null, 2)}\n`, "utf8"),
+    writeFile(path.join(generatedSourceDir, "worldMapFingerprint.ts"), fingerprintSource, "utf8"),
+  ]);
+  return metadata;
+}
+
+/** Rebuilds browser-ready renditions from the checked-in deterministic full-island capture. */
+export async function postprocessExistingWorldMap(): Promise<MapMetadata> {
+  const sourcePath = path.join(gameRoot, "public", "generated", SOURCE_IMAGE_FILE);
+  return writeWorldMapArtifacts(buildMapLayout(), await readFile(sourcePath));
+}
+
+/**
+ * Captures the actual Three scene in north-up orthographic tiles and stitches them into the map.
+ * Nothing is reconstructed in Sharp: it only crops tile bleed, joins pixels, and compresses PNG.
+ */
+export async function generateWorldMap(): Promise<MapMetadata> {
+  const layout = buildMapLayout();
+  const { imageBounds } = layout;
+  const { columns, rows } = layout.tiles;
 
   const server = await startGameServer({ logLevel: "error" });
   let browser: Browser | undefined;
@@ -140,19 +360,10 @@ export async function generateWorldMap(): Promise<MapMetadata> {
 
     if (errors.length > 0) throw new Error(`World-map browser capture failed:\n${errors.join("\n")}`);
 
-    const outputDir = path.join(gameRoot, "public", "generated");
-    const generatedSourceDir = path.join(gameRoot, "src", "generated");
-    const imagePath = path.join(outputDir, "world-map.png");
-    const metadataPath = path.join(outputDir, "world-map.json");
-    const fingerprintPath = path.join(generatedSourceDir, "worldMapFingerprint.ts");
-    await Promise.all([
-      mkdir(outputDir, { recursive: true }),
-      mkdir(generatedSourceDir, { recursive: true }),
-    ]);
     const image = await sharp({
       create: {
-        width: outputWidth,
-        height: outputHeight,
+        width: layout.width,
+        height: layout.height,
         channels: 4,
         background: { r: 0, g: 0, b: 0, alpha: 1 },
       },
@@ -160,43 +371,7 @@ export async function generateWorldMap(): Promise<MapMetadata> {
       .composite(inputs)
       .png({ compressionLevel: 9, quality: 100 })
       .toBuffer();
-    const sha256 = createHash("sha256").update(image).digest("hex");
-    await writeFile(imagePath, image);
-
-    const metadata: MapMetadata = {
-      version: 3,
-      source: "actual-game-scene",
-      width: outputWidth,
-      height: outputHeight,
-      metresPerPixel: METRES_PER_PIXEL,
-      playableBounds: { ...spec.bounds },
-      imageBounds,
-      imagePaddingMetres,
-      north: "+z",
-      seed: DEFAULT_WORLD_SEED,
-      sha256,
-      renderFingerprint: sha256,
-      tiles: {
-        columns,
-        rows,
-        metres: TILE_METRES,
-        pixels: TILE_PIXELS,
-        bleedPixels: TILE_BLEED_PIXELS,
-      },
-      layers: ["terrain", "stamped-ground", "water", "buildings", "props", "trees", "grass", "entities"],
-      overlays: "none",
-    };
-    await Promise.all([
-      writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8"),
-      writeFile(
-        fingerprintPath,
-        "/** Generated by tools/generate-world-map.ts. Do not edit. */\n"
-          + `export const WORLD_MAP_RENDER_FINGERPRINT = ${JSON.stringify(sha256)};\n`
-          + `export const WORLD_MAP_IMAGE_BOUNDS = ${JSON.stringify(imageBounds)} as const;\n`,
-        "utf8",
-      ),
-    ]);
-    return metadata;
+    return writeWorldMapArtifacts(layout, image);
   } finally {
     await browser?.close().catch(() => undefined);
     await server.close().catch(() => undefined);
@@ -205,9 +380,12 @@ export async function generateWorldMap(): Promise<MapMetadata> {
 
 const entry = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : "";
 if (import.meta.url === entry) {
-  const metadata = await generateWorldMap();
+  const postprocessOnly = process.argv.includes("--postprocess-existing");
+  const metadata = postprocessOnly
+    ? await postprocessExistingWorldMap()
+    : await generateWorldMap();
   console.log(
-    `Captured ${metadata.width}x${metadata.height} world map from the full game scene `
-      + `(${metadata.tiles.columns}x${metadata.tiles.rows} tiles, no drawn overlays).`,
+    `${postprocessOnly ? "Postprocessed" : "Captured"} ${metadata.width}x${metadata.height} world map `
+      + `(${metadata.tiles.columns}x${metadata.tiles.rows} tiles; ${metadata.renditions.detail.length} detail levels).`,
   );
 }

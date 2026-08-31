@@ -178,7 +178,7 @@ npm run world-map
 ```
 
 This captures the real scene into the padded `game/public/generated/world-map.png` and `.json`, plus
-`game/src/generated/worldMapFingerprint.ts`. Map metadata v3 records `playableBounds`, `imageBounds`,
+`game/src/generated/worldMapFingerprint.ts`. Map metadata v4 records `playableBounds`, `imageBounds`,
 and `imagePaddingMetres`; the padded image may extend beyond the canonical gameplay bounds.
 
 Focused development probes are available on `window.__gameDebug`:

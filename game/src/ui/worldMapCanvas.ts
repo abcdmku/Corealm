@@ -1,14 +1,14 @@
 /**
  * Canvas2D view of the build-time rendered world map.
  *
- * Terrain, stamped roads, paving, water and settlement footprints are baked into one north-up
- * orthographic PNG before Vite builds the game. Runtime work is only one image blit plus the DOM
+ * Terrain, stamped roads, paving, water and settlement footprints are baked into north-up WebP
+ * renditions before Vite builds the game. Runtime work is one selected image blit plus the DOM
  * marker layer owned by MapPanel.
  */
 import type { Vec3 } from "../contracts.js";
 import {
+  WORLD_MAP_DETAIL_RENDITIONS,
   WORLD_MAP_IMAGE_BOUNDS,
-  WORLD_MAP_RENDER_FINGERPRINT,
 } from "../generated/worldMapFingerprint.js";
 import type { MapTerrainSource } from "./panels.js";
 
@@ -43,15 +43,23 @@ interface TerrainLevel {
   height: number;
 }
 
-interface CachedTerrain {
-  /** Pre-downsampled copies, largest first. Render picks the smallest one that is still at
-   * least 1:1 for the current zoom, so a zoomed-out pan never resamples the full-resolution
-   * PNG (17 megapixels) every frame — that was the whole of the map's drag lag. */
-  levels: TerrainLevel[];
-  bounds: ProjectedBounds;
+interface DetailRendition {
+  readonly id: string;
+  readonly path: string;
+  readonly width: number;
+  readonly height: number;
+  readonly sha256: string;
+}
+
+interface TerrainLoadState {
+  level: TerrainLevel | null;
+  loading: HTMLImageElement | null;
+  failures: number;
+  retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const VIEW_PADDING_PX = 18;
+const LOAD_RETRY_DELAYS_MS = [250, 1_000] as const;
 
 /**
  * Zoom 1 fits the whole map; MAP_HOME_ZOOM is the "street level" view the window opens at,
@@ -69,45 +77,13 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Full resolution plus 1/2 and 1/4 copies, largest first, downsampled once at load. A copy that
- * cannot get a 2D context (unit tests without a canvas backend) is skipped; the full image is
- * always level zero, so rendering never depends on the copies existing.
- */
-function buildLevels(image: HTMLImageElement): TerrainLevel[] {
-  const levels: TerrainLevel[] = [
-    { source: image, width: image.naturalWidth, height: image.naturalHeight },
-  ];
-  let previous: CanvasImageSource = image;
-  let width = image.naturalWidth;
-  let height = image.naturalHeight;
-  for (let step = 0; step < 2; step += 1) {
-    const nextWidth = Math.max(1, Math.round(width / 2));
-    const nextHeight = Math.max(1, Math.round(height / 2));
-    const canvas = document.createElement("canvas");
-    canvas.width = nextWidth;
-    canvas.height = nextHeight;
-    const context = canvas.getContext("2d");
-    if (!context) break;
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(previous, 0, 0, nextWidth, nextHeight);
-    levels.push({ source: canvas, width: nextWidth, height: nextHeight });
-    previous = canvas;
-    width = nextWidth;
-    height = nextHeight;
-  }
-  return levels;
-}
-
-/**
  * Owns the cached basemap and the pan/zoom transform. It deliberately knows nothing about labels,
  * discovery, destinations, or movement; MapPanel keeps those semantic layers in DOM/SVG.
  */
 export class WorldMapCanvas {
   private readonly context: CanvasRenderingContext2D | null;
-  private cache: CachedTerrain | null = null;
-  private preparing = false;
-  private loadFailed = false;
+  private readonly terrainStates = new Map<string, TerrainLoadState>();
+  private disposed = false;
   private width = 1;
   private height = 1;
   private pixelRatio = 1;
@@ -145,7 +121,6 @@ export class WorldMapCanvas {
   }
 
   render(): void {
-    this.prepare();
     if (!this.viewReady) this.resetView();
     const context = this.context;
     if (!context) return;
@@ -155,18 +130,19 @@ export class WorldMapCanvas {
     context.fillStyle = "#121310";
     context.fillRect(0, 0, this.width, this.height);
 
-    const cache = this.cache;
-    if (cache) {
-      const topLeft = this.toScreen(cache.bounds.minU, cache.bounds.minV);
-      const scale = this.screenScale();
-      const level = this.pickLevel(cache, scale);
-      const spanW = (cache.bounds.maxU - cache.bounds.minU) * scale;
-      const spanH = (cache.bounds.maxV - cache.bounds.minV) * scale;
+    const scale = this.screenScale();
+    this.prepare(scale);
+    const level = this.pickLoadedLevel(scale);
+    if (level) {
+      const bounds = this.projectedBounds;
+      const topLeft = this.toScreen(bounds.minU, bounds.minV);
+      const spanW = (bounds.maxU - bounds.minU) * scale;
+      const spanH = (bounds.maxV - bounds.minV) * scale;
       context.imageSmoothingEnabled = true;
       // "medium", not "high": at a 2x-DPI megapixel canvas the high-quality resample is the
       // single most expensive part of a pan frame, and the difference is invisible in motion.
       context.imageSmoothingQuality = "medium";
-      // The PNG is stored +x-rightward; the display frame is +x-leftward (see project()).
+      // Renditions store +x rightward; the display frame is +x leftward (see project()).
       context.save();
       context.scale(-1, 1);
       context.drawImage(level.source, -(topLeft.x + spanW), topLeft.y, spanW, spanH);
@@ -248,49 +224,124 @@ export class WorldMapCanvas {
   }
 
   dispose(): void {
-    this.cache = null;
-    this.loadFailed = true;
+    this.disposed = true;
+    for (const state of this.terrainStates.values()) {
+      if (state.retryTimer !== null) clearTimeout(state.retryTimer);
+      state.retryTimer = null;
+      if (state.loading) state.loading.src = "";
+      state.loading = null;
+      state.level = null;
+    }
+    this.terrainStates.clear();
     this.canvas.width = 1;
     this.canvas.height = 1;
   }
 
-  private prepare(): void {
-    if (this.cache || this.preparing || this.loadFailed || !this.context) return;
-    this.preparing = true;
+  /**
+   * Image requests begin here, and render() is only called once MapPanel opens. Constructing the
+   * closed panel during UI boot therefore does not request any detail rendition.
+   */
+  private prepare(screenScale: number): void {
+    if (this.disposed || !this.context) return;
+    const rendition = this.pickRendition(screenScale);
+    if (rendition) this.loadRendition(rendition);
+  }
+
+  private stateFor(rendition: DetailRendition): TerrainLoadState {
+    const existing = this.terrainStates.get(rendition.id);
+    if (existing) return existing;
+    const state: TerrainLoadState = {
+      level: null,
+      loading: null,
+      failures: 0,
+      retryTimer: null,
+    };
+    this.terrainStates.set(rendition.id, state);
+    return state;
+  }
+
+  private loadRendition(rendition: DetailRendition): void {
+    const state = this.stateFor(rendition);
+    if (
+      this.disposed
+      || state.level
+      || state.loading
+      || state.retryTimer !== null
+      || state.failures > LOAD_RETRY_DELAYS_MS.length
+    ) return;
     const image = new Image();
     image.decoding = "async";
+    state.loading = image;
     image.onload = () => {
-      const projectedBounds = this.projectBounds(WORLD_MAP_IMAGE_BOUNDS);
-      this.cache = { levels: buildLevels(image), bounds: projectedBounds };
-      this.projectedBounds = projectedBounds;
-      this.preparing = false;
+      state.loading = null;
+      if (this.disposed) return;
+      state.failures = 0;
+      state.level = {
+        source: image,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      };
       if (!this.viewReady) this.resetView();
       else this.clampCentre();
       this.render();
     };
     image.onerror = () => {
-      this.preparing = false;
-      this.loadFailed = true;
+      state.loading = null;
+      if (this.disposed) return;
+      state.failures += 1;
+      const retryDelay = LOAD_RETRY_DELAYS_MS[state.failures - 1];
+      if (retryDelay !== undefined) {
+        state.retryTimer = setTimeout(() => {
+          state.retryTimer = null;
+          this.loadRendition(rendition);
+        }, retryDelay);
+      }
+      const fallback = this.fallbackRendition(rendition);
+      if (fallback) this.loadRendition(fallback);
       this.render();
     };
-    const imageUrl = new URL("generated/world-map.png", document.baseURI);
-    imageUrl.searchParams.set("v", WORLD_MAP_RENDER_FINGERPRINT);
+    const imageUrl = new URL(rendition.path, document.baseURI);
+    imageUrl.searchParams.set("v", rendition.sha256);
     image.src = imageUrl.href;
   }
 
   /**
-   * The smallest pre-downsampled copy that still has at least one source pixel per screen pixel
-   * at this zoom (device ratio included). Smaller source, same picture, far cheaper resample.
+   * Pick the smallest pregenerated rendition with at least one source pixel per screen pixel at
+   * this zoom. The generator writes largest-first, so walking the list preserves stable ties.
    */
-  private pickLevel(cache: CachedTerrain, screenScale: number): TerrainLevel {
-    const spanU = Math.max(1, cache.bounds.maxU - cache.bounds.minU);
+  private pickRendition(screenScale: number): DetailRendition | null {
+    const renditions: readonly DetailRendition[] = WORLD_MAP_DETAIL_RENDITIONS;
+    const first = renditions[0];
+    if (!first) return null;
+    const spanU = Math.max(1, this.projectedBounds.maxU - this.projectedBounds.minU);
     const needPxPerUnit = screenScale * this.pixelRatio;
-    let chosen = cache.levels[0]!;
-    for (const level of cache.levels) {
-      if (level.width / spanU >= needPxPerUnit) chosen = level;
+    let chosen = first;
+    for (const rendition of renditions) {
+      if (rendition.width / spanU >= needPxPerUnit) chosen = rendition;
       else break;
     }
     return chosen;
+  }
+
+  private pickLoadedLevel(screenScale: number): TerrainLevel | null {
+    const spanU = Math.max(1, this.projectedBounds.maxU - this.projectedBounds.minU);
+    const needPxPerUnit = screenScale * this.pixelRatio;
+    let chosen: TerrainLevel | null = null;
+    for (const rendition of WORLD_MAP_DETAIL_RENDITIONS) {
+      const level = this.terrainStates.get(rendition.id)?.level ?? null;
+      if (!level) continue;
+      if (!chosen) chosen = level;
+      if (level.width / spanU >= needPxPerUnit) chosen = level;
+    }
+    return chosen;
+  }
+
+  /** Use another pregenerated level while the preferred file retries. */
+  private fallbackRendition(failed: DetailRendition): DetailRendition | null {
+    const renditions: readonly DetailRendition[] = WORLD_MAP_DETAIL_RENDITIONS;
+    const index = renditions.findIndex((rendition) => rendition.id === failed.id);
+    if (index < 0) return null;
+    return renditions[index + 1] ?? renditions[index - 1] ?? null;
   }
 
   /**
