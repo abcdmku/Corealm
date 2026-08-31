@@ -167,9 +167,28 @@ export interface EnemyDef {
   /**
    * Pursuit speed in metres per second. Omitted means the shared default in `systems/enemyAI.ts`.
    *
-   * Set per family from the animal's own gait: `tools/animals/build-animals.ts` measures what
-   * ground speed each walk cycle implies, and these sit at roughly 1.6x that, which is the fastest
-   * a cycle can be played without the legs reading as sped-up film.
+   * SET FROM THE ANIMAL'S OWN GAIT, and that is a hard rule rather than a guideline:
+   *
+   *     moveSpeedMps <= MAX_WALK_CADENCE_HZ * impliedWalkMps * walkClipSeconds
+   *
+   * `tools/animals/build-animals.ts` measures what ground speed each walk cycle implies and how
+   * long the cycle is, and both live in the asset manifest. Their product with the cadence ceiling
+   * is the fastest a creature can move while its legs still complete no more than 2.4 cycles a
+   * second.
+   *
+   * CORRECTION. These used to sit at "roughly 1.6x the implied speed", on the reasoning that 1.6x
+   * was the fastest a cycle could be played without looking like sped-up film. That is true of a
+   * RATE and false of a creature, because the same rate is a different cadence on a different clip:
+   * 1.6x on the goat's 0.47 s cycle is 3.4 leg cycles a second, and on the hog's 1.33 s cycle it is
+   * 1.2. Tuned that way the roster ended up with a coney at 3.94 Hz, a frog at 3.62 and a goat at
+   * 3.35 — all at zero foot slide, and all reported from play as feet moving rapidly and jittering.
+   * The speeds are now solved from the inequality instead, so the renderer's cadence cap never has
+   * to bite; `tests/creature-gait.test.ts` checks both halves of that.
+   *
+   * The exceptions are the rigs with no measurable stride — viper, rat, scorpion, crab — whose
+   * implied speed is an artefact of a bad clip sub-range rather than a fact about the animal. A
+   * snake moving at the 0.05 m/s its measurement implies would be absurd, and a snake has no
+   * plantable foot to slide in the first place, so those keep a gameplay speed and lean on the cap.
    */
   moveSpeedMps?: number;
   /** Behaviour selector. Bosses add phases on top. */

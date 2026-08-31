@@ -159,7 +159,8 @@
         "Sword_Attack",
         "Walk_Loop"
       ],
-      "materials": []
+      "materials": [],
+      "walkClipSeconds": 1.333
     },
     {
       "id": "animation_library_2",
@@ -201,7 +202,8 @@
         "Sword_Regular_A",
         "TreeChopping_Loop"
       ],
-      "materials": []
+      "materials": [],
+      "walkClipSeconds": 2
     },
     {
       "id": "balcony_corner",
@@ -1466,7 +1468,8 @@
         "animal_aurochs_mat"
       ],
       "impliedWalkMps": 1.65,
-      "sha256": "9B254BFF5FF3DC97F04922C718697DBE556025997BC4AF927227BEDFE3DEA3CC"
+      "sha256": "9B254BFF5FF3DC97F04922C718697DBE556025997BC4AF927227BEDFE3DEA3CC",
+      "walkClipSeconds": 0.667
     },
     {
       "id": "animal_bear",
@@ -1504,7 +1507,8 @@
         "animal_bear_mat"
       ],
       "impliedWalkMps": 2.25,
-      "sha256": "3BC98097091C1BD7CF7E8B1F5094EA0A6F1DEDB4E3E78C3D5A79D959EA4A3B4A"
+      "sha256": "3BC98097091C1BD7CF7E8B1F5094EA0A6F1DEDB4E3E78C3D5A79D959EA4A3B4A",
+      "walkClipSeconds": 0.567
     },
     {
       "id": "animal_boar",
@@ -1542,7 +1546,8 @@
         "animal_boar_mat"
       ],
       "impliedWalkMps": 1.25,
-      "sha256": "86ECACB47EDD2FC4E0122DD57059EDECC83A44EFCBAEA2273E7FE149CBE7021E"
+      "sha256": "86ECACB47EDD2FC4E0122DD57059EDECC83A44EFCBAEA2273E7FE149CBE7021E",
+      "walkClipSeconds": 0.5
     },
     {
       "id": "animal_cattle",
@@ -1581,7 +1586,8 @@
         "animal_cattle_mat"
       ],
       "impliedWalkMps": 1.65,
-      "sha256": "98BA5C1BCB15B2A483F48FE1FBA14028674A238E596E635489182114A9F5C2FC"
+      "sha256": "98BA5C1BCB15B2A483F48FE1FBA14028674A238E596E635489182114A9F5C2FC",
+      "walkClipSeconds": 0.667
     },
     {
       "id": "animal_chicken",
@@ -1620,7 +1626,8 @@
         "animal_chicken_mat"
       ],
       "impliedWalkMps": 0.75,
-      "sha256": "7784A4C820156084A82D3E50115D6B6CF11718A3C3F207F6DEEA55DD95097AB1"
+      "sha256": "7784A4C820156084A82D3E50115D6B6CF11718A3C3F207F6DEEA55DD95097AB1",
+      "walkClipSeconds": 0.567
     },
     {
       "id": "animal_chicken_speckled",
@@ -1659,7 +1666,8 @@
         "animal_chicken_speckled_mat"
       ],
       "impliedWalkMps": 0.75,
-      "sha256": "AD33B0C3E2BED2643208705DEC0F006288D6D74B0B1BDF0C20115A2A301C9DAE"
+      "sha256": "AD33B0C3E2BED2643208705DEC0F006288D6D74B0B1BDF0C20115A2A301C9DAE",
+      "walkClipSeconds": 0.567
     },
     {
       "id": "animal_coyote",
@@ -1697,7 +1705,8 @@
         "animal_coyote_mat"
       ],
       "impliedWalkMps": 2.05,
-      "sha256": "692CFEFDFD19965862B3CFB3EB8D5F3FBFAAE619F95F6396552A9FAECA702845"
+      "sha256": "692CFEFDFD19965862B3CFB3EB8D5F3FBFAAE619F95F6396552A9FAECA702845",
+      "walkClipSeconds": 0.567
     },
     {
       "id": "animal_crab",
@@ -1735,7 +1744,8 @@
       "materials": [
         "animal_crab_mat"
       ],
-      "sha256": "1335DB8D2CBB723FBE0F681055570AA7DAFD1D97CA1A8D1FED2FEEB09DEF0AD4"
+      "sha256": "1335DB8D2CBB723FBE0F681055570AA7DAFD1D97CA1A8D1FED2FEEB09DEF0AD4",
+      "walkClipSeconds": 1.067
     },
     {
       "id": "animal_deer",
@@ -1774,7 +1784,8 @@
         "animal_deer_mat"
       ],
       "impliedWalkMps": 1.16,
-      "sha256": "000A766C8943CED893055A4284FE7E43E2C0E99A0C5ACBBA7B959B2A77EC641A"
+      "sha256": "000A766C8943CED893055A4284FE7E43E2C0E99A0C5ACBBA7B959B2A77EC641A",
+      "walkClipSeconds": 0.667
     },
     {
       "id": "animal_frog",
@@ -1813,7 +1824,8 @@
         "animal_frog_mat"
       ],
       "impliedWalkMps": 0.43,
-      "sha256": "E87A0230649716AD68E22AAFCF39BA4DE6D3C619A771B63169C064415BC00E60"
+      "sha256": "E87A0230649716AD68E22AAFCF39BA4DE6D3C619A771B63169C064415BC00E60",
+      "walkClipSeconds": 0.767
     },
     {
       "id": "animal_frog_green",
@@ -1852,7 +1864,8 @@
         "animal_frog_green_mat"
       ],
       "impliedWalkMps": 0.43,
-      "sha256": "8E5CD3D885E7B9D6AF69663318B6F146471339708347A9B327750537EE0BE3CC"
+      "sha256": "8E5CD3D885E7B9D6AF69663318B6F146471339708347A9B327750537EE0BE3CC",
+      "walkClipSeconds": 0.767
     },
     {
       "id": "animal_goat",
@@ -1890,7 +1903,8 @@
         "animal_goat_mat"
       ],
       "impliedWalkMps": 1.84,
-      "sha256": "C3AFD1D7F0B50F83E289E0B688518EE45E2B3B5C4261331684DBAF142BD28D9E"
+      "sha256": "C3AFD1D7F0B50F83E289E0B688518EE45E2B3B5C4261331684DBAF142BD28D9E",
+      "walkClipSeconds": 0.467
     },
     {
       "id": "animal_hog",
@@ -1928,7 +1942,8 @@
         "animal_hog_mat"
       ],
       "impliedWalkMps": 0.29,
-      "sha256": "31A64DFFB3F0CF1A3C694E4D0E51BEC6FEBF2B4DD82B3E3241E77B8165C5F040"
+      "sha256": "31A64DFFB3F0CF1A3C694E4D0E51BEC6FEBF2B4DD82B3E3241E77B8165C5F040",
+      "walkClipSeconds": 1.333
     },
     {
       "id": "animal_ibex",
@@ -1966,7 +1981,8 @@
         "animal_ibex_mat"
       ],
       "impliedWalkMps": 2.02,
-      "sha256": "9E09FDFED1447E4746B5AFFE0C75296751437106B4CF6FA28A029236D3B69A3F"
+      "sha256": "9E09FDFED1447E4746B5AFFE0C75296751437106B4CF6FA28A029236D3B69A3F",
+      "walkClipSeconds": 0.467
     },
     {
       "id": "animal_perch",
@@ -2001,7 +2017,8 @@
       "materials": [
         "animal_perch_mat"
       ],
-      "sha256": "03F41B39FEDF84B2563DB4E6346F9ADCBA2EBCC478CE038CC848EC33CA992200"
+      "sha256": "03F41B39FEDF84B2563DB4E6346F9ADCBA2EBCC478CE038CC848EC33CA992200",
+      "walkClipSeconds": 0.833
     },
     {
       "id": "animal_pike",
@@ -2036,7 +2053,8 @@
       "materials": [
         "animal_pike_mat"
       ],
-      "sha256": "026AC472845FC646798B7C13348DAB06D8921016F7DD922BE34AEAC1E44FDD68"
+      "sha256": "026AC472845FC646798B7C13348DAB06D8921016F7DD922BE34AEAC1E44FDD68",
+      "walkClipSeconds": 0.833
     },
     {
       "id": "animal_rabbit",
@@ -2075,7 +2093,8 @@
         "animal_rabbit_mat"
       ],
       "impliedWalkMps": 0.66,
-      "sha256": "4FAD424B2C3C8E3B2116255CF174A91383490113A2D530041E9DEB0E0C76EA4B"
+      "sha256": "4FAD424B2C3C8E3B2116255CF174A91383490113A2D530041E9DEB0E0C76EA4B",
+      "walkClipSeconds": 0.5
     },
     {
       "id": "animal_rabbit_dark",
@@ -2113,7 +2132,8 @@
         "animal_rabbit_dark_mat"
       ],
       "impliedWalkMps": 0.66,
-      "sha256": "0CDFCAE74F29174BA7321A6B7E1FF51FBA0EDAC55D2C64976F12D48F24ED8C27"
+      "sha256": "0CDFCAE74F29174BA7321A6B7E1FF51FBA0EDAC55D2C64976F12D48F24ED8C27",
+      "walkClipSeconds": 0.5
     },
     {
       "id": "animal_rat",
@@ -2151,7 +2171,8 @@
         "animal_rat_mat"
       ],
       "impliedWalkMps": 0.06,
-      "sha256": "6964B846BC5375354C15D66442C5A0E50E5AF66833E01AA4247BCA70A707011D"
+      "sha256": "6964B846BC5375354C15D66442C5A0E50E5AF66833E01AA4247BCA70A707011D",
+      "walkClipSeconds": 1.4
     },
     {
       "id": "animal_salmon",
@@ -2186,7 +2207,8 @@
       "materials": [
         "animal_salmon_mat"
       ],
-      "sha256": "0E878EAF18ED5886CB010E08A48447E6B62F04D17D26D4F9FEA74E401A39A153"
+      "sha256": "0E878EAF18ED5886CB010E08A48447E6B62F04D17D26D4F9FEA74E401A39A153",
+      "walkClipSeconds": 0.833
     },
     {
       "id": "animal_scorpion",
@@ -2224,7 +2246,8 @@
         "animal_scorpion_mat"
       ],
       "impliedWalkMps": 0.12,
-      "sha256": "ACB6C667ABD8E04054F43E71AE3E16BF2D9AFF8389E32B292CFDB876CF4CF9D3"
+      "sha256": "ACB6C667ABD8E04054F43E71AE3E16BF2D9AFF8389E32B292CFDB876CF4CF9D3",
+      "walkClipSeconds": 0.633
     },
     {
       "id": "animal_viper",
@@ -2263,7 +2286,8 @@
         "animal_viper_mat"
       ],
       "impliedWalkMps": 0.02,
-      "sha256": "90E1920080383FED48C2955D3E49A9A62DB5D8E75B23777CEC1B1E2D8F92AD61"
+      "sha256": "90E1920080383FED48C2955D3E49A9A62DB5D8E75B23777CEC1B1E2D8F92AD61",
+      "walkClipSeconds": 1.133
     },
     {
       "id": "base_female",
@@ -2368,7 +2392,8 @@
         "boss_rhino_air_mat"
       ],
       "sha256": "995F78406231278AB6033CBB9096F6FD3F317C8615F42E2645A1DC85A60A1456",
-      "impliedWalkMps": 1.32
+      "impliedWalkMps": 1.32,
+      "walkClipSeconds": 0.667
     },
     {
       "id": "boss_rhino_earth",
@@ -2406,7 +2431,8 @@
         "boss_rhino_earth_mat"
       ],
       "sha256": "A4D6EA9A853598415374A4F658DBD50655FF1E22D3A989DFE7424901C857DFA3",
-      "impliedWalkMps": 1.32
+      "impliedWalkMps": 1.32,
+      "walkClipSeconds": 0.667
     },
     {
       "id": "boss_rhino_water",
@@ -2445,7 +2471,8 @@
         "boss_rhino_water_mat"
       ],
       "sha256": "4F7DA2AE14DD58BCCE40EDF6F49A94A4768A0295A6DDC1483897B48A913DFB92",
-      "impliedWalkMps": 1.32
+      "impliedWalkMps": 1.32,
+      "walkClipSeconds": 0.667
     },
     {
       "id": "enemy_bee",
@@ -2531,7 +2558,8 @@
         "Horns",
         "Tongue",
         "Teeth"
-      ]
+      ],
+      "walkClipSeconds": 0.542
     },
     {
       "id": "enemy_crab",
@@ -2575,7 +2603,8 @@
         "Black",
         "Main_Dark",
         "White"
-      ]
+      ],
+      "walkClipSeconds": 0.542
     },
     {
       "id": "enemy_skull",
@@ -2620,7 +2649,8 @@
       "materials": [
         "Main",
         "Main_Light"
-      ]
+      ],
+      "walkClipSeconds": 0.542
     },
     {
       "id": "eyebrows",

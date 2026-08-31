@@ -131,7 +131,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // Passive at 5 m, sitting on the Redsill shallows, so a player chooses this fight.
     maxHealth: 6, attackLevel: 2, defenceLevel: 1,
     accuracy: 0, armour: 0, magicArmour: 0,
-    maxHit: 2, attackSpeedMs: 2400, aggroRadius: 5, moveSpeedMps: 1.2, behaviour: "passive",
+    maxHit: 2, attackSpeedMs: 2400, aggroRadius: 5, moveSpeedMps: 0.79, behaviour: "passive",
     marks: marksFor(1),
     drops: [
       { itemId: "raw_game_meat", quantity: [1, 1], chance: 0.40 },
@@ -149,7 +149,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // character walks the March Road through the flock and fights only what they swing at.
     maxHealth: 4, attackLevel: 2, defenceLevel: 1,
     accuracy: 0, armour: 0, magicArmour: 0,
-    maxHit: 1, attackSpeedMs: 1200, aggroRadius: 3, moveSpeedMps: 1.2, behaviour: "passive",
+    maxHit: 1, attackSpeedMs: 1200, aggroRadius: 3, moveSpeedMps: 1.0, behaviour: "passive",
     marks: marksFor(1),
     drops: [
       { itemId: "hen_feather", quantity: [1, 3], chance: 0.55 },
@@ -166,7 +166,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // damage; in the full tier 1 kit (29 max health, armour 16) it is 25 s and 11 damage.
     maxHealth: 12, attackLevel: 4, defenceLevel: 3,
     accuracy: 4, armour: 4, magicArmour: 2,
-    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 2.9, behaviour: "aggressive",
+    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 2.05, behaviour: "aggressive",
     marks: marksFor(1),
     drops: [
       { itemId: "coarse_hide", quantity: [1, 2], chance: 0.55 },
@@ -203,7 +203,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // Worth killing for the hide and the foot, not for the fight.
     maxHealth: 5, attackLevel: 2, defenceLevel: 4,
     accuracy: 0, armour: 0, magicArmour: 0,
-    maxHit: 1, attackSpeedMs: 1800, aggroRadius: 2, moveSpeedMps: 1.3, behaviour: "passive",
+    maxHit: 1, attackSpeedMs: 1800, aggroRadius: 2, moveSpeedMps: 0.79, behaviour: "passive",
     marks: marksFor(1),
     drops: [
       { itemId: "coarse_hide", quantity: [1, 1], chance: 0.50 },
@@ -282,7 +282,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // Territorial at 9 m: a rutting hart is the one deer that does not run.
     maxHealth: 26, attackLevel: 12, defenceLevel: 7,
     accuracy: 12, armour: 10, magicArmour: 18,
-    maxHit: 5, attackSpeedMs: 2400, aggroRadius: 9, moveSpeedMps: 1.95, behaviour: "territorial",
+    maxHit: 5, attackSpeedMs: 2400, aggroRadius: 9, moveSpeedMps: 1.85, behaviour: "territorial",
     marks: marksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 2], chance: 0.55 },
@@ -316,7 +316,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // fight in the region after the Reaver: 27.6 s at Melee 7 with a Corven sword.
     maxHealth: 28, attackLevel: 13, defenceLevel: 8,
     accuracy: 10, armour: 14, magicArmour: 8,
-    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 3.1, behaviour: "aggressive",
+    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 2.75, behaviour: "aggressive",
     marks: marksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 2], chance: 0.55 },
@@ -331,7 +331,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // same passive 4 m, scaled to the region: 12 health and max hit 3 instead of 4 and 1.
     maxHealth: 12, attackLevel: 10, defenceLevel: 5,
     accuracy: 6, armour: 8, magicArmour: 8,
-    maxHit: 3, attackSpeedMs: 1200, aggroRadius: 4, moveSpeedMps: 1.2, behaviour: "passive",
+    maxHit: 3, attackSpeedMs: 1200, aggroRadius: 4, moveSpeedMps: 0.79, behaviour: "passive",
     marks: marksFor(5),
     drops: [
       { itemId: "marsh_gland", quantity: [1, 2], chance: 0.45 },
@@ -347,7 +347,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // meets in numbers, and it is still the cheapest thing in the region to kill.
     maxHealth: 10, attackLevel: 4, defenceLevel: 9,
     accuracy: 0, armour: 0, magicArmour: 0,
-    maxHit: 2, attackSpeedMs: 1800, aggroRadius: 2, moveSpeedMps: 1.3, behaviour: "passive",
+    maxHit: 2, attackSpeedMs: 1800, aggroRadius: 2, moveSpeedMps: 0.79, behaviour: "passive",
     marks: marksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 1], chance: 0.45 },
@@ -416,7 +416,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // silhouette on the moor.
     maxHealth: 38, attackLevel: 18, defenceLevel: 11,
     accuracy: 16, armour: 55, magicArmour: 10,
-    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 3.1, behaviour: "aggressive",
+    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 3.05, behaviour: "aggressive",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 1], chance: 0.45 },
@@ -439,7 +439,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // A mud-caked bristle hide over stone dust is what that number reads as on an animal.
     maxHealth: 34, attackLevel: 16, defenceLevel: 11,
     accuracy: 14, armour: 30, magicArmour: 115,
-    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 2.0, behaviour: "aggressive",
+    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 1.5, behaviour: "aggressive",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 1], chance: 0.40 },
@@ -457,7 +457,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // the ibex is the one you simply have to out-fight. Territorial at 11 m on the ridge line.
     maxHealth: 44, attackLevel: 20, defenceLevel: 12,
     accuracy: 18, armour: 40, magicArmour: 30,
-    maxHit: 8, attackSpeedMs: 3000, aggroRadius: 11, moveSpeedMps: 3.1, behaviour: "territorial",
+    maxHit: 8, attackSpeedMs: 3000, aggroRadius: 11, moveSpeedMps: 2.25, behaviour: "territorial",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 2], chance: 0.50 },
@@ -512,7 +512,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // 41 health, where the bear is 32.7 s and 27.9.
     maxHealth: 30, attackLevel: 21, defenceLevel: 12,
     accuracy: 18, armour: 20, magicArmour: 12,
-    maxHit: 7, attackSpeedMs: 1800, aggroRadius: 12, moveSpeedMps: 3.1, behaviour: "aggressive",
+    maxHit: 7, attackSpeedMs: 1800, aggroRadius: 12, moveSpeedMps: 2.75, behaviour: "aggressive",
     marks: marksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 1], chance: 0.35 },

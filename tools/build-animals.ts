@@ -67,6 +67,7 @@ interface ManifestAsset {
    * cycles are authored in place and carry no root travel to read a stride from.
    */
   impliedWalkMps?: number;
+  walkClipSeconds?: number;
 }
 
 const STAGE_DIR = path.join(repoRoot, ".asset-cache", "animal-pack");
@@ -128,6 +129,27 @@ async function optimize(document: Document): Promise<void> {
       quality: 90, effort: 100, formats: /image\/png/,
     }),
   );
+}
+
+
+/**
+ * Length of the asset's walk cycle in seconds, or undefined when it has none.
+ *
+ * Recorded because CADENCE is what decides whether a gait reads: `render/entityViews.ts` caps a
+ * walk at `MAX_WALK_CADENCE_HZ` cycles per second, and cycles per second needs the clip's length as
+ * well as its playback rate. `content/enemies.ts` solves each creature's `moveSpeedMps` against the
+ * same two numbers, and `tests/creature-gait.test.ts` checks the result, so this is a build input
+ * rather than a diagnostic.
+ */
+function walkClipSeconds(document: Document): number | undefined {
+  const walk = document.getRoot().listAnimations().find((entry) => /^walk/i.test(entry.getName()));
+  if (!walk) return undefined;
+  let duration = 0;
+  for (const sampler of walk.listSamplers()) {
+    const times = sampler.getInput()?.getArray();
+    if (times && times.length > 0) duration = Math.max(duration, Number(times[times.length - 1]));
+  }
+  return duration > 0 ? Math.round(duration * 1000) / 1000 : undefined;
 }
 
 async function main(): Promise<void> {
@@ -259,6 +281,9 @@ async function main(): Promise<void> {
         },
         base: { x: round(bounds.min[0]), y: round(bounds.min[1]), z: round(bounds.min[2]) },
         animations,
+        ...(walkClipSeconds(document) === undefined
+          ? {}
+          : { walkClipSeconds: walkClipSeconds(document) }),
         materials,
         ...(result.impliedWalkMps > 0.02
           ? { impliedWalkMps: Math.round(result.impliedWalkMps * 100) / 100 }

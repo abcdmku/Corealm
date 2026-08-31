@@ -433,20 +433,38 @@ const HUMANOID_CLIPS: Record<CharacterMotion, readonly string[]> = {
 /**
  * Bounds on how far a walk cycle may be retimed to match the ground it covers.
  *
- * Below 0.6 a cycle reads as slow motion. The ceiling is 3.2 rather than the 2.0 it started at
- * because 2.0 was not enough for the pack's small animals: they are authored as slow ambles, so the
- * frog's cycle implies 0.43 m/s under a body the simulation moves at 1.2, and the hog's 0.29 under
- * 1.3. Clamped at 2.0 those two kept 28% and 55% of their foot slide - the "feet barely move"
- * report - and the only other way to close it is to slow the creatures until nothing can catch the
- * player. A small animal taking quick steps reads as scurrying; a small animal gliding does not.
+ * Below 0.6 a cycle reads as slow motion.
  *
- * Beyond 3.2 it does become sped-up film, and what is asking for it by then is a rig with no
- * measurable stride at all: `tools/animals/gait.ts` reports the viper at 0.02 m/s and the rat at
- * 0.06. Those have no plantable foot to slide in the first place - a snake glides - so the clamp
- * takes them and the residual is left alone rather than blurred over.
+ * CORRECTION, and the reason `MAX_WALK_CADENCE_HZ` exists below. The old ceiling was 3.2 and was
+ * raised to it deliberately, to close the foot slide on the pack's small animals. That reasoning
+ * optimised the wrong quantity. Slide is minimised by cranking the playback rate, and cranking the
+ * playback rate is exactly what makes legs race — so driving slide to zero produced a roster where
+ * a coney completed 3.94 leg cycles per second, a frog 3.62 and a goat 3.35, all at 0% slide and
+ * all reported from play as "their feet move rapidly and they are jittery". Both halves of that
+ * report are one cause: at 3.9 Hz a 60 fps frame budget leaves fifteen frames to draw a whole
+ * cycle, so the legs snap between poses rather than sweeping through them.
+ *
+ * A rate ceiling cannot express that, because the same rate means different things on different
+ * clips: the goat's walk is 0.47 s and the hog's is 1.33 s, so 1.6x is 3.4 Hz on one and 1.2 Hz on
+ * the other. The ceiling that matters is in CYCLES PER SECOND, and it is applied below.
  */
 const WALK_RATE_MIN = 0.6;
 const WALK_RATE_MAX = 3.2;
+
+/**
+ * The fastest a walk cycle may be played, in cycles per second.
+ *
+ * This is what the eye actually judges. Real quadruped walks and trots sit between about 1.5 and
+ * 2.5 Hz, and small animals live at the top of that; 2.4 is the generous end of natural rather than
+ * a stylistic choice, so it corrects the racing without slowing anything that already looked right
+ * (the bear at 2.42 and the rhino bosses at 1.59 are untouched by it).
+ *
+ * It is a SAFETY NET, not the primary mechanism. `content/enemies.ts` speeds are tuned so the cap
+ * does not bite, because a cap that bites is a cap trading racing legs for foot slide — the same
+ * trade in the other direction. `tests/creature-gait.test.ts` asserts both ends of that: nothing
+ * exceeds this cadence, and nothing needs the cap to avoid exceeding it.
+ */
+const MAX_WALK_CADENCE_HZ = 2.4;
 
 /** Measured planted-foot speed of Jog_Fwd_Loop in the shared humanoid animation library. */
 const HUMANOID_JOG_IMPLIED_MPS = 5.92;
@@ -3874,8 +3892,13 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     // sideways, a fish swims - and their implied speed is near zero, which would ask for a playback
     // rate in the tens. Those have no plantable foot either, so the slide does not read.
     if (motion === "walk" && entry?.impliedWalkMps && moveSpeedMps) {
-      const rate = moveSpeedMps / entry.impliedWalkMps;
-      return Math.min(WALK_RATE_MAX, Math.max(WALK_RATE_MIN, rate));
+      const rate = Math.min(WALK_RATE_MAX, Math.max(WALK_RATE_MIN, moveSpeedMps / entry.impliedWalkMps));
+      // Then the cadence ceiling, which needs the clip's own length: playing a 0.47 s cycle at 1.6x
+      // is 3.4 leg cycles a second, and playing a 1.33 s cycle at the same 1.6x is 1.2. Only the
+      // first of those reads as a creature sprinting on the spot.
+      const duration = clip.duration;
+      if (duration > 0) return Math.min(rate, MAX_WALK_CADENCE_HZ * duration);
+      return rate;
     }
     return 1;
   }

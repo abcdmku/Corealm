@@ -63,6 +63,16 @@ export interface AssetEntry {
    * in place. `render/entityViews.ts` divides the creature's real speed by it to retime the clip.
    */
   impliedWalkMps?: number;
+  /**
+   * Length of the walk cycle in seconds.
+   *
+   * NOT read at runtime — `motionTimeScale` has the live `AnimationClip` and uses its own duration.
+   * This is the build-time copy, so `content/enemies.ts` can solve each creature's `moveSpeedMps`
+   * against its gait and `tests/creature-gait.test.ts` can check the result without loading GLBs.
+   * Cadence needs the clip's length as well as its playback rate: the same rate is 3.4 cycles a
+   * second on the goat's 0.47 s clip and 1.2 on the hog's 1.33 s one.
+   */
+  walkClipSeconds?: number;
 }
 
 export interface AssetPack {
