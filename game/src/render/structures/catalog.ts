@@ -111,8 +111,14 @@ function roundMetres(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+/**
+ * The one insert that closes a kit aperture.
+ *
+ * `window_thin` used to count here, which meant a recipe that put a shutter over an arrow loop
+ * satisfied the invariant with two overlays and no pane, and the hole stayed open.
+ */
 function isWindowInsert(part: PartPlacement): boolean {
-  return part.assetId === "window_wide" || part.assetId === "window_thin";
+  return part.assetId === "window_wide";
 }
 
 function isPairedWindow(shutter: PartPlacement, candidate: PartPlacement): boolean {
@@ -135,18 +141,29 @@ function uniqueBackingTag(shutterTag: string, usedTags: Set<string>): string {
 }
 
 /**
- * Shutters are an overlay, not a window. Recipes may still use them as a replacement asset, so
- * repair every unpaired shutter after recipe selection and also repair the classic prefab path.
+ * Every insert that stands in a wall aperture has to close it.
+ *
+ * Two overlays in the kit do not: `window_shutters` is a pair of leaves with nothing behind them,
+ * and `window_thin` is an arrow loop 0.888 m wide. The panel they go into is a hole 1.19 m wide
+ * from a 1.05 m sill to a 2.69 m arched crown, and the only asset authored to plug it is
+ * `window_wide` at scale 1 - which is exactly what the classic prefab path inserts
+ * (`buildings.ts:ringWindows`).
+ *
+ * Recipes are allowed to use either overlay for its silhouette. This adds the backing pane behind
+ * whichever of them is left unpaired, so a shuttered bay or a watch slit is a window and not a
+ * hole you can see the far side of the building through. Backings do not count against a recipe's
+ * detail budget.
  */
+const APERTURE_OVERLAYS = new Set(["window_shutters", "window_thin"]);
+
 function enforceShutterWindowInvariant(parts: readonly PartPlacement[]): ShutterInvariantResult {
   const result = [...parts];
   const usedTags = new Set(result.map((part) => part.tag));
   const generatedBackingTags = new Set<string>();
 
   for (const shutter of parts) {
-    if (shutter.assetId !== "window_shutters" || result.some((part) => isPairedWindow(shutter, part))) {
-      continue;
-    }
+    if (!APERTURE_OVERLAYS.has(shutter.assetId)) continue;
+    if (result.some((part) => part !== shutter && isPairedWindow(shutter, part))) continue;
 
     const tag = uniqueBackingTag(shutter.tag, usedTags);
     generatedBackingTags.add(tag);
@@ -157,7 +174,8 @@ function enforceShutterWindowInvariant(parts: readonly PartPlacement[]): Shutter
       dy: shutter.dy,
       dz: roundMetres(shutter.dz - Math.cos(shutter.rotationY) * SHUTTER_BACKING_INSET_METRES),
       rotationY: shutter.rotationY,
-      scale: shutter.scale,
+      // The backing is sized to the aperture, never to the overlay standing in front of it.
+      scale: 1,
     });
   }
 

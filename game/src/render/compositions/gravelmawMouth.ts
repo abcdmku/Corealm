@@ -42,8 +42,10 @@ const MOUTH_VARIANTS: readonly MouthVariant[] = [
     rocks: [
       { tag: "jaw_l", assetId: "rock_medium_3", dx: -4.7, dy: -0.58, dz: -1.82, rotationY: 0.45, scale: 0.9 },
       { tag: "jaw_r", assetId: "rock_medium_1", dx: 4.7, dy: -0.58, dz: -1.82, rotationY: -0.7, scale: 0.9 },
-      { tag: "shoulder_l", assetId: "rock_medium_1", dx: -4.75, dy: 1.62, dz: -1.9, rotationY: 1.1, scale: 0.82 },
-      { tag: "shoulder_r", assetId: "rock_medium_3", dx: 4.75, dy: 1.7, dz: -1.9, rotationY: 2.0, scale: 0.78 },
+      // Shoulders bed INTO the jaws below them. Authored 0.18-0.24 m higher, every one of them
+      // was a boulder hanging in the air over the jaw it is supposed to be resting on.
+      { tag: "shoulder_l", assetId: "rock_medium_1", dx: -4.75, dy: 1.32, dz: -1.9, rotationY: 1.1, scale: 0.82 },
+      { tag: "shoulder_r", assetId: "rock_medium_3", dx: 4.75, dy: 1.4, dz: -1.9, rotationY: 2.0, scale: 0.78 },
       { tag: "crown_l", assetId: "rock_medium_1", dx: -3.2, dy: 7.1, dz: -0.45, rotationY: 0.08, scale: 0.98 },
       { tag: "crown_c", assetId: "rock_medium_2", dx: 0, dy: 7.45, dz: -0.5, rotationY: 1.55, scale: 1.0 },
       { tag: "crown_r", assetId: "rock_medium_3", dx: 3.2, dy: 7.1, dz: -0.45, rotationY: 0.12, scale: 0.92 },
@@ -64,8 +66,8 @@ const MOUTH_VARIANTS: readonly MouthVariant[] = [
     rocks: [
       { tag: "jaw_l", assetId: "rock_medium_1", dx: -4.75, dy: -0.62, dz: -1.85, rotationY: -0.3, scale: 0.9 },
       { tag: "jaw_r", assetId: "rock_medium_3", dx: 4.82, dy: -0.56, dz: -1.9, rotationY: 1.3, scale: 0.84 },
-      { tag: "shoulder_l", assetId: "rock_medium_3", dx: -4.7, dy: 1.56, dz: -1.98, rotationY: 1.95, scale: 0.76 },
-      { tag: "shoulder_r", assetId: "rock_medium_2", dx: 4.92, dy: 1.34, dz: -1.92, rotationY: 0.3, scale: 0.86 },
+      { tag: "shoulder_l", assetId: "rock_medium_3", dx: -4.7, dy: 1.26, dz: -1.98, rotationY: 1.95, scale: 0.76 },
+      { tag: "shoulder_r", assetId: "rock_medium_2", dx: 4.92, dy: 1.04, dz: -1.92, rotationY: 0.3, scale: 0.86 },
       { tag: "crown_l", assetId: "rock_medium_2", dx: -3.15, dy: 7.08, dz: -0.4, rotationY: 1.6, scale: 0.92 },
       { tag: "crown_c", assetId: "rock_medium_1", dx: 0.02, dy: 7.6, dz: -0.46, rotationY: 0.05, scale: 0.9 },
       { tag: "crown_r", assetId: "rock_medium_3", dx: 3.25, dy: 7.08, dz: -0.4, rotationY: 0.08, scale: 0.86 },
@@ -86,8 +88,8 @@ const MOUTH_VARIANTS: readonly MouthVariant[] = [
     rocks: [
       { tag: "jaw_l", assetId: "rock_medium_2", dx: -4.75, dy: -0.55, dz: -1.88, rotationY: 2.3, scale: 0.92 },
       { tag: "jaw_r", assetId: "rock_medium_1", dx: 4.72, dy: -0.62, dz: -1.86, rotationY: -1, scale: 0.9 },
-      { tag: "shoulder_l", assetId: "rock_medium_1", dx: -4.72, dy: 1.6, dz: -1.96, rotationY: 0.8, scale: 0.82 },
-      { tag: "shoulder_r", assetId: "rock_medium_3", dx: 4.78, dy: 1.48, dz: -1.92, rotationY: 1.9, scale: 0.78 },
+      { tag: "shoulder_l", assetId: "rock_medium_1", dx: -4.72, dy: 1.3, dz: -1.96, rotationY: 0.8, scale: 0.82 },
+      { tag: "shoulder_r", assetId: "rock_medium_3", dx: 4.78, dy: 1.18, dz: -1.92, rotationY: 1.9, scale: 0.78 },
       { tag: "crown_l", assetId: "rock_medium_3", dx: -3.25, dy: 7.08, dz: -0.42, rotationY: 0.08, scale: 0.88 },
       { tag: "crown_c", assetId: "rock_medium_2", dx: 0, dy: 7.78, dz: -0.48, rotationY: 0.02, scale: 1.0 },
       { tag: "crown_r", assetId: "rock_medium_1", dx: 3.25, dy: 7.08, dz: -0.42, rotationY: 0.08, scale: 0.9 },
@@ -108,8 +110,8 @@ const MOUTH_VARIANTS: readonly MouthVariant[] = [
     rocks: [
       { tag: "jaw_l", assetId: "rock_medium_3", dx: -4.78, dy: -0.62, dz: -1.9, rotationY: -0.8, scale: 0.86 },
       { tag: "jaw_r", assetId: "rock_medium_2", dx: 4.8, dy: -0.58, dz: -1.88, rotationY: 1.7, scale: 0.9 },
-      { tag: "shoulder_l", assetId: "rock_medium_2", dx: -4.78, dy: 1.42, dz: -1.96, rotationY: 2.4, scale: 0.82 },
-      { tag: "shoulder_r", assetId: "rock_medium_3", dx: 4.82, dy: 1.66, dz: -1.94, rotationY: 0.9, scale: 0.8 },
+      { tag: "shoulder_l", assetId: "rock_medium_2", dx: -4.78, dy: 1.12, dz: -1.96, rotationY: 2.4, scale: 0.82 },
+      { tag: "shoulder_r", assetId: "rock_medium_3", dx: 4.82, dy: 1.36, dz: -1.94, rotationY: 0.9, scale: 0.8 },
       { tag: "crown_l", assetId: "rock_medium_1", dx: -3.25, dy: 7.08, dz: -0.42, rotationY: 0.06, scale: 0.9 },
       { tag: "crown_c", assetId: "rock_medium_3", dx: 0, dy: 7.45, dz: -0.48, rotationY: 0.06, scale: 0.92 },
       { tag: "crown_r", assetId: "rock_medium_2", dx: 3.25, dy: 7.08, dz: -0.42, rotationY: 0.06, scale: 0.9 },
@@ -125,6 +127,21 @@ const MOUTH_VARIANTS: readonly MouthVariant[] = [
     pathZ: 2.52,
   },
 ] as const;
+
+/**
+ * Beds a `floor_brick` paving tile into the ground with its face just proud of it.
+ *
+ * `floor_brick` is a 0.020 m slab about a base at -0.010, so at 2.2 it is 44 mm thick. Both of
+ * these tiles were authored at a flat `dy -0.035`, which put their TOP at -0.013 and -0.018: they
+ * were submitted to the renderer, batched, and drew nothing at all because the whole tile was
+ * under the ground plane.
+ */
+const PAVING_PROUD_METRES = 0.012;
+const FLOOR_BRICK_TOP = 0.01;
+
+function pavingY(scale: number): number {
+  return PAVING_PROUD_METRES - FLOOR_BRICK_TOP * scale;
+}
 
 function placement(
   tag: string,
@@ -159,12 +176,15 @@ export function buildGravelmawMouthComposition(seed: number, kit: BuildingKit): 
   // sits farther down the approach and is low enough to remain walkable, keeping the black centre
   // visible between the two piers.
   out.push(placement("threshold", "kerb_straight", 0, -0.035, variant.thresholdZ, 0, variant.thresholdScale));
-  out.push(placement("approach_stone", "floor_brick", 0, -0.035, variant.pathZ, 0, 2.2));
+  out.push(placement("approach_stone", "floor_brick", 0, pavingY(2.2), variant.pathZ, 0, 2.2));
 
-  // Torch's pivot is at its top-side origin and its measured base.y is -0.278. These pivots sink
-  // the feet a few centimetres into the sloping terrace while leaving both flames at the mouth.
-  out.push(placement("brazier_l", "torch", -3.35, variant.torchY, 0.96, 0, variant.torchScale));
-  out.push(placement("brazier_r", "torch", 3.35, variant.torchY, 0.96, 0, variant.torchScale));
+  // A bracket torch mounts ON the pier, not in front of it. `torch`'s measured base.y is -0.278,
+  // so a raw `variant.torchY` of 0.38-0.43 buried the foot 0.2 m at these scales, and dz 0.96 left
+  // the mounting plate 0.82 m out in the open air in front of the pier's brick plane at z 0.140.
+  // The pivot correction is the same one `rootTunnel.ts:torch` and `regionGate.ts:torchY` use.
+  const brazierY = 0.278 * variant.torchScale + 0.38;
+  out.push(placement("brazier_l", "torch", -3.35, brazierY, 0.1, 0, variant.torchScale));
+  out.push(placement("brazier_r", "torch", 3.35, brazierY, 0.1, 0, variant.torchScale));
 
   for (const rock of variant.rocks) {
     out.push(placement(
@@ -248,14 +268,16 @@ const EXIT_VARIANTS: readonly ExitVariant[] = [
 export function buildGravelmawExitComposition(seed: number, kit: BuildingKit): PartPlacement[] {
   const variant = EXIT_VARIANTS[(seed >>> 0) % EXIT_VARIANTS.length]!;
   const out: PartPlacement[] = [
-    // The brick gate piers stay behind the separate wall_arch hero and leave its clear opening
-    // untouched. At scale 1.05 their inner edges are 2.30 m from centre, wider than the approach.
-    placement("exit_pier_l", kit.gatePier, -3.35, -0.04, -0.18, 0, 1.05),
-    placement("exit_pier_r", kit.gatePier, 3.35, -0.04, -0.18, 0, 1.05),
+    // The brick gate piers frame the separate `wall_brick_door` hero and leave its clear opening
+    // untouched. At dx +-3.35 and scale 1.05 their inner edges landed at 2.30 m against a hero
+    // whose panel reaches 2.20 m, so each pier stood off the portal behind a full-height 0.10 m
+    // slot of daylight. +-3.15 laps them 0.10 m into the hero instead.
+    placement("exit_pier_l", kit.gatePier, -3.15, -0.04, -0.18, 0, 1.05),
+    placement("exit_pier_r", kit.gatePier, 3.15, -0.04, -0.18, 0, 1.05),
 
     // A single floor-brick tile reads as the threshold and remains floor, not a blocker across the
     // portal. The tile is centred on the +Z approach so the arch is still visible over it.
-    placement("exit_floor_threshold", "floor_brick", 0, -0.035, variant.thresholdZ, 0, variant.thresholdScale),
+    placement("exit_floor_threshold", "floor_brick", 0, pavingY(variant.thresholdScale), variant.thresholdZ, 0, variant.thresholdScale),
 
     // `torch` is vertical at rotationY 0; its feet sit slightly below the chamber floor while the
     // flames flank the arch. No wall lamps or cage stand-ins are needed for this interior view.

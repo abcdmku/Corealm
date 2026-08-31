@@ -41,6 +41,14 @@ const WALL_FACE = 0.093;
  * walkable floor down the middle of a portal the player only has to reach, never fight in.
  */
 const PIER_INNER = 1.35;
+/**
+ * The hero portal's own numbers. `wall_arch` is 2.000 x 3.000 x 0.064 about a pivot at its bottom
+ * centre with the body entirely on local +Z, and the world draws the gate hero at 1.4x.
+ */
+const ARCH_SCALE = 1.4;
+const ARCH_ASSET_DEPTH = 0.064;
+/** Leaves a hair either side of the hero so the ribs meet it without coplanar faces. */
+const ARCH_RIB_SEAM = 0.002;
 const PIER_WIDTH = 2;
 const PIER_OUTER = PIER_INNER + PIER_WIDTH;
 const PIER_CENTRE = PIER_INNER + PIER_WIDTH / 2;
@@ -54,8 +62,15 @@ const WING_END = PIER_OUTER + 2;
 const TOWER_CROWN_Y = 3.3175;
 const TOWER_CROWN_SCALE = 0.34;
 
-const BANNER_1_BASE_Y = -1.549;
-const BANNER_2_BASE_Y = -1.234;
+/**
+ * Both banner assets share one bracket: the metal fitting tops out at local y 0.844 and the timber
+ * arm at 0.811; only the cloth differs (`banner_1` hangs to -1.549, `banner_2` to -1.234). Hanging
+ * by the bracket rather than the cloth is what keeps a pennant off the road.
+ */
+const BANNER_BRACKET_TOP_Y = 0.844;
+const BANNER_HEAD_CLEARANCE = 0.06;
+const BANNER_1_RAIL_DROP = BANNER_BRACKET_TOP_Y + BANNER_HEAD_CLEARANCE;
+const BANNER_2_RAIL_DROP = BANNER_1_RAIL_DROP;
 const TORCH_BASE_Y = -0.278;
 const WALL_PLASTER_STRAIGHT_BASE_Y = -0.002;
 const POST_GROUND_LIFT = 0.01;
@@ -115,10 +130,17 @@ function wallY(assetId: string): number {
   return assetId === "wall_plaster_straight" ? -WALL_PLASTER_STRAIGHT_BASE_Y + 0.001 : 0;
 }
 
-/** Ground-aligns the two elevated props using their measured manifest pivots. */
+/**
+ * Hangs a banner from just under the pier head instead of standing it on the grass.
+ *
+ * `bannerY` used to ground-align the mesh's bbox floor, but a banner's bbox floor is the bottom of
+ * its cloth: `banner_1` at 0.82 then ran from y 0.02 to 1.98, so the pennant trailed on the road
+ * and its wooden arm - the part that is supposed to be bolted to masonry - started at 0.63 m. The
+ * rail now sits a little below the 3.123 m pier head and the cloth hangs clear of the ground.
+ */
 function bannerY(assetId: "banner_1" | "banner_2", scale: number): number {
-  const baseY = assetId === "banner_1" ? BANNER_1_BASE_Y : BANNER_2_BASE_Y;
-  return -baseY * scale + 0.02;
+  const railDrop = assetId === "banner_1" ? BANNER_1_RAIL_DROP : BANNER_2_RAIL_DROP;
+  return STOREY_METRES - railDrop * scale;
 }
 
 function torchY(scale: number): number {
@@ -193,6 +215,10 @@ function addWing(out: PartPlacement[], kit: BuildingKit, side: -1 | 1, asset: st
   out.push(placement(
     `wing_${name}_end`, kit.corner, side * WING_END, POST_GROUND_LIFT, 0, side * Math.PI / 4, postScale(kit),
   ));
+  // NO post where the wing butts the pier. It was tried: the pier's own corner posts already stand
+  // at (PIER_OUTER, +-1) on that same face, so a third post on the wing's centre plane lands
+  // 0.21-0.29 m from both of them and reads as a cluster rather than a joint. A 0.406 m panel
+  // dying into a 2 m masonry box is ordinary construction and wants no expressed post.
 }
 
 function addBanners(
@@ -216,8 +242,11 @@ function addTorches(out: PartPlacement[], scale: number, single: boolean): void 
   const y = torchY(scale);
   // On the passage jambs, where a gate watch would actually want light. Both heads look down the
   // +Z road and neither is in the corridor: the bracket is 0.11 m wide against a 2.70 m gap.
-  const dx = PIER_INNER + 0.12;
-  const dz = PIER_HALF_DEPTH - 0.25;
+  // On the pier's road elevation, the way `gatehouse` mounts its lamps - not tucked into the
+  // passage corner. At `PIER_INNER + 0.12` the 0.25 m bracket straddled the pier's inner
+  // arris with most of its body inside the masonry and only the flame showing.
+  const dx = PIER_INNER + 0.35;
+  const dz = PIER_HALF_DEPTH + 0.01;
   if (!single) out.push(placement("torch_left", "torch", -dx, y, dz, 0, scale));
   out.push(placement("torch_right", "torch", dx, y, dz, 0, scale));
 }
@@ -246,16 +275,29 @@ export function buildRegionGateComposition(seed: number, kit: BuildingKit): Part
   addWing(out, kit, -1, sideWicket ? kit.wallDoor : kit.wall);
   addWing(out, kit, 1, kit.wall);
 
-  // Two more ribs behind the hero arch, so the crossing is a PASSAGE and not a card.
+  // The crossing is a barrel, not a stack of cards.
   //
-  // `wall_arch` is 2.000 x 3.000 x 0.064 and the world draws it at 1.4x, which is 0.09 m of timber
-  // spanning a 2 m deep gate. Head on it reads fine; from the road shoulder - which is where the
-  // player walks up to it - it is a cardboard cutout between two solid piers, and that mismatch is
-  // more obvious now the piers have mass than it was when they were cards too. Three ribs on the
-  // same 1.4x the world uses turn it into an arched opening two metres deep. Their jambs land
-  // 0.05 m inside the pier faces, so the passage is masonry, timber, masonry all the way through.
-  for (const [index, dz] of [-0.58, 0.52].entries()) {
-    out.push(placement(`arch_rib_${index}`, "wall_arch", 0, 0, dz, 0, 1.4));
+  // `wall_arch` is 2.000 x 3.000 x 0.064 and the world draws its hero at 1.4x, which is 0.09 m of
+  // timber spanning a 2 m deep gate. Two loose ribs at z -0.58 and 0.52 did not fix that: together
+  // with the hero at z 0..0.09 they left three planes with 0.39-0.49 m of daylight between each,
+  // and 1.73 m of the piers' 2.00 m depth had no arch over it at all. Head on it read as an arch;
+  // from the road shoulder, which is where the player actually walks up to it, it read as three
+  // black cutouts - and the 4.20 m panel standing 1.08 m proud of the 3.12 m pier heads read as a
+  // slab hanging in the air between the two crowns.
+  //
+  // One rib either side of the hero, each stretched along Z only, fills the passage end to end.
+  // The arch is then a solid timber portal two metres deep whose head sits ON the pier heads as a
+  // gate head with real mass, and whose opening is the hero's own arch all the way through.
+  const archDepth = ARCH_ASSET_DEPTH * ARCH_SCALE;
+  const heroFront = archDepth;
+  for (const [index, span] of ([
+    [-PIER_HALF_DEPTH, -ARCH_RIB_SEAM],
+    [heroFront + ARCH_RIB_SEAM, PIER_HALF_DEPTH],
+  ] as const).entries()) {
+    out.push({
+      ...placement(`arch_rib_${index}`, "wall_arch", 0, 0, span[0], 0, ARCH_SCALE),
+      scaleAxes: [1, 1, round4((span[1] - span[0]) / archDepth)],
+    });
   }
 
   // Half-timbered kits keep the solid panel and put the open-frame asset 0.02 m proud of it. Stone

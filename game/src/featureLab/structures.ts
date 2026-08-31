@@ -38,7 +38,7 @@ export interface FeatureLabStructureMeasurements extends StructureAssetMeasureme
   readonly baseY: (assetId: string) => number;
 }
 
-interface CompositionHero {
+export interface CompositionHero {
   readonly assetId: string;
   readonly scale: number;
   readonly clipFraction?: number;
@@ -55,7 +55,12 @@ const DEFAULT_FOOTPRINTS: Readonly<Record<PrefabId, readonly [number, number]>> 
   townhouse: [6, 4],
   hall: [12, 6],
   tower: [6, 6],
-  stall: [4, 3],
+  // 3 x 2, not 4 x 3. No settlement places a `stall` building, so this default IS the footprint the
+  // prefab is ever built at - and `structures/stall.ts:fitsStall` admits width 3..3.5 and depth up
+  // to 2.5, which is the pitch the recipe's own +-1.1 / +-0.9 prop offsets are authored for. At
+  // 4 x 3 `structureVariantCount("stall", ...)` returned 0 for all three kits and every one of the
+  // six stall recipes was unreachable.
+  stall: [3, 2],
   wall_segment: [8, 2],
   gatehouse: [8, 4],
   shed: [4, 4],
@@ -317,7 +322,7 @@ function compositionHeroEntity(
 }
 
 /** The actual semantic anchor paired with each production dressing recipe. */
-function compositionHero(selection: FeatureLabStructureSelection): CompositionHero | null {
+export function compositionHero(selection: FeatureLabStructureSelection): CompositionHero | null {
   const fixed: Partial<Record<CompositionId, CompositionHero>> = {
     vault_door: { assetId: "door_frame_round", scale: 1.5, solid: true },
     milestone: { assetId: "wall_brick_straight", scale: 0.7, solid: true },
@@ -325,7 +330,9 @@ function compositionHero(selection: FeatureLabStructureSelection): CompositionHe
     gravelmaw_mouth: { assetId: "wall_brick_door", scale: 3, solid: false },
     gravelmaw_exit: { assetId: "wall_brick_door", scale: 2.2, solid: false },
     great_cairn: { assetId: "rock_medium_2", scale: 1.8, solid: true },
-    standing_stones: { assetId: "boulder_medium", scale: 1.1, solid: true },
+    // Must track content/regions.ts: the world moved off `boulder_medium` because it is one of
+    // the six untextured platformer rocks and drew as a smooth tan cone.
+    standing_stones: { assetId: "rock_medium_2", scale: 1.35, solid: true },
     rootfall_stump: {
       assetId: "tree_twisted_2", scale: 2, clipFraction: 0.24, solid: false,
     },

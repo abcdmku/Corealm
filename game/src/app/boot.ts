@@ -335,7 +335,10 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     // reveal and the dungeon read as a black rectangular card. Oversizing it behind the masonry
     // lets the arch itself mask the darkness into the intended wound shape.
     const shadowWidth = scale * 1.52;
-    const shadowHeight = scale * 2.3;
+    // 2.5, not 2.3. Rasterised off `wall_brick_door.glb` the aperture's apex is at asset y
+    // 2.471, which at the hero's scale 3 is 7.413 m; a 6.900 m backdrop left the top 0.5 m of
+    // the arch open to the sky behind it, so the dungeon mouth showed daylight through its head.
+    const shadowHeight = scale * 2.5;
     const backdrop = new THREE.Mesh(
       new THREE.PlaneGeometry(shadowWidth, shadowHeight),
       new THREE.MeshBasicMaterial({ color: 0x050709, toneMapped: false }),

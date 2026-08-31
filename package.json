@@ -36,6 +36,8 @@
     "structure:contracts": "vitest run tests/structures.test.ts",
     "structure:contracts:watch": "vitest tests/structures.test.ts",
     "structure:test": "tsx tools/structure-preview-test.ts",
+    "structure:lint": "tsx tools/structure-lint.ts",
+    "structure:sweep": "tsx tools/structure-sweep.ts",
     "play": "tsx tools/play-game.ts",
     "screenshot": "tsx tools/screenshot.ts",
     "inspect-glb": "tsx tools/inspect-glb.ts",

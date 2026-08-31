@@ -12,6 +12,15 @@ interface WellStyle {
 
 const HALF_FOOTPRINT = 1;
 const CURB_LINE = inset(0.68, HALF_FOOTPRINT, 0.25);
+/**
+ * Closes the tiled winch canopy's two open ends.
+ *
+ * `roof_gable_brick` is 6.694 x 4.516 x 1.129 and the canopy is `roof_tiles_4x6` at 0.38, whose
+ * tile plane is 2.479 m of half-span and 3.441 m of apex at scale 1. These axes match the gable
+ * to that plane: 5.513 * 0.38 / 6.694 across, and (3.441 + 0.516) * 0.38 / 4.516 up.
+ */
+const GABLE_AXES: readonly [number, number, number] = [0.313, 0.333, 0.313];
+
 const FLOWER_EDGE = inset(0.82, HALF_FOOTPRINT, 0.12);
 /**
  * Top of the wellhead curb, mirroring `WELL_CURB_SHOW` in render/buildings.ts.
@@ -56,7 +65,7 @@ export const WELL_VARIANTS: readonly StructureVariantRecipe[] = [
     label: "Tiled Winch Well",
     family: "civic",
     prefab: "well",
-    detailBudget: 2,
+    detailBudget: 4,
     build: (_context, base) => withDetails(
       // The two dark plank slopes read as an upright rack from Coldbrace's square camera. Replace
       // them with the kit's smallest complete tiled roof, scaled to the same measured envelope.
@@ -66,6 +75,12 @@ export const WELL_VARIANTS: readonly StructureVariantRecipe[] = [
       // above the placement height, which clears the caps by 0.06 m. The base already carries the
       // windlass drum; a second `roof_log` here drew two axles in the same 0.15 m of space.
       variantPart("tiled_canopy", "roof_tiles_4x6", 0, 2.1, 0, 0, 0.38),
+      // `roof_tiles_4x6` is two tile planes and a ridge with NO gable, so on its own it is an
+      // open-ended prism: from either end of the square you looked straight up under the tiles
+      // and out the far side. `roof_gable_brick` closes both ends, which is what `gableEnds`
+      // does for every pitched roof on a building.
+      { ...variantPart("gable_n", "roof_gable_brick", 0, 2.1, -1.439, 0, 1), scaleAxes: GABLE_AXES },
+      { ...variantPart("gable_s", "roof_gable_brick", 0, 2.1, 1.439, Math.PI, 1), scaleAxes: GABLE_AXES },
     ),
   },
   {

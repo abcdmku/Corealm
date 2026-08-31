@@ -252,16 +252,22 @@ export const TOWER_VARIANTS: readonly StructureVariantRecipe[] = [
     detailBudget: 4,
     build: (context, base) => {
       const x = inset(2, halfWidth(context), 0.4);
-      const y = STOREY_METRES + 1.017;
+      // Grilles go on the tower's ACTUAL upper apertures, which is what `shutterTargets` already
+      // resolves for the shuttered recipe. They used to be pinned to the centre of the +Z and +X
+      // faces, and `ringWindows` does not put an aperture in the middle of a face: on the shipped
+      // 4 x 4 Highcairn watch tower both grilles landed on blank masonry while the two real
+      // openings a metre away were left bare.
+      const targets = shutterTargets(context, base);
+      const grilles = targets.map((wall, index) => (
+        facadePart(`watch_grille_${index}`, "fence_metal_ornate", wall, 0.19, 0.6)
+      ));
       return withDetails(
         base,
-        // These grilles dress the two real upper openings; the classic base supplies both lamps.
-        // Keep the grille face just proud of the tower trim. The asset's shallow depth needs
-        // roughly 0.19 m of outward clearance; 0.1 m visibly embeds it in the wall.
-        variantPart("watch_grille_north", "fence_metal_ornate", 0, y, halfDepth(context) + 0.19, 0, 0.6),
-        variantPart("watch_grille_east", "fence_metal_ornate", halfWidth(context) + 0.19, y, 0, Math.PI / 2, 0.6),
-        variantPart("watch_shield_l", "shield", -x, 2.3, -halfDepth(context) + 0.07, Math.PI, 1.3),
-        variantPart("watch_shield_r", "shield", x, 2.3, -halfDepth(context) + 0.07, Math.PI, 1.3),
+        ...grilles,
+        // 0.07 m of stand-off, not -0.07: the sign buried each shield 0.16 m into the brick and
+        // left only its central boss showing.
+        variantPart("watch_shield_l", "shield", -x, 2.3, -halfDepth(context) - 0.07, Math.PI, 1.3),
+        variantPart("watch_shield_r", "shield", x, 2.3, -halfDepth(context) - 0.07, Math.PI, 1.3),
       );
     },
   },
@@ -317,11 +323,15 @@ export const TOWER_VARIANTS: readonly StructureVariantRecipe[] = [
       const z = halfDepth(context);
       return withDetails(
         base,
-        variantPart("ivy_front_low", "vine_1", inset(-1.8, x, 0.8), 2.13, -z + 0.02, Math.PI, 0.9),
-        variantPart("ivy_front_high", "vine_1", inset(1.45, x, 0.8), 4.55, -z + 0.02, Math.PI, 0.78),
-        variantPart("ivy_west", "vine_1", -x + 0.02, 2.45, inset(1.35, z, 0.8), -Math.PI / 2, 0.82),
-        variantPart("ivy_north", "vine_1", inset(-1.45, x, 0.8), 4.9, z - 0.02, 0, 0.7),
-        variantPart("ivy_east", "vine_1", x - 0.02, 3.5, inset(-1.4, z, 0.8), Math.PI / 2, 0.75),
+        // Ivy grows ON the wall, so every offset is OUTWARD from the face. The signs were
+        // inverted - `-z + 0.02` is 0.02 m INSIDE the -Z face - which buried all five vines in
+        // the masonry and left an "ivy-covered" tower with no ivy on it. `foundationGreenery`
+        // in buildings.ts uses the same 0.1 m stand-off.
+        variantPart("ivy_front_low", "vine_1", inset(-1.8, x, 0.8), 2.13, -z - 0.1, Math.PI, 0.9),
+        variantPart("ivy_front_high", "vine_1", inset(1.45, x, 0.8), 4.55, -z - 0.1, Math.PI, 0.78),
+        variantPart("ivy_west", "vine_1", -x - 0.1, 2.45, inset(1.35, z, 0.8), -Math.PI / 2, 0.82),
+        variantPart("ivy_north", "vine_1", inset(-1.45, x, 0.8), 4.9, z + 0.1, 0, 0.7),
+        variantPart("ivy_east", "vine_1", x + 0.1, 3.5, inset(-1.4, z, 0.8), Math.PI / 2, 0.75),
       );
     },
   },

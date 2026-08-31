@@ -47,6 +47,9 @@ function featureRearWall(
   ));
 }
 
+/** Sets the drying brace's near face on the rear panel's outward face at z = depth / 2 + 0.092. */
+const DRYING_BRACE_GAP = 0.16;
+
 function rearZ(context: StructureVariantContext, gap = 0.3): number {
   return context.depth / 2 + gap;
 }
@@ -94,8 +97,11 @@ export const SHED_VARIANTS: readonly StructureVariantRecipe[] = [
         stageBaseCrate(context, base, "crate_wood"),
         variantPart("lean_roof_left", "roof_wood_plank", -plankX, 2.35, plankZ, 0, plankScale),
         variantPart("lean_roof_right", "roof_wood_plank", plankX, 2.35, plankZ, 0, plankScale),
-        variantPart("drying_brace_left", "support_beam", -0.82, braceDrop, rearZ(context, 0.22), Math.PI / 2, braceScale),
-        variantPart("drying_brace_right", "support_beam", 0.82, braceDrop, rearZ(context, 0.22), -Math.PI / 2, braceScale),
+        // A quarter turn puts `support_beam`'s 0.199 m width along Z, so at 0.8 the brace's near
+        // face is 0.08 m in front of its anchor. The old 0.22 gap therefore left both braces
+        // 0.048 m clear of the panel they lean on, bracing nothing.
+        variantPart("drying_brace_left", "support_beam", -0.82, braceDrop, rearZ(context, DRYING_BRACE_GAP), Math.PI / 2, braceScale),
+        variantPart("drying_brace_right", "support_beam", 0.82, braceDrop, rearZ(context, DRYING_BRACE_GAP), -Math.PI / 2, braceScale),
         variantPart("drying_rope", "rope_coil", 0, 0.04, rearZ(context, 0.48), 0.4, 0.9),
       );
     },

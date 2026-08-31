@@ -18,7 +18,24 @@ const TORCH_BASE_Y = -0.278;
 const TORCH_MOUNT_Y = 1.62;
 const LINTEL_BOTTOM_Y = 3.52;
 const LINTEL_SCALE = 0.34;
-const FRAME_POST_SCALE = 1.16;
+/**
+ * Post height is derived from where the beam actually is over the post, not from its lowest point.
+ *
+ * `roof_log` is not a prism. Decoded off the GLB its underside is 3.849 at the middle of the span
+ * but sags away to 3.948 at |z| 3.0, 4.081 at |z| 4.5 and 4.100 at the tip. The posts stand at
+ * |x| 1.42, which after the quarter turn is local |z| 4.18 at `LINTEL_SCALE` 0.34, where the
+ * underside is 4.05 - so the beam's soffit over a post is 3.59, not the 3.52 the constant above
+ * describes.
+ *
+ * The authored post scales - 1.16, 1.14 and 1.18 across the three variants - gave 3.48, 3.42 and
+ * 3.54 m posts, so every variant left a slot of daylight between the post head and the beam it is
+ * supposed to carry. `POST_BURY_METRES` takes the head far enough into the timber that the joint
+ * reads as a joint and survives `r3` rounding, while staying under the log's 3.94 m upper surface.
+ */
+const CORNER_WOOD_HEIGHT = 3;
+const LINTEL_SOFFIT_OVER_POST_Y = 3.59;
+const POST_BURY_METRES = 0.13;
+const FRAME_POST_SCALE = (LINTEL_SOFFIT_OVER_POST_Y + POST_BURY_METRES) / CORNER_WOOD_HEIGHT;
 type RockAsset = "rock_medium_1" | "rock_medium_2" | "rock_medium_3";
 const ROCK_BASE_Y: Record<RockAsset, number> = {
   rock_medium_1: -0.271,
@@ -151,8 +168,8 @@ function variantA(kit: BuildingKit): PartPlacement[] {
 function variantB(kit: BuildingKit): PartPlacement[] {
   return [
     threshold("root_b_threshold", 0.8, 0.8),
-    post("root_b_post_l", kit, -1.42, 0.02, 1.14),
-    post("root_b_post_r", kit, 1.42, 0.02, 1.14),
+    post("root_b_post_l", kit, -1.42, 0.02),
+    post("root_b_post_r", kit, 1.42, 0.02),
     lintel("root_b_lintel", 0.32, -0.06),
     groundRoot("root_b_root_l", -1.68, 0.7),
     groundRoot("root_b_root_r", 1.68, 0.7),
@@ -169,8 +186,8 @@ function variantB(kit: BuildingKit): PartPlacement[] {
 function variantC(kit: BuildingKit): PartPlacement[] {
   return [
     threshold("root_c_threshold", 0.84, 0.84),
-    post("root_c_post_l", kit, -1.43, 0, 1.18),
-    post("root_c_post_r", kit, 1.43, 0, 1.18),
+    post("root_c_post_l", kit, -1.43, 0),
+    post("root_c_post_r", kit, 1.43, 0),
     lintel("root_c_lintel", 0.33, -0.08),
     brace("root_c_brace_l", -1.53, 0.96, 0.6),
     brace("root_c_brace_r", 1.53, 0.96, 0.6),

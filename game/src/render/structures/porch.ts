@@ -10,6 +10,27 @@ import type { StructureVariantContext, StructureVariantRecipe } from "./types.js
  */
 const PORCH_BACK_WALL_OFFSET = 0.103;
 
+/**
+ * Converted bays are glazed with the asset authored to the aperture, at the scale the base prefab
+ * uses (`buildings.ts:ringWindows` inserts `window_wide` at 1).
+ *
+ * The kit's window panel is a 1.20 m wide hole from a 1.04 m sill to a 2.71 m arched crown.
+ * `window_wide` at 1 covers x +-0.6825 and y 1.016..2.742, so it plugs it. Every recipe here used
+ * to shrink the insert - 0.82, 0.9, 0.94, and `window_thin`, which is an arrow loop - and left the
+ * arched head of the aperture standing open on a wall the player walks right under.
+ */
+const WINDOW_INSERT_SCALE = 1;
+
+/**
+ * How far behind the post line a front knee brace's foot sits.
+ *
+ * `support_beam` is a rake whose foot is at local z -0.118 and whose head is at 1.918. At the
+ * old 0.55 the foot landed 0.21 m in front of the post it leans on and the head stopped 0.10 m
+ * under the canopy soffit, so both braces floated in the bay carrying nothing - the geometry
+ * linter reports them as a free assembly 2.20 m in the air.
+ */
+const FRONT_BRACE_SETBACK = 0.18;
+
 interface PorchFrame {
   readonly bays: number;
   readonly span: number;
@@ -68,6 +89,16 @@ function movePart(
   return base.map((part) => part.tag === tag ? { ...part, ...at } : part);
 }
 
+/**
+ * A porch banner hangs under the canopy, not over it.
+ *
+ * Both banner assets put their bbox top 0.844 above the pivot, so the inherited `dy 2.4, scale
+ * 1.05` reached 3.285 m against a plaster canopy that tops out at 3.028 - the whole 1.69 m arm and
+ * its finial stood on the roof. These are the numbers `arcade.ts` already proved.
+ */
+const BANNER_RAIL_Y = 2.38;
+const BANNER_RAIL_SCALE = 0.75;
+
 function backWallBanner(
   frame: PorchFrame,
   tag: string,
@@ -83,6 +114,28 @@ function backWallBanner(
     0,
     scale,
   );
+}
+
+/**
+ * Slides the base lamp along the back wall, keeping the depth and height the base recipe set.
+ *
+ * Recipes used to re-place the lamp with their own `dz: frame.backZ + 0.35..0.42`, which is the
+ * pre-`bayLamp` convention: in the stone kit that stands the bracket up to 0.24 m clear of the
+ * panel behind it, and the geometry linter reports the lamp as a free-floating assembly 1.49 m in
+ * the air. A variant's business is which bay the lamp lights, not how far off the wall it sits.
+ */
+function slideLamp(base: readonly PartPlacement[], dx: number): PartPlacement[] {
+  return movePart(base, "lamp", { dx });
+}
+
+/** Every porch banner, retained or added, hangs from the one rail height that clears the canopy. */
+function canopyBanner(
+  frame: PorchFrame,
+  tag: string,
+  assetId: BannerAssetId,
+  dx: number,
+): PartPlacement {
+  return backWallBanner(frame, tag, assetId, dx, BANNER_RAIL_Y, BANNER_RAIL_SCALE);
 }
 
 function bannerAssetForKit(context: StructureVariantContext): BannerAssetId {
@@ -103,7 +156,7 @@ function remountBaseBanner(
     if (part.tag !== "banner") return part;
     const assetId = assetOverride
       ?? (part.assetId === "banner_2" ? "banner_2" : "banner_1");
-    return backWallBanner(frame, part.tag, assetId, part.dx, part.dy, part.scale);
+    return canopyBanner(frame, part.tag, assetId, part.dx);
   });
 }
 
@@ -113,7 +166,7 @@ function frontBraces(frame: PorchFrame, prefix = "brace"): readonly PartPlacemen
     "support_beam",
     frame.postX * side,
     1.62,
-    frame.frontZ - 0.55,
+    frame.frontZ - FRONT_BRACE_SETBACK,
     Math.PI,
     0.48,
   ));
@@ -189,7 +242,7 @@ function shutteredBayWindows(frame: PorchFrame): readonly PartPlacement[] {
       0,
       frame.backZ + 0.035,
       0,
-      0.82,
+      WINDOW_INSERT_SCALE,
     ),
     variantPart(
       "centre_shutters",
@@ -213,7 +266,7 @@ export const PORCH_VARIANTS: readonly StructureVariantRecipe[] = [
     build: (context, base) => {
       const frame = frameFor(context);
       const bannered = remountBaseBanner(context, base, "banner_2");
-      const lit = movePart(bannered, "lamp", { dx: 0, dz: frame.backZ + 0.35, scale: 1.1 });
+      const lit = slideLamp(bannered, 0);
       return withDetails(lit, ...frontBraces(frame));
     },
   },
@@ -226,7 +279,7 @@ export const PORCH_VARIANTS: readonly StructureVariantRecipe[] = [
     build: (context, base) => {
       const frame = frameFor(context);
       const converted = remountBaseBanner(context, shutteredBayBase(context, base, frame));
-      const lit = movePart(converted, "lamp", { dx: -frame.windowX - 0.55, dz: frame.backZ + 0.38 });
+      const lit = slideLamp(converted, -frame.windowX - 0.55);
       return withDetails(
         lit,
         ...shutteredBayWindows(frame),
@@ -246,9 +299,9 @@ export const PORCH_VARIANTS: readonly StructureVariantRecipe[] = [
       const windowXs = windowBays.map((index) => bayCentre(frame, index));
       const converted = convertWindowBays(context, plain, frame, windowBays);
       return withDetails(
-        movePart(converted, "lamp", { dx: 0, dz: frame.backZ + 0.4, scale: 1.05 }),
-        variantPart("window_l", "window_thin", windowXs[0]!, 0, frame.backZ + 0.035, 0, 0.9),
-        variantPart("window_r", "window_thin", windowXs[1]!, 0, frame.backZ + 0.035, 0, 0.9),
+        slideLamp(converted, 0),
+        variantPart("window_l", "window_wide", windowXs[0]!, 0, frame.backZ + 0.035, 0, WINDOW_INSERT_SCALE),
+        variantPart("window_r", "window_wide", windowXs[1]!, 0, frame.backZ + 0.035, 0, WINDOW_INSERT_SCALE),
       );
     },
   },
@@ -264,13 +317,13 @@ export const PORCH_VARIANTS: readonly StructureVariantRecipe[] = [
       const frame = frameFor(context);
       const heraldAsset = bannerAssetForKit(context);
       const unbannered = omit(base, "banner");
-      const lit = movePart(unbannered, "lamp", { dx: 0, dz: frame.backZ + 0.42, scale: 1.08 });
+      const lit = slideLamp(unbannered, 0);
       return withDetails(
         lit,
         // The rail is the wall anchor. Both standards project into the +Z covered walk, so neither
         // uses the old cloth-width compensation that placed a banner span along the facade.
-        backWallBanner(frame, "v_banner_l", heraldAsset, -frame.postX, 2.42, 0.9),
-        backWallBanner(frame, "v_banner_r", heraldAsset, frame.postX, 2.42, 0.9),
+        canopyBanner(frame, "v_banner_l", heraldAsset, -frame.postX),
+        canopyBanner(frame, "v_banner_r", heraldAsset, frame.postX),
         ...frontBraces(frame, "herald_brace"),
       );
     },
@@ -285,17 +338,17 @@ export const PORCH_VARIANTS: readonly StructureVariantRecipe[] = [
       const frame = frameFor(context);
       const plain = omit(base, "banner");
       const converted = convertWindowBays(context, plain, frame, [frame.windowBayIndex]);
-      const lit = movePart(converted, "lamp", { dx: -frame.postX + 0.55, dz: frame.backZ + 0.38 });
+      const lit = slideLamp(converted, -frame.postX + 0.55);
       return withDetails(
         lit,
         variantPart(
           "watch_glass",
-          "window_thin",
+          "window_wide",
           frame.windowBayX,
           0,
           frame.backZ + 0.035,
           0,
-          0.94,
+          WINDOW_INSERT_SCALE,
         ),
         variantPart(
           "watch_shutters",

@@ -191,8 +191,11 @@ function buildQuarryCairn(seed: number, micro: MicroVariant): PartPlacement[] {
   return [
     // The landmark hero is the tall slate waystone. These grounded shoulders make one cairn foot,
     // and the small pennant gives the vertical post a clear face from the road.
-    groundedRock("wp_quarry_base_l", layout.lowerLeft, -0.92, leftZ, leftYaw, 0.28),
-    groundedRock("wp_quarry_base_r", layout.lowerRight, 0.92, rightZ, rightYaw, 0.28),
+    // 1.05 and 0.6, not 0.92 and 0.28. At 0.28 these rocks were 0.23-0.25 m clear of the
+    // waystone they are supposed to foot, and at r = 0.95 from the origin they fell inside
+    // `regionBuilder`'s 1 m composition clearance and were dropped from collision entirely.
+    groundedRock("wp_quarry_base_l", layout.lowerLeft, -1.05, leftZ, leftYaw, 0.6),
+    groundedRock("wp_quarry_base_r", layout.lowerRight, 1.05, rightZ, rightYaw, 0.6),
     // banner_2's mounting upright is local X = 0 and its projection rail runs along local +X.
     // Keep it at the hero's right/front (+X) corner with yaw 0: local +X projects out from the
     // hero's +X side, so this is a deliberate side mount rather than a cloth panel laid across
@@ -201,7 +204,9 @@ function buildQuarryCairn(seed: number, micro: MicroVariant): PartPlacement[] {
     part("wp_quarry_foot_l", layout.footLeft, leftFootX, 0, 0.82, leftYaw * 0.5, 0.7),
     part("wp_quarry_foot_r", layout.footRight, rightFootX, 0, 0.82, rightYaw * 0.5, 0.7),
     // One low torch gives the quarry reading a reason to exist after dusk. It is the only light.
-    part("wp_quarry_torch", "torch", torchLeft ? -1.25 : 1.25, 0.24, 0.42, 0, 0.78),
+    // Clear of the cairn foot: at +-1.25 the torch was inside the shoulder boulder with only
+    // its flame tip showing.
+    part("wp_quarry_torch", "torch", torchLeft ? -1.85 : 1.85, 0.24, 0.42, 0, 0.78),
   ];
 }
 

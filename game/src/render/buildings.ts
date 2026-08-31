@@ -1574,8 +1574,13 @@ function tower(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPl
     onSide(entry, entryCount, doorIndex, 0.02, 0.02, DOOR_LEAF_OFFSET),
     entry.yaw,
   ));
-  out.push(part("lamp_l", "lamp_wall", onSide(entry, entryCount, doorIndex, 2.1, 0.08, -1.3), entry.yaw, 1.2));
-  out.push(part("lamp_r", "lamp_wall", onSide(entry, entryCount, doorIndex, 2.1, 0.08, 1.3), entry.yaw, 1.2));
+  // Flank the door by whatever the facade actually has room for. A hard-coded 1.3 m is wider
+  // than the half-width of a 4 m tower face, so at the shipped `tower [4,4]` both lamps hung
+  // off the ends of the elevation with nothing behind them.
+  const doorOffset = (doorIndex + 0.5) * (entry.length / entryCount) - entry.length / 2;
+  const flank = Math.min(1.3, entry.length / 2 - 0.25 - Math.abs(doorOffset));
+  out.push(part("lamp_l", "lamp_wall", onSide(entry, entryCount, doorIndex, 2.1, 0.08, -flank), entry.yaw, 1.2));
+  out.push(part("lamp_r", "lamp_wall", onSide(entry, entryCount, doorIndex, 2.1, 0.08, flank), entry.yaw, 1.2));
 
   return out;
 }
@@ -2041,7 +2046,11 @@ function coveredBay(
   // z + 0.093. The plinth was placed on the kit convention and therefore sat 0.072 m BEHIND the
   // face of the wall it was supposed to foot: invisible on every porch, arcade and bank counter in
   // the plaster and timber towns, while the stone versions had one.
-  out.push(loose(`${tag}t`, "wall_bottom_trim", dx, 0, backZ + 0.2 - 0.118 + 0.01, 0));
+  // The plinth seats on the plaster plane at `backZ`. The old `+ 0.2 - 0.118 + 0.01` mixed the
+  // wall-face offset into a band that is only 0.432 m deep, so it stood 0.091 m clear of the
+  // wall it foots and every plaster and timber porch, arcade and bank counter had a floating
+  // skirting board instead of a footing.
+  out.push(loose(`${tag}t`, "wall_bottom_trim", dx, 0, backZ + 0.001, 0));
 }
 
 /** How many whole 2 m bays a covered structure of this width gets, at least `low`, at most `high`. */
@@ -2116,6 +2125,40 @@ function forge(width: number, depth: number, rng: Rng, kit: BuildingKit): PartPl
  * exclusion rectangle. The bays snap to whole 2 m modules, so a [4,3] porch is two bays and a
  * [6,3] is three regardless of the exact authored width.
  */
+/** How far a covered bay's back wall face stands in front of the bay's authored anchor. */
+export function bayWallFace(kit: BuildingKit): number {
+  // `overhang_plaster` carries its own wall, whose face is 0.2 m proud of the anchor; the stone
+  // bay uses a kit panel, whose face is the usual `WALL_FACE`.
+  return kit.id === "stone" ? WALL_FACE : 0.2;
+}
+
+/**
+ * A lantern bracketed to the back wall of a covered bay, under the canopy rather than through it.
+ *
+ * `lamp_wall` is 0.357 x 1.337 x 1.302 about a base at (-0.179, 0.082, -0.051): its plate is the
+ * -Z face and the lantern hangs out along +Z. Every caller used to place it at `dy 2.1, scale
+ * 1.15`, which puts its head at 3.73 m - 0.70 m above the plaster canopy's 3.03 m slab and 0.81 m
+ * above its 2.92 m roof plane - so the lamp stood out through the roof it was hanging under. In
+ * the stone kit the same `backZ + 0.35` left its plate 0.22 m clear of the panel behind it.
+ */
+const BAY_LAMP_SCALE = 1;
+const BAY_LAMP_HEAD_Y = 2.82;
+const LAMP_WALL_BASE_Y = 0.082;
+const LAMP_WALL_HEIGHT = 1.337;
+const LAMP_WALL_PLATE_Z = -0.051;
+
+function bayLamp(tag: string, kit: BuildingKit, dx: number, backZ: number): PartPlacement {
+  return loose(
+    tag,
+    "lamp_wall",
+    dx,
+    r3(BAY_LAMP_HEAD_Y - (LAMP_WALL_BASE_Y + LAMP_WALL_HEIGHT) * BAY_LAMP_SCALE),
+    r3(backZ + bayWallFace(kit) - LAMP_WALL_PLATE_Z * BAY_LAMP_SCALE),
+    0,
+    BAY_LAMP_SCALE,
+  );
+}
+
 function porch(width: number, depth: number, kit: BuildingKit): PartPlacement[] {
   const out: PartPlacement[] = [];
   const bays = bayCount(width, 2, 3);
@@ -2135,7 +2178,7 @@ function porch(width: number, depth: number, kit: BuildingKit): PartPlacement[] 
       Math.atan2(sx, 1), storeyPostScale(kit),
     ));
   }
-  out.push(loose("lamp", "lamp_wall", -span / 2 + 0.7, 2.1, backZ + 0.35, 0, 1.15));
+  out.push(bayLamp("lamp", kit, -span / 2 + 0.7, backZ));
   out.push(wallMountedBanner(
     "banner", "banner_1",
     { dx: span / 2 - 0.55, dy: 2.4, dz: backZ + WALL_FACE + 0.01 },
@@ -2165,8 +2208,8 @@ function arcade(width: number, depth: number, kit: BuildingKit): PartPlacement[]
   }
   out.push(loose("end_l", kit.corner, -span / 2, 0, backZ, -Math.PI / 4, storeyPostScale(kit)));
   out.push(loose("end_r", kit.corner, span / 2, 0, backZ, Math.PI / 4, storeyPostScale(kit)));
-  out.push(loose("lamp_l", "lamp_wall", -span / 2 + 1, 2.1, backZ + 0.35, 0, 1.15));
-  out.push(loose("lamp_r", "lamp_wall", span / 2 - 1, 2.1, backZ + 0.35, 0, 1.15));
+  out.push(bayLamp("lamp_l", kit, -span / 2 + 1, backZ));
+  out.push(bayLamp("lamp_r", kit, span / 2 - 1, backZ));
 
   return out;
 }
@@ -2286,7 +2329,9 @@ function well(kit: BuildingKit): PartPlacement[] {
         outZ * (ring + copingOverhang),
         yaw + Math.PI, WELL_CURB_SCALE,
       ),
-      scaleAxes: [1, 1, WELL_COPING_DEPTH],
+      // Runs to +-0.780 so the four pieces lap at the corners. Left at 1 they stopped at
+      // +-0.700 and left an 80 mm open column at each corner of the ring.
+      scaleAxes: [1.1143, 1, WELL_COPING_DEPTH],
     });
   }
 
@@ -2303,7 +2348,9 @@ function well(kit: BuildingKit): PartPlacement[] {
   out.push(loose("roof_b", "roof_wood_plank", 0, 2.4, 0.03, Math.PI, 0.75));
   // The coping's top is `WELL_CURB_SHOW`, so both stand on the curb rather than in the air.
   out.push(loose("bucket", "bucket_wood", 0.1, WELL_CURB_SHOW, 0.62, 0.6));
-  out.push(loose("chain", "chain_coil", -0.62, WELL_CURB_SHOW, -0.62, 1.2, 0.95));
+  // On the coping band, not over the corner: at 0.95 and a diagonal offset two thirds of the
+  // coil overhung the shaft with nothing under it.
+  out.push(loose("chain", "chain_coil", -0.579, WELL_CURB_SHOW, 0, 1.2, 0.38));
 
   return out;
 }
@@ -2385,21 +2432,35 @@ export function buildWallRun(
     }
   }
 
-  // Only the run endpoints belong to the wall. Every current opening is occupied by a gatehouse,
-  // whose outer return joint sits at the exact cutout boundary and supplies the transition post.
-  for (const [postIndex, x] of [0, length].entries()) {
+  // A post at both ends of the run AND at both jambs of every opening.
+  //
+  // This used to be the two endpoints only, on the assumption that "every current opening is
+  // occupied by a gatehouse, whose outer return joint supplies the transition post". That is not
+  // something `buildWallRun` can know: the building lab builds bare runs, and any authored run
+  // whose opening is a plain gap gets two raw sawn panel ends facing each other across the road.
+  // `regionBuilder` already de-duplicates `p*` posts by world position, so where a gatehouse does
+  // stand in the opening this adds nothing.
+  const posts = [0, length, ...mergeSpans(modules).flatMap((span) => (
+    [span.from, span.to].filter((edge) => edge > 1e-6 && edge < length - 1e-6)
+  ))];
+  for (const [postIndex, x] of posts.entries()) {
     out.push(loose(
-      `p${postIndex}`, kit.corner, x, 0, 0, Math.PI / 4, storeyPostScale(kit),
+      `p${postIndex}`, kit.corner, r3(x), 0, 0, Math.PI / 4, storeyPostScale(kit),
     ));
   }
 
   // Buttresses mark a deliberate cadence rather than every panel joint. The old every-joint stone
   // rhythm repeated a 3,102-triangle brick post every two metres and made Highcairn's wall read as
-  // a picket fence. Panels now draw at authored scale and meet cleanly, so timber/plaster needs a
-  // post every fourth joint and masonry only every eighth. Gatehouse return joints own openings.
+  // a picket fence.
+  //
+  // The cadence used to be every fourth joint for timber/plaster and every eighth for stone, and
+  // `contiguousJoints` resets at every opening - so a run had to be 10 m of unbroken wall before
+  // the first buttress and 18 m for stone. The lab's 18 m run with a 6 m gate is three modules a
+  // side, which is two contiguous joints: it emitted no buttress at all and read as two blank
+  // slabs. Every third joint (6 m) and every fourth (8 m) still leaves plain wall between them.
   let buttress = 0;
   let contiguousJoints = 0;
-  const buttressCadence = kit.id === "stone" ? 8 : 4;
+  const buttressCadence = kit.id === "stone" ? 4 : 3;
   for (const [index, module] of modules.entries()) {
     const next = modules[index + 1];
     if (next === undefined || Math.abs(next.from - module.to) > 1e-6) {
@@ -2514,11 +2575,20 @@ export function buildComposition(
   }
 }
 
-/** The vault tower's door: two braziers, two company banners, a kerbed approach. */
+/**
+ * The vault tower's door: two braziers, two company banners, a kerbed approach.
+ *
+ * Local +Z is the court. The composition origin is 0.207 m beyond the tower's south wall, which is
+ * the plane every wall-mounted part here has to land on - `VAULT_WALL_Z`. The banners already used
+ * it; the braziers did not, and at `dz 0.4` their mounting plates hung 0.607 m out in the open air
+ * in front of the masonry they are bracketed to.
+ */
+const VAULT_WALL_Z = -0.207;
+
 function vaultDoor(): PartPlacement[] {
   return [
-    loose("torch_l", "torch", -1.5, 1.9, 0.4, 0, 2.6),
-    loose("torch_r", "torch", 1.5, 1.9, 0.4, 0, 2.6),
+    loose("torch_l", "torch", -1.5, 1.9, VAULT_WALL_Z, 0, 2.6),
+    loose("torch_r", "torch", 1.5, 1.9, VAULT_WALL_Z, 0, 2.6),
     // The composition origin is 0.207 m beyond the tower's south wall. Seat each mounting rail on
     // that wall and let the bracket project out into the court instead of laying the cloth flat.
     wallMountedBanner("banner_l", "banner_1", { dx: -2.35, dy: 3.3, dz: -0.19 }, 0, 1.1),
@@ -2563,7 +2633,10 @@ function milestone(): PartPlacement[] {
     loose("quoin_r", "corner_brick", 0.63, 0, -0.21, Math.PI / 4, head / 3.016),
     // `kerb_straight`'s body sits entirely on the +Z side of its pivot, so this lands the coping
     // across the pier's 0.70 m section with a 3 cm shadow line on each face.
-    loose("cap", "kerb_straight", 0, r3(head - 0.02), -0.66, 0, stump),
+    // The section it caps is 0.704 m deep (hero z -0.220..0.064 plus `back` at -0.640). At the
+    // stump's own 0.7 scale the 0.700 m kerb body only reached 0.490 m and stopped 0.234 m
+    // short of the front face, so the marker was capped at the back and open at the front.
+    loose("cap", "kerb_straight", 0, r3(head - 0.02), -0.67, 0, 1.09),
     // The top, snapped off and lying where it fell.
     loose("shard_l", "rubble_brick_2", -1.1, 0, 0.7, 0.6, 3.1),
     loose("shard_r", "rubble_brick_3", -1.65, 0, 0.25, 2.3, 2.5),
@@ -2590,72 +2663,15 @@ function highcairnCrane(): PartPlacement[] {
     loose("jib", "roof_log", 0, 8.4 - 3.85 * 0.85, 3.0, 0, 0.85),
     // Point away from the mast. The old yaws pointed both long beams inward, overlapping almost
     // their entire 3.25 m span and producing a flickering knot at the crane's foot.
-    loose("brace_l", "support_beam", -1.3, -1.211 * 1.6, 0.4, -Math.PI / 2, 1.6),
-    loose("brace_r", "support_beam", 1.3, -1.211 * 1.6, 0.4, Math.PI / 2, 1.6),
+    // The mast is the hero `corner_wood` at 3.2, which is x/z +-0.336/+-0.384. A quarter turn
+    // maps a brace's post (asset z -0.118) onto -X, so dx +-0.525 lands each post exactly on a
+    // mast face; at +-1.3 they stood 0.775 m clear of it and cantilevered 3 m over open grass.
+    loose("brace_l", "support_beam", -0.525, -1.211 * 1.6, 0, -Math.PI / 2, 1.6),
+    loose("brace_r", "support_beam", 0.525, -1.211 * 1.6, 0, Math.PI / 2, 1.6),
     loose("drum", "chain_coil", 1.4, 0.05, 2.6, 0.4, 2.2),
     loose("rope", "rope_coil", -0.4, 0.05, 5.4, 1.1, 2.4),
     loose("crate", "crate_metal", -2.4, 0, 1.4, 0.7, 1.3),
     loose("barrel", "barrel", 2.5, 0, 0.8, 0, 1.2),
-  ];
-}
-
-/**
- * The Gravelmaw. PRD: "a twelve-metre black wound in grey stone, visible from anywhere on terrace
- * one". The arch itself is the dungeon portal entity (`wall_arch` at 3x, drawn 4.61 m wide and
- * 7.82 m tall); this builds the larger stone silhouette around it. A recessed brick door panel
- * closes the daylight behind the arch while leaving a narrower, shadowed passage in its centre.
- *
- * WHY EVERY PART IS A `rock_medium_*` AND NOT A `cliff_*` OR `boulder_*`. Measured on the shipped
- * GLBs: the six ultimate-platformer rocks - boulder_large, boulder_medium, cliff_tall,
- * cliff_step_1..3 - carry POSITION and NORMAL and NOTHING ELSE. No TEXCOORD_0, no texture, no
- * vertex colour; one flat `baseColorFactor` (0.384, 0.208, 0.108) on a doubleSided material. They
- * CANNOT be textured, at any tier, by any material swap, because there are no UVs to sample with.
- * At the 1.7-2.6x scales this composition used they drew as 8.9 m wide smooth tan truncated cones
- * and were most of runs/corealm/screenshots/w3-gravelmaw_entrance.png. The
- * stylized-nature-megakit rocks (`rock_medium_1/2/3`, 3.0-3.4 m) carry TEXCOORD_0 and an embedded
- * `Rocks_Diffuse` jpeg, so they are the only rock in the library that reads as stone.
- *
- * AND WHY NOTHING REACHES PAST 9.3 m. `world/regionBuilder.emitParts` places every composition part
- * at `origin.y + dy` - flat, with no terrain sample of its own - so a part's grounding error is
- * exactly how far the terrain has moved by the time you get out to it. Measured around (46, -24)
- * with `__gameDebug.groundHeight` (runs/corealm/audit/wd-probe.json): +-0.14 m at 3 m, -1.01 m at
- * 5 m, -1.57 m at 7 m, -2.13 m at 9 m and -3.37 m at 13 m, all of it on the downhill approach.
- * The old `shoulder_l` at 13.4 m floated 3.03 m, `spoil_l` at 15.2 m floated 3.22 m, and the
- * `brow` at dy 6.0 floated 5.59 m with daylight under a 19.9 m wide rock. Everything here is
- * inside 9.3 m and sunk 0.5-0.9 m, so the worst measured local ground still buries its footing.
- *
- * Local +Z faces the approach from the Lower Quarry. The corridor between the spoil heaps is 7 m
- * clear, so the mouth stays reachable by `moveTo({ entityId: "gravelmaw_mouth_portal" })`.
- */
-function gravelmawMouth(): PartPlacement[] {
-  return [
-    // The two jaws, three courses each, leaning in over the arch.
-    loose("jaw_l", "rock_medium_3", -6.6, -0.5, 0.2, 0.55, 2.2),
-    loose("jaw_r", "rock_medium_1", 6.6, -0.5, 0.2, -1.15, 2.35),
-    loose("rock_l", "rock_medium_1", -6.0, 2.6, -0.4, 2.35, 1.8),
-    loose("rock_r", "rock_medium_3", 6.0, 2.6, -0.4, 0.85, 1.75),
-    loose("crown_l", "rock_medium_2", -5.6, 5.2, 0.3, 1.6, 1.4),
-    loose("crown_r", "rock_medium_2", 5.6, 5.2, 0.3, -0.4, 1.35),
-    // Recessed masonry keeps the portal from framing the bright horizon. `wall_brick_door`
-    // preserves a real opening and sits behind the interaction point, so it neither seals nor
-    // obstructs the approach.
-    loose("back_wall", "wall_brick_door", 0, 0, -4.2, 0, 2.7),
-    // Behind the arch, so the opening leads into rock rather than into sky. Its solid is capped by
-    // `emitComposition` (4.6 m out against a 3.3 m half-diagonal), which keeps the portal's own
-    // 2.4 m interact ring clear.
-    loose("brow", "rock_medium_3", -0.2, -0.7, -4.6, 1.9, 3.0),
-    loose("brow_top", "rock_medium_1", 0.6, 3.4, -5.6, 0.7, 2.4),
-    loose("shoulder_l", "rock_medium_3", -9.2, -0.8, -1.0, 1.1, 2.0),
-    loose("shoulder_r", "rock_medium_3", 9.2, -0.8, -1.0, -0.7, 2.05),
-    // Spoil at the lip, on the falling ground, sunk deeper for it.
-    loose("spoil_l", "rock_medium_2", -5.0, -0.9, 5.5, 0.8, 1.15),
-    loose("spoil_r", "rock_medium_1", 5.0, -0.9, 5.5, 2.2, 1.05),
-    loose("rubble_l", "rock_medium_2", -3.3, -0.7, 7.4, 2.6, 0.7),
-    loose("rubble_r", "rock_medium_3", 3.6, -0.7, 7.0, 0.4, 0.6),
-    // `torch` base.y is -0.278, so at 2.6x it hangs 0.63 m below its own pivot: dy 0.5 stands it on
-    // the ground instead of leaving the head floating 1.7 m up, which is where dy 1.7 left it.
-    loose("brazier_l", "torch", -4.4, 0.5, 1.4, 0, 2.6),
-    loose("brazier_r", "torch", 4.4, 0.5, 1.4, 0, 2.6),
   ];
 }
 
@@ -2729,7 +2745,8 @@ function greatCairn(): PartPlacement[] {
  * A ring of four stacked uprights around the hero stone. The edge the Thornbound will not cross.
  *
  * `cliff_tall` was the upright and it is one of the six untextured platformer rocks
- * (`gravelmawMouth` carries the measurement), so all four read as smooth tan cones. Swapping to the
+ * (`compositions/gravelmawMouth.ts` carries the measurement), so all four read as smooth tan cones.
+ * Swapping to the
  * textured `rock_medium_*` fixed the material and lost the silhouette: a single 3.2 m boulder at
  * 1.15-1.45 is 2.6-3.3 m tall and 4 m wide, which is a boulder field and not a stone ring, and it
  * is what the clearing looked like - six lumps in the fern, with a pale untextured cone in the
@@ -2801,20 +2818,6 @@ function rootfallStump(): PartPlacement[] {
   ];
 }
 
-/** A region gate: the arch flanked by two stretches of wall, lit both sides. */
-function regionGate(): PartPlacement[] {
-  return [
-    // The gate's own `wall_arch` draws at 1.4x, so it is 2.8 m across: the flanking walls sit at
-    // +-2.8 to land flush against it with no gap on the kit's grid.
-    loose("wall_l", "wall_brick_straight", -2.8, 0, 0, 0, 1.4),
-    loose("wall_r", "wall_brick_straight", 2.8, 0, 0, 0, 1.4),
-    loose("post_l", "corner_brick", -4.2, 0, 0, -Math.PI / 4, 1.4),
-    loose("post_r", "corner_brick", 4.2, 0, 0, Math.PI / 4, 1.4),
-    loose("lamp_l", "lamp_wall", -1.6, 2.5, 0.14, 0, 1.3),
-    loose("lamp_r", "lamp_wall", 1.6, 2.5, 0.14, 0, 1.3),
-  ];
-}
-
 // ------------------------------------------------- settlement compositions
 
 /**
@@ -2843,8 +2846,8 @@ function bankCounter(kit: BuildingKit): PartPlacement[] {
   // table_large is 2.848 x 0.813 x 1.097 with its pivot centred, so this sits it across the bay
   // mouth with 1.5 m of standing room behind it and the chest behind that.
   out.push(loose("counter", "table_large", 0, 0, -0.15, 0, 1));
-  out.push(loose("lamp_l", "lamp_wall", -1.5, 2.1, backZ + 0.32, 0, 1.15));
-  out.push(loose("lamp_r", "lamp_wall", 1.5, 2.1, backZ + 0.32, 0, 1.15));
+  out.push(bayLamp("lamp_l", kit, -1.5, backZ));
+  out.push(bayLamp("lamp_r", kit, 1.5, backZ));
   out.push(wallMountedBanner(
     "banner", "banner_1", { dx: -0.65, dy: 2.55, dz: backZ + WALL_FACE + 0.01 }, 0, 1.05,
   ));
@@ -2913,7 +2916,10 @@ function garden(rng: Rng): PartPlacement[] {
   }
   for (let index = 0; index < 2; index += 1) {
     // A part's rotationY turns its local +X toward (cos, -sin), so PI/2 lays the run along -Z.
-    out.push(loose(`fz${index}`, "fence_wood_single", 2 * module, 0, -2.4 + (index + 0.5) * module, Math.PI / 2));
+    // 1.5 modules, not 2: a panel is 2.064 m about its centre, so the Z run's rail line has to
+    // land on the X run's last panel END (x 3.097). At 2 * module it stood at x 4.068 and left
+    // 0.971 m of daylight at the inside corner of a fence whose whole job is to be closed.
+    out.push(loose(`fz${index}`, "fence_wood_single", 1.5 * module, 0, -2.4 + (index + 0.5) * module, Math.PI / 2));
   }
   out.push(loose("crate_1", "farm_crate_carrot", -1.2, 0, -1.2, rng.float(0, Math.PI)));
   out.push(loose("crate_2", "farm_crate_apple", -0.4, 0, -0.5, rng.float(0, Math.PI)));
@@ -2948,7 +2954,9 @@ function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
   const panels = 24;
   const radius = 7.9;
   // Left out: the gate on local +Z, and the run the barn stands in.
-  const gate = new Set([5, 6, 7, 17, 18, 19]);
+  // 16 and 20 are omitted too: at 240 deg and 300 deg those panels cross x = +-4.0, which is
+  // where the barn's side walls stand, and 0.87 m of each rail ran through the masonry.
+  const gate = new Set([5, 6, 7, 16, 17, 18, 19, 20]);
   for (let index = 0; index < panels; index += 1) {
     if (gate.has(index)) continue;
     const angle = (index / panels) * Math.PI * 2;
@@ -2962,7 +2970,9 @@ function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
   }
   // Gate posts at the two ends of the +Z opening. `kit.corner` is 3.0-3.02 m tall, so 0.4 is a
   // 1.2 m post: a head taller than the 0.84 m fence and not a fifth of the barn.
-  for (const [index, step] of [4, 8].entries()) {
+  // Half-steps: panel i is CENTRED on i * 15 deg, so the mouth's edges are at 67.5 and 112.5
+  // deg, not 60 and 120. The posts used to stand 1.03 m inside the last rail either side.
+  for (const [index, step] of [4.5, 8.5].entries()) {
     const angle = (step / panels) * Math.PI * 2;
     out.push(loose(
       `post${index}`, kit.corner,

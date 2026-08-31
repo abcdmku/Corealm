@@ -48,6 +48,8 @@ The game remains a normal Vite application and never imports the harness at runt
 npm run dev
 npm run test:watch
 npm run structure:contracts:watch
+npm run structure:lint
+npm run structure:sweep
 npm run lab:preview
 npm run lab:building:preview
 npm run lab:test

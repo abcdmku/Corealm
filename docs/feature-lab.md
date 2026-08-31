@@ -32,6 +32,9 @@ npm run test:watch
 # Structure recipes, compositions, collisions, and asset references
 npm run structure:contracts:watch
 
+# Whole-catalogue geometry lint: floating, sunken, near-miss and card-thin parts
+npm run structure:lint
+
 # Combat mode on the persistent Vite server
 npm run lab:preview
 
@@ -76,6 +79,46 @@ Rebuilding a structure stops movement and resets the player to the yard spawn. I
 A structure rebuild preserves the selected workbench and publishes its normalized selection, revision, bounds, entity count, asset count, collision count, build time, and errors through `window.__featureLab`.
 
 The old `npm run structure:preview` command and `structure-preview.html` route remain compatibility entry points. They forward into the production building mode instead of booting a separate renderer. Direct `mode=actors` and `mode=structures` queries remain aliases for combat and building respectively.
+
+## Geometry lint and the structure sweep
+
+Two commands sit between the focused tests and the browser gate. Neither renders anything the game
+needs; both are review instruments and their output is disposable.
+
+```bash
+# Every recipe, every shipped footprint, kit and variant seed, measured against the GLB manifest
+npm run structure:lint
+npm run structure:lint -- --only "composition region_gate" --kind FLOATING
+
+# Photograph the whole catalogue in the building lab, four orbit poses each
+npm run structure:sweep
+npm run structure:sweep -- --out test-results/my-sweep --group composition --angles a-front,c-eye
+```
+
+`structure:lint` turns every `PartPlacement` into a world-space box using each asset's measured
+`size` and `base`, then reports the defects that need no opinion: a connected group of parts that
+never reaches the ground (`FLOATING`), a part drawn entirely under the ground plane (`SUNKEN`), two
+load-bearing pieces that line up on two axes and stop short on the third (`NEAR_MISS`), a
+near-zero-thickness plane used where the recipe wants mass (`THIN_PLANE`), stacked duplicates
+(`DUPLICATE`), and assets the manifest does not ship (`MISSING_ASSET`). Contact is decided on the
+axis-aligned envelope of each rotated box, so it is deliberately generous and will not claim a gap
+a rotated part actually closes. Composition dressing is linted together with the hero mesh the
+world pairs it with, because half of a composition leans on that hero.
+
+`tests/structure-geometry.test.ts` runs the same checks as a contract, with one documented
+allowlist entry: `vault_door` is authored against the Coldbrace vault tower, which is a separate
+building, so its braziers and banners have nothing behind them in isolation.
+
+`structure:sweep` boots one Vite server and one Chromium page in `mode=building` and walks the
+whole prefab-variant, composition and wall-run space through `window.__featureLab`, capturing four
+poses per selection into `test-results/structure-sweep/` plus a JSON manifest of bounds, part
+counts, collision counts and errors. `--shard 2/4` lets several sweeps share one output directory;
+keep the shard count low, because each shard is a full software-rasterised renderer.
+
+Note which way the lab faces. `fitStructure` frames from `bounds.min[2]`, the **-Z** side. Closed
+prefab rings enter at -Z, so that is their door; `forge`, `porch`, `arcade` and every composition
+author local **+Z** as their approach, so for those the fitted view is the back and the sweep's
+`b-rear` capture is the front.
 
 ## Browser gate and shared-state proof
 

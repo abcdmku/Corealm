@@ -237,16 +237,24 @@ function watchPanel(
     .sort((left, right) => Math.abs(left.dx) - Math.abs(right.dx))[0];
 }
 
-/** A narrow upper-storey watch slit fitted to a real apertured pier panel. */
+/**
+ * An upper-storey watch opening fitted to a real apertured pier panel.
+ *
+ * This used to insert `window_thin` lifted 0.28 m. The kit's window panel is a hole 1.19 m wide
+ * from a 1.05 m sill to a 2.69 m arched crown, and `window_thin` is 0.888 m wide reaching 2.90 m
+ * once lifted - so it covered 61% of the aperture and left 0.15 m of open jamb down each side plus
+ * the whole sill strip. From outside the gate you looked through the pier.
+ *
+ * `window_wide` at the default scale is the insert authored to this aperture (frame x +-0.6825,
+ * y 1.016..2.742), which is what `buildings.ts:ringWindows` inserts and what `tower.ts` uses.
+ */
 function watchSlit(tag: string, panel: PartPlacement): PartPlacement {
   const outward = 0.01;
   return variantPart(
     tag,
-    "window_thin",
+    "window_wide",
     panel.dx + Math.sin(panel.rotationY) * outward,
-    // The insert is 1.016..2.621 m above its pivot. A 0.28 m lift keeps the top inside the
-    // measured three-metre pier panel while retaining the high, defensive slit silhouette.
-    panel.dy + 0.28,
+    panel.dy,
     panel.dz + Math.cos(panel.rotationY) * outward,
     panel.rotationY,
   );

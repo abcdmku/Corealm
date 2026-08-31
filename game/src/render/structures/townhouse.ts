@@ -30,12 +30,19 @@ function facadeBase(
   ));
 }
 
-/** Two L rails cover the same two floor tiles as the classic four-piece balcony rail. */
+/**
+ * Two L rails cover the same two floor tiles as the classic four-piece balcony rail.
+ *
+ * `balcony_corner` is an L whose corner is at local (+1, -1) with its legs running toward -X
+ * and +Z. The two yaws were swapped, which turned the L the wrong way at both ends: the left
+ * piece laid a rail back across the balcony doorway and the right-hand edge of the deck was
+ * left open. These yaws put each corner on the deck corner it belongs to.
+ */
 function cornerRails(context: StructureVariantContext): PartPlacement[] {
   const z = -context.depth / 2 - 1;
   return [
-    variantPart("corner_rail_l", "balcony_corner", -1, BALCONY_RAIL_Y, z, Math.PI),
-    variantPart("corner_rail_r", "balcony_corner", 1, BALCONY_RAIL_Y, z, Math.PI / 2),
+    variantPart("corner_rail_l", "balcony_corner", -1, BALCONY_RAIL_Y, z, Math.PI / 2),
+    variantPart("corner_rail_r", "balcony_corner", 1, BALCONY_RAIL_Y, z, 0),
   ];
 }
 
@@ -275,7 +282,10 @@ export const TOWNHOUSE_VARIANTS: readonly StructureVariantRecipe[] = [
         elevation,
         ...cornerRails(context),
         dormer(context, "merchant_dormer", 0),
-        banner(context, "merchant_banner", 2.35),
+        // 0.8, not 2.35: this recipe shutters the +1 bay, whose leaf occupies x 0.915..3.080,
+        // so a banner at 2.35 was planted straight through the open shutter. The balcony door
+        // ends at x 0.596, which leaves this the only clear column on a 6 m frontage.
+        banner(context, "merchant_banner", 0.8),
         lamp(context, "merchant_lamp_l", -1.45),
         lamp(context, "merchant_lamp_r", 1.65),
       );

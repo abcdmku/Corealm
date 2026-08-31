@@ -5,7 +5,10 @@ import type { StructureVariantContext, StructureVariantRecipe } from "./types.js
 
 const BASE_GOODS_TAG = /^goods\d+[ab]$/;
 const STALL_TAG = /^stall\d+$/;
-const MIN_SAFE_PITCH_SPACING = 2.7;
+// 2.6, not 2.7. A 9 m row is three 3.0 m pitches, but an 8 m row is three 2.667 m pitches and
+// was rejected by 33 mm, so every market_row variant silently fell back to the classic recipe
+// at that width. 2.6 admits 8 m (0.822 m clear between stalls) and still rejects 5 m.
+const MIN_SAFE_PITCH_SPACING = 2.6;
 const MAX_DETAILS = 10;
 // `market_stall`'s front uprights are centred at x +/-0.845 and z +0.35 in the
 // prefab frame.  The festival banner is a projecting bracket: its rail sits on

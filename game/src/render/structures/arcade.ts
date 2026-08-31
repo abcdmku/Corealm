@@ -1,4 +1,4 @@
-import type { PartPlacement } from "../buildings.js";
+import { bayWallFace, type PartPlacement } from "../buildings.js";
 import { wallMountedBanner } from "../bannerPlacement.js";
 import { inset, variantPart, withDetails } from "./parts.js";
 import type { StructureVariantContext, StructureVariantRecipe } from "./types.js";
@@ -16,7 +16,25 @@ const BANNER_ASSET = "banner_1" as const;
 // additional centimetre leaves the banner rail clear of the facade while its bracket projects
 // into the covered bay.
 const BANNER_WALL_FACE_OFFSET = 0.103;
-const WINDOW_INSERT_SCALE = 0.72;
+/**
+ * A window insert plugs its aperture at scale 1, which is what `buildings.ts:ringWindows` uses.
+ *
+ * The kit's window panel is a hole 1.20 m wide from a 1.04 m sill to a 2.71 m arched crown, and
+ * `window_wide` is authored to it: frame x +-0.6825, y 1.016..2.742. At the 0.72 this file used,
+ * the frame covered x +-0.491 and stopped at y 1.999, so every converted bay kept 0.2 m of open
+ * jamb down each side and the whole arched head stood empty - you could see the far side of the
+ * building through a shuttered window.
+ */
+/**
+ * Keeps the lantern's head under the canopy and its plate on the wall, in every kit.
+ *
+ * `lamp_wall` is 1.337 m tall over a base at +0.082 with its mounting plate at local z -0.051.
+ */
+const LANTERN_SCALE = 1;
+const LAMP_WALL_PLATE_Z = -0.051;
+const LANTERN_HEAD_Y = 2.82;
+const LANTERN_Y = LANTERN_HEAD_Y - (0.082 + 1.337) * LANTERN_SCALE;
+const WINDOW_INSERT_SCALE = 1;
 const WINDOW_INSERT_OUT = 0.03;
 const SHUTTER_SCALE = 0.72;
 const SHUTTER_OUT = 0.08;
@@ -232,14 +250,18 @@ export const ARCADE_VARIANTS: readonly StructureVariantRecipe[] = [
       const litBays = centres.length % 2 === 0
         ? [centres[middle - 1]!, centres[middle]!]
         : [centres[middle]!];
+      // `lamp_wall` is 1.337 m tall over a base at +0.082, so at 1.15 it reaches 1.63 m above its
+      // pivot. Hung at 2.1 it topped out at 3.73 against a canopy soffit at 2.92 and a slab top of
+      // 3.03: a lantern standing three quarters of a metre out through the roof it hangs under.
+      const backZ = -context.depth / 2;
       const lamps = litBays.map((centre, index) => variantPart(
         `lamp_${index}`,
         "lamp_wall",
         inset(centre, edge, 0.5),
-        2.1,
-        -context.depth / 2 + 0.35,
+        LANTERN_Y,
+        backZ + bayWallFace(context.kit) - LAMP_WALL_PLATE_Z * LANTERN_SCALE,
         0,
-        1.15,
+        LANTERN_SCALE,
       ));
       return withDetails(withoutBaseLamps(base), ...lamps);
     },
@@ -269,13 +291,16 @@ export const ARCADE_VARIANTS: readonly StructureVariantRecipe[] = [
       const windows = bays.flatMap((bay) => {
         const anchor = bay.wall ?? bay.canopy;
         if (anchor === undefined) return [];
+        // `window_thin` is an arrow loop, not a window: at 0.88 it covers x +-0.391 of a
+        // +-0.597 aperture and tops out 0.35 m under the crown, so it holed every bay it was
+        // supposed to glaze. The narrow reading now comes from the shutter, not from the frame.
         return [wallAttachment(
           anchor,
           `window_${bay.index}`,
-          "window_thin",
+          "window_wide",
           WINDOW_INSERT_OUT,
-          0.05,
-          0.88,
+          0,
+          WINDOW_INSERT_SCALE,
         )];
       });
       return withDetails(shell, ...windows);

@@ -76,13 +76,16 @@ export const WALL_SEGMENT_VARIANTS: readonly StructureVariantRecipe[] = [
         base,
         // A shallow run of boards over a solid panel reads as a repair without adding wall mass.
         variantPart("repair_slats", "fence_wood_single", patchX, 0.9, 0.13, 0, 0.72),
+        // Rubble belongs at the foot of the wall, not inside it. At dz 0.06 both bricks sat
+        // within the panel's own 0.406 m thickness, so a repair spoil heap was buried in the
+        // masonry it had supposedly fallen off.
         variantPart(
           "repair_rubble_l", "rubble_brick_1",
-          inset(-context.width * 0.22, halfWidth, 0.3), 0.14, 0.06, 0.35, 1.25,
+          inset(-context.width * 0.22, halfWidth, 0.3), 0.14, 0.36, 0.35, 1.25,
         ),
         variantPart(
           "repair_rubble_r", "rubble_brick_2",
-          inset(context.width * 0.22, halfWidth, 0.3), 0.13, 0.06, 2.25, 1.15,
+          inset(context.width * 0.22, halfWidth, 0.3), 0.13, 0.4, 2.25, 1.15,
         ),
       );
     },

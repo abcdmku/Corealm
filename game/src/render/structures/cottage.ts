@@ -391,7 +391,8 @@ export const COTTAGE_VARIANTS: readonly StructureVariantRecipe[] = [
     detailBudget: 4,
     fits: fitsCottage,
     build: (context, base) => {
-      const garden = moveVine(context, withoutFoundationPlants(moveChimney(context, base, 1, -1)), [1, 3, 0]);
+      // -1.56 keeps the stack clear of `vine_dormer`, which sits at along +0.68 on the same slope.
+      const garden = moveVine(context, withoutFoundationPlants(moveChimney(context, base, -1, -1)), [1, 3, 0]);
       const roofline = withDormers(context, garden, "vine_dormer", [{ along: 0.68, slope: -1 }]);
       return withDetails(
         roofline,
@@ -466,10 +467,14 @@ export const COTTAGE_VARIANTS: readonly StructureVariantRecipe[] = [
     detailBudget: 7,
     fits: fitsCottage,
     build: (context, base) => {
-      const clean = withoutFoundationGreenery(moveChimney(context, base, 1, -1));
+      // The chimney goes on the slope the dormers are NOT on; at (1, -1) it was driven straight
+      // through `woodstore_dormer_1`.
+      const clean = withoutFoundationGreenery(moveChimney(context, base, 1, 1));
+      // +-1.28, not +-0.72. The stone kit draws dormers at 0.8, so each is 1.951 m wide along
+      // the ridge and a 1.44 m separation drove the pair 0.511 m through each other.
       const roofline = withDormers(context, clean, "woodstore_dormer", [
-        { along: -0.72, slope: -1 },
-        { along: 0.72, slope: -1 },
+        { along: -1.28, slope: -1 },
+        { along: 1.28, slope: -1 },
       ]);
       return withDetails(
         roofline,
@@ -489,8 +494,8 @@ export const COTTAGE_VARIANTS: readonly StructureVariantRecipe[] = [
     build: (context, base) => {
       const clean = withoutFoundationPlants(base);
       const roofline = withDormers(context, clean, "lantern_dormer", [
-        { along: -0.72, slope: -1 },
-        { along: 0.72, slope: -1 },
+        { along: -1.28, slope: -1 },
+        { along: 1.28, slope: -1 },
       ]);
       return withDetails(
         roofline,
