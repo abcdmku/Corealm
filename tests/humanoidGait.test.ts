@@ -1,24 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { ENEMY_BLOCKS } from "../game/src/content/enemies.js";
 import { ENEMY_RETURN_SPEED_MPS, ENEMY_SPEED_MPS } from "../game/src/systems/enemyAI.js";
+import { PLAYER_SPEED } from "../game/src/app/config.js";
 
 /**
- * Humanoids get the same per-gait retiming discipline the animals have, against the two shared
- * library cycles. The constants are duplicated from `render/entityViews.ts` so a change there has
- * to be meant — the same convention `tests/creature-gait.test.ts` uses.
+ * Humanoids RUN — on the same Jog_Fwd_Loop the player runs on, only slightly slower.
  *
- * The defect this pins against: retiming the 5.92 m/s Jog_Fwd_Loop exactly to a reaver's authored
- * 2.1 m/s pursuit played it at 0.35x, and every humanoid in the game ran in slow motion. Below
- * `HUMANOID_JOG_MIN_RATE` the renderer now runs them on Walk_Loop sped up instead.
+ * Two failed states bracket this file, both shipped and both reported. Retiming the 5.92 m/s jog
+ * exactly to a 2.1 m/s pursuit played it at 0.35x: slow motion. Swapping to a sped-up walk fixed
+ * the slow motion and produced "they should run, not walk fast": the read of a raider is a RUN.
+ * The resolution is on the CONTENT side — pursuit speeds authored at 3.4-3.9, just under the
+ * player's 4.2, so the shared jog plays at 0.57-0.66 against the player's own 0.71 and reads as
+ * the same gait. The clip threshold and rate constants are duplicated from
+ * `render/entityViews.ts` so a change there has to be meant.
  */
 const HUMANOID_JOG_IMPLIED_MPS = 5.92;
 const HUMANOID_WALK_IMPLIED_MPS = 1.15;
-const HUMANOID_JOG_MIN_RATE = 0.7;
-const WALK_RATE_MIN = 0.6;
-const WALK_RATE_MAX = 3.2;
-const MAX_WALK_CADENCE_HZ = 2.4;
-/** Walk_Loop's authored length, from the animation library manifest entry. */
-const WALK_LOOP_SECONDS = 1.333;
+const HUMANOID_JOG_MIN_RATE = 0.55;
 const RETURN_RATIO = ENEMY_RETURN_SPEED_MPS / ENEMY_SPEED_MPS;
 
 const HUMANOIDS = ENEMY_BLOCKS.filter((block) => block.family === "reaver");
@@ -28,48 +26,42 @@ describe("humanoid gait", () => {
     expect(HUMANOIDS.length).toBeGreaterThan(0);
   });
 
-  it("never asks the jog for a slow-motion rate at any authored speed", () => {
-    // Every reaver speed — walk, pursuit, and hurried return — sits below the jog threshold, so
-    // the clip choice lands on Walk_Loop and the jog's slow-motion band is simply never entered.
+  it("pursues and returns on the jog, in the band where a jog reads as running", () => {
     for (const block of HUMANOIDS) {
-      for (const speed of [
-        block.walkSpeedMps ?? 0,
-        block.moveSpeedMps ?? ENEMY_SPEED_MPS,
-        (block.moveSpeedMps ?? ENEMY_SPEED_MPS) * RETURN_RATIO,
-      ]) {
-        expect(speed, `${block.id} at ${speed} m/s must prefer the walk cycle`)
-          .toBeLessThan(HUMANOID_JOG_IMPLIED_MPS * HUMANOID_JOG_MIN_RATE);
+      const pursuit = block.moveSpeedMps ?? ENEMY_SPEED_MPS;
+      for (const [gait, speed] of [["run", pursuit], ["return", pursuit * RETURN_RATIO]] as const) {
+        // At or above the threshold the clip choice is Jog_Fwd_Loop...
+        expect(speed, `${block.id} ${gait} must land on the jog`)
+          .toBeGreaterThanOrEqual(HUMANOID_JOG_IMPLIED_MPS * HUMANOID_JOG_MIN_RATE);
+        // ...and the exact retime sits in the band the player's own 0.71 defines: fast enough to
+        // read as running, never above 1 (nothing outruns the clip's authored tempo).
+        const rate = speed / HUMANOID_JOG_IMPLIED_MPS;
+        expect(rate, `${block.id} ${gait} jog rate`).toBeGreaterThanOrEqual(HUMANOID_JOG_MIN_RATE);
+        expect(rate, `${block.id} ${gait} jog rate`).toBeLessThanOrEqual(1);
       }
     }
   });
 
-  it("keeps the sped-up walk inside the rate and cadence bands at every speed", () => {
+  it("runs slightly slower than the player, so escaping on foot stays possible", () => {
     for (const block of HUMANOIDS) {
-      for (const [gait, speed] of [
-        ["walk", block.walkSpeedMps ?? 0],
-        ["run", block.moveSpeedMps ?? ENEMY_SPEED_MPS],
-        ["return", (block.moveSpeedMps ?? ENEMY_SPEED_MPS) * RETURN_RATIO],
-      ] as const) {
-        if (speed <= 0) continue;
-        const rate = Math.min(
-          WALK_RATE_MAX,
-          Math.max(WALK_RATE_MIN, speed / HUMANOID_WALK_IMPLIED_MPS),
-        );
-        const applied = Math.min(rate, MAX_WALK_CADENCE_HZ * WALK_LOOP_SECONDS);
-        const cadence = applied / WALK_LOOP_SECONDS;
-        const slide = Math.abs(1 - (HUMANOID_WALK_IMPLIED_MPS * applied) / speed);
-        expect(cadence, `${block.id} ${gait} cadence`).toBeLessThanOrEqual(MAX_WALK_CADENCE_HZ + 1e-6);
-        expect(cadence, `${block.id} ${gait} cadence floor`).toBeGreaterThan(0.4);
-        // The clamps should not be doing real work: feet stay planted at every authored speed.
-        expect(slide, `${block.id} ${gait} slide`).toBeLessThan(0.25);
-      }
+      const pursuit = block.moveSpeedMps ?? ENEMY_SPEED_MPS;
+      expect(pursuit, `${block.id} pursuit`).toBeLessThan(PLAYER_SPEED);
+      // "Slightly": a raider that pursues at half the player's speed is not a threat, and one at
+      // 95% is an escape that takes a minute of running. 80-93% is the authored band.
+      expect(pursuit / PLAYER_SPEED, `${block.id} pursuit fraction`).toBeGreaterThan(0.8);
     }
   });
 
-  it("keeps the jog floor above the slow-motion band for a walkless rig", () => {
-    // The floor only bites when Walk_Loop is missing; when it does, a slightly-sliding jog at
-    // 0.7x is the chosen failure over a body hanging mid-air at 0.35x.
-    expect(HUMANOID_JOG_MIN_RATE).toBeGreaterThanOrEqual(0.7);
-    expect(HUMANOID_JOG_MIN_RATE).toBeLessThan(1);
+  it("potters on the walk cycle, below the jog threshold", () => {
+    for (const block of HUMANOIDS) {
+      const walk = block.walkSpeedMps ?? 0;
+      expect(walk, `${block.id} walk`).toBeGreaterThan(0);
+      expect(walk, `${block.id} walk stays under the jog threshold`)
+        .toBeLessThan(HUMANOID_JOG_IMPLIED_MPS * HUMANOID_JOG_MIN_RATE);
+      // And the walk retime is natural rather than clamped.
+      const rate = walk / HUMANOID_WALK_IMPLIED_MPS;
+      expect(rate, `${block.id} walk rate`).toBeGreaterThan(0.5);
+      expect(rate, `${block.id} walk rate`).toBeLessThan(1.5);
+    }
   });
 });

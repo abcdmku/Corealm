@@ -235,6 +235,12 @@ const BLOCKS: readonly EnemyDef[] = [
     // it (see `purseMarksFor`). Balanced armour and magicArmour both at 10, so neither style has an
     // answer to it and it is the block a new player learns to just fight.
     //
+    // Humanoids RUN. The family's pursuit speeds (3.4 / 3.6 / 3.9 by tier) sit just under the
+    // player's 4.2 on purpose: they share the player's own Jog_Fwd_Loop, which implies 5.92 m/s,
+    // and a pursuit much slower than ~3.3 forces that clip under the rate where a jog stops
+    // reading as running (`render/entityViews.ts: HUMANOID_JOG_MIN_RATE`). Escaping on foot
+    // stays possible at every tier, just barely, which is what a raider should feel like.
+    //
     // 9 health is the number that makes an UNAVOIDABLE tier 1 fight survivable, and it is a hard
     // constraint rather than a taste: at Melee 1 in the starter kit the player deals 0.26 dmg/s, so
     // every extra point of enemy health costs about 2 of the player's 23. At 9 the fight runs 34.4 s
@@ -242,7 +248,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // of 8. Everything harder than this in Fallowmarch is territorial and can be walked past.
     maxHealth: 9, attackLevel: 6, defenceLevel: 4,
     accuracy: 6, armour: 10, magicArmour: 10,
-    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 2.1, walkSpeedMps: 0.9, behaviour: "aggressive",
+    maxHit: 3, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 3.4, walkSpeedMps: 0.9, behaviour: "aggressive",
     marks: purseMarksFor(1),
     drops: [
       { itemId: "coarse_hide", quantity: [1, 2], chance: 0.35 },
@@ -380,7 +386,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // because this one initiates from 14 m and the coyote does not. The purse pays 35-135 marks.
     maxHealth: 26, attackLevel: 14, defenceLevel: 9,
     accuracy: 14, armour: 26, magicArmour: 24,
-    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 2.1, walkSpeedMps: 0.9, behaviour: "aggressive",
+    maxHit: 6, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 3.6, walkSpeedMps: 0.9, behaviour: "aggressive",
     marks: purseMarksFor(5),
     drops: [
       { itemId: "bramble_hide", quantity: [1, 2], chance: 0.35 },
@@ -494,7 +500,7 @@ const BLOCKS: readonly EnemyDef[] = [
     // sword, against the Cairnwight's 32.7 s and 27.9.
     maxHealth: 40, attackLevel: 22, defenceLevel: 13,
     accuracy: 18, armour: 42, magicArmour: 40,
-    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 2.75, walkSpeedMps: 0.9, behaviour: "aggressive",
+    maxHit: 7, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 3.9, walkSpeedMps: 0.9, behaviour: "aggressive",
     marks: purseMarksFor(10),
     drops: [
       { itemId: "cairn_pelt", quantity: [1, 1], chance: 0.30 },

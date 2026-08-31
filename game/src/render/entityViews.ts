@@ -506,13 +506,16 @@ const HUMANOID_WALK_IMPLIED_MPS = 1.15;
 /**
  * The slowest a jog cycle may be played before it stops reading as a jog.
  *
- * Stricter than `WALK_RATE_MIN`'s 0.6, because a jog has an airborne phase and slowing it hangs
- * the body in the air. Retiming the 5.92 m/s jog exactly to a reaver's authored 2.1 m/s pursuit
- * asked for 0.35x, and every humanoid in the game ran in slow motion — the follow-up report to
- * giving them exact retiming. Below this rate the locomotion prefers Walk_Loop SPED UP instead:
- * 2.1 m/s on the 1.15 m/s walk is a 1.8x hurried march at 1.4 Hz, which reads as intent.
+ * A jog has an airborne phase, and slowing it hangs the body in the air: retiming the 5.92 m/s
+ * jog exactly to the old 2.1 m/s reaver pursuit asked for 0.35x and every humanoid ran in slow
+ * motion. The direction from play is that humanoids should RUN like the player does, only
+ * slightly slower — the player's own rig plays this same jog at 4.2 / 5.92 = 0.71, and the
+ * reaver pursuit speeds are now authored at 3.4-3.9 (rates 0.57-0.66) to sit in the same band.
+ * 0.55 is the edge of that band; below it (pottering at 0.9, and nothing else) the locomotion
+ * prefers Walk_Loop sped up instead, and the jog keeps this floor only as the failure mode for
+ * a rig with no walk at all.
  */
-const HUMANOID_JOG_MIN_RATE = 0.7;
+const HUMANOID_JOG_MIN_RATE = 0.55;
 
 /**
  * One deterministic tempo for the AI's narrow 3.1..3.6 m/s band.
@@ -2020,8 +2023,10 @@ export class EntityViews {
         // walking pose could never latch for anything.
         record.movingTicks = MOVING_HOLD_SYNCS;
         // Structural sync runs at 4 Hz. Waiting for it to select the walking clip leaves up to a
-        // quarter-second of a chasing enemy gliding in its idle pose.
-        if (!record.spent) this.setMotion(record, record.pursuing ? "run" : "walk", true);
+        // quarter-second of a chasing enemy gliding in its idle pose. `interruptOneShot` is FALSE:
+        // an attack or flinch in flight finishes before the gait resumes — the attack is the read,
+        // and cutting it for a step is how swings became invisible.
+        if (!record.spent) this.setMotion(record, record.pursuing ? "run" : "walk", false);
       } else if (tickRolled) {
         // SETTLE. Nothing else ever collapses this span, and without it a stopped entity jitters
         // forever: `previous` keeps the second-to-last position, `target` the last, and the lerp
@@ -3953,8 +3958,9 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     // the rest of the session.
     if (rig.motion === "death" && (motion === "death" || record.spent)) return;
     if (!ONE_SHOT_MOTIONS.has(motion)) rig.resting = motion;
-    // Idle sync must not cut off a real swing or flinch. Actual translation is different: keeping
-    // the one-shot while the root moves is visible sliding, so syncMotion interrupts it into Jog.
+    // A running one-shot outranks locomotion: THE ATTACK IS THE READ, per play direction, so a
+    // swing or flinch finishes even while the root translates — the resting motion above is still
+    // updated, so the `finished` callback hands the rig straight back to the gait it should be in.
     // A clamped action is no longer running and must also be allowed through. This is the route the
     // mixer's `finished` callback uses to hand the rig back to its resting motion.
     if (ONE_SHOT_MOTIONS.has(rig.motion)
@@ -4110,20 +4116,13 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
   playAction(entityId: EntityId, motion: "attack" | "hit"): boolean {
     const record = this.records.get(entityId);
     if (!record) return false;
-    // Combat publishes enemy swings only inside ENEMY_ATTACK_RANGE. The render-side half of that
-    // rule is that a rig which is genuinely translating should not start a planted-foot swing.
-    //
-    // The test is "is it moving RIGHT NOW", not `movingTicks`. That counter is a two-sync
-    // hysteresis decayed by `updateMoving` at 4 Hz, so it stays armed for up to half a second after
-    // the last step, and `syncMotion` re-arms it on any 3 cm change. Against a player who keeps
-    // moving, the enemy re-steps every tick, the counter never reaches zero, and the swing was
-    // dropped every single time: enemies traded damage numbers without ever visibly attacking.
-    // Comparing the interpolation span answers the same question with no lag, because `syncMotion`
-    // collapses it one tick after the entity actually stops.
-    if (motion === "attack"
-      && record.previous.distanceToSquared(record.target) > MOVING_EPSILON * MOVING_EPSILON) {
-      return false;
-    }
+    // No movement gate. An earlier round refused an attack while the rig was translating, on the
+    // argument that a planted-foot swing under a moving root is visible sliding — and the result
+    // was enemies trading damage numbers without ever visibly swinging whenever anything kept
+    // them shuffling. The direction from play is the opposite priority: THE ATTACK IS THE READ.
+    // A swing always plays; half a second of foot slide under a bite is a cheaper lie than damage
+    // from a creature that never moved. `syncMotion` honours the same rule by not interrupting a
+    // running one-shot when locomotion resumes.
     if (!record.rig) {
       // A combat target is necessarily near the player, but an old rig inside release hysteresis
       // may still own the pool. Give this record one synchronous priority pass before giving up.
