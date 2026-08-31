@@ -14,7 +14,7 @@
  * pose. The cost is up to one tick of latency on the drawn character, which is the standard trade
  * and is invisible next to a 42 cm jump.
  */
-import type { Store } from "../state/store.js";
+import type { GameState, Store } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
 import type { SimClock } from "../core/time.js";
 import type { RngStreams } from "../core/rng.js";
@@ -34,7 +34,7 @@ import type { CharacterMotionEvent, CharacterRig, CharacterPose } from "../rende
 import type { Vfx } from "../render/vfx.js";
 import type { SpellVfx } from "../render/spellVfx.js";
 import { content } from "../content/index.js";
-import type { GameEvent, SpellElement, SpellRung } from "../contracts.js";
+import type { GameEvent, ItemId, SkillId, SpellElement, SpellRung } from "../contracts.js";
 import type { Ui } from "../ui/panels.js";
 import type { EntityId, SemanticEntity, Vec3 } from "../contracts.js";
 import { GATHER_TICK_MS, SIM_TICK_MS } from "../core/time.js";
@@ -103,6 +103,23 @@ const TELEPORT_SNAP_METRES = 2;
 const TELEPORT_SNAP_SQUARED = TELEPORT_SNAP_METRES * TELEPORT_SNAP_METRES;
 
 const TWO_PI = Math.PI * 2;
+
+/**
+ * Tools are carried, not equipped. Return the strongest matching tool in the pack so the held
+ * fishing model shows what the gathering roll actually uses.
+ */
+function bestCarriedGatheringTool(state: GameState, skill: SkillId): ItemId | null {
+  let best: { itemId: ItemId; bonus: number } | null = null;
+  for (const stack of state.inventory.slots) {
+    if (!stack) continue;
+    const tool = content.item(stack.itemId)?.tool;
+    if (!tool || tool.skill !== skill) continue;
+    if (!best || tool.gatherBonus > best.bonus) {
+      best = { itemId: stack.itemId, bonus: tool.gatherBonus };
+    }
+  }
+  return best?.itemId ?? null;
+}
 
 
 /**
@@ -405,6 +422,10 @@ export class GameLoop {
     // 13. clock commit
     clock.commitTick();
     state.meta.playSeconds += SIM_TICK_MS / 1000;
+    // Played time is persisted state and is also the clock for portable fires and resource
+    // respawns. Keep the save dirty between autosave intervals so an idle countdown cannot rewind
+    // after reload. `Store` holds one boolean, so this does not queue writes per tick.
+    store.markDirty();
 
     // 14. events flush LAST, on purpose.
     events.flush();
@@ -534,6 +555,10 @@ export class GameLoop {
         inCombat: state.combat.targetId !== null || state.combat.engagedBy.length > 0,
         activityKind: activity?.kind ?? null,
         activitySkill: activity?.kind === "gathering" ? activity.skill : null,
+        activityTier: activity?.kind === "gathering" ? activity.nodeTier : null,
+        activityToolItemId: activity?.kind === "gathering"
+          ? bestCarriedGatheringTool(state, activity.skill)
+          : null,
       }));
     }
     rig.setLocomotionSpeed(speed);

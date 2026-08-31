@@ -157,6 +157,10 @@ export type InteractionId =
   | "attack" | "cast" | "talk" | "open" | "enter" | "climb" | "vault"
   | "loot" | "take" | "produce" | "bank" | "trade" | "equip" | "unequip";
 
+/** A production station category. Recipes may accept more than one category. */
+export type StationKind =
+  | "furnace" | "anvil" | "range" | "campfire" | "crafting_table" | "fletching_bench";
+
 // ---------------------------------------------------------- structure library
 
 /**
@@ -242,7 +246,7 @@ export interface SemanticEntity {
   resource?: { remaining: number; maxYields: number; respawnSeconds: number; itemId: ItemId };
   combat?: { health: number; maxHealth: number; level: number; aggroRadius: number };
   npc?: { dialogueRootId: string; questIds: QuestId[] };
-  station?: { skill: SkillId; recipeIds: RecipeId[] };
+  station?: { kind: StationKind; skill: SkillId; recipeIds: RecipeId[] };
   /** Agility shortcut. Traversal is a route-graph edge, not a navmesh off-mesh link. */
   obstacle?: { reqLevel: number; exitPosition: Vec3; durationMs: number; savesMeters: number };
   /**
@@ -460,6 +464,7 @@ export type GameEventType =
   | "spell.launched"
   | "health.low" | "player.died"
   | "level.gained" | "production.completed"
+  | "campfire.built" | "campfire.replaced" | "campfire.expired"
   | "quest.updated" | "dialogue.opened" | "dialogue.closed"
   | "entity.discovered";
 
@@ -672,7 +677,20 @@ export interface GameApi {
   useItem(itemId: ItemId, target?: { itemId: ItemId } | { entityId: EntityId }): Result<{ effect: string }>;
   equipItem(itemId: ItemId): Result<{ slot: EquipSlot; replaced: ItemId | null }>;
   unequipItem(slot: EquipSlot): Result<{ itemId: ItemId }>;
+  /** Compatibility command: uses the nearest valid station. */
   produce(recipeId: RecipeId, quantity: number): Result<{ queued: number; durationMs: number }>;
+  /** Starts at the exact station the player or agent selected. */
+  produceAt(
+    stationId: EntityId,
+    recipeId: RecipeId,
+    quantity: number,
+  ): Result<{ queued: number; durationMs: number }>;
+  /** Build one portable cooking fire from a carried log at the first valid nearby sample. */
+  buildCampfire(logItemId: ItemId): Result<{
+    entityId: EntityId;
+    lifetimeMs: number;
+    position: Vec3;
+  }>;
 
   // combat
   attack(entityId: EntityId): Result<{ targetId: EntityId; attackSpeedMs: number }>;

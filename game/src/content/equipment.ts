@@ -115,13 +115,38 @@ function gear(row: GearRow): ItemDef {
 }
 
 /**
- * Every melee weapon and every staff swings on the same cadence. PRD 2.4 fixes 2.4 s for "a
+ * Every melee weapon uses the same swing cadence. Staffs and wands share the spell cadence. PRD 2.4 fixes 2.4 s for "a
  * standard sword", and the unarmed / dagger TTK rows only reproduce at 2.4 s, so daggers share it
  * and trade damage for cost rather than for speed.
  */
 const MELEE_SPEED_MS = 2400;
 /** PRD 2.4: "Magic is slower (3.0 s per cast against 2.4 s for a standard sword)". */
 const CAST_SPEED_MS = 3000;
+
+type GatheringTier = 1 | 5 | 10;
+
+interface StaffBonuses {
+  readonly power?: number;
+  readonly magicAccuracy: number;
+  readonly magicPower: number;
+  readonly magicArmour: number;
+}
+
+const STAFF_BONUSES: Readonly<Record<GatheringTier, StaffBonuses>> = {
+  1: { magicAccuracy: 6, magicPower: 4, magicArmour: 1 },
+  5: { power: 2, magicAccuracy: 12, magicPower: 9, magicArmour: 2 },
+  10: { power: 4, magicAccuracy: 24, magicPower: 20, magicArmour: 4 },
+};
+
+/** Wands keep two thirds of a staff's magic stats and never inherit its incidental melee power. */
+function wandBonuses(tier: GatheringTier): Partial<EquipmentBonuses> {
+  const staff = STAFF_BONUSES[tier];
+  return {
+    magicAccuracy: Math.round(staff.magicAccuracy * 2 / 3),
+    magicPower: Math.round(staff.magicPower * 2 / 3),
+    magicArmour: Math.round(staff.magicArmour * 2 / 3),
+  };
+}
 
 // -------------------------------------------------------------- starter kit, tier 0 (Worn)
 /**
@@ -398,7 +423,13 @@ const MAGIC_TIER_1: readonly ItemDef[] = [
     id: "palewood_staff", name: "Palewood Staff", tier: 1, slot: "mainHand", value: 140,
     description: "A shaved palewood shaft with a quartz chip wedged in the split top.",
     requires: { magic: 1 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: { magicAccuracy: 6, magicPower: 4, magicArmour: 1 },
+    bonuses: STAFF_BONUSES[1],
+  }),
+  gear({
+    id: "palewood_wand", name: "Palewood Wand", tier: 1, slot: "mainHand", value: 84,
+    description: "A palewood shaft cut short around a pale quartz point. Quick to make, modest in a fight.",
+    requires: { magic: 1 }, attackSpeedMs: CAST_SPEED_MS,
+    bonuses: wandBonuses(1),
   }),
   gear({
     id: "quartz_focus", name: "Quartz Focus", tier: 1, slot: "offHand", value: 70,
@@ -459,7 +490,13 @@ const MAGIC_TIER_5: readonly ItemDef[] = [
     id: "duskoak_staff", name: "Duskoak Staff", tier: 5, slot: "mainHand", value: 500,
     description: "Duskoak, banded in Corven, an amber the size of a thumb in the crown.",
     requires: { magic: 5 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: { power: 2, magicAccuracy: 12, magicPower: 9, magicArmour: 2 },
+    bonuses: STAFF_BONUSES[5],
+  }),
+  gear({
+    id: "duskoak_wand", name: "Duskoak Wand", tier: 5, slot: "mainHand", value: 300,
+    description: "A dense duskoak wand capped with Vell amber. Easier to replace than a full staff.",
+    requires: { magic: 5 }, attackSpeedMs: CAST_SPEED_MS,
+    bonuses: wandBonuses(5),
   }),
   gear({
     id: "amber_focus", name: "Amber Focus", tier: 5, slot: "offHand", value: 240,
@@ -520,7 +557,13 @@ const MAGIC_TIER_10: readonly ItemDef[] = [
     id: "cairnpine_staff", name: "Cairnpine Staff", tier: 10, slot: "mainHand", value: 1180,
     description: "Cairnpine with a Kaldite ferrule and a cairn garnet caged at the head. Voltrend needs the cage.",
     requires: { magic: 10 }, attackSpeedMs: CAST_SPEED_MS,
-    bonuses: { power: 4, magicAccuracy: 24, magicPower: 20, magicArmour: 4 },
+    bonuses: STAFF_BONUSES[10],
+  }),
+  gear({
+    id: "cairnpine_wand", name: "Cairnpine Wand", tier: 10, slot: "mainHand", value: 708,
+    description: "A cairnpine wand with a garnet cage at the tip. It trades reach and power for a shorter build.",
+    requires: { magic: 10 }, attackSpeedMs: CAST_SPEED_MS,
+    bonuses: wandBonuses(10),
   }),
   gear({
     id: "garnet_focus", name: "Garnet Focus", tier: 10, slot: "offHand", value: 560,
@@ -574,8 +617,7 @@ const MAGIC_TIER_10: readonly ItemDef[] = [
 
 /**
  * Every equippable item: the tier-0 starter pair, then the melee line and the magic line at tiers
- * 1 / 5 / 10. 59 rows. The count was written as 57 while the table already held 58, so treat
- * `tests/equipment.test.ts` as the authority on it, not this line.
+ * 1 / 5 / 10. The three wands bring the table to 62 rows.
  */
 export const EQUIPMENT: readonly ItemDef[] = [
   ...STARTER_EQUIPMENT,

@@ -13,6 +13,7 @@
  */
 import type { RegionId } from "../contracts.js";
 import { REGIONS, type RegionDef, type SettlementDef } from "../content/regions.js";
+import { resourceDef } from "../content/resources.js";
 import type { FlatSpot, RegionTerrainSpec, WorldTerrainSpec, Rect } from "../render/scene.js";
 import { seedFromText, type OrganicBiomeSpec } from "../world/organicFields.js";
 import { WATER_BASIN_DEPTH, waterBasinForCluster } from "../world/waterBodies.js";
@@ -263,7 +264,7 @@ export function buildWorldTerrainSpec(): WorldTerrainSpec {
 
   const flats = REGIONS.flatMap((region) => flatSpotsFor(region));
   const basins = REGIONS.flatMap((region) => region.clusters
-    .filter((cluster) => cluster.archetype === "fishing_spot")
+    .filter((cluster) => resourceDef(cluster.resourceId).archetype === "fishing_spot")
     .map(waterBasinForCluster));
 
   const minX = Math.min(...regions.map((region) => region.rect.minX));

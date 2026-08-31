@@ -1,0 +1,64 @@
+{
+  "name": "gathering-production-campfire-low-light",
+  "actions": [
+    {
+      "debug": "setSkillLevel",
+      "args": ["fletching", 10],
+      "label": "Set a non-capped build skill"
+    },
+    {
+      "debug": "setSkillLevel",
+      "args": ["crafting", 10],
+      "label": "Set a non-capped crafting skill"
+    },
+    {
+      "debug": "giveItem",
+      "args": ["palewood_log", 1, "inventory"],
+      "label": "Supply one legal fire log"
+    },
+    {
+      "debug": "setPaused",
+      "args": [true],
+      "label": "Freeze combat before entering the unlit chamber"
+    },
+    {
+      "debug": "teleport",
+      "args": [{ "locationId": "gravelmaw_chamber3" }],
+      "label": "Enter the unlit Gravelmaw chamber while combat is frozen"
+    },
+    {
+      "debug": "callTool",
+      "args": ["corealm_build_campfire", { "logItemId": "palewood_log" }],
+      "label": "Build through the public game tool"
+    },
+    {
+      "debug": "advanceGameTime",
+      "args": [3.5],
+      "label": "Move the build deadline past completion while paused"
+    },
+    {
+      "debug": "setPaused",
+      "args": [false],
+      "label": "Run one short completion slice"
+    },
+    {
+      "debug": "setPaused",
+      "args": [true],
+      "label": "Freeze the completed fire before enemies can interfere"
+    },
+    {
+      "debug": "getDrawnBounds",
+      "args": ["player_campfire"],
+      "label": "Synchronize and confirm the real campfire base"
+    },
+    {
+      "debug": "focusEntity",
+      "args": ["player_campfire"],
+      "label": "Frame the low-light fire"
+    },
+    {
+      "screenshot": "gathering-production-campfire-low-light",
+      "label": "Capture the campfire in an unlit chamber"
+    }
+  ]
+}

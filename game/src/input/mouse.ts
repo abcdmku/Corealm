@@ -58,6 +58,8 @@ export interface InputOptions {
   onSelectionChange?: (entityId: EntityId | null) => void;
   /** Notified after a walk-only click starts a valid path, so the view can mark its destination. */
   onWalkDestination?: (point: Vec3) => void;
+  /** Opens recipe selection for a production station instead of auto-starting one recipe. */
+  onProduction?: (entityId: EntityId) => void;
   /** Defaults to #ui-root. */
   uiRoot?: HTMLElement | null;
   hoverThrottleMs?: number;
@@ -111,9 +113,11 @@ export class InputController {
       },
     );
 
-    const menuDeps = options.uiRoot !== undefined
-      ? { api, root: options.uiRoot }
-      : { api };
+    const menuDeps = {
+      api,
+      ...(options.uiRoot !== undefined ? { root: options.uiRoot } : {}),
+      ...(options.onProduction ? { onProduction: options.onProduction } : {}),
+    };
     this.contextMenu = new ContextMenu(menuDeps);
 
     const keyboardOptions = {
@@ -320,6 +324,10 @@ export class InputController {
       const inspected = this.api.inspect(entityId);
       if (!reportResult(inspected)) return;
       notify(`${inspected.value.name} — tier ${inspected.value.tier}, ${inspected.value.state}.`, "info");
+      return;
+    }
+    if (interaction === "produce" && this.options.onProduction) {
+      this.options.onProduction(entityId);
       return;
     }
     reportResult(this.api.interact(entityId, interaction));

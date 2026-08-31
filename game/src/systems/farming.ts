@@ -453,7 +453,12 @@ export class FarmingSystem implements TickSystem {
     if (existing) return existing;
     // Never "depleted": that state belongs to gathering's respawn pass, which would otherwise
     // re-roll a farm plot into an ore seam's worth of yields.
-    const created: NodeRuntime = { remaining: 0, state: "available", respawnAtMs: null };
+    const created: NodeRuntime = {
+      remaining: 0,
+      maxYields: 0,
+      state: "available",
+      respawnAtMs: null,
+    };
     state.world.nodes[plotId] = created;
     return created;
   }
@@ -462,6 +467,7 @@ export class FarmingSystem implements TickSystem {
     const node = this.plotNode(state, plot.plotId);
     const [min, max] = profile.yieldRange;
     node.remaining = this.rng.int(min, max);
+    node.maxYields = node.remaining;
     node.state = "available";
     node.respawnAtMs = null;
   }
@@ -482,6 +488,7 @@ export class FarmingSystem implements TickSystem {
 
     const node = this.plotNode(state, plot.plotId);
     node.remaining = 0;
+    node.maxYields = 0;
     node.state = "available";
     node.respawnAtMs = null;
 

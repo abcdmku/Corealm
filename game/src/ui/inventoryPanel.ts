@@ -9,6 +9,7 @@
  * Hovering an item shows the shared tooltip with the stat delta against what is currently worn.
  */
 import type { InventorySlot, ItemId, ItemStack } from "../contracts.js";
+import { CAMPFIRE_FUELS } from "../content/gatheringProductionTiers.js";
 import { notify } from "./contextMenu.js";
 import type { ContextMenuItem } from "./contextMenu.js";
 import type { ManagedPanel, UiContext } from "./panels.js";
@@ -131,6 +132,19 @@ export class InventoryPanel implements ManagedPanel {
     this.ctx.refresh();
   }
 
+  private buildFire(itemId: ItemId): void {
+    const result = this.ctx.api.buildCampfire(itemId);
+    if (result.ok) {
+      notify(
+        `Started building a ${itemName(itemId)} fire · ${Math.round(result.value.lifetimeMs / 1_000)}s lifetime.`,
+        "success",
+      );
+    } else {
+      report(result);
+    }
+    this.ctx.refresh();
+  }
+
   private openMenu(index: number, clientX: number, clientY: number): void {
     const stack = this.stackAt(index);
     if (!stack) return;
@@ -144,6 +158,27 @@ export class InventoryPanel implements ManagedPanel {
         label: `Equip ${name}`,
         enabled: true,
         onSelect: () => this.equip(stack.itemId),
+      });
+    }
+
+    const fireFuel = CAMPFIRE_FUELS.find((fuel) => fuel.logItemId === stack.itemId);
+    if (fireFuel) {
+      const player = this.ctx.api.getPlayer();
+      const activity = this.ctx.api.getActivity();
+      const unavailableReason = player.dead
+        ? "Cannot build while dead"
+        : player.inCombat
+          ? "Cannot build during combat"
+          : activity
+            ? "Finish or stop the current activity first"
+            : undefined;
+      items.push({
+        id: "build-fire",
+        label: "Build fire",
+        enabled: unavailableReason === undefined,
+        reason: unavailableReason,
+        hint: `${Math.round(fireFuel.lifetimeMs / 1_000)}s`,
+        onSelect: () => this.buildFire(stack.itemId),
       });
     }
 

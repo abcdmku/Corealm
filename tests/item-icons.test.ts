@@ -13,12 +13,12 @@ import {
   ITEM_ICON_MASTER_SIZE,
   itemIconFiles,
 } from "../tools/generate-item-icons.js";
+import { isProceduralGearAsset } from "../game/src/render/proceduralGear.js";
 
 describe("3D item icon catalog", () => {
   it("covers every item explicitly", () => {
-    // 106 before the magic ladder, plus `worn_staff`. The `/_staff$/` rule in
-    // `itemIconAppearances.ts` already covers it, so the count is the only thing that moved.
-    expect(ALL_ITEMS).toHaveLength(107);
+    // Three handles and three wands extend the earlier 107-item catalog.
+    expect(ALL_ITEMS).toHaveLength(113);
     expect([...ITEM_ICON_APPEARANCE_IDS].sort()).toEqual(ALL_ITEMS.map((item) => item.id).sort());
     for (const item of ALL_ITEMS) expect(itemIconAppearance(item.id).parts.length, item.id).toBeGreaterThan(0);
   });
@@ -28,7 +28,21 @@ describe("3D item icon catalog", () => {
       assets: { id: string }[];
     };
     const known = new Set(manifest.assets.map((asset) => asset.id));
-    expect(itemIconAssetIds().filter((id) => !known.has(id))).toEqual([]);
+    expect(itemIconAssetIds().filter((id) => !known.has(id) && !isProceduralGearAsset(id))).toEqual([]);
+  });
+
+  it("uses compact handle geometry and the same procedural wands the character holds", () => {
+    for (const id of ["palewood_handle", "duskoak_handle", "cairnpine_handle"] as const) {
+      expect(itemIconAppearance(id).parts).toEqual([
+        expect.objectContaining({ kind: "primitive", primitive: "handle" }),
+      ]);
+    }
+    for (const id of ["palewood_wand", "duskoak_wand", "cairnpine_wand"] as const) {
+      const parts = itemIconAppearance(id).parts;
+      expect(parts).toHaveLength(1);
+      expect(parts[0]).toEqual(expect.objectContaining({ kind: "asset" }));
+      if (parts[0]?.kind === "asset") expect(isProceduralGearAsset(parts[0].assetId)).toBe(true);
+    }
   });
 
   it("points the runtime at the 48px public derivative, never the master", () => {

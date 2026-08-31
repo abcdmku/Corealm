@@ -78,7 +78,7 @@
  * the PRD quoted a figure its own 420 m regions could not geometrically produce, the measured
  * value is used and the discrepancy is noted at the obstacle.
  */
-import type { ItemId, QuestId, RecipeId, RegionId, SkillId } from "../contracts.js";
+import type { ItemId, QuestId, RecipeId, RegionId, SkillId, StationKind } from "../contracts.js";
 import {
   COMPOSITION_IDS, KIT_IDS, MODULE_METRES, PREFAB_IDS, compositionPartAssetIds, isCompositionId,
   isKitId, isPrefabId, prefabPartAssetIds, type CompositionId, type KitId, type PrefabId,
@@ -91,6 +91,7 @@ import {
 import { COLDBRACE } from "./settlements/coldbrace.js";
 import { HIGHCAIRN } from "./settlements/highcairn.js";
 import { ROOTFALL } from "./settlements/rootfall.js";
+import { resourceDef } from "./resources.js";
 
 // ------------------------------------------------------------------ primitives
 
@@ -107,8 +108,6 @@ export interface RegionBounds {
   min: Spot;
   max: Spot;
 }
-
-export type StationKind = "furnace" | "anvil" | "range" | "crafting_table" | "fletching_bench";
 
 export type LocationKind =
   | "settlement" | "bank" | "seam" | "grove" | "water" | "farm"
@@ -139,24 +138,12 @@ export interface RoadDef {
 
 export interface ResourceClusterDef {
   id: string;
-  name: string;
-  archetype: "ore" | "tree" | "fishing_spot" | "farm_plot";
-  skill: SkillId;
-  tier: number;
-  reqLevel: number;
-  itemId: ItemId;
+  /** Canonical gatherable definition. Clusters own placement, not gameplay or presentation data. */
+  resourceId: string;
   /** How many nodes to place. Positions come from a deterministic spiral plus seeded jitter. */
   count: number;
   centre: Spot;
   radius: number;
-  assetId: string;
-  /**
-   * A different mesh for the worked-out state. Optional, and usually absent: the render layer
-   * derives "spent" from the live mesh so a node never changes silhouette when it runs dry.
-   * Author one only when the spent state is genuinely a different object.
-   */
-  depletedAssetId?: string;
-  scale?: number;
   /** The route-graph node a player banks against when working this cluster. */
   locationId: string;
 }
@@ -752,8 +739,7 @@ const FALLOWMARCH: RegionDef = {
 
   clusters: [
     {
-      id: "bracken_pit_grithe", name: "Grithe Seam", archetype: "ore",
-      skill: "mining", tier: 1, reqLevel: 1, itemId: "grithe_ore",
+      id: "bracken_pit_grithe", resourceId: "ore_grithe",
       count: 6, centre: [-160, 80], radius: 11,
       // No pack ships a mineable vein (asset-report gap 2). The rock meshes tagged `ore-node` are
       // single-material, so the render layer tints them per `view.materialTier`.
@@ -763,39 +749,30 @@ const FALLOWMARCH: RegionDef = {
       // cutting a crop back to stubble. Swapping in a smaller rock read as the seam vanishing, and
       // swapping a tree for `anvil_log` — which is an anvil sitting on a log — put a blacksmith's
       // anvil where every felled tree had been.
-      assetId: "rock_medium_1", scale: 0.25,
       locationId: "bracken_pit",
     },
     {
-      id: "bracken_pit_stone", name: "Marchstone Face", archetype: "ore",
-      skill: "mining", tier: 1, reqLevel: 1, itemId: "march_stone",
+      id: "bracken_pit_stone", resourceId: "ore_marchstone",
       count: 2, centre: [-146, 88], radius: 5,
-      assetId: "rock_medium_3", scale: 0.25,
       locationId: "bracken_pit",
     },
     {
-      id: "palewood_copse_trees", name: "Palewood", archetype: "tree",
-      skill: "woodcutting", tier: 1, reqLevel: 1, itemId: "palewood_log",
+      id: "palewood_copse_trees", resourceId: "tree_palewood",
       count: 8, centre: [-334, -64], radius: 15,
-      assetId: "tree_common_1", scale: 0.9,
       locationId: "palewood_copse",
     },
     {
-      id: "redsill_spots", name: "Redsill Shallow", archetype: "fishing_spot",
-      skill: "fishing", tier: 1, reqLevel: 1, itemId: "silt_minnow",
+      id: "redsill_spots", resourceId: "fish_silt_minnow",
       count: 4, centre: [-40, -60], radius: 9,
-      // There is no fish, boat, or rod mesh (asset-report gap 3). A coil of rope on the bank is
-      // the interaction marker; the water itself is a shader plane owned by the render layer.
-      assetId: "rope_coil", depletedAssetId: "rope_coil", scale: 1.2,
+      // Fish schools render below the canonical solved water surface. The semantic entity remains
+      // the surface interaction proxy, so cluster placement must stay inside the authored pond.
       locationId: "redsill_shallows",
     },
     {
-      id: "marchfield_plots", name: "Marchfield Plot", archetype: "farm_plot",
-      skill: "farming", tier: 1, reqLevel: 1, itemId: "bittergrain",
+      id: "marchfield_plots", resourceId: "plot_bittergrain",
       count: 6, centre: [-96, -22], radius: 7,
       // No soil-plot or scarecrow mesh (asset-report gap 5). The crop is the clickable thing; the
       // dirt quad and its fence border are render-layer geometry.
-      assetId: "crop_carrot",
       locationId: "marchfield_farm",
     },
   ],
@@ -1022,15 +999,12 @@ const VELLENWOOD: RegionDef = {
 
   clusters: [
     {
-      id: "hollowcut_corven", name: "Corven Seam", archetype: "ore",
-      skill: "mining", tier: 5, reqLevel: 5, itemId: "corven_ore",
+      id: "hollowcut_corven", resourceId: "ore_corven",
       count: 5, centre: [94, 145], radius: 9,
-      assetId: "rock_medium_2", scale: 0.25,
       locationId: "hollowcut_seam",
     },
     {
-      id: "duskoak_stand_trees", name: "Duskoak", archetype: "tree",
-      skill: "woodcutting", tier: 5, reqLevel: 5, itemId: "duskoak_log",
+      id: "duskoak_stand_trees", resourceId: "tree_duskoak",
       count: 10, centre: [14, 166], radius: 20,
       // Was tree_twisted_1. That family carries the `Leaves_TwistedTree` texture, whose sampled
       // mean is rgb(105,79,84) — an autumn tree. Ten of them at the heart of the region is what
@@ -1039,14 +1013,11 @@ const VELLENWOOD: RegionDef = {
       // tree_common_2 carries the green `Leaves_NormalTree` texture, and staying off the scatter
       // canopy's 3 and 5 keeps the choppable tree distinguishable from the dressing. Scale 1.15
       // holds the old-growth read that 0.55 on a larger source mesh was buying.
-      assetId: "tree_common_2", scale: 1.15,
       locationId: "vellenwood_canopy",
     },
     {
-      id: "blackwater_spots", name: "Blackwater Pool", archetype: "fishing_spot",
-      skill: "fishing", tier: 5, reqLevel: 5, itemId: "bramble_trout",
+      id: "blackwater_spots", resourceId: "fish_bramble_trout",
       count: 5, centre: [128, 84], radius: 12,
-      assetId: "rope_coil", depletedAssetId: "rope_coil", scale: 1.2,
       locationId: "blackwater_pools",
     },
   ],
@@ -1287,47 +1258,35 @@ const KARROWMOOR: RegionDef = {
 
   clusters: [
     {
-      id: "lower_quarry_kaldite", name: "Kaldite Face", archetype: "ore",
-      skill: "mining", tier: 10, reqLevel: 10, itemId: "kaldite_ore",
+      id: "lower_quarry_kaldite", resourceId: "ore_kaldite",
       count: 5, centre: [60, -16], radius: 10,
-      assetId: "rock_medium_3", scale: 0.25,
       locationId: "karrowmoor_terraces",
     },
     {
       // Three nodes on purpose. Architecture R5: this seam genuinely runs dry above Mining 20,
       // which is what pushes a player back to the Lower Quarry or onto the Sunder Ledge circuit.
-      id: "upper_karrow_kaldite", name: "Upper Kaldite Face", archetype: "ore",
-      skill: "mining", tier: 10, reqLevel: 10, itemId: "kaldite_ore",
+      id: "upper_karrow_kaldite", resourceId: "ore_kaldite",
       count: 3, centre: [194, -132], radius: 7,
-      assetId: "rock_medium_1", scale: 0.25,
       locationId: "upper_karrow_seam",
     },
     {
-      id: "ridge_pines_trees", name: "Cairnpine", archetype: "tree",
-      skill: "woodcutting", tier: 10, reqLevel: 10, itemId: "cairnpine_log",
+      id: "ridge_pines_trees", resourceId: "tree_cairnpine",
       count: 8, centre: [250, -96], radius: 18,
-      assetId: "tree_pine_2", scale: 0.95,
       locationId: "ridge_pines",
     },
     {
-      id: "cairn_tarn_spots", name: "Cairn Tarn", archetype: "fishing_spot",
-      skill: "fishing", tier: 10, reqLevel: 10, itemId: "cragfin",
+      id: "cairn_tarn_spots", resourceId: "fish_cragfin",
       count: 2, centre: [206, -88], radius: 8,
-      assetId: "rope_coil", depletedAssetId: "rope_coil", scale: 1.2,
       locationId: "cairn_tarns",
     },
     {
-      id: "far_tarn_spots", name: "Far Tarn", archetype: "fishing_spot",
-      skill: "fishing", tier: 10, reqLevel: 10, itemId: "cragfin",
+      id: "far_tarn_spots", resourceId: "fish_cragfin",
       count: 2, centre: [284, -110], radius: 7,
-      assetId: "rope_coil", depletedAssetId: "rope_coil", scale: 1.2,
       locationId: "far_tarn",
     },
     {
-      id: "highcairn_plot_beds", name: "Highcairn Plot", archetype: "farm_plot",
-      skill: "farming", tier: 10, reqLevel: 10, itemId: "cairnleaf",
+      id: "highcairn_plot_beds", resourceId: "plot_cairnleaf",
       count: 4, centre: [128, -58], radius: 6,
-      assetId: "crop_carrot",
       locationId: "highcairn_plots",
     },
   ],
@@ -1922,8 +1881,17 @@ export function validateRegions(knownAssetIds?: ReadonlySet<string>): string[] {
     checkAsset(`${region.id}: bank ${settlement.bank.id}`, settlement.bank.assetId);
 
     for (const cluster of region.clusters) {
-      checkAsset(`${region.id}: cluster ${cluster.id}`, cluster.assetId);
-      if (cluster.depletedAssetId) checkAsset(`${region.id}: cluster ${cluster.id}`, cluster.depletedAssetId);
+      try {
+        const resource = resourceDef(cluster.resourceId);
+        for (const assetId of resource.presentation.availableAssetIds) {
+          checkAsset(`${region.id}: cluster ${cluster.id}`, assetId);
+        }
+        if (resource.presentation.depletedAssetId) {
+          checkAsset(`${region.id}: cluster ${cluster.id}`, resource.presentation.depletedAssetId);
+        }
+      } catch {
+        problems.push(`${region.id}: cluster ${cluster.id} references missing resource ${cluster.resourceId}`);
+      }
     }
     for (const group of region.enemyGroups) checkAsset(`${region.id}: enemies ${group.id}`, group.assetId);
     for (const obstacle of region.obstacles) checkAsset(`${region.id}: obstacle ${obstacle.id}`, obstacle.assetId);

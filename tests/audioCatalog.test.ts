@@ -5,7 +5,7 @@ import { AUDIO_CUE_IDS } from "../game/src/contracts.js";
 import type { GroundSurfaceSample } from "../game/src/contracts.js";
 import {
   COREALM_AUDIO_CATALOG, FUTURE_REGION_MUSIC_FILES, cueForActivity, cueForMovement,
-  footstepSurfaceAt, loopsForRegion,
+  cueForGameEvent, footstepSurfaceAt, loopsForRegion,
 } from "../game/src/audio/index.js";
 import type { AudioVariant } from "../game/src/audio/index.js";
 
@@ -63,6 +63,16 @@ describe("Corealm audio catalog", () => {
     expect(cueForActivity({ kind: "eating" })).toBe("interaction.consume");
     expect(cueForActivity({ kind: "traversing", op: "climb" })).toBe("interaction.climb");
     expect(cueForActivity({ kind: "traversing", op: "vault" })).toBe("interaction.vault");
+  });
+
+  it("plays the catch cue on each successful fishing receipt", () => {
+    expect(cueForGameEvent({
+      seq: 1,
+      type: "item.received",
+      atMs: 1_800,
+      entityId: "fish_node_1",
+      data: { itemId: "silt_minnow", quantity: 1, source: "gather", skill: "fishing" },
+    })).toBe("gather.fishing_catch");
   });
 
   it("maps visible ground materials to distinct footstep cues", () => {

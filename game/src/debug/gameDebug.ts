@@ -75,7 +75,11 @@ export interface DebugDeps {
   saveNow(): void;
   getSaveBlob(): string;
   loadSaveBlob(json: string): void;
+  /** Fast-forwards world timers that deliberately do not use the session SimClock. */
+  advanceWorldTime?(seconds: number): void;
   focusCamera(shotId: string): boolean;
+  /** Frames the live player closely enough to inspect held equipment. */
+  focusPlayer(): boolean;
   /** Frames one live entity for generated guide photography. */
   focusEntity(entityId: EntityId): boolean;
   /** Frames a route-graph location, using its authored shot when one exists. */
@@ -346,6 +350,7 @@ export function installGameDebug(deps: DebugDeps): void {
     advanceGameTime(seconds: number): void {
       if (!Number.isFinite(seconds) || seconds <= 0) return;
       clock.skipMs(seconds * 1000);
+      deps.advanceWorldTime?.(seconds);
     },
 
     teleport(to: Vec3 | { x: number; y: number; z: number } | { entityId: EntityId } | { locationId: string }): boolean {
@@ -648,6 +653,10 @@ export function installGameDebug(deps: DebugDeps): void {
 
     focusCamera(shotId: string): boolean {
       return deps.focusCamera(shotId);
+    },
+
+    focusPlayer(): boolean {
+      return deps.focusPlayer();
     },
 
     focusEntity(entityId: EntityId): boolean {

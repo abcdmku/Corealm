@@ -17,7 +17,7 @@ import { RngStreams } from "../core/rng.js";
 import { Renderer } from "../render/renderer.js";
 import { OrbitCamera } from "../render/camera.js";
 import { AssetRegistry } from "../render/assets.js";
-import { registerProceduralGear } from "../render/proceduralGear.js";
+import { ALL_PROCEDURAL_GEAR_ASSETS, registerProceduralGear } from "../render/proceduralGear.js";
 import { WorldScene } from "../render/scene.js";
 import { EntityViews } from "../render/entityViews.js";
 import { Physics } from "../systems/physics.js";
@@ -29,7 +29,7 @@ import { SaveService } from "../persistence/storage.js";
 import { installBootPlaceholder, installGameDebug, type RecordedError } from "../debug/gameDebug.js";
 import { GameLoop } from "./loop.js";
 import { InputController } from "../input/mouse.js";
-import { WATER_BASIN_DEPTH, buildWorldTerrainSpec, startingSpawn } from "./worldSpec.js";
+import { buildWorldTerrainSpec, startingSpawn } from "./worldSpec.js";
 import { prepareWorldSurface } from "./worldSurface.js";
 import { CAMERA } from "./config.js";
 import { buildWorld, type BuildingBox } from "../world/regionBuilder.js";
@@ -40,6 +40,8 @@ import { BankSystem } from "../systems/bank.js";
 import { EquipmentSystem } from "../systems/equipment.js";
 import { EconomySystem } from "../systems/economy.js";
 import { ActivitySystem } from "../systems/activity.js";
+import { EatingSystem } from "../systems/eating.js";
+import { CAMPFIRE_ENTITY_ID, CampfireSystem, campfireFuelLookup } from "../systems/campfire.js";
 import { GatheringSystem } from "../systems/gathering.js";
 import { FarmingSystem } from "../systems/farming.js";
 import { AgilitySystem } from "../systems/agility.js";
@@ -57,6 +59,7 @@ import { distanceXZ } from "../core/math.js";
 import { REGIONS, getRegion, validateRegions } from "../content/regions.js";
 import { content } from "../content/index.js";
 import { ALL_ITEMS } from "../content/items.js";
+import { GATHERING_PRODUCTION_TIERS } from "../content/gatheringProductionTiers.js";
 import { RESOURCES } from "../content/resources.js";
 import { RECIPES } from "../content/recipes.js";
 import { SPELLS } from "../content/spells.js";
@@ -71,10 +74,14 @@ import { SettingsStore, type UiSettings } from "../ui/settings.js";
 import { keybindings } from "../input/keyboard.js";
 import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
-import { addChamberLights, buildDungeon, type DungeonSpec } from "../render/dungeon.js";
+import {
+  addChamberLights, buildDungeon, chamberFloorAt, dungeonFloorHeight, type DungeonSpec,
+} from "../render/dungeon.js";
 import { Ambience, Vfx, type AmbienceEmitter, type AmbienceKind } from "../render/vfx.js";
 import { SpellVfx } from "../render/spellVfx.js";
 import { DocSearch, buildDocs } from "../api/docs.js";
+import { validateGatheringProduction } from "../content/validateGatheringProduction.js";
+import { ITEM_ICON_APPEARANCE_IDS, itemIconAppearance } from "../render/itemIconAppearances.js";
 import {
   AudioDirector, AudioEngine, COREALM_AUDIO_CATALOG, CorealmAudioBridge,
   footstepSurfaceAt, type AudioDiagnostic,
@@ -179,11 +186,37 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
 
   // Content references assets by id, so the ids can only be checked once the manifest exists.
   // This catches a prefab part or landmark composition naming a mesh that was never shipped.
-  const knownAssetIds = new Set((assets.getManifest()?.assets ?? []).map((asset) => asset.id));
+  const manifest = assets.getManifest();
+  const knownAssetIds = new Set([
+    ...(manifest?.assets ?? []).map((asset) => asset.id),
+    ...ALL_PROCEDURAL_GEAR_ASSETS.map((asset) => asset.assetId),
+  ]);
   if (knownAssetIds.size > 0) {
     for (const problem of validateRegions(knownAssetIds)) {
       errors.push({ atMs: atMs(), source: "content.assets", message: problem });
     }
+  }
+  // Structural validation is not conditional on a successful asset fetch. A missing manifest must
+  // not hide a missing recipe, item, station, or tier reference behind the earlier network error.
+  // The empty fallback also turns every required authored asset into an explicit fatal problem.
+  const gatheringProductionProblems = validateGatheringProduction({
+    tiers: GATHERING_PRODUCTION_TIERS,
+    resources: RESOURCES,
+    recipes: RECIPES,
+    items: ALL_ITEMS,
+    knownManifestAssetIds: knownAssetIds,
+    assetManifest: manifest ?? { packs: [], assets: [] },
+    clusters: REGIONS.flatMap((region) => region.clusters),
+    stations: REGIONS.flatMap((region) => region.settlement.stations),
+    itemAppearances: ITEM_ICON_APPEARANCE_IDS.map(itemIconAppearance),
+  });
+  for (const problem of gatheringProductionProblems) {
+    errors.push({ atMs: atMs(), source: "content.gathering-production", message: problem });
+  }
+  if (gatheringProductionProblems.length > 0) {
+    throw new Error(
+      `Gathering/production content validation failed:\n${gatheringProductionProblems.join("\n")}`,
+    );
   }
 
   // 7. Terrain, derived from canonical region data so there is one source of truth for where the
@@ -498,8 +531,11 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // `use()` on a wearable should equip it, which is what clicking a sword means. Equipment does not
   // exist yet at this point, so the dep is a late-bound closure rather than a direct reference.
   let equipmentSystem: EquipmentSystem | undefined;
+  let eatingSystem: EatingSystem | undefined;
   const inventorySystem = new InventorySystem({
     store, events, now,
+    beginEating: (itemId, durationMs, atMs) =>
+      eatingSystem?.beginEating(itemId, durationMs, atMs) ?? false,
     equip: (itemId) => equipmentSystem
       ? equipmentSystem.equip(itemId)
       : { ok: false as const, error: { code: "UNAVAILABLE" as const, message: "Equipment is not ready" } },
@@ -528,10 +564,82 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   });
 
   const activitySystem = new ActivitySystem(store, events);
+  eatingSystem = new EatingSystem({ store, activity: activitySystem, inventory: inventorySystem });
+  const campfireSystem = new CampfireSystem({
+    store,
+    events,
+    activity: activitySystem,
+    inventory: {
+      countItem: (itemId) => inventorySystem.countItem(itemId),
+      removeItem: (itemId, quantity) => inventorySystem.removeItem(itemId, quantity),
+    },
+    entities: entityStore,
+    fuelFor: campfireFuelLookup(GATHERING_PRODUCTION_TIERS),
+    now,
+    placement: {
+      groundAt: (regionId, x, z) => {
+        if (dungeonSpec && regionId === dungeonSpec.regionId) {
+          const y = chamberFloorAt(dungeonSpec, [x, 0, z]);
+          if (y === null) return null;
+          const step = 0.35;
+          const dx = (dungeonFloorHeight(dungeonSpec, x + step, z)
+            - dungeonFloorHeight(dungeonSpec, x - step, z)) / (step * 2);
+          const dz = (dungeonFloorHeight(dungeonSpec, x, z + step)
+            - dungeonFloorHeight(dungeonSpec, x, z - step)) / (step * 2);
+          const length = Math.hypot(dx, 1, dz);
+          return { y, normal: [-dx / length, 1 / length, -dz / length] as Vec3 };
+        }
+        const sample = scene.sampleWorld(x, z);
+        if (!sample.playable || sample.semanticRegion !== regionId || sample.waterBodyId) return null;
+        return { y: scene.meshHeightAt(x, z), normal: scene.normalAt(x, z) };
+      },
+      withinPlayableBounds: (regionId, position) => {
+        if (dungeonSpec && regionId === dungeonSpec.regionId) {
+          return chamberFloorAt(dungeonSpec, position) !== null;
+        }
+        const sample = scene.sampleWorld(position[0], position[2]);
+        return sample.playable && sample.semanticRegion === regionId;
+      },
+      distanceToWater: (regionId, position) => {
+        if (dungeonSpec && regionId === dungeonSpec.regionId) return Number.POSITIVE_INFINITY;
+        // The placement rule only needs to distinguish "closer than one metre". Dense, concentric
+        // probes against the solved water contours also catch the authored ocean just outside the
+        // playable rectangle without introducing a second water calculation.
+        const radii = [0, 0.2, 0.4, 0.6, 0.8, 1] as const;
+        for (const radius of radii) {
+          const samples = radius === 0 ? 1 : 32;
+          for (let index = 0; index < samples; index += 1) {
+            const angle = (index / samples) * Math.PI * 2;
+            const sample = scene.sampleWorld(
+              position[0] + Math.sin(angle) * radius,
+              position[2] + Math.cos(angle) * radius,
+            );
+            if (!sample.playable || sample.waterBodyId) return radius;
+          }
+        }
+        return 1.001;
+      },
+      clearAt: (regionId, position, radius) => {
+        // `Solids.resolve` already answers circle-vs-building/resource collision for movement. A
+        // zero-length move with the campfire clearance radius reuses that exact canonical shape.
+        const resolved = solids.resolve(position, position, radius);
+        if (distanceXZ(position, resolved) > 0.001) return false;
+        for (const entity of entityStore.all()) {
+          if (!entity.resource || entity.id === CAMPFIRE_ENTITY_ID || entity.regionId !== regionId) continue;
+          if (distanceXZ(position, entity.position) < radius) return false;
+        }
+        return true;
+      },
+    },
+  });
   const gatheringSystem = new GatheringSystem({
     store, events, clock, rng, entities: entityStore,
     inventory: inventorySystem, activity: activitySystem, dispatcher: interactions,
   });
+  // The first render happened before the save was loaded. Gathering construction hydrates saved
+  // node semantics, and this second sync makes depleted rocks, stumps, and fishing recovery marks
+  // visible before the loading screen is dismissed.
+  entityViews.sync(entityStore.all());
   const farmingSystem = new FarmingSystem({
     store, events, clock, rng, entities: entityStore,
     inventory: inventorySystem, activity: activitySystem, dispatcher: interactions,
@@ -542,8 +650,8 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     activity: activitySystem, dispatcher: interactions, nav,
   });
 
-  // ---- Combat and production. Combat is NOT an activity: it lives in its own state slice so the
-  // player can eat while auto-attacking, without which the boss is unwinnable.
+  // ---- Combat and production. Combat is not an activity: it owns an independent state slice.
+  // Food still rejects an active attack target, and an eating activity pauses the attack cadence.
   const combatSystem = new CombatSystem({
     store, events, rng,
     entities: entityStore,
@@ -695,6 +803,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     entities: entityStore,
     nav,
     dispatcher: interactions,
+    activity: activitySystem,
     place: teleportPlayer,
   });
   void travelSystem;
@@ -703,6 +812,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   api.register("dialogue", dialogueSystem);
   api.register("combat", combatSystem.hook());
   api.register("production", productionSystem.hook());
+  api.register("campfire", campfireSystem.hook());
   api.register("inventory", {
     slots: () => inventorySystem.slots(),
     freeSlots: () => inventorySystem.freeSlots(),
@@ -797,6 +907,35 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   const ambience = new Ambience(scene.overlayGroup, { maxParticles: 640 });
   vfx.setAmbience(ambience);
   for (const emitter of collectAmbienceEmitters(scene, built)) ambience.addEmitter(emitter);
+  const syncCampfireAmbience = (): void => {
+    ambience.removeEmitter("player-campfire-flame");
+    ambience.removeEmitter("player-campfire-smoke");
+    const fire = store.get().world.campfire;
+    if (!fire) return;
+    ambience.addEmitter({
+      id: "player-campfire-flame",
+      kind: "flame",
+      position: [fire.position[0], fire.position[1] + 0.22, fire.position[2]],
+      count: 7,
+      cullMetres: 70,
+      scale: 0.72,
+    });
+    ambience.addEmitter({
+      id: "player-campfire-smoke",
+      kind: "smoke",
+      position: [fire.position[0], fire.position[1] + 0.48, fire.position[2]],
+      count: 4,
+      cullMetres: 70,
+      scale: 0.55,
+    });
+  };
+  syncCampfireAmbience();
+  events.subscribe((event) => {
+    if (event.type === "campfire.built" || event.type === "campfire.replaced"
+      || event.type === "campfire.expired") {
+      syncCampfireAmbience();
+    }
+  });
   // Polled rather than pushed: a telegraph has to keep drawing for the whole wind-up, and a dropped
   // frame on an `onTelegraph` listener would leave a ring on the ground after the slam landed.
   vfx.setTelegraphSource(() => enemyAiSystem.telegraphs().map((telegraph) => ({
@@ -864,6 +1003,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     onWalkDestination: (point) => {
       overlays.setWalkDestination(WALK_DESTINATION_HIGHLIGHT_ID, point, clock.elapsedMs);
     },
+    onProduction: (entityId) => ui.openProduction(entityId),
   });
   input.setEntityPickSource((raycaster) => {
     const entityId = entityViews.pick(raycaster);
@@ -1017,6 +1157,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
   // visible from inside it.
   const playerInDungeon = (): boolean => store.get().player.regionId === "gravelmaw";
   // Tick order is each system's own `order` field, following the PRD's documented update order.
+  loop.addSystem(campfireSystem);
   loop.addSystem(activitySystem);
   loop.addSystem(agilitySystem);
   loop.addSystem(gatheringSystem);
@@ -1062,6 +1203,7 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     rng.reseed(store.get().meta.seed);
     events.reset();
     clock.reset();
+    productionSystem.reset(0);
     movement.stop(store.get(), 0, "reset");
     movement.setDirectInput({ forward: 0, strafe: 0, cameraYaw: 0 });
     input.clear();
@@ -1081,6 +1223,8 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     const rebuilt = buildWorld(store.get().meta.seed, heightAt, worldPorts);
     entityStore.load(rebuilt.entities);
     entityStore.registerLocations(rebuilt.knownLocations);
+    campfireSystem.reconstruct();
+    syncCampfireAmbience();
     nav.setRouteGraph(rebuilt.routeNodes, rebuilt.routeEdges);
     entityViews.sync(entityStore.all());
     errors.length = 0;
@@ -1099,8 +1243,9 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     pitch: number,
     distance: number,
     reason: string,
+    playerTarget: Vec3 = target,
   ): void => {
-    const landed = nav.closestPoint(target) ?? target;
+    const landed = nav.closestPoint(playerTarget) ?? playerTarget;
     const regionId = regionAtPoint(landed);
     store.get().player.position = landed;
     store.get().player.regionId = regionId;
@@ -1173,12 +1318,26 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     saveNow: () => { saves.save(store.get(), Date.now()); },
     getSaveBlob: () => saves.serialize(store.get()),
     loadSaveBlob: (json: string) => {
-      try {
-        store.replace(JSON.parse(json) as ReturnType<Store["snapshot"]>);
-      } catch (cause) {
-        errors.push({ atMs: clock.elapsedMs, source: "debug.loadSaveBlob", message: describeError(cause) });
+      const loadedBlob = saves.loadSerialized(json);
+      if (loadedBlob.status !== "loaded" || !loadedBlob.state) {
+        errors.push({
+          atMs: clock.elapsedMs,
+          source: "debug.loadSaveBlob",
+          message: loadedBlob.reason ?? "Save import failed",
+        });
+        return;
       }
+      store.replace(loadedBlob.state);
+      productionSystem.reset(clock.elapsedMs);
+      gatheringSystem.tick(0, clock.elapsedMs);
+      campfireSystem.reconstruct();
+      syncCampfireAmbience();
+      entityViews.sync(entityStore.all());
+      const player = store.get().player;
+      teleportPlayer(player.position, player.regionId);
+      ui.update();
     },
+    advanceWorldTime: (seconds) => gatheringSystem.fastForwardRespawns(seconds),
     /**
      * Moves the camera to a named repeatable pose. Screenshots and the perf budget both use these,
      * so a shot points at the thing it is named after rather than at a fixed compass bearing.
@@ -1199,7 +1358,14 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
     },
 
     forceRespawn: (entityId: string) => gatheringSystem.forceRespawn(entityId, clock.elapsedMs),
-    drawnBounds: (entityId: string) => entityViews.drawnBounds(entityId),
+    drawnBounds: (entityId: string) => {
+      // This is an evidence probe, so measure the semantic state that exists now rather than the
+      // last 250 ms render-sync slice. Under accelerated acceptance runs a node can deplete and
+      // respawn between slices; synchronizing here also makes the screenshot taken immediately
+      // after the probe show the same state the returned bounds describe.
+      entityViews.sync(entityStore.all());
+      return entityViews.drawnBounds(entityId);
+    },
     entityViewStats: () => entityViews.stats(),
     groundHeight: (x: number, z: number) => scene.heightAtXZ(x, z),
     listBuildings: () => REGIONS.flatMap((region) => (region.settlement?.buildings ?? []).map((building) => ({
@@ -1247,6 +1413,24 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
           shot.position[1],
         ] as Vec3;
       frameDocumentationTarget(target, shot.yaw, shot.pitch, shot.distance, "focus-camera");
+      return true;
+    },
+    focusPlayer: () => {
+      const player = store.get().player;
+      const dungeonPlayer = player.regionId === "gravelmaw";
+      entityViews.setCaptureSubject(null);
+      scene.scatterGroup.visible = !dungeonPlayer;
+      scene.terrainGroup.visible = !dungeonPlayer;
+      if (dungeon) dungeon.group.visible = dungeonPlayer;
+      const target: Vec3 = [player.position[0], player.position[1] + 1.05, player.position[2]];
+      frameDocumentationTarget(
+        target,
+        player.facingRad + Math.PI + 0.35,
+        0.16,
+        2.4,
+        "focus-player",
+        player.position,
+      );
       return true;
     },
     focusEntity: (entityId: string) => {
@@ -1309,7 +1493,23 @@ export async function boot(canvas: HTMLCanvasElement): Promise<BootResult> {
         ]
         : entity.position;
       const pitch = entity.archetype === "npc" ? 0.38 : dungeonEntity ? 0.28 : 0.34;
-      frameDocumentationTarget(target, contextualYaw, pitch, distance, "focus-entity");
+      // Resource photographs are about the node, not an avatar standing through its centre. Put
+      // the player on a deterministic tangent offset while the camera stays fixed on the authored
+      // resource. Keep a small margin inside interaction range because `nav.closestPoint` can
+      // nudge a point on the exact boundary outward; the same framed player must still be able to
+      // start the real gather action without a second debug teleport.
+      const resourceSubject = entity.archetype === "ore"
+        || entity.archetype === "tree"
+        || entity.archetype === "fishing_spot";
+      const resourceFocusOffset = Math.max(0, INTERACT_RANGE - 0.25);
+      const playerTarget: Vec3 = resourceSubject
+        ? [
+          target[0] + Math.cos(contextualYaw) * resourceFocusOffset,
+          target[1],
+          target[2] - Math.sin(contextualYaw) * resourceFocusOffset,
+        ]
+        : target;
+      frameDocumentationTarget(target, contextualYaw, pitch, distance, "focus-entity", playerTarget);
       return true;
     },
     focusLocation: (locationId: string) => {
@@ -1607,9 +1807,12 @@ function registerExclusions(scene: WorldScene): void {
 /**
  * Assets for entities the world creates while it is running rather than at build time.
  *
- * Today that is one thing: the recovery cache dropped where the player died.
+ * Recovery caches and player campfires can appear after the initial entity preload.
  */
-const SPAWNED_LATER_ASSET_IDS: readonly string[] = ["crate_wood"];
+const SPAWNED_LATER_ASSET_IDS: readonly string[] = [
+  "crate_wood",
+  ...GATHERING_PRODUCTION_TIERS.map((definition) => definition.campfire.visualLogAssetId),
+];
 
 async function preloadEntityAssets(
   assets: AssetRegistry,
@@ -1696,17 +1899,8 @@ function collectAmbienceEmitters(scene: WorldScene, built: { entities: readonly 
       });
     }
 
-    // Water movement, on the fishing clusters the water surface is centred on.
-    for (const cluster of region.clusters) {
-      if (cluster.archetype !== "fishing_spot") continue;
-      const [x, z] = cluster.centre;
-      emitters.push({
-        id: `ripple-${cluster.id}`,
-        kind: "ripple",
-        position: [x, scene.heightAt(region.id, x, z) + WATER_BASIN_DEPTH * 0.55, z],
-        scale: Math.max(1, cluster.radius / 8),
-      });
-    }
+    // Fishing ripples are node state now. EntityViews owns their active/depleted intensity so a
+    // worked-out school cannot keep the old always-on cluster marker.
   }
 
   return emitters;

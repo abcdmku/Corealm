@@ -8,43 +8,43 @@ description: "Production recipes generated from the live game tables."
 | Recipe | Level | Station | Ingredients | Makes | Time | XP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Grithe Bar | 1 | furnace | 1× Grithe Ore + 1× March Stone | 1× Grithe Bar | 2.4 s | 8 |
-| Grithe Dagger | 1 | anvil | 1× Grithe Bar + 1× Palewood Shaft | 1× Grithe Dagger | 3.0 s | 20 |
-| Grithe Sword | 1 | anvil | 2× Grithe Bar + 1× Palewood Shaft | 1× Grithe Sword | 3.0 s | 35 |
+| Grithe Dagger | 1 | anvil | 1× Grithe Bar + 1× Palewood Handle | 1× Grithe Dagger | 3.0 s | 20 |
+| Grithe Sword | 1 | anvil | 2× Grithe Bar + 1× Palewood Handle | 1× Grithe Sword | 3.0 s | 35 |
 | Grithe Helm | 1 | anvil | 2× Grithe Bar | 1× Grithe Helm | 3.0 s | 25 |
 | Grithe Body | 1 | anvil | 3× Grithe Bar | 1× Grithe Cuirass | 3.0 s | 50 |
 | Grithe Legs | 1 | anvil | 3× Grithe Bar | 1× Grithe Greaves | 3.0 s | 50 |
 | Grithe Boots | 1 | anvil | 1× Grithe Bar | 1× Grithe Boots | 3.0 s | 25 |
 | Grithe Gloves | 1 | anvil | 1× Grithe Bar | 1× Grithe Gloves | 3.0 s | 25 |
-| Grithe Pickaxe | 1 | anvil | 2× Grithe Bar + 2× Palewood Shaft | 1× Grithe Pickaxe | 3.0 s | 22 |
-| Grithe Hatchet | 1 | anvil | 2× Grithe Bar + 2× Palewood Shaft | 1× Grithe Hatchet | 3.0 s | 22 |
+| Grithe Pickaxe | 1 | anvil | 2× Grithe Bar + 1× Palewood Handle | 1× Grithe Pickaxe | 3.0 s | 22 |
+| Grithe Hatchet | 1 | anvil | 2× Grithe Bar + 1× Palewood Handle | 1× Grithe Hatchet | 3.0 s | 22 |
 | Corven Bar | 5 | furnace | 2× Corven Ore + 1× March Stone | 1× Corven Bar | 2.4 s | 19 |
-| Corven Dagger | 5 | anvil | 1× Corven Bar + 1× Duskoak Shaft | 1× Corven Dagger | 3.0 s | 48 |
-| Corven Sword | 5 | anvil | 2× Corven Bar + 1× Duskoak Shaft | 1× Corven Sword | 3.0 s | 84 |
+| Corven Dagger | 5 | anvil | 1× Corven Bar + 1× Duskoak Handle | 1× Corven Dagger | 3.0 s | 48 |
+| Corven Sword | 5 | anvil | 2× Corven Bar + 1× Duskoak Handle | 1× Corven Sword | 3.0 s | 84 |
 | Corven Helm | 5 | anvil | 2× Corven Bar | 1× Corven Helm | 3.0 s | 60 |
 | Corven Body | 5 | anvil | 3× Corven Bar | 1× Corven Plate | 3.0 s | 120 |
 | Corven Legs | 5 | anvil | 3× Corven Bar | 1× Corven Greaves | 3.0 s | 120 |
 | Corven Boots | 5 | anvil | 1× Corven Bar | 1× Corven Boots | 3.0 s | 60 |
 | Corven Gloves | 5 | anvil | 1× Corven Bar | 1× Corven Gauntlets | 3.0 s | 60 |
-| Corven Pickaxe | 5 | anvil | 2× Corven Bar + 2× Duskoak Shaft | 1× Corven Pickaxe | 3.0 s | 53 |
-| Corven Hatchet | 5 | anvil | 2× Corven Bar + 2× Duskoak Shaft | 1× Corven Hatchet | 3.0 s | 53 |
+| Corven Pickaxe | 5 | anvil | 2× Corven Bar + 1× Duskoak Handle | 1× Corven Pickaxe | 3.0 s | 53 |
+| Corven Hatchet | 5 | anvil | 2× Corven Bar + 1× Duskoak Handle | 1× Corven Hatchet | 3.0 s | 53 |
 | Kaldite Bar | 10 | furnace | 2× Kaldite Ore + 2× March Stone | 1× Kaldite Bar | 2.4 s | 28 |
-| Kaldite Dagger | 10 | anvil | 1× Kaldite Bar + 1× Cairnpine Shaft | 1× Kaldite Dagger | 3.0 s | 70 |
-| Kaldite Sword | 10 | anvil | 2× Kaldite Bar + 1× Cairnpine Shaft | 1× Kaldite Sword | 3.0 s | 123 |
+| Kaldite Dagger | 10 | anvil | 1× Kaldite Bar + 1× Cairnpine Handle | 1× Kaldite Dagger | 3.0 s | 70 |
+| Kaldite Sword | 10 | anvil | 2× Kaldite Bar + 1× Cairnpine Handle | 1× Kaldite Sword | 3.0 s | 123 |
 | Kaldite Helm | 10 | anvil | 2× Kaldite Bar | 1× Kaldite Helm | 3.0 s | 88 |
 | Kaldite Body | 10 | anvil | 3× Kaldite Bar | 1× Kaldite Plate | 3.0 s | 175 |
 | Kaldite Legs | 10 | anvil | 3× Kaldite Bar | 1× Kaldite Greaves | 3.0 s | 175 |
 | Kaldite Boots | 10 | anvil | 1× Kaldite Bar | 1× Kaldite Boots | 3.0 s | 88 |
 | Kaldite Gloves | 10 | anvil | 1× Kaldite Bar | 1× Kaldite Gauntlets | 3.0 s | 88 |
-| Kaldite Pickaxe | 10 | anvil | 2× Kaldite Bar + 2× Cairnpine Shaft | 1× Kaldite Pickaxe | 3.0 s | 77 |
-| Kaldite Hatchet | 10 | anvil | 2× Kaldite Bar + 2× Cairnpine Shaft | 1× Kaldite Hatchet | 3.0 s | 77 |
+| Kaldite Pickaxe | 10 | anvil | 2× Kaldite Bar + 1× Cairnpine Handle | 1× Kaldite Pickaxe | 3.0 s | 77 |
+| Kaldite Hatchet | 10 | anvil | 2× Kaldite Bar + 1× Cairnpine Handle | 1× Kaldite Hatchet | 3.0 s | 77 |
 
 ## Cooking
 
 | Recipe | Level | Station | Ingredients | Makes | Time | XP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Seared Minnow | 1 | range | 1× Silt Minnow | 1× Seared Minnow | 2.4 s | 15 |
-| Seared Trout | 5 | range | 1× Bramble Trout | 1× Seared Trout | 2.4 s | 36 |
-| Seared Cragfin | 10 | range | 1× Cragfin | 1× Seared Cragfin | 2.4 s | 53 |
+| Seared Minnow | 1 | range / campfire | 1× Silt Minnow | 1× Seared Minnow | 2.4 s | 15 |
+| Seared Trout | 5 | range / campfire | 1× Bramble Trout | 1× Seared Trout | 2.4 s | 36 |
+| Seared Cragfin | 10 | range / campfire | 1× Cragfin | 1× Seared Cragfin | 2.4 s | 53 |
 
 ## Crafting
 
@@ -86,17 +86,23 @@ description: "Production recipes generated from the live game tables."
 | Recipe | Level | Station | Ingredients | Makes | Time | XP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Palewood Shafts | 1 | fletching_bench | 1× Palewood Log | 4× Palewood Shaft | 1.8 s | 10 |
+| Palewood Handles | 1 | fletching_bench | 1× Palewood Log | 2× Palewood Handle | 1.8 s | 10 |
 | Palewood Staff | 1 | fletching_bench | 3× Palewood Shaft + 1× Pale Quartz | 1× Palewood Staff | 1.8 s | 32 |
+| Palewood Wand | 1 | fletching_bench | 1× Palewood Shaft + 1× Pale Quartz | 1× Palewood Wand | 1.8 s | 18 |
 | Palewood Shield | 1 | fletching_bench | 2× Palewood Log + 1× Grithe Bar | 1× Palewood Shield | 1.8 s | 28 |
 | Quartz Focus | 1 | fletching_bench | 1× Palewood Log + 1× Pale Quartz | 1× Quartz Focus | 1.8 s | 28 |
 | Palewood Rod | 1 | fletching_bench | 2× Palewood Shaft + 1× Coarse Hide | 1× Palewood Rod | 1.8 s | 18 |
 | Duskoak Shafts | 5 | fletching_bench | 1× Duskoak Log | 4× Duskoak Shaft | 1.8 s | 24 |
+| Duskoak Handles | 5 | fletching_bench | 1× Duskoak Log | 2× Duskoak Handle | 1.8 s | 24 |
 | Duskoak Staff | 5 | fletching_bench | 3× Duskoak Shaft + 1× Vell Amber | 1× Duskoak Staff | 1.8 s | 77 |
+| Duskoak Wand | 5 | fletching_bench | 1× Duskoak Shaft + 1× Vell Amber | 1× Duskoak Wand | 1.8 s | 43 |
 | Duskoak Shield | 5 | fletching_bench | 2× Duskoak Log + 1× Corven Bar | 1× Duskoak Shield | 1.8 s | 67 |
 | Amber Focus | 5 | fletching_bench | 1× Duskoak Log + 1× Vell Amber | 1× Amber Focus | 1.8 s | 67 |
 | Duskoak Rod | 5 | fletching_bench | 2× Duskoak Shaft + 1× Bramble Hide | 1× Duskoak Rod | 1.8 s | 43 |
 | Cairnpine Shafts | 10 | fletching_bench | 1× Cairnpine Log | 4× Cairnpine Shaft | 1.8 s | 35 |
+| Cairnpine Handles | 10 | fletching_bench | 1× Cairnpine Log | 2× Cairnpine Handle | 1.8 s | 35 |
 | Cairnpine Staff | 10 | fletching_bench | 3× Cairnpine Shaft + 1× Cairn Garnet | 1× Cairnpine Staff | 1.8 s | 112 |
+| Cairnpine Wand | 10 | fletching_bench | 1× Cairnpine Shaft + 1× Cairn Garnet | 1× Cairnpine Wand | 1.8 s | 63 |
 | Cairnpine Shield | 10 | fletching_bench | 2× Cairnpine Log + 1× Kaldite Bar | 1× Cairnpine Shield | 1.8 s | 98 |
 | Garnet Focus | 10 | fletching_bench | 1× Cairnpine Log + 1× Cairn Garnet | 1× Garnet Focus | 1.8 s | 98 |
 | Cairnpine Rod | 10 | fletching_bench | 2× Cairnpine Shaft + 1× Wight Shroud | 1× Cairnpine Rod | 1.8 s | 63 |

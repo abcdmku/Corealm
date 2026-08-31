@@ -27,10 +27,11 @@
 import path from "node:path";
 import zlib from "node:zlib";
 import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { open, mkdir, readFile, writeFile, rm, readdir, stat } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import type { Dirent } from "node:fs";
-import { Document, Logger, NodeIO, type JSONDocument } from "@gltf-transform/core";
+import { Document, Logger, NodeIO, type JSONDocument, type TypedArray } from "@gltf-transform/core";
 import { KHRONOS_EXTENSIONS } from "@gltf-transform/extensions";
 import { dedup, prune, weld, resample, quantize, textureCompress, getBounds } from "@gltf-transform/functions";
 import sharp from "sharp";
@@ -181,9 +182,13 @@ interface PackDef {
   author: string;
   source: string;
   license: string;
+  /** SHA-256 of the complete source archive. This pins the exact CC0 input. */
+  archiveSha256: string;
   zip: string;
-  /** Directory inside the zip that holds the .gltf files, used for catalog paths. */
+  /** Directory inside the zip that holds the source files, used for catalog paths. */
   root: string;
+  /** OBJ packs pass through the pinned in-repo converter before normal optimization. */
+  sourceFormat?: "gltf" | "obj";
 }
 
 const PACKS: PackDef[] = [
@@ -193,6 +198,7 @@ const PACKS: PackDef[] = [
     author: "Quaternius",
     source: "https://quaternius.itch.io/stylized-nature-megakit",
     license: "CC0-1.0",
+    archiveSha256: "298f6732b872e4cf7b30e6e7abf9641c7f6dc6b326df37ac089533ed7e3d58c9",
     zip: "Stylized_Nature_MegaKit[Standard].zip",
     root: "glTF/",
   },
@@ -202,6 +208,7 @@ const PACKS: PackDef[] = [
     author: "Quaternius",
     source: "https://quaternius.itch.io/medieval-village-megakit",
     license: "CC0-1.0",
+    archiveSha256: "e60dea67c10f30dccccfbff92a7933f5ea5cfe99be0e2a0fa5118cceabeec5c4",
     zip: "Medieval_Village_MegaKit[Standard].zip",
     root: "Medieval Village MegaKit[Standard]/glTF/",
   },
@@ -211,6 +218,7 @@ const PACKS: PackDef[] = [
     author: "Quaternius",
     source: "https://quaternius.itch.io/fantasy-props-megakit",
     license: "CC0-1.0",
+    archiveSha256: "8b6f7e806d222e585478f0e1bdc6b271bbc7bc6f84dd6af8ca703a7c64f0cb1e",
     zip: "Fantasy_Props_MegaKit[Standard].zip",
     root: "Exports/glTF/",
   },
@@ -220,6 +228,7 @@ const PACKS: PackDef[] = [
     author: "Quaternius",
     source: "https://quaternius.itch.io/universal-base-characters",
     license: "CC0-1.0",
+    archiveSha256: "fdbf1804c90dfc1ea03e992bff7da2dfd1a79318e13270a660180f9308455f40",
     zip: "Universal_Base_Characters[Standard].zip",
     root: "Universal Base Characters[Standard]/",
   },
@@ -229,6 +238,7 @@ const PACKS: PackDef[] = [
     author: "Quaternius",
     source: "https://quaternius.itch.io/modular-character-outfits-fantasy",
     license: "CC0-1.0",
+    archiveSha256: "c3468b18871cc8c8f05ab14df7712baf22cb9f389cbd870babf130e595187f70",
     zip: "Modular_Character_Outfits_-_Fantasy[Standard].zip",
     root: "Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/",
   },
@@ -238,6 +248,7 @@ const PACKS: PackDef[] = [
     author: "Quaternius",
     source: "https://quaternius.itch.io/ultimate-platformer-pack",
     license: "CC0-1.0",
+    archiveSha256: "2d0cac0f3cb58f6845f779a4c6b4a92be6fa27d118ee0b976ead55c6834a53d4",
     zip: "Ultimate_Platformer_Pack_by_Quaternius.zip",
     root: "Ultimate Platformer Pack - Dec 2021/",
   },
@@ -247,6 +258,7 @@ const PACKS: PackDef[] = [
     author: "Quaternius",
     source: "https://quaternius.itch.io/universal-animation-library",
     license: "CC0-1.0",
+    archiveSha256: "cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724",
     zip: "Universal_Animation_Library[Standard].zip",
     root: "Universal Animation Library[Standard]/Unreal-Godot/",
   },
@@ -256,8 +268,31 @@ const PACKS: PackDef[] = [
     author: "Quaternius",
     source: "https://quaternius.itch.io/universal-animation-library-2",
     license: "CC0-1.0",
+    archiveSha256: "4008ea208a604773a2b2177d965f0f5d3195498b5bf838c3f5785d68e95f2a68",
     zip: "Universal_Animation_Library_2[Standard].zip",
     root: "Universal Animation Library 2[Standard]/Unreal-Godot/",
+  },
+  {
+    id: "ultimate-nature-pack",
+    name: "Ultimate Nature Pack",
+    author: "Quaternius",
+    source: "https://quaternius.com/packs/ultimatenature.html",
+    license: "CC0-1.0",
+    archiveSha256: "865e4ae735116181923fe6ace410da3cec29e814935dc90fb298e0af3a4ff869",
+    zip: "Ultimate_Nature_Pack_by_Quaternius.zip",
+    root: "OBJ/",
+    sourceFormat: "obj",
+  },
+  {
+    id: "animated-fish-pack",
+    name: "Animated Fish Pack",
+    author: "Quaternius",
+    source: "https://quaternius.com/packs/animatedfish.html",
+    license: "CC0-1.0",
+    archiveSha256: "1fc56d63ae16497add1c187d8bafb430f4d0a1e6d89e04396d23f4b58519ac1c",
+    zip: "Fish_Pack_Animated_by_Quaternius.zip",
+    root: "OBJ/",
+    sourceFormat: "obj",
   },
 ];
 
@@ -337,6 +372,20 @@ const platformer = (file: string, id: string, category: Category, tags: string[]
   category,
   tags,
 });
+const ultimateNature = (file: string, id: string, tags: string[]): Pick => ({
+  id,
+  pack: "ultimate-nature-pack",
+  file,
+  category: "nature",
+  tags,
+});
+const animatedFish = (file: string, id: string, tags: string[]): Pick => ({
+  id,
+  pack: "animated-fish-pack",
+  file,
+  category: "nature",
+  tags,
+});
 
 const CATALOG: Pick[] = [
   // --- nature: trees -------------------------------------------------------
@@ -360,6 +409,19 @@ const CATALOG: Pick[] = [
   nature("TwistedTree_3", "tree_twisted_3", ["tree", "twisted", "gnarled", "woodland", "deep-woodland"]),
   nature("TwistedTree_4", "tree_twisted_4", ["tree", "twisted", "gnarled", "woodland", "deep-woodland"]),
   nature("TwistedTree_5", "tree_twisted_5", ["tree", "twisted", "gnarled", "woodland", "deep-woodland"]),
+
+  // --- nature: authored depleted trees and loose campfire fuel ------------
+  ultimateNature("TreeStump", "nature_tree_stump", ["stump", "tree", "depleted", "palewood"]),
+  ultimateNature("TreeStump_Moss", "nature_tree_stump_moss", ["stump", "tree", "depleted", "moss", "duskoak"]),
+  ultimateNature("TreeStump_Snow", "nature_tree_stump_snow", ["stump", "tree", "depleted", "snow", "cairnpine"]),
+  ultimateNature("WoodLog", "nature_wood_log", ["log", "wood", "campfire", "palewood"]),
+  ultimateNature("WoodLog_Moss", "nature_wood_log_moss", ["log", "wood", "campfire", "moss", "duskoak"]),
+  ultimateNature("WoodLog_Snow", "nature_wood_log_snow", ["log", "wood", "campfire", "snow", "cairnpine"]),
+
+  // --- nature: fishing schools --------------------------------------------
+  animatedFish("Fish1", "fish_minnow", ["fish", "minnow", "fishing", "school", "water"]),
+  animatedFish("Fish2", "fish_trout", ["fish", "trout", "fishing", "school", "water"]),
+  animatedFish("Fish3", "fish_cragfin", ["fish", "cragfin", "fishing", "school", "water"]),
 
   // --- nature: undergrowth -------------------------------------------------
   nature("Bush_Common", "bush_common", ["bush", "shrub", "undergrowth"]),
@@ -740,7 +802,14 @@ interface ManifestAsset {
 
 interface Manifest {
   generatedAt: string;
-  packs: Array<{ id: string; name: string; author: string; source: string; license: string }>;
+  packs: Array<{
+    id: string;
+    name: string;
+    author: string;
+    source: string;
+    license: string;
+    archiveSha256: string;
+  }>;
   assets: ManifestAsset[];
 }
 
@@ -775,6 +844,12 @@ function sha1(...parts: Array<Buffer | string>): string {
   return hash.digest("hex");
 }
 
+async function sha256File(file: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
@@ -785,7 +860,14 @@ async function archive(packId: string): Promise<ZipArchive> {
   if (!pack) throw new Error(`Unknown pack: ${packId}`);
   let existing = archives.get(packId);
   if (!existing) {
-    existing = await ZipArchive.open(path.join(CACHE_DIR, pack.zip));
+    const file = path.join(CACHE_DIR, pack.zip);
+    const actualSha256 = await sha256File(file);
+    if (actualSha256 !== pack.archiveSha256) {
+      throw new Error(
+        `Archive SHA-256 mismatch for ${pack.id}: expected ${pack.archiveSha256}, got ${actualSha256}`,
+      );
+    }
+    existing = await ZipArchive.open(file);
     archives.set(packId, existing);
   }
   return existing;
@@ -898,15 +980,30 @@ function measure(document: Document): Metrics {
 }
 
 /**
- * What a single asset needs out of its zip: the glTF/GLB entry plus, for glTF,
- * every buffer and base-colour image it references. Resources that resolve to
- * null are the maps this pipeline discards; they get a 1x1 stand-in.
+ * What a single asset needs out of its zip. OBJ/MTL inputs are converted to a
+ * glTF-Transform document first, then enter the same measured optimization path
+ * as authored glTF. Resources that resolve to null are glTF maps this pipeline
+ * discards; they get a 1x1 stand-in.
  */
 interface SourcePlan {
   entry: string;
-  binary: boolean;
+  format: "glb" | "gltf" | "obj";
+  mtlEntry?: string;
   json?: Record<string, unknown>;
   resources: Array<{ uri: string; entry: string | null }>;
+}
+
+function mtlDiffuseMaps(source: string): string[] {
+  const maps = new Set<string>();
+  for (const raw of source.split(/\r?\n/)) {
+    const line = raw.replace(/\s+#.*$/, "").trim();
+    const match = /^map_Kd\s+(.+)$/i.exec(line);
+    if (!match) continue;
+    const tokens = match[1]!.match(/"[^"]*"|'[^']*'|\S+/g) ?? [];
+    const last = tokens.at(-1)?.replace(/^(?:"|')|(?:"|')$/g, "");
+    if (last) maps.add(last.replace(/\\/g, "/"));
+  }
+  return [...maps];
 }
 
 async function planSource(pick: Pick): Promise<{ zip: ZipArchive; plan: SourcePlan }> {
@@ -915,9 +1012,24 @@ async function planSource(pick: Pick): Promise<{ zip: ZipArchive; plan: SourcePl
   const zip = await archive(pick.pack);
   const index = indexFor(pick.pack, zip);
 
+  if (pack.sourceFormat === "obj") {
+    const objEntry = `${pack.root}${pick.file}.obj`;
+    const mtlEntry = `${pack.root}${pick.file}.mtl`;
+    if (!zip.entries.has(objEntry)) throw new Error(`Missing source: ${objEntry} in ${pack.zip}`);
+    if (!zip.entries.has(mtlEntry)) throw new Error(`Missing material library: ${mtlEntry} in ${pack.zip}`);
+    const mtlSource = (await zip.read(mtlEntry)).toString("utf8");
+    const dir = objEntry.slice(0, objEntry.lastIndexOf("/") + 1);
+    const resources = mtlDiffuseMaps(mtlSource).map((uri) => {
+      const entry = resolveResource(zip, index, dir, uri);
+      if (!entry) throw new Error(`Cannot resolve diffuse texture "${uri}" for ${pick.id} (${mtlEntry})`);
+      return { uri, entry };
+    });
+    return { zip, plan: { entry: objEntry, format: "obj", mtlEntry, resources } };
+  }
+
   const glbEntry = `${pack.root}${pick.file}.glb`;
   if (zip.entries.has(glbEntry)) {
-    return { zip, plan: { entry: glbEntry, binary: true, resources: [] } };
+    return { zip, plan: { entry: glbEntry, format: "glb", resources: [] } };
   }
 
   const gltfEntry = `${pack.root}${pick.file}.gltf`;
@@ -949,7 +1061,7 @@ async function planSource(pick: Pick): Promise<{ zip: ZipArchive; plan: SourcePl
     resources.push({ uri, entry: baseColorImages.has(i) ? resolveResource(zip, index, dir, uri) : null });
   }
 
-  return { zip, plan: { entry: gltfEntry, binary: false, json, resources } };
+  return { zip, plan: { entry: gltfEntry, format: "gltf", json, resources } };
 }
 
 /**
@@ -964,18 +1076,285 @@ function fingerprintSource(zip: ZipArchive, plan: SourcePlan): string {
     return entry ? `${name}:${entry.crc}:${entry.uncompressedSize}` : `${name}:missing`;
   };
   parts.push(stamp(plan.entry));
+  if (plan.mtlEntry) parts.push(stamp(plan.mtlEntry));
   for (const resource of plan.resources) {
     parts.push(resource.entry ? `${resource.uri}=${stamp(resource.entry)}` : `${resource.uri}=placeholder`);
   }
   return sha1(parts.join("|"));
 }
 
+const OBJ_CONVERTER_VERSION = "corealm-obj-mtl-1.0.0";
+
+interface ObjMaterialDef {
+  name: string;
+  diffuse: [number, number, number];
+  opacity: number;
+  diffuseMap?: string;
+}
+
+interface ObjPrimitiveData {
+  materialName: string;
+  positions: number[];
+  normals: number[];
+  texcoords: number[];
+  hasTexcoords: boolean;
+  indices: number[];
+  vertices: Map<string, number>;
+}
+
+function sourceLine(raw: string): string {
+  return raw.replace(/\s+#.*$/, "").trim();
+}
+
+function parseMtl(source: string): Map<string, ObjMaterialDef> {
+  const result = new Map<string, ObjMaterialDef>();
+  let current: ObjMaterialDef | null = null;
+  for (const raw of source.split(/\r?\n/)) {
+    const line = sourceLine(raw);
+    if (!line) continue;
+    const separator = line.search(/\s/);
+    const command = separator < 0 ? line : line.slice(0, separator);
+    const value = separator < 0 ? "" : line.slice(separator + 1).trim();
+    if (command === "newmtl") {
+      current = { name: value, diffuse: [0.8, 0.8, 0.8], opacity: 1 };
+      result.set(value, current);
+    } else if (current && command === "Kd") {
+      const components = value.split(/\s+/).map(Number);
+      if (components.length >= 3 && components.slice(0, 3).every(Number.isFinite)) {
+        current.diffuse = [components[0]!, components[1]!, components[2]!];
+      }
+    } else if (current && command === "d") {
+      const opacity = Number(value);
+      if (Number.isFinite(opacity)) current.opacity = Math.max(0, Math.min(1, opacity));
+    } else if (current && command === "Tr") {
+      const transparency = Number(value);
+      if (Number.isFinite(transparency)) current.opacity = Math.max(0, Math.min(1, 1 - transparency));
+    } else if (current && command.toLowerCase() === "map_kd") {
+      const tokens = value.match(/"[^"]*"|'[^']*'|\S+/g) ?? [];
+      const map = tokens.at(-1)?.replace(/^(?:"|')|(?:"|')$/g, "");
+      if (map) current.diffuseMap = map.replace(/\\/g, "/");
+    }
+  }
+  return result;
+}
+
+function resolveObjIndex(raw: string | undefined, length: number, label: string): number {
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed === 0) throw new Error(`Invalid OBJ ${label} index: ${raw ?? "missing"}`);
+  const resolved = parsed > 0 ? parsed - 1 : length + parsed;
+  if (resolved < 0 || resolved >= length) {
+    throw new Error(`OBJ ${label} index ${parsed} is outside 1..${length}`);
+  }
+  return resolved;
+}
+
+function textureMimeType(uri: string): string {
+  const extension = path.extname(uri).toLowerCase();
+  if (extension === ".jpg" || extension === ".jpeg") return "image/jpeg";
+  if (extension === ".png") return "image/png";
+  if (extension === ".webp") return "image/webp";
+  throw new Error(`Unsupported OBJ diffuse texture format: ${uri}`);
+}
+
+/**
+ * Deterministic, deliberately small OBJ/MTL converter for the pinned Quaternius
+ * archives. It supports indexed polygon faces, authored normals, UVs, diffuse
+ * colour, opacity, and one diffuse texture per material. Untextured opaque
+ * material groups are folded into vertex colours, retaining the authored Kd
+ * palette in one draw call instead of one draw per colour swatch.
+ */
+function convertObjMtl(
+  name: string,
+  objSource: string,
+  mtlSource: string,
+  resourceBytes: ReadonlyMap<string, Uint8Array>,
+): Document {
+  const materialDefs = parseMtl(mtlSource);
+  const positions: Array<[number, number, number]> = [];
+  const normals: Array<[number, number, number]> = [];
+  const texcoords: Array<[number, number]> = [];
+  const groups = new Map<string, ObjPrimitiveData>();
+  let materialName = "__default";
+
+  const groupFor = (key: string): ObjPrimitiveData => {
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        materialName: key,
+        positions: [],
+        normals: [],
+        texcoords: [],
+        hasTexcoords: false,
+        indices: [],
+        vertices: new Map(),
+      };
+      groups.set(key, group);
+    }
+    return group;
+  };
+
+  for (const raw of objSource.split(/\r?\n/)) {
+    const line = sourceLine(raw);
+    if (!line) continue;
+    const separator = line.search(/\s/);
+    const command = separator < 0 ? line : line.slice(0, separator);
+    const value = separator < 0 ? "" : line.slice(separator + 1).trim();
+    const components = value.split(/\s+/);
+
+    if (command === "v") {
+      const numbers = components.slice(0, 3).map(Number);
+      if (numbers.length < 3 || numbers.some((entry) => !Number.isFinite(entry))) {
+        throw new Error(`Malformed OBJ position in ${name}: ${line}`);
+      }
+      positions.push([numbers[0]!, numbers[1]!, numbers[2]!]);
+    } else if (command === "vn") {
+      const numbers = components.slice(0, 3).map(Number);
+      if (numbers.length < 3 || numbers.some((entry) => !Number.isFinite(entry))) {
+        throw new Error(`Malformed OBJ normal in ${name}: ${line}`);
+      }
+      normals.push([numbers[0]!, numbers[1]!, numbers[2]!]);
+    } else if (command === "vt") {
+      const numbers = components.slice(0, 2).map(Number);
+      if (numbers.length < 2 || numbers.some((entry) => !Number.isFinite(entry))) {
+        throw new Error(`Malformed OBJ texture coordinate in ${name}: ${line}`);
+      }
+      texcoords.push([numbers[0]!, 1 - numbers[1]!]);
+    } else if (command === "usemtl") {
+      materialName = value || "__default";
+    } else if (command === "f") {
+      if (components.length < 3) throw new Error(`OBJ face has fewer than three vertices in ${name}`);
+      const group = groupFor(materialName);
+      const polygon = components.map((reference) => {
+        const tuple = reference.split("/");
+        const positionIndex = resolveObjIndex(tuple[0], positions.length, "position");
+        const normalIndex = resolveObjIndex(tuple[2], normals.length, "normal");
+        const texcoordIndex = tuple[1] ? resolveObjIndex(tuple[1], texcoords.length, "texture-coordinate") : -1;
+        const key = `${positionIndex}/${texcoordIndex}/${normalIndex}`;
+        const cached = group.vertices.get(key);
+        if (cached !== undefined) return cached;
+
+        const index = group.positions.length / 3;
+        const position = positions[positionIndex]!;
+        const normal = normals[normalIndex]!;
+        group.positions.push(...position);
+        group.normals.push(...normal);
+        if (texcoordIndex >= 0) {
+          group.hasTexcoords = true;
+          group.texcoords.push(...texcoords[texcoordIndex]!);
+        } else {
+          group.texcoords.push(0, 0);
+        }
+        group.vertices.set(key, index);
+        return index;
+      });
+      for (let index = 1; index < polygon.length - 1; index += 1) {
+        group.indices.push(polygon[0]!, polygon[index]!, polygon[index + 1]!);
+      }
+    }
+  }
+
+  if (positions.length === 0 || groups.size === 0) throw new Error(`OBJ source ${name} contains no mesh faces`);
+
+  const document = new Document();
+  const buffer = document.createBuffer(`${name}-buffer`);
+  const mesh = document.createMesh(name);
+  const groupsList = [...groups.values()].filter((group) => group.indices.length > 0);
+  const canUseVertexColours = groupsList.every((group) => {
+    const def = materialDefs.get(group.materialName);
+    return !def?.diffuseMap && (def?.opacity ?? 1) === 1;
+  });
+
+  const accessor = (label: string, type: "SCALAR" | "VEC2" | "VEC3" | "VEC4", array: TypedArray) =>
+    document.createAccessor(label).setType(type).setArray(array).setBuffer(buffer);
+
+  if (canUseVertexColours) {
+    const mergedPositions: number[] = [];
+    const mergedNormals: number[] = [];
+    const mergedTexcoords: number[] = [];
+    const mergedColours: number[] = [];
+    const mergedIndices: number[] = [];
+    let hasTexcoords = false;
+    for (const group of groupsList) {
+      const offset = mergedPositions.length / 3;
+      const def = materialDefs.get(group.materialName);
+      const colour = def?.diffuse ?? [0.8, 0.8, 0.8];
+      mergedPositions.push(...group.positions);
+      mergedNormals.push(...group.normals);
+      mergedTexcoords.push(...group.texcoords);
+      hasTexcoords ||= group.hasTexcoords;
+      for (let vertex = 0; vertex < group.positions.length / 3; vertex += 1) {
+        mergedColours.push(colour[0], colour[1], colour[2], 1);
+      }
+      for (const index of group.indices) mergedIndices.push(index + offset);
+    }
+    const indexArray = mergedPositions.length / 3 <= 65_535
+      ? new Uint16Array(mergedIndices)
+      : new Uint32Array(mergedIndices);
+    const material = document.createMaterial(`${name}-vertex-colours`)
+      .setBaseColorFactor([1, 1, 1, 1])
+      .setMetallicFactor(0)
+      .setRoughnessFactor(0.85);
+    const primitive = document.createPrimitive()
+      .setAttribute("POSITION", accessor(`${name}-position`, "VEC3", new Float32Array(mergedPositions)))
+      .setAttribute("NORMAL", accessor(`${name}-normal`, "VEC3", new Float32Array(mergedNormals)))
+      .setAttribute("COLOR_0", accessor(`${name}-colour`, "VEC4", new Float32Array(mergedColours)))
+      .setIndices(accessor(`${name}-indices`, "SCALAR", indexArray))
+      .setMaterial(material);
+    if (hasTexcoords) {
+      primitive.setAttribute("TEXCOORD_0", accessor(`${name}-uv`, "VEC2", new Float32Array(mergedTexcoords)));
+    }
+    mesh.addPrimitive(primitive);
+  } else {
+    for (const [groupIndex, group] of groupsList.entries()) {
+      const def = materialDefs.get(group.materialName) ?? {
+        name: group.materialName,
+        diffuse: [0.8, 0.8, 0.8] as [number, number, number],
+        opacity: 1,
+      };
+      const material = document.createMaterial(def.name)
+        .setBaseColorFactor([...def.diffuse, def.opacity])
+        .setMetallicFactor(0)
+        .setRoughnessFactor(0.85);
+      if (def.opacity < 1) material.setAlphaMode("BLEND");
+      if (def.diffuseMap) {
+        const image = resourceBytes.get(def.diffuseMap);
+        if (!image) throw new Error(`Missing materialized OBJ diffuse texture: ${def.diffuseMap}`);
+        material.setBaseColorTexture(
+          document.createTexture(def.diffuseMap)
+            .setImage(image)
+            .setMimeType(textureMimeType(def.diffuseMap)),
+        );
+      }
+      const indexArray = group.positions.length / 3 <= 65_535
+        ? new Uint16Array(group.indices)
+        : new Uint32Array(group.indices);
+      const prefix = `${name}-${groupIndex}`;
+      const primitive = document.createPrimitive()
+        .setAttribute("POSITION", accessor(`${prefix}-position`, "VEC3", new Float32Array(group.positions)))
+        .setAttribute("NORMAL", accessor(`${prefix}-normal`, "VEC3", new Float32Array(group.normals)))
+        .setIndices(accessor(`${prefix}-indices`, "SCALAR", indexArray))
+        .setMaterial(material);
+      if (group.hasTexcoords) {
+        primitive.setAttribute("TEXCOORD_0", accessor(`${prefix}-uv`, "VEC2", new Float32Array(group.texcoords)));
+      }
+      mesh.addPrimitive(primitive);
+    }
+  }
+
+  const node = document.createNode(name).setMesh(mesh);
+  const scene = document.createScene(`${name}-scene`).addChild(node);
+  document.getRoot().setDefaultScene(scene);
+  document.getRoot().setExtras({ objConverter: OBJ_CONVERTER_VERSION });
+  return document;
+}
+
 async function materialize(zip: ZipArchive, plan: SourcePlan): Promise<{ document: Document; sourceBytes: number }> {
-  if (plan.binary) {
+  if (plan.format === "glb") {
     const bytes = await zip.read(plan.entry);
     return { document: await io.readBinary(new Uint8Array(bytes)), sourceBytes: bytes.length };
   }
-  let sourceBytes = zip.entries.get(plan.entry)?.uncompressedSize ?? 0;
+  const source = await zip.read(plan.entry);
+  let sourceBytes = source.length;
   const resources: Record<string, Uint8Array> = {};
   for (const resource of plan.resources) {
     if (!resource.entry) {
@@ -985,6 +1364,19 @@ async function materialize(zip: ZipArchive, plan: SourcePlan): Promise<{ documen
     const bytes = await zip.read(resource.entry);
     resources[resource.uri] = new Uint8Array(bytes);
     sourceBytes += bytes.length;
+  }
+  if (plan.format === "obj") {
+    const mtl = await zip.read(plan.mtlEntry!);
+    sourceBytes += mtl.length;
+    return {
+      document: convertObjMtl(
+        plan.entry.slice(plan.entry.lastIndexOf("/") + 1, -4),
+        source.toString("utf8"),
+        mtl.toString("utf8"),
+        new Map(Object.entries(resources)),
+      ),
+      sourceBytes,
+    };
   }
   const document = await io.readJSON({ json: plan.json!, resources } as unknown as JSONDocument);
   return { document, sourceBytes };
@@ -1132,6 +1524,7 @@ async function buildOne(
     pick.tags.join(","),
     pick.category,
     pick.pack,
+    ...(PACK_BY_ID.get(pick.pack)?.sourceFormat === "obj" ? [OBJ_CONVERTER_VERSION] : []),
   );
 
   const { zip, plan } = await planSource(pick);
@@ -1325,13 +1718,11 @@ async function main(): Promise<void> {
   if (args[0] === "--check") {
     let missing = 0;
     for (const pick of CATALOG) {
-      const pack = PACK_BY_ID.get(pick.pack)!;
-      const zip = await archive(pick.pack);
-      const gltf = `${pack.root}${pick.file}.gltf`;
-      const glb = `${pack.root}${pick.file}.glb`;
-      if (!zip.entries.has(gltf) && !zip.entries.has(glb)) {
+      try {
+        await planSource(pick);
+      } catch (error) {
         missing += 1;
-        console.error(`MISSING ${pick.id}: ${gltf}`);
+        console.error(`MISSING ${pick.id}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
     for (const zip of archives.values()) await zip.close();
@@ -1418,12 +1809,13 @@ async function main(): Promise<void> {
   const usedPacks = new Set(assets.map((asset) => asset.pack));
   const manifest: Manifest = {
     generatedAt: new Date().toISOString(),
-    packs: PACKS.filter((pack) => usedPacks.has(pack.id)).map(({ id, name, author, source, license }) => ({
+    packs: PACKS.filter((pack) => usedPacks.has(pack.id)).map(({ id, name, author, source, license, archiveSha256 }) => ({
       id,
       name,
       author,
       source,
       license,
+      archiveSha256,
     })),
     assets: assets.sort((a, b) => a.category.localeCompare(b.category) || a.id.localeCompare(b.id)),
   };

@@ -68,7 +68,7 @@ export async function runPlayScenario(runCandidate: string, scenarioCandidate: s
 
   try {
     await driver.launch();
-    await driver.open();
+    await driver.open(120_000);
     report.initial = await driver.snapshot();
 
     for (let index = 0; index < scenario.actions.length; index += 1) {

@@ -14,6 +14,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="coarse-hide"></span>![Coarse Hide](./assets/items/coarse_hide.png) **Coarse Hide** | 1 | component | No | 16 | 10 | - |
 | <span id="essence-shard"></span>![Essence Shard](./assets/items/essence_shard.png) **Essence Shard** | 1 | component | Yes | 9 | 5 | - |
 | <span id="pale-quartz"></span>![Pale Quartz](./assets/items/pale_quartz.png) **Pale Quartz** | 1 | component | Yes | 20 | 12 | - |
+| <span id="palewood-handle"></span>![Palewood Handle](./assets/items/palewood_handle.png) **Palewood Handle** | 1 | component | Yes | 6 | 4 | - |
 | <span id="palewood-shaft"></span>![Palewood Shaft](./assets/items/palewood_shaft.png) **Palewood Shaft** | 1 | component | Yes | 4 | 2 | - |
 | <span id="marks"></span>![Marks](./assets/items/marks.png) **Marks** | 1 | currency | Yes | 1 | 1 | - |
 | <span id="ember-charm"></span>![Ember Charm](./assets/items/ember_charm.png) **Ember Charm** | 1 | equipment | No | 105 | 63 | accessory2; Magic 1 |
@@ -34,6 +35,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="marchhide-wraps"></span>![Marchhide Wraps](./assets/items/marchhide_wraps.png) **Marchhide Wraps** | 1 | equipment | No | 65 | 39 | hands; Magic 1 |
 | <span id="palewood-shield"></span>![Palewood Shield](./assets/items/palewood_shield.png) **Palewood Shield** | 1 | equipment | No | 70 | 42 | offHand; Melee 1 |
 | <span id="palewood-staff"></span>![Palewood Staff](./assets/items/palewood_staff.png) **Palewood Staff** | 1 | equipment | No | 140 | 84 | mainHand; Magic 1 |
+| <span id="palewood-wand"></span>![Palewood Wand](./assets/items/palewood_wand.png) **Palewood Wand** | 1 | equipment | No | 84 | 50 | mainHand; Magic 1 |
 | <span id="quartz-focus"></span>![Quartz Focus](./assets/items/quartz_focus.png) **Quartz Focus** | 1 | equipment | No | 70 | 42 | offHand; Magic 1 |
 | <span id="burnt-minnow"></span>![Burnt Minnow](./assets/items/burnt_minnow.png) **Burnt Minnow** | 1 | food | No | 1 | 1 | - |
 | <span id="seared-minnow"></span>![Seared Minnow](./assets/items/seared_minnow.png) **Seared Minnow** | 1 | food | No | 22 | 13 | Heals 3 |
@@ -48,6 +50,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="palewood-rod"></span>![Palewood Rod](./assets/items/palewood_rod.png) **Palewood Rod** | 1 | tool | No | 45 | 27 | Fishing +2 |
 | <span id="corven-bar"></span>![Corven Bar](./assets/items/corven_bar.png) **Corven Bar** | 5 | bar | No | 110 | 66 | - |
 | <span id="bramble-hide"></span>![Bramble Hide](./assets/items/bramble_hide.png) **Bramble Hide** | 5 | component | No | 55 | 33 | - |
+| <span id="duskoak-handle"></span>![Duskoak Handle](./assets/items/duskoak_handle.png) **Duskoak Handle** | 5 | component | Yes | 23 | 14 | - |
 | <span id="duskoak-shaft"></span>![Duskoak Shaft](./assets/items/duskoak_shaft.png) **Duskoak Shaft** | 5 | component | Yes | 14 | 8 | - |
 | <span id="vell-amber"></span>![Vell Amber](./assets/items/vell_amber.png) **Vell Amber** | 5 | component | Yes | 70 | 42 | - |
 | <span id="amber-focus"></span>![Amber Focus](./assets/items/amber_focus.png) **Amber Focus** | 5 | equipment | No | 240 | 144 | offHand; Magic 5 |
@@ -67,6 +70,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="corven-sword"></span>![Corven Sword](./assets/items/corven_sword.png) **Corven Sword** | 5 | equipment | No | 620 | 372 | mainHand; Melee 5 |
 | <span id="duskoak-shield"></span>![Duskoak Shield](./assets/items/duskoak_shield.png) **Duskoak Shield** | 5 | equipment | No | 240 | 144 | offHand; Melee 5 |
 | <span id="duskoak-staff"></span>![Duskoak Staff](./assets/items/duskoak_staff.png) **Duskoak Staff** | 5 | equipment | No | 500 | 300 | mainHand; Magic 5 |
+| <span id="duskoak-wand"></span>![Duskoak Wand](./assets/items/duskoak_wand.png) **Duskoak Wand** | 5 | equipment | No | 300 | 180 | mainHand; Magic 5 |
 | <span id="stone-charm"></span>![Stone Charm](./assets/items/stone_charm.png) **Stone Charm** | 5 | equipment | No | 360 | 216 | accessory2; Magic 5 |
 | <span id="stone-ring"></span>![Stone Ring](./assets/items/stone_ring.png) **Stone Ring** | 5 | equipment | No | 330 | 198 | accessory1; Magic 5 |
 | <span id="burnt-trout"></span>![Burnt Trout](./assets/items/burnt_trout.png) **Burnt Trout** | 5 | food | No | 1 | 1 | - |
@@ -81,10 +85,12 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="duskoak-rod"></span>![Duskoak Rod](./assets/items/duskoak_rod.png) **Duskoak Rod** | 5 | tool | No | 190 | 114 | Fishing +5 |
 | <span id="kaldite-bar"></span>![Kaldite Bar](./assets/items/kaldite_bar.png) **Kaldite Bar** | 10 | bar | No | 250 | 150 | - |
 | <span id="cairn-garnet"></span>![Cairn Garnet](./assets/items/cairn_garnet.png) **Cairn Garnet** | 10 | component | Yes | 160 | 96 | - |
+| <span id="cairnpine-handle"></span>![Cairnpine Handle](./assets/items/cairnpine_handle.png) **Cairnpine Handle** | 10 | component | Yes | 53 | 32 | - |
 | <span id="cairnpine-shaft"></span>![Cairnpine Shaft](./assets/items/cairnpine_shaft.png) **Cairnpine Shaft** | 10 | component | Yes | 32 | 19 | - |
 | <span id="wight-shroud"></span>![Wight Shroud](./assets/items/wight_shroud.png) **Wight Shroud** | 10 | component | No | 130 | 78 | - |
 | <span id="cairnpine-shield"></span>![Cairnpine Shield](./assets/items/cairnpine_shield.png) **Cairnpine Shield** | 10 | equipment | No | 560 | 336 | offHand; Melee 10 |
 | <span id="cairnpine-staff"></span>![Cairnpine Staff](./assets/items/cairnpine_staff.png) **Cairnpine Staff** | 10 | equipment | No | 1180 | 708 | mainHand; Magic 10 |
+| <span id="cairnpine-wand"></span>![Cairnpine Wand](./assets/items/cairnpine_wand.png) **Cairnpine Wand** | 10 | equipment | No | 708 | 425 | mainHand; Magic 10 |
 | <span id="garnet-focus"></span>![Garnet Focus](./assets/items/garnet_focus.png) **Garnet Focus** | 10 | equipment | No | 560 | 336 | offHand; Magic 10 |
 | <span id="kaldite-boots"></span>![Kaldite Boots](./assets/items/kaldite_boots.png) **Kaldite Boots** | 10 | equipment | No | 600 | 360 | feet; Melee 10 |
 | <span id="kaldite-dagger"></span>![Kaldite Dagger](./assets/items/kaldite_dagger.png) **Kaldite Dagger** | 10 | equipment | No | 760 | 456 | mainHand; Melee 9 |

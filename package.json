@@ -25,6 +25,7 @@
     "check": "npm run typecheck && npm test && npm run build && npm run docs:build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:gathering-production": "vitest run tests/gathering-production-matrix.test.ts tests/gathering-production-validation.test.ts tests/gathering-integrity.test.ts tests/production-integrity.test.ts tests/eating-activity.test.ts tests/campfire-system.test.ts tests/campfire-persistence-integrity.test.ts tests/save-v3-campfire.test.ts tests/persistence-v3-integrity.test.ts tests/fishing-render-visibility.test.ts tests/gathering-asset-provenance-doc.test.ts tests/resource-presentation-stability.test.ts",
     "smoke": "tsx tools/smoke-test.ts",
     "play": "tsx tools/play-game.ts",
     "screenshot": "tsx tools/screenshot.ts",
@@ -48,7 +49,9 @@
     "icons": "tsx tools/generate-item-icons.ts",
     "assets:refresh": "npm run icons && npm run world-map",
     "icons:verify": "tsx tools/verify-item-icons.ts",
-    "gate-check": "tsx tools/gate-check.ts"
+    "gate-check": "tsx tools/gate-check.ts",
+    "contact-sheets:gathering-production": "tsx tools/build-gathering-contact-sheets.ts --run runs/corealm",
+    "verify:gathering-production": "tsx tools/verify-gathering-production.ts --run runs/corealm"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.20.0",

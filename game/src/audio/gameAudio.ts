@@ -106,6 +106,11 @@ export class CorealmAudioBridge implements TickSystem {
         });
         return;
       }
+      case "campfire.built":
+        // The existing Cooking cue is the authored campfire crackle. Replacements also emit a
+        // built event, so one completion produces one crackle instead of stacking two sounds.
+        this.play("production.cook");
+        return;
       case "resource.depleted": {
         const entity = event.entityId ? this.deps.entity(event.entityId) : undefined;
         if (entity?.archetype === "ore") {
@@ -331,6 +336,7 @@ function activityIdentity(activity: ReturnType<Store["get"]>["activity"]): strin
     case "production": return `production:${activity.recipeId}:${activity.nextCompleteAtMs - activity.completed}`;
     case "traversing": return `traversing:${activity.obstacleId}:${activity.endsAtMs}`;
     case "eating": return `eating:${activity.itemId}:${activity.endsAtMs}`;
+    case "building_campfire": return `building_campfire:${activity.logItemId}:${activity.endsAtMs}`;
   }
 }
 

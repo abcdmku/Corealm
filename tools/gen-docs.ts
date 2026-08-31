@@ -4,15 +4,16 @@
  * The Markdown and the website consume the same output. Screenshots are produced separately by
  * tools/capture-docs.ts from the running Chromium game, then referenced here by stable content id.
  *
- * Usage: npx tsx tools/gen-docs.ts [--out docs/game]
+ * Usage: npx tsx tools/gen-docs.ts [--out docs/game] [--provenance-out docs/asset-provenance-gathering.md]
  */
 import path from "node:path";
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 import { argValue, repoRoot } from "./lib/paths.js";
 
 import {
+  burnChance,
   content,
   gatherXp,
   respawnSeconds,
@@ -22,7 +23,8 @@ import {
   type EnemyDef,
 } from "../game/src/content/index.js";
 import { ALL_ITEMS } from "../game/src/content/items.js";
-import { RESOURCES, RESOURCE_ARCHETYPES } from "../game/src/content/resources.js";
+import { GATHERING_PRODUCTION_TIERS } from "../game/src/content/gatheringProductionTiers.js";
+import { CROPS, RESOURCES, RESOURCE_ARCHETYPES } from "../game/src/content/resources.js";
 import { RECIPES } from "../game/src/content/recipes.js";
 import { SPELLS } from "../game/src/content/spells.js";
 import { ENEMIES, ENEMY_BLOCKS } from "../game/src/content/enemies.js";
@@ -43,6 +45,7 @@ import { SKILLS } from "../game/src/content/skills.js";
 import { MAX_LEVEL, TIERS, totalXpAt, xpTable } from "../game/src/content/xp.js";
 import { WORLD_MAP_IMAGE_BOUNDS } from "../game/src/generated/worldMapFingerprint.js";
 import type { RegionId, SkillId } from "../game/src/contracts.js";
+import type { AssetManifest, AssetPack } from "../game/src/render/assets.js";
 
 function cleanCell(value: string | number): string {
   return String(value).replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
@@ -73,6 +76,354 @@ function skillName(id: SkillId): string {
 
 function itemName(id: string): string {
   return content.item(id)?.name ?? id;
+}
+
+function itemForGuide(id: string): typeof ALL_ITEMS[number] {
+  const item = ALL_ITEMS.find((candidate) => candidate.id === id);
+  if (!item) throw new Error(`The gathering and production catalog references unknown item ${id}.`);
+  return item;
+}
+
+type GatheringProductionTier = (typeof GATHERING_PRODUCTION_TIERS)[number];
+
+function resourceForGuide(id: string): typeof RESOURCE_ARCHETYPES[number] {
+  const resource = RESOURCE_ARCHETYPES.find((candidate) => candidate.id === id);
+  if (!resource) throw new Error(`The gathering and production catalog references unknown resource ${id}.`);
+  return resource;
+}
+
+export function resourceGuideLifecycle(resourceId: string): {
+  xpEach: number;
+  perNode: string;
+  recovery: string;
+} {
+  const resource = resourceForGuide(resourceId);
+  if (resource.archetype === "farm_plot") {
+    const crop = CROPS.find((candidate) => candidate.cropItemId === resource.itemId);
+    if (!crop) throw new Error(`Farm plot ${resource.id} has no crop lifecycle for ${resource.itemId}.`);
+    return {
+      xpEach: crop.harvestXp,
+      perNode: `${crop.yieldRange[0]}-${crop.yieldRange[1]} per harvest`,
+      recovery: `${crop.stages * crop.secondsPerStage} s wall-clock growth`,
+    };
+  }
+
+  const [low, high] = yieldRange(resource.tier);
+  return {
+    xpEach: gatherXp(resource.tier),
+    perNode: `${low}-${high}`,
+    recovery: `${respawnSeconds(resource.tier)} s respawn`,
+  };
+}
+
+const ARCHIVE_SHA256 = /^[a-f0-9]{64}$/;
+const FOUNDATION_IMPORT_PACK_IDS = new Set(["ultimate-nature-pack", "animated-fish-pack"]);
+
+const APPROVED_GATHERING_ASSET_CANDIDATES = [
+  {
+    name: "Animated Cute Fish Pack",
+    source: "https://quaternius.com/packs/cutefish.html",
+    use: "More fish species, rods, and lures",
+  },
+  {
+    name: "Ultimate RPG Pack",
+    source: "https://quaternius.com/packs/ultimaterpg.html",
+    use: "Later weapon and prop silhouettes",
+  },
+  {
+    name: "Survival Pack",
+    source: "https://quaternius.com/packs/survival.html",
+    use: "Later camps and survival props",
+  },
+  {
+    name: "Ultimate Stylized Nature Pack",
+    source: "https://quaternius.com/packs/ultimatestylizednature.html",
+    use: "Later biome vegetation and textured nature assets",
+  },
+] as const;
+
+interface FoundationAssetReference {
+  assetId: string;
+  uses: string[];
+}
+
+function code(value: string): string {
+  return `\`${value}\``;
+}
+
+function packLink(pack: AssetPack): string {
+  return `[${pack.name}](${pack.source})`;
+}
+
+function validateManifestPack(pack: AssetPack): void {
+  if (!/^https?:\/\//.test(pack.source)) {
+    throw new Error(`Asset pack ${pack.id} has no reproducible HTTP(S) source.`);
+  }
+  if (pack.license !== "CC0-1.0") {
+    throw new Error(`Asset pack ${pack.id} is licensed ${pack.license}; expected CC0-1.0.`);
+  }
+  if (!pack.archiveSha256 || !ARCHIVE_SHA256.test(pack.archiveSha256)) {
+    throw new Error(`Asset pack ${pack.id} has no valid lowercase archive SHA-256.`);
+  }
+}
+
+function foundationAssetReferences(
+  tiers: readonly GatheringProductionTier[],
+): FoundationAssetReference[] {
+  const usesByAsset = new Map<string, Set<string>>();
+  const add = (assetId: string, use: string): void => {
+    const uses = usesByAsset.get(assetId) ?? new Set<string>();
+    uses.add(use);
+    usesByAsset.set(assetId, uses);
+  };
+
+  for (const definition of tiers) {
+    for (const resource of definition.resourceDefs) {
+      for (const assetId of resource.presentation.availableAssetIds) {
+        add(assetId, `Level ${definition.reqLevel} ${resource.id}, available`);
+      }
+      if (resource.presentation.depletedAssetId) {
+        add(resource.presentation.depletedAssetId, `Level ${definition.reqLevel} ${resource.id}, depleted`);
+      }
+    }
+    add(
+      definition.campfire.visualLogAssetId,
+      `Level ${definition.reqLevel} campfire, ${definition.campfire.logItemId}`,
+    );
+  }
+
+  return [...usesByAsset]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([assetId, uses]) => ({ assetId, uses: [...uses] }));
+}
+
+function naturalList(values: readonly (string | number)[]): string {
+  if (values.length === 0) return "";
+  if (values.length === 1) return String(values[0]);
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
+}
+
+/**
+ * Generates the checked-in gathering provenance report from the runtime manifest and tier catalog.
+ * The manifest timestamp is deliberately ignored so an identical asset catalog produces identical
+ * Markdown after a rebuild.
+ */
+export function gatheringAssetProvenanceDoc(
+  manifest: AssetManifest,
+  tiers: readonly GatheringProductionTier[] = GATHERING_PRODUCTION_TIERS,
+): string {
+  const orderedTiers = [...tiers].sort((left, right) => left.reqLevel - right.reqLevel);
+  const packs = [...manifest.packs].sort((left, right) => left.id.localeCompare(right.id));
+  const assets = [...manifest.assets].sort((left, right) => left.id.localeCompare(right.id));
+  const packsById = new Map(packs.map((pack) => [pack.id, pack] as const));
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset] as const));
+  const references = foundationAssetReferences(orderedTiers);
+
+  if (packsById.size !== packs.length) throw new Error("The runtime manifest has duplicate pack IDs.");
+  if (assetsById.size !== assets.length) throw new Error("The runtime manifest has duplicate asset IDs.");
+  for (const pack of packs) validateManifestPack(pack);
+  for (const asset of assets) {
+    if (!packsById.has(asset.pack)) {
+      throw new Error(`Runtime manifest asset ${asset.id} references missing pack ${asset.pack}.`);
+    }
+  }
+  for (const reference of references) {
+    const asset = assetsById.get(reference.assetId);
+    if (!asset) throw new Error(`Gathering provenance references missing manifest asset ${reference.assetId}.`);
+    if (!packsById.has(asset.pack)) {
+      throw new Error(`Gathering provenance asset ${asset.id} references missing pack ${asset.pack}.`);
+    }
+  }
+
+  const assetCountByPack = new Map<string, number>();
+  for (const asset of assets) assetCountByPack.set(asset.pack, (assetCountByPack.get(asset.pack) ?? 0) + 1);
+  const referenceCountByPack = new Map<string, number>();
+  for (const reference of references) {
+    const packId = assetsById.get(reference.assetId)!.pack;
+    referenceCountByPack.set(packId, (referenceCountByPack.get(packId) ?? 0) + 1);
+  }
+
+  const packRows = packs.map((pack) => [
+    code(pack.id),
+    packLink(pack),
+    pack.author,
+    pack.license,
+    code(pack.archiveSha256!),
+    assetCountByPack.get(pack.id) ?? 0,
+    referenceCountByPack.get(pack.id) ?? 0,
+  ]);
+
+  const presentationRows = orderedTiers.flatMap((definition) => definition.resourceDefs.map((resource) => [
+    definition.reqLevel,
+    `${resource.name} (${code(resource.id)})`,
+    skillName(resource.skill),
+    resource.presentation.availableAssetIds.map(code).join(", "),
+    resource.presentation.depletedAssetId
+      ? code(resource.presentation.depletedAssetId)
+      : resource.archetype === "ore"
+        ? "Procedural worked scar"
+        : "Procedural recovery ripple",
+    `${resource.presentation.targetWorldSize} m`,
+    resource.presentation.waterOffset === undefined ? "-" : `${resource.presentation.waterOffset} m`,
+    resource.presentation.materialTier,
+  ]));
+
+  const campfireRows = orderedTiers.map((definition) => {
+    const fuel = definition.campfire;
+    const asset = assetsById.get(fuel.visualLogAssetId)!;
+    const pack = packsById.get(asset.pack)!;
+    return [
+      definition.reqLevel,
+      code(fuel.logItemId),
+      code(fuel.visualLogAssetId),
+      code(pack.id),
+      packLink(pack),
+      pack.license,
+      code(pack.archiveSha256!),
+      `${fuel.lifetimeMs / 1_000} s`,
+    ];
+  });
+
+  const referenceRows = references.map((reference) => {
+    const asset = assetsById.get(reference.assetId)!;
+    const pack = packsById.get(asset.pack)!;
+    return [
+      code(reference.assetId),
+      reference.uses.join("; "),
+      code(pack.id),
+      packLink(pack),
+      pack.license,
+      code(pack.archiveSha256!),
+    ];
+  });
+
+  const importedPacks = packs.filter((pack) => FOUNDATION_IMPORT_PACK_IDS.has(pack.id));
+  for (const packId of FOUNDATION_IMPORT_PACK_IDS) {
+    if (!packsById.has(packId)) {
+      throw new Error(`Gathering provenance import pack ${packId} is missing from the runtime manifest.`);
+    }
+  }
+  const importedRows = importedPacks.map((pack) => {
+    const importedReferences = references
+      .filter((reference) => assetsById.get(reference.assetId)?.pack === pack.id)
+      .map((reference) => code(reference.assetId));
+    return [
+      code(pack.id),
+      packLink(pack),
+      pack.license,
+      code(pack.archiveSha256!),
+      importedReferences.join(", "),
+    ];
+  });
+
+  const candidateRows = APPROVED_GATHERING_ASSET_CANDIDATES.map((candidate) => [
+    `[${candidate.name}](${candidate.source})`,
+    "Pack page states CC0",
+    candidate.use,
+    "Approved candidate, do not import yet",
+  ]);
+
+  return [
+    "# Gathering asset provenance",
+    "",
+    "This report is generated by `npm run gen-docs`. It reads `game/public/assets/manifest.json` and the canonical gathering tier catalog. Do not edit its tables by hand.",
+    "",
+    `The runtime manifest contains ${assets.length} assets from ${packs.length} packs. The levels ${naturalList(orderedTiers.map((tier) => tier.reqLevel))} foundation catalog references ${references.length} distinct manifest assets. Every pack row below has a source URL, the \`CC0-1.0\` license, and a pinned 64-character archive SHA-256.`,
+    "",
+    "## Runtime pack catalog",
+    "",
+    table(
+      ["Pack ID", "Pack and source", "Author", "License", "Archive SHA-256", "Runtime assets", "Foundation assets"],
+      packRows,
+    ),
+    "",
+    "## Canonical resource presentation",
+    "",
+    "Available and depleted appearances come straight from each tier's resource definition. Ore and fish use explicit renderer treatments when they do not name a separate depleted mesh.",
+    "",
+    table(
+      ["Level", "Resource", "Skill", "Available assets", "Depleted appearance", "Target size", "Water offset", "Material tier"],
+      presentationRows,
+    ),
+    "",
+    "The three `rock_medium` meshes retain their authored diffuse material. The resource renderer scales them to the target size above, adds embedded tier-coloured fractures, and replaces the bright fracture treatment with worked scars after depletion.",
+    "",
+    "## Campfire log provenance",
+    "",
+    table(
+      ["Level", "Log item", "Visual asset", "Pack ID", "Pack and source", "License", "Archive SHA-256", "Lifetime"],
+      campfireRows,
+    ),
+    "",
+    "Campfires combine the listed log mesh with existing small rocks and the shared flame, smoke, and crackle layers. Held wands and the fishing rod, line, and bobber come from the procedural gear renderer, so they do not claim manifest provenance.",
+    "",
+    "## Foundation asset references",
+    "",
+    table(["Asset ID", "Canonical use", "Pack ID", "Pack and source", "License", "Archive SHA-256"], referenceRows),
+    "",
+    "## Imported for this foundation",
+    "",
+    "The build converts the selected OBJ and MTL sources to self-contained GLB files before its normal optimization pass. Fish movement is procedural, so the static fish meshes are sufficient.",
+    "",
+    table(["Pack ID", "Pack and source", "License", "Archive SHA-256", "Referenced assets"], importedRows),
+    "",
+    "## Approved later candidates",
+    "",
+    "These packs are CC0 candidates for later regions. They are not in the runtime manifest.",
+    "",
+    table(["Pack", "License check", "Possible later use", "Decision"], candidateRows),
+    "",
+    "Approval is not an import. A later region must pin the downloaded archive hash, curate the required models, regenerate this report, and repeat the visual and license checks.",
+    "",
+    "## Rejected source",
+    "",
+    "[DEXSOFT Rocks FREE pack](https://marketplace.unity.com/packages/3d/props/exterior/rocks-free-pack-98219) is rejected. Its Unity Asset Store page names the Standard Unity Asset Store EULA, not CC0. A zero price does not satisfy Corealm's CC0-only rule. Do not add its models or textures to the asset build.",
+    "",
+    "## Reproduce the import",
+    "",
+    "Use the pinned archives in `.asset-cache`, then run:",
+    "",
+    "```text",
+    "npm run build-assets -- --check",
+    "npm run build-assets",
+    "npm run build-assets -- --verify",
+    "npm run gen-docs",
+    "```",
+    "",
+    "The archive check must fail if a pinned hash changes. The build must emit parseable, non-empty GLB files. Inspect the resulting rocks, stumps, logs, fish, and campfires in Chromium because a valid GLB does not prove readable scale, placement, or depletion states.",
+    "",
+  ].join("\n");
+}
+
+function recipesAtTier(tier: number, skill: SkillId): typeof RECIPES[number][] {
+  return RECIPES.filter((recipe) => recipe.tier === tier && recipe.skill === skill);
+}
+
+function recipeForOutput(
+  definition: GatheringProductionTier,
+  itemId: string,
+): typeof RECIPES[number] {
+  const recipe = RECIPES.find((candidate) =>
+    candidate.tier === definition.tier && candidate.output.itemId === itemId);
+  if (!recipe) {
+    throw new Error(`Tier ${definition.tier} has no recipe that produces ${itemId}.`);
+  }
+  return recipe;
+}
+
+function recipeIngredients(recipe: typeof RECIPES[number]): string {
+  return recipe.inputs
+    .map((input) => `${input.quantity}× ${itemName(input.itemId)}`)
+    .join(" + ");
+}
+
+function recipeResult(recipe: typeof RECIPES[number]): string {
+  return `${recipe.output.quantity}× ${itemName(recipe.output.itemId)}`;
+}
+
+function recipeStations(recipe: typeof RECIPES[number]): string {
+  return recipe.stations?.map(humanizeId).join(" / ") ?? "Anywhere";
 }
 
 function itemIcon(id: string, label = itemName(id)): string {
@@ -550,6 +901,42 @@ function xpDoc(): string {
   ].join("\n"));
 }
 
+const GATHERING_PRODUCTION_SKILLS = [
+  "mining", "smithing", "fishing", "cooking", "woodcutting", "fletching", "crafting",
+] as const satisfies readonly SkillId[];
+
+function gatheringUnlocks(definition: GatheringProductionTier, skill: SkillId): string[] {
+  const resourceIds = skill === "mining"
+    ? definition.resources.mining
+    : skill === "fishing"
+      ? [definition.resources.fishing]
+      : skill === "woodcutting"
+        ? [definition.resources.woodcutting]
+        : [];
+  return resourceIds.map((id) => {
+    const resource = resourceForGuide(id);
+    const bonus = resource.bonus?.length
+      ? `, plus ${resource.bonus.map((drop) => itemName(drop.itemId)).join(" or ")}`
+      : "";
+    return `${resource.name} yields ${itemName(resource.itemId)}${bonus}`;
+  });
+}
+
+function productionUnlocks(definition: GatheringProductionTier, skill: SkillId): string[] {
+  return recipesAtTier(definition.tier, skill).map((recipe) => recipeResult(recipe));
+}
+
+function generatedSkillGuides(): string {
+  return GATHERING_PRODUCTION_SKILLS.map((skill) => {
+    const rows = GATHERING_PRODUCTION_TIERS.map((definition) => {
+      const unlocks = gatheringUnlocks(definition, skill);
+      if (unlocks.length === 0) unlocks.push(...productionUnlocks(definition, skill));
+      return [definition.reqLevel, unlocks.join(", ")];
+    });
+    return `### ${skillName(skill)}\n\n${table(["Level", "Unlocks"], rows)}`;
+  }).join("\n\n");
+}
+
 function skillsDoc(): string {
   const groups: Record<string, string[]> = {};
   for (const skill of Object.values(SKILLS)) {
@@ -558,9 +945,15 @@ function skillsDoc(): string {
   const sections = Object.entries(groups)
     .map(([group, lines]) => `## ${group[0]!.toUpperCase()}${group.slice(1)}\n\n${lines.join("\n")}`)
     .join("\n\n");
-  const gatherRows = TIERS.map((tier) => {
-    const [low, high] = yieldRange(tier);
-    return [tier, gatherXp(tier), `${low}-${high}`, `${respawnSeconds(tier)} s`, `+${toolBonus(tier)}`];
+  const gatherRows = GATHERING_PRODUCTION_TIERS.map((definition) => {
+    const [low, high] = yieldRange(definition.tier);
+    return [
+      definition.reqLevel,
+      gatherXp(definition.tier),
+      `${low}-${high}`,
+      `${respawnSeconds(definition.tier)} s`,
+      `+${toolBonus(definition.tier)}`,
+    ];
   });
   return page("Skills", "Corealm skills, gathering rules, and combat rules.", [
     sections,
@@ -569,7 +962,13 @@ function skillsDoc(): string {
     "",
     "Mining, Woodcutting, and Fishing attempt an action every **1.8 seconds**. Success starts at 30% at the required level, rises by 1.6 percentage points per extra level, and caps at 95%.",
     "",
-    table(["Tier", "XP per yield", "Yields per node", "Respawn", "Tool bonus"], gatherRows),
+    table(["Level", "XP per yield", "Yields per node", "Respawn", "Tool bonus"], gatherRows),
+    "",
+    "## Gathering and production skill guides",
+    "",
+    "The unlock rows below come from the same tier, resource, recipe, and item tables used by the game. See the [three complete gathering loops](./gathering-production) for ingredients and finished equipment.",
+    "",
+    generatedSkillGuides(),
     "",
     "## Combat",
     "",
@@ -614,7 +1013,7 @@ function recipesDoc(): string {
     const rows = [...recipes].sort((a, b) => a.reqLevel - b.reqLevel).map((recipe) => [
       recipe.name,
       recipe.reqLevel,
-      recipe.station ?? "Anywhere",
+      recipe.stations?.join(" / ") ?? "Anywhere",
       recipe.inputs.map((input) => `${input.quantity}× ${itemName(input.itemId)}`).join(" + "),
       `${recipe.output.quantity}× ${itemName(recipe.output.itemId)}`,
       `${(recipe.durationMs / 1000).toFixed(1)} s`,
@@ -623,6 +1022,179 @@ function recipesDoc(): string {
     return `## ${skillName(skill)}\n\n${table(["Recipe", "Level", "Station", "Ingredients", "Makes", "Time", "XP"], rows)}`;
   });
   return page("Recipes", "Production recipes generated from the live game tables.", sections.join("\n\n"));
+}
+
+function miningAndSmithingGuide(): string {
+  const gatheringRows = GATHERING_PRODUCTION_TIERS.flatMap((definition) =>
+    definition.resources.mining.map((resourceId) => {
+      const resource = resourceForGuide(resourceId);
+      const [low, high] = yieldRange(resource.tier);
+      const secondary = resource.bonus?.map((drop) =>
+        `${itemLink(drop.itemId)} at ${Math.round(drop.chance * 1_000) / 10}%`).join(", ") ?? "-";
+      return [
+        definition.reqLevel,
+        resource.name,
+        itemLink(resource.itemId),
+        secondary,
+        gatherXp(resource.tier),
+        `${low}-${high}`,
+        `${respawnSeconds(resource.tier)} s`,
+      ];
+    }));
+
+  const smithingRows = GATHERING_PRODUCTION_TIERS.map((definition) => {
+    const barRecipe = recipeForOutput(definition, definition.items.bar);
+    const finished = recipesAtTier(definition.tier, "smithing")
+      .filter((recipe) => recipe.kind === "smith")
+      .map((recipe) => itemLink(recipe.output.itemId))
+      .join(", ");
+    return [
+      definition.reqLevel,
+      `${recipeIngredients(barRecipe)} → ${recipeResult(barRecipe)}`,
+      recipeStations(barRecipe),
+      `${(barRecipe.durationMs / 1_000).toFixed(1)} s`,
+      barRecipe.xp,
+      finished,
+    ];
+  });
+
+  return [
+    "## 1. Mining and Smithing",
+    "",
+    "March Stone remains the flux for every bar. This keeps the level 1 mine useful after later metal tiers unlock.",
+    "",
+    "### Mining unlocks",
+    "",
+    table(["Level", "Node", "Primary yield", "Secondary yield", "XP", "Per node", "Respawn"], gatheringRows),
+    "",
+    "### Smithing unlocks",
+    "",
+    table(["Level", "Bar recipe", "Station", "Time", "XP", "Finished equipment"], smithingRows),
+  ].join("\n");
+}
+
+function fishingAndCookingGuide(): string {
+  const rows = GATHERING_PRODUCTION_TIERS.map((definition) => {
+    const resource = resourceForGuide(definition.resources.fishing);
+    const recipe = recipeForOutput(definition, definition.items.cookedFish);
+    const cooked = itemForGuide(definition.items.cookedFish);
+    if (!cooked.food) throw new Error(`${cooked.id} is the cooked fish for tier ${definition.tier} but has no food data.`);
+    return [
+      definition.reqLevel,
+      resource.name,
+      itemLink(definition.items.rawFish),
+      itemLink(definition.items.cookedFish),
+      cooked.food.healAmount,
+      recipe.xp,
+      recipeStations(recipe),
+      `${(recipe.durationMs / 1_000).toFixed(1)} s`,
+      `${Math.round(burnChance(definition.reqLevel, recipe.reqLevel) * 100)}%`,
+      itemLink(definition.items.burntFish),
+    ];
+  });
+
+  return [
+    "## 2. Fishing and Cooking",
+    "",
+    "A range and a player-built campfire use the same recipe and burn chance. Raw and burnt fish are not food.",
+    "",
+    table(
+      ["Level", "Fishing spot", "Raw fish", "Cooked food", "Heal", "Cooking XP", "Stations", "Time", "Burn at unlock", "Burnt result"],
+      rows,
+    ),
+    "",
+    "Burn chance is `clamp(0.45 - 0.030 × (Cooking level - recipe level), 0, 0.45)`. Cooked fish takes 1.8 seconds to eat and cannot heal above maximum health.",
+  ].join("\n");
+}
+
+function woodcuttingFletchingCraftingGuide(): string {
+  const rows = GATHERING_PRODUCTION_TIERS.map((definition) => {
+    const resource = resourceForGuide(definition.resources.woodcutting);
+    const shaft = recipeForOutput(definition, definition.items.shaft);
+    const handle = recipeForOutput(definition, definition.items.handle);
+    const woodenEquipment = recipesAtTier(definition.tier, "fletching")
+      .filter((recipe) => recipe.output.itemId !== definition.items.shaft && recipe.output.itemId !== definition.items.handle)
+      .map((recipe) => `${itemLink(recipe.output.itemId)} from ${recipeIngredients(recipe)}`)
+      .join("; ");
+    return [
+      definition.reqLevel,
+      resource.name,
+      itemLink(definition.items.log),
+      `${recipeIngredients(shaft)} → ${recipeResult(shaft)} for ${shaft.xp} XP`,
+      `${recipeIngredients(handle)} → ${recipeResult(handle)} for ${handle.xp} XP`,
+      woodenEquipment,
+    ];
+  });
+
+  const craftingRows = GATHERING_PRODUCTION_TIERS.map((definition) => [
+    definition.reqLevel,
+    itemLink(definition.items.gem),
+    recipesAtTier(definition.tier, "crafting")
+      .map((recipe) => `${itemLink(recipe.output.itemId)} from ${recipeIngredients(recipe)}`)
+      .join("; "),
+  ]);
+
+  return [
+    "## 3. Woodcutting, Fletching, and Crafting",
+    "",
+    "Each log tier supplies the reusable shafts and handles used by wooden gear and handled metal equipment.",
+    "",
+    "### Wood and Fletching unlocks",
+    "",
+    table(["Level", "Tree", "Log", "Shafts", "Handles", "Wooden equipment"], rows),
+    "",
+    "### Mining and Crafting bridge",
+    "",
+    table(["Level", "Gem", "Crafting outputs"], craftingRows),
+    "",
+    "[Campfire fuel, lifetime, and build XP](./campfires) also derive from each tier's log row.",
+  ].join("\n");
+}
+
+function gatheringProductionDoc(): string {
+  return page(
+    "Gathering and production",
+    "The level 1, 5, and 10 gathering loops, generated from the live tier, resource, item, and recipe tables.",
+    [
+      "These tables are a content check as much as a player guide. A tier appears here only when the canonical catalog resolves its resources, items, and recipes.",
+      "",
+      miningAndSmithingGuide(),
+      "",
+      fishingAndCookingGuide(),
+      "",
+      woodcuttingFletchingCraftingGuide(),
+    ].join("\n"),
+  );
+}
+
+function campfiresDoc(): string {
+  const rows = GATHERING_PRODUCTION_TIERS.map((definition) => {
+    const fuel = definition.campfire;
+    return [
+      definition.reqLevel,
+      itemLink(fuel.logItemId),
+      `${(fuel.buildTimeMs / 1_000).toFixed(1)} s`,
+      `${fuel.lifetimeMs / 1_000} s`,
+      fuel.buildXp.fletching,
+      fuel.buildXp.crafting,
+      fuel.visualLogAssetId,
+    ];
+  });
+  const cookingRecipes = GATHERING_PRODUCTION_TIERS.map((definition) =>
+    recipeForOutput(definition, definition.items.cookedFish));
+  const incompatible = cookingRecipes.filter((recipe) => !recipe.stations?.includes("campfire"));
+  if (incompatible.length > 0) {
+    throw new Error(`Cooking recipes missing campfire compatibility: ${incompatible.map((recipe) => recipe.id).join(", ")}`);
+  }
+  return page("Campfires", "Campfire fuels, lifetimes, build XP, and cooking compatibility from the live content tables.", [
+    "Building a fire consumes one log when the three-second build completes. A successful new fire replaces the old one. Log tier changes lifetime and build XP only.",
+    "",
+    table(["Level", "Log", "Build time", "Lifetime", "Fletching XP", "Crafting XP", "Log asset"], rows),
+    "",
+    "Lifetime follows `60 + 12 × tier` seconds. Each skill receives `round(gatherXp(tier) × 0.2)` XP.",
+    "",
+    `All ${cookingRecipes.length} fish recipes accept both Range and Campfire. If a fire expires during a batch, completed food stays in the inventory and the next fish is not consumed.`,
+  ].join("\n"));
 }
 
 function creatureSpawnMap(creature: EnemyDef, spawns: readonly CreatureSpawn[]): string {
@@ -728,20 +1300,29 @@ function resourcesDoc(): string {
   const rows = [...RESOURCE_ARCHETYPES]
     .sort((a, b) => a.tier - b.tier || a.skill.localeCompare(b.skill))
     .map((resource) => {
-      const [low, high] = yieldRange(resource.tier);
+      const lifecycle = resourceGuideLifecycle(resource.id);
+      const secondary = resource.bonus?.map((drop) =>
+        `${itemLink(drop.itemId)} ${Math.round(drop.chance * 1_000) / 10}%`).join(", ") ?? "-";
+      const size = resource.presentation.waterOffset === undefined
+        ? `${resource.presentation.targetWorldSize} m`
+        : `${resource.presentation.targetWorldSize} m, water ${resource.presentation.waterOffset} m`;
       return [
         resource.name,
         skillName(resource.skill),
         resource.tier,
         resource.reqLevel,
         itemLink(resource.itemId),
-        gatherXp(resource.tier),
-        `${low}-${high}`,
-        `${respawnSeconds(resource.tier)} s`,
+        secondary,
+        lifecycle.xpEach,
+        lifecycle.perNode,
+        lifecycle.recovery,
+        resource.presentation.availableAssetIds.join(", "),
+        resource.presentation.depletedAssetId ?? "Renderer fallback",
+        size,
       ];
     });
-  return page("Resources", "Gathering nodes, requirements, yields, and respawn times.", table(
-    ["Node", "Skill", "Tier", "Level", "Yields", "XP each", "Per node", "Respawn"],
+  return page("Resources", "Gathering nodes, requirements, yields, respawns, and authored presentation from the live resource table.", table(
+    ["Node", "Skill", "Tier", "Level", "Primary", "Secondary", "XP each", "Per node", "Respawn / growth", "Available assets", "Depleted asset", "Target size"],
     rows,
   ));
 }
@@ -933,13 +1514,21 @@ function spellsAndShopsDoc(): string {
 }
 
 async function main(): Promise<void> {
-  const out = path.resolve(repoRoot, argValue(process.argv.slice(2), "--out") ?? "docs/game");
+  const args = process.argv.slice(2);
+  const out = path.resolve(repoRoot, argValue(args, "--out") ?? "docs/game");
+  const provenanceOut = path.resolve(
+    repoRoot,
+    argValue(args, "--provenance-out") ?? "docs/asset-provenance-gathering.md",
+  );
   await mkdir(out, { recursive: true });
 
   content.register({
     items: ALL_ITEMS, resources: RESOURCES, recipes: RECIPES,
     spells: SPELLS, enemies: ENEMIES, shops: SHOPS,
   });
+  const manifest = JSON.parse(
+    await readFile(path.resolve(repoRoot, "game/public/assets/manifest.json"), "utf8"),
+  ) as AssetManifest;
 
   for (const stale of ["quests.md", "enemies.md", "locations.md", "quests", "creatures"]) {
     await rm(path.join(out, stale), { recursive: true, force: true });
@@ -956,6 +1545,8 @@ async function main(): Promise<void> {
     ["recipes.md", recipesDoc()],
     ["resources.md", resourcesDoc()],
     ["skills.md", skillsDoc()],
+    ["gathering-production.md", gatheringProductionDoc()],
+    ["campfires.md", campfiresDoc()],
     ["experience.md", xpDoc()],
     ["spells-and-shops.md", spellsAndShopsDoc()],
   ];
@@ -971,6 +1562,8 @@ async function main(): Promise<void> {
     "- [Recipes](./recipes)",
     "- [Resources](./resources)",
     "- [Skills](./skills)",
+    "- [Gathering and production](./gathering-production)",
+    "- [Campfires](./campfires)",
     "- [Experience table](./experience)",
     "- [Spells and shops](./spells-and-shops)",
   ].join("\n"));
@@ -991,7 +1584,12 @@ async function main(): Promise<void> {
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, body, "utf8");
   }
-  console.log(`Wrote ${files.length + 1} guide files to ${path.relative(repoRoot, out)}`);
+  await mkdir(path.dirname(provenanceOut), { recursive: true });
+  await writeFile(provenanceOut, gatheringAssetProvenanceDoc(manifest), "utf8");
+  console.log(
+    `Wrote ${files.length + 1} guide files to ${path.relative(repoRoot, out)} `
+    + `and gathering provenance to ${path.relative(repoRoot, provenanceOut)}`,
+  );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

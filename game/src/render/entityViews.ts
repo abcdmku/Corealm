@@ -89,6 +89,7 @@ import {
   architectureMaterialRole,
   architectureMaterialRoleForAsset,
   MaterialLibrary,
+  paletteForTier,
   tierSilhouetteScale,
 } from "./materials.js";
 import {
@@ -98,7 +99,9 @@ import {
   type DressedCharacter,
 } from "./skinning.js";
 
+const X_AXIS = new THREE.Vector3(1, 0, 0);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const DOWN_AXIS = new THREE.Vector3(0, -1, 0);
 
 /**
  * How a new `Batch` is sized, and how much it grows by.
@@ -154,6 +157,10 @@ const SCRATCH_TILT = new THREE.Quaternion();
 const SCRATCH_BLEND = new THREE.Quaternion();
 const SCRATCH_PLACEMENT = new THREE.Matrix4();
 const SCRATCH_TRANSFORM = new THREE.Matrix4();
+const SCRATCH_DETAIL = new THREE.Matrix4();
+const SCRATCH_DETAIL_POSITION = new THREE.Vector3();
+const SCRATCH_DETAIL_SCALE = new THREE.Vector3();
+const SCRATCH_DETAIL_QUATERNION = new THREE.Quaternion();
 // Written and consumed inside one synchronous call, exactly like the matrices above.
 const SCRATCH_COLOUR = new THREE.Color();
 
@@ -602,8 +609,29 @@ const MOVING_HOLD_SYNCS = 2;
 /** Metres of movement between syncs below which an entity counts as standing still. */
 const MOVING_EPSILON = 0.03;
 
-/** Shards in an ore seam. Five reads as a vein from any bearing and costs 40 triangles. */
-const SEAM_SHARDS = 5;
+/** Four fish are authored into a school. Each entity shows a deterministic two to four of them. */
+const FISH_SCHOOL_CAPACITY = 4;
+
+/** The procedural school loop is deliberately slow. It reads as fish milling, not a whirlpool. */
+const FISH_LOOP_RADIANS_PER_SECOND = 0.62;
+
+/**
+ * Water draws at order 2 in `WorldScene`. Fish remain below that surface in world space, but draw
+ * immediately afterward through a translucent material so the 94%-opaque water cannot erase the
+ * school. The ripple follows the fish and stays the last, quiet surface cue.
+ */
+const SUBMERGED_FISH_RENDER_ORDER = 3;
+const FISH_MARKER_RENDER_ORDER = 4;
+const SUBMERGED_FISH_OPACITY = 0.64;
+
+/**
+ * Starter fish are intentionally small, but their interaction ripple cannot shrink in the same
+ * proportion or the whole node drops below a pixel at normal play distance. Later, larger fish
+ * need less relative padding. The logarithmic falloff keeps future tiers within the same range.
+ */
+const FISH_MARKER_TIER_ONE_SCALE = 0.94;
+const FISH_MARKER_MIN_SCALE = 0.68;
+const FISH_MARKER_TIER_FALLOFF = 0.07;
 
 /**
  * How much of a felled tree is left standing, as a fraction of its height.
@@ -698,11 +726,27 @@ const UNIQUE_RELEASE_FACTOR = 1.75;
  */
 const UNIQUE_PROMOTIONS_PER_FRAME = 4;
 
+type ResourcePartDetail =
+  | { kind: "oreVein" }
+  | {
+    kind: "fish";
+    schoolIndex: number;
+    phase: number;
+    orbitX: number;
+    orbitZ: number;
+    depthJitter: number;
+    scale: number;
+  }
+  | { kind: "ripple"; recovery: boolean }
+  | { kind: "bubbles" };
+
 interface SourcePart {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
   matrix: THREE.Matrix4;
   triangles: number;
+  /** Optional local motion for generated resource details. It never affects gameplay position. */
+  resourceDetail?: ResourcePartDetail;
 }
 
 /**
@@ -910,6 +954,12 @@ interface ViewRecord {
   architectureValue: number;
   /** Per-entity build multiplier on `scale`, as (x, y, z). `NO_BUILD` for everything else. */
   build: readonly [number, number, number];
+  /** Number of visible fish in this node's four-fish batched school. */
+  schoolCount: number;
+  /** Stable phase offset so nearby schools do not turn together. */
+  schoolPhase: number;
+  /** Fish depth below the semantic surface proxy. Authored on resource presentation metadata. */
+  waterOffset: number;
   spent: boolean;
   /** Unit terrain normal from `view.groundNormal`, or null. */
   normal: readonly [number, number, number] | null;
@@ -1089,6 +1139,21 @@ export class EntityViews {
   /** Asset id -> whether one of its source materials belongs to the architecture palette. */
   private readonly architectureAssets = new Map<string, boolean>();
   private readonly seamGeometries = new Map<string, THREE.BufferGeometry>();
+  private readonly workedOreGeometries = new Map<
+    string,
+    { scar: THREE.BufferGeometry; dust: THREE.BufferGeometry; fragments: THREE.BufferGeometry }
+  >();
+  private readonly fishingGeometries = new Map<
+    string,
+    { ripple: THREE.BufferGeometry; bubbles: THREE.BufferGeometry }
+  >();
+  private readonly campfireRockGeometries = new Map<string, THREE.BufferGeometry>();
+  private readonly resourceMaterials = new Map<string, THREE.MeshStandardMaterial>();
+  /** One translucent underwater treatment per authored fish material, shared by every school. */
+  private readonly submergedFishMaterials = new Map<THREE.Material, THREE.Material>();
+  /** Only fishing nodes need generated motion, so the render tick never walks every resource. */
+  private readonly fishingViews = new Set<ViewRecord>();
+  private resourceTimeSeconds = 0;
   /** Per-entity dye clones for the non-instanced path, keyed (source material, tint hex). */
   private readonly tintedMaterials = new Map<string, THREE.Material>();
   private readonly bakedGeometries: THREE.BufferGeometry[] = [];
@@ -1273,11 +1338,20 @@ export class EntityViews {
       // while the shot is held could create a newly visible unique character behind it.
       if (this.captureSubjectId === null) this.rebalanceUniques();
     }
-    if (this.animated.size === 0) return;
 
     // A backgrounded tab hands back a delta of seconds. Fast-forwarding a crowd through 40 loops
     // of an idle clip costs real time and looks identical to not doing it.
     const delta = Math.min(Math.max(deltaSeconds, 0), 0.25);
+
+    this.resourceTimeSeconds += delta;
+    for (const record of this.fishingViews) {
+      if (this.captureSubjectId !== null && record.entityId !== this.captureSubjectId) continue;
+      if (record.unique || record.slot < 0) continue;
+      const group = this.groups.get(record.groupKey);
+      if (group) this.writeSlot(group, record);
+    }
+
+    if (this.animated.size === 0) return;
 
     // Reused rather than rebuilt: this runs every frame, and a fresh array per frame is garbage
     // the collector has to walk during exactly the frames that are already the most expensive.
@@ -1408,20 +1482,27 @@ export class EntityViews {
     const clip = view.clipFraction ?? 0;
     const character = this.characterFor(entity.id, entity.archetype, view.assetId, view.partAssetIds);
     const regionId = this.architectureRegion(entity.archetype, entity.regionId, view.assetId);
-    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${regionId ?? "-"}|${entity.archetype}|${clip}|${batchCell(entity.archetype, entity.position)}`;
+    const campfire = entity.station?.kind === "campfire";
+    const authoredWaterOffset = entity.meta?.waterOffset;
+    const waterOffset = typeof authoredWaterOffset === "number" ? authoredWaterOffset : 0;
+    const groupKey = `${character?.key ?? view.assetId}|${view.depletedAssetId ?? "-"}|${this.groupTier(entity.archetype, tier, view.assetId, character)}|${regionId ?? "-"}|${entity.archetype}|${clip}|${campfire ? "fire" : "-"}|${batchCell(entity.archetype, entity.position)}`;
     const spent = SPENT_STATES.has(entity.state);
     const silhouette = TIERED_ARCHETYPES.has(entity.archetype) ? tierSilhouetteScale(tier) : 1;
     const scale = (view.scale ?? 1) * silhouette;
     const scaleAxes = view.scaleAxes ?? NO_BUILD;
     const rotationY = view.rotationY ?? 0;
     const normal = view.groundNormal ?? null;
-    const tilt = normal ? (view.tiltStrength ?? DEFAULT_TILT[entity.archetype] ?? 0) : 0;
+    // A fishing proxy sits on solved water. Tilting it toward terrain below the pool would cant
+    // the surface ripple and turn the authored water offset into a diagonal displacement.
+    const tilt = entity.archetype === "fishing_spot"
+      ? 0
+      : normal ? (view.tiltStrength ?? DEFAULT_TILT[entity.archetype] ?? 0) : 0;
 
     // Movement has to be decided BEFORE the signature, because it is part of it: an enemy that
     // stops walking stops changing position, so a signature built from position alone would never
     // notice the stop and the walk pose would stick forever.
     const moving = this.updateMoving(entity);
-    const signature = `${groupKey}|${spent ? 1 : 0}|${moving ? 1 : 0}|${round(entity.position[0])},${round(entity.position[1])},${round(entity.position[2])}|${round(rotationY)}|${round(scale)}|${scaleAxes.map(round).join(",")}|${tiltKey(normal, tilt)}`;
+    const signature = `${groupKey}|${spent ? 1 : 0}|${moving ? 1 : 0}|${round(entity.position[0])},${round(entity.position[1])},${round(entity.position[2])}|${round(rotationY)}|${round(scale)}|${scaleAxes.map(round).join(",")}|${round(waterOffset)}|${tiltKey(normal, tilt)}`;
 
     let existing = this.records.get(entity.id);
 
@@ -1456,6 +1537,7 @@ export class EntityViews {
     record.rotationY = rotationY;
     record.scale = scale;
     record.scaleAxes = scaleAxes;
+    record.waterOffset = waterOffset;
     record.spent = spent;
     record.normal = normal;
     record.tilt = tilt;
@@ -1514,6 +1596,7 @@ export class EntityViews {
     const group = this.ensureGroup(
       groupKey, view.assetId, view.depletedAssetId ?? null, entity.archetype, tier,
       batchCell(entity.archetype, entity.position), clip, character, regionId,
+      entity.station?.kind === "campfire",
     );
     if (!group) return null;
 
@@ -1554,6 +1637,9 @@ export class EntityViews {
       tints: tintsFor(entity.id, entity.archetype, character),
       architectureValue: regionId ? architectureValueFor(regionId) : 1,
       build: buildFor(entity.id, entity.archetype),
+      schoolCount: 2 + (hashString(`${entity.id}:school-count`) % 3),
+      schoolPhase: (hashString(`${entity.id}:school-phase`) / 0xffff_ffff) * Math.PI * 2,
+      waterOffset: typeof entity.meta?.waterOffset === "number" ? entity.meta.waterOffset : 0,
       spent: false,
       normal: null,
       tilt: 0,
@@ -1568,6 +1654,7 @@ export class EntityViews {
     }
 
     this.records.set(entity.id, record);
+    if (entity.archetype === "fishing_spot") this.fishingViews.add(record);
     if (rigged) this.rigCandidates.add(record);
     return record;
   }
@@ -1738,6 +1825,7 @@ export class EntityViews {
 
   private release(record: ViewRecord): void {
     this.rigCandidates.delete(record);
+    this.fishingViews.delete(record);
     if (record.unique) {
       this.releaseUnique(record);
       return;
@@ -1844,6 +1932,7 @@ export class EntityViews {
     clipFraction = 0,
     character: CharacterSpec | null = null,
     regionId: RegionId | null = null,
+    campfire = false,
   ): InstanceGroup | null {
     const existing = this.groups.get(key);
     if (existing) return existing;
@@ -1858,6 +1947,12 @@ export class EntityViews {
     if (clipFraction > 0 && clipFraction < 1) {
       const clipped = clipPartsBelow(liveParts, clipFraction);
       if (clipped.length > 0) liveParts = clipped;
+    }
+
+    if (archetype === "fishing_spot" && liveParts.length > 0) {
+      liveParts = this.buildFishingSchool(assetId, tier, liveParts);
+    } else if (campfire && liveParts.length > 0) {
+      liveParts = this.buildCampfireBase(assetId, liveParts);
     }
 
     // The ore seam. It is a separate part on the LIVE side only: losing the vein is half of what
@@ -1937,28 +2032,35 @@ export class EntityViews {
   /**
    * What a worked-out node looks like.
    *
-   * The rule is that a spent node keeps the silhouette the player walked up to. Swapping in a
-   * different, smaller asset reads as the node disappearing, because from ten metres up a
-   * `rock_small_1` standing where a `rock_medium_1` stood is indistinguishable from nothing at all.
-   * So the spent variant is derived from the LIVE geometry wherever the archetype gives us a
-   * meaning for "spent":
+   * An authored depleted asset wins. It may carry a cut face, moss, snow, or another state that a
+   * material filter cannot recover. Derived states only cover content without one:
    *
    *   ore        the rock, minus its vein. The vein is already a separate part (see `seamPart`),
    *              so dropping it is exactly the change the player made by mining it.
    *   tree       the trunk, clipped to `TREE_STUMP_FRACTION` of its height: a stump.
    *   farm_plot  the crop cut back to `CROP_STUBBLE_FRACTION`: stubble.
    *
-   * Everything else falls back to `depletedAssetId` when content authored one, and to the live
-   * geometry under the spent material when it did not.
+   * Everything else falls back to the live geometry under the spent material.
    */
   private buildSpentParts(group: InstanceGroup): SourcePart[] {
+    if (group.depletedAssetId && this.assets.isLoaded(group.depletedAssetId)) {
+      const rigged = this.isRigged(group.depletedAssetId);
+      const source = rigged ? this.sourceOf(group.depletedAssetId) : null;
+      const parts = rigged && source
+        ? this.bakedParts(
+          group.depletedAssetId, null, group.archetype, group.tier, group.regionId, false, "death",
+        )
+        : this.collectParts(
+          group.depletedAssetId, group.archetype, group.tier, group.regionId, false,
+        );
+      if (parts.length > 0) return this.alignDepletedParts(group.liveParts, parts);
+    }
+
     const live = this.spentMaterialParts(group);
 
     if (group.archetype === "ore") {
-      // `ensureGroup` appends the seam as the LAST live part, so everything before it is the rock.
-      const seamIndex = group.liveParts.length - 1;
-      const rock = live.filter((_part, index) => index !== seamIndex || live.length === 1);
-      if (rock.length > 0) return rock;
+      const rock = live.filter((part) => part.resourceDetail?.kind !== "oreVein");
+      if (rock.length > 0) return [...rock, ...this.workedOutOreParts(group, rock)];
     }
 
     if (group.archetype === "tree" || group.archetype === "farm_plot") {
@@ -1967,20 +2069,36 @@ export class EntityViews {
       if (clipped.length > 0) return clipped;
     }
 
-    if (group.depletedAssetId && this.assets.isLoaded(group.depletedAssetId)) {
-      const rigged = this.isRigged(group.depletedAssetId);
-      const source = rigged ? this.sourceOf(group.depletedAssetId) : null;
-      const parts = rigged && source
-        ? this.bakedParts(
-          group.depletedAssetId, null, group.archetype, group.tier, group.regionId, true, "death",
-        )
-        : this.collectParts(
-          group.depletedAssetId, group.archetype, group.tier, group.regionId, true,
-        );
-      if (parts.length > 0) return parts;
-    }
+    if (group.archetype === "fishing_spot") return [this.fishingRecoveryPart(group)];
 
     return live;
+  }
+
+  /**
+   * An entity is grounded from its available asset's authored floor. A stump or other authored
+   * depleted mesh can use a different pivot, so align its floor and horizontal centre to the live
+   * silhouette before both variants share the entity transform.
+   */
+  private alignDepletedParts(
+    liveParts: readonly SourcePart[],
+    depletedParts: readonly SourcePart[],
+  ): SourcePart[] {
+    const live = this.partsBounds(liveParts);
+    const depleted = this.partsBounds(depletedParts);
+    if (live.isEmpty() || depleted.isEmpty()) return [...depletedParts];
+    const liveCentre = new THREE.Vector3();
+    const depletedCentre = new THREE.Vector3();
+    live.getCenter(liveCentre);
+    depleted.getCenter(depletedCentre);
+    const alignment = new THREE.Matrix4().makeTranslation(
+      liveCentre.x - depletedCentre.x,
+      live.min.y - depleted.min.y,
+      liveCentre.z - depletedCentre.z,
+    );
+    return depletedParts.map((part) => ({
+      ...part,
+      matrix: alignment.clone().multiply(part.matrix),
+    }));
   }
 
   /**
@@ -2386,41 +2504,387 @@ export class EntityViews {
     return architecture ? regionId : null;
   }
 
+  // ------------------------------------------------ resource presentation
+
+  private partsBounds(parts: readonly SourcePart[]): THREE.Box3 {
+    const box = new THREE.Box3();
+    for (const part of parts) {
+      part.geometry.computeBoundingBox();
+      const bounds = part.geometry.boundingBox;
+      if (bounds) box.union(bounds.clone().applyMatrix4(part.matrix));
+    }
+    return box;
+  }
+
+  /** Turns one fish mesh into a batched four-slot school plus a quiet surface marker. */
+  private buildFishingSchool(
+    assetId: string,
+    tier: number,
+    parts: readonly SourcePart[],
+  ): SourcePart[] {
+    const box = this.partsBounds(parts);
+    if (box.isEmpty()) return [...parts];
+    const size = new THREE.Vector3();
+    const centre = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(centre);
+    const span = Math.max(size.x, size.z, 0.1);
+    const centreModel = new THREE.Matrix4().makeTranslation(-centre.x, -centre.y, -centre.z);
+    const rng = new Rng(hashString(`${assetId}:school`));
+    const school: SourcePart[] = [];
+
+    for (let schoolIndex = 0; schoolIndex < FISH_SCHOOL_CAPACITY; schoolIndex += 1) {
+      const detail: ResourcePartDetail = {
+        kind: "fish",
+        schoolIndex,
+        phase: (schoolIndex / FISH_SCHOOL_CAPACITY) * Math.PI * 2 + rng.float(-0.28, 0.28),
+        orbitX: span * rng.float(0.28, 0.48),
+        orbitZ: span * rng.float(0.2, 0.38),
+        depthJitter: -span * rng.float(0.015, 0.055),
+        scale: rng.float(0.82, 1.04),
+      };
+      for (const part of parts) {
+        school.push({
+          ...part,
+          material: this.submergedFishMaterial(part.material),
+          matrix: centreModel.clone().multiply(part.matrix),
+          resourceDetail: detail,
+        });
+      }
+    }
+
+    const marker = this.fishingMarkerGeometry(assetId, tier, span);
+    school.push({
+      geometry: marker.ripple,
+      material: this.resourceMaterial("water-live", tier),
+      matrix: new THREE.Matrix4(),
+      triangles: triangleCount(marker.ripple),
+      resourceDetail: { kind: "ripple", recovery: false },
+    });
+    school.push({
+      geometry: marker.bubbles,
+      material: this.resourceMaterial("water-live", tier),
+      matrix: new THREE.Matrix4(),
+      triangles: triangleCount(marker.bubbles),
+      resourceDetail: { kind: "bubbles" },
+    });
+    return school;
+  }
+
+  /**
+   * Makes authored fish readable through the nearly opaque water without flattening their texture
+   * or colour into a procedural tint. The clone keeps every source map and PBR value. Only alpha,
+   * depth writing and shadow casting change, and the cache means four fish still use one material.
+   */
+  private submergedFishMaterial(source: THREE.Material): THREE.Material {
+    const cached = this.submergedFishMaterials.get(source);
+    if (cached) return cached;
+
+    const material = source.clone();
+    material.name = `${source.name || source.type}@submerged-fish`;
+    material.transparent = true;
+    material.opacity = source.opacity * SUBMERGED_FISH_OPACITY;
+    material.depthWrite = false;
+    material.userData.entityCastShadow = false;
+    this.submergedFishMaterials.set(source, material);
+    return material;
+  }
+
+  private fishingMarkerGeometry(
+    assetId: string,
+    tier: number,
+    span: number,
+  ): { ripple: THREE.BufferGeometry; bubbles: THREE.BufferGeometry } {
+    const paletteTier = paletteForTier(tier).tier;
+    const cacheKey = `${assetId}:${paletteTier}`;
+    const cached = this.fishingGeometries.get(cacheKey);
+    if (cached) return cached;
+
+    const relativeRadius = THREE.MathUtils.clamp(
+      FISH_MARKER_TIER_ONE_SCALE
+        - Math.log2(Math.max(1, paletteTier)) * FISH_MARKER_TIER_FALLOFF,
+      FISH_MARKER_MIN_SCALE,
+      FISH_MARKER_TIER_ONE_SCALE,
+    );
+    const ringRadius = span * relativeRadius;
+    const rings: THREE.BufferGeometry[] = [];
+    for (const scale of [0.62, 1] as const) {
+      const outer = ringRadius * scale;
+      const ring = new THREE.RingGeometry(
+        outer * 0.86,
+        outer,
+        28,
+      );
+      ring.rotateX(-Math.PI * 0.5);
+      rings.push(ring);
+    }
+    const ripple = mergeGeometries(rings, false) ?? rings[0]!;
+    if (ripple !== rings[0]) for (const ring of rings) ring.dispose();
+    ripple.computeBoundingSphere();
+
+    const bubblesRaw: THREE.BufferGeometry[] = [];
+    const rng = new Rng(hashString(`${assetId}:bubbles`));
+    for (let index = 0; index < 3; index += 1) {
+      const angle = (index / 3) * Math.PI * 2 + rng.float(-0.4, 0.4);
+      const radius = ringRadius * rng.float(0.055, 0.085);
+      const bubble = new THREE.SphereGeometry(radius, 6, 4);
+      bubble.translate(
+        Math.cos(angle) * ringRadius * rng.float(0.24, 0.48),
+        -ringRadius * rng.float(0.05, 0.13),
+        Math.sin(angle) * ringRadius * rng.float(0.24, 0.48),
+      );
+      bubblesRaw.push(bubble);
+    }
+    const bubbles = mergeGeometries(bubblesRaw, false) ?? bubblesRaw[0]!;
+    if (bubbles !== bubblesRaw[0]) for (const bubble of bubblesRaw) bubble.dispose();
+    bubbles.computeBoundingSphere();
+
+    const out = { ripple, bubbles };
+    this.fishingGeometries.set(cacheKey, out);
+    return out;
+  }
+
+  /** A depleted fishing node retains only a low-opacity recovery ripple. */
+  private fishingRecoveryPart(group: InstanceGroup): SourcePart {
+    const cacheKey = `${group.assetId}:${paletteForTier(group.tier).tier}`;
+    let marker = this.fishingGeometries.get(cacheKey);
+    if (!marker) marker = this.fishingMarkerGeometry(group.assetId, group.tier, 1);
+    return {
+      geometry: marker.ripple,
+      material: this.resourceMaterial("water-recovery", group.tier),
+      matrix: new THREE.Matrix4(),
+      triangles: triangleCount(marker.ripple),
+      resourceDetail: { kind: "ripple", recovery: true },
+    };
+  }
+
+  /** Crosses two copies of the authored log and adds one merged low-poly stone ring. */
+  private buildCampfireBase(assetId: string, parts: readonly SourcePart[]): SourcePart[] {
+    const box = this.partsBounds(parts);
+    if (box.isEmpty()) return [...parts];
+    const size = new THREE.Vector3();
+    const centre = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(centre);
+    const span = Math.max(size.x, size.z, 0.25);
+    const normalise = new THREE.Matrix4().makeTranslation(-centre.x, -box.min.y, -centre.z);
+    const out: SourcePart[] = [];
+
+    for (const [index, angle] of [Math.PI * 0.25, -Math.PI * 0.25].entries()) {
+      const crossed = new THREE.Matrix4().makeRotationY(angle);
+      crossed.setPosition(0, index * Math.max(0.025, size.y * 0.18), 0);
+      for (const part of parts) {
+        out.push({
+          ...part,
+          matrix: crossed.clone().multiply(normalise).multiply(part.matrix),
+        });
+      }
+    }
+
+    let rocks = this.campfireRockGeometries.get(assetId);
+    if (!rocks) {
+      const stones: THREE.BufferGeometry[] = [];
+      const rng = new Rng(hashString(`${assetId}:fire-ring`));
+      for (let index = 0; index < 9; index += 1) {
+        const angle = (index / 9) * Math.PI * 2;
+        const radius = span * rng.float(0.09, 0.12);
+        const stone = new THREE.DodecahedronGeometry(radius, 0);
+        stone.scale(rng.float(1.05, 1.35), rng.float(0.58, 0.78), rng.float(0.85, 1.15));
+        stone.rotateY(rng.float(0, Math.PI));
+        stone.translate(
+          Math.cos(angle) * span * 0.64,
+          radius * 0.45,
+          Math.sin(angle) * span * 0.64,
+        );
+        stones.push(stone);
+      }
+      rocks = mergeGeometries(stones, false) ?? stones[0]!;
+      if (rocks !== stones[0]) for (const stone of stones) stone.dispose();
+      rocks.computeBoundingSphere();
+      this.campfireRockGeometries.set(assetId, rocks);
+    }
+    out.push({
+      geometry: rocks,
+      material: this.resourceMaterial("fire-rock", 1),
+      matrix: new THREE.Matrix4(),
+      triangles: triangleCount(rocks),
+    });
+    return out;
+  }
+
+  /** Dark cut face, ground dust, and loose chips layered over the intact depleted rock. */
+  private workedOutOreParts(group: InstanceGroup, rock: readonly SourcePart[]): SourcePart[] {
+    let geometry = this.workedOreGeometries.get(group.assetId);
+    if (!geometry) {
+      const box = this.partsBounds(rock);
+      if (box.isEmpty()) return [];
+      const size = new THREE.Vector3();
+      const centre = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(centre);
+      const span = Math.max(0.1, Math.min(size.x, size.z));
+
+      const scarPieces: THREE.BufferGeometry[] = [];
+      const cut = new THREE.CircleGeometry(1, 11);
+      cut.scale(size.x * 0.17, size.y * 0.12, 1);
+      cut.translate(centre.x, centre.y + size.y * 0.03, centre.z + size.z * 0.435);
+      scarPieces.push(cut);
+      for (const [offset, angle] of [[-0.05, -0.58], [0.03, 0.12], [0.08, 0.72]] as const) {
+        const slash = new THREE.BoxGeometry(size.x * 0.2, size.y * 0.018, size.z * 0.018);
+        slash.rotateZ(angle);
+        slash.translate(
+          centre.x + size.x * offset,
+          centre.y + size.y * (0.03 + offset * 0.45),
+          centre.z + size.z * 0.445,
+        );
+        scarPieces.push(slash);
+      }
+      const scar = mergeGeometries(scarPieces, false) ?? scarPieces[0]!;
+      if (scar !== scarPieces[0]) for (const part of scarPieces) part.dispose();
+      scar.computeBoundingSphere();
+
+      const dust = new THREE.CircleGeometry(1, 18);
+      dust.scale(span * 0.47, span * 0.31, 1);
+      dust.rotateX(-Math.PI * 0.5);
+      dust.translate(centre.x + size.x * 0.08, box.min.y + size.y * 0.012, centre.z + size.z * 0.2);
+      dust.computeBoundingSphere();
+
+      const chips: THREE.BufferGeometry[] = [];
+      const rng = new Rng(hashString(`${group.assetId}:worked-out`));
+      for (let index = 0; index < 5; index += 1) {
+        const radius = span * rng.float(0.035, 0.07);
+        const chip = new THREE.TetrahedronGeometry(radius, 0);
+        const angle = rng.float(-0.15, Math.PI + 0.15);
+        chip.rotateY(rng.float(0, Math.PI));
+        chip.translate(
+          centre.x + Math.cos(angle) * span * rng.float(0.45, 0.68),
+          box.min.y + radius * 0.55,
+          centre.z + Math.sin(angle) * span * rng.float(0.42, 0.62),
+        );
+        chips.push(chip);
+      }
+      const fragments = mergeGeometries(chips, false) ?? chips[0]!;
+      if (fragments !== chips[0]) for (const chip of chips) chip.dispose();
+      fragments.computeBoundingSphere();
+      geometry = { scar, dust, fragments };
+      this.workedOreGeometries.set(group.assetId, geometry);
+    }
+
+    return [
+      {
+        geometry: geometry.scar,
+        material: this.resourceMaterial("ore-scar", group.tier),
+        matrix: new THREE.Matrix4(),
+        triangles: triangleCount(geometry.scar),
+      },
+      {
+        geometry: geometry.dust,
+        material: this.resourceMaterial("ore-dust", group.tier),
+        matrix: new THREE.Matrix4(),
+        triangles: triangleCount(geometry.dust),
+      },
+      {
+        geometry: geometry.fragments,
+        material: this.materials.oreRock(group.tier, true),
+        matrix: new THREE.Matrix4(),
+        triangles: triangleCount(geometry.fragments),
+      },
+    ];
+  }
+
+  /** Small shared material set. Keys are stable, so cells still batch by material and state. */
+  private resourceMaterial(
+    kind: "water-live" | "water-recovery" | "fire-rock" | "ore-scar" | "ore-dust",
+    tier: number,
+  ): THREE.MeshStandardMaterial {
+    const key = `${kind}:${tier}`;
+    const cached = this.resourceMaterials.get(key);
+    if (cached) return cached;
+    const palette = paletteForTier(tier);
+    let material: THREE.MeshStandardMaterial;
+
+    if (kind === "water-live" || kind === "water-recovery") {
+      material = new THREE.MeshStandardMaterial({
+        name: `resource-${kind}-${tier}`,
+        color: new THREE.Color(palette.accent).lerp(new THREE.Color(0xa8dce4), 0.58),
+        emissive: new THREE.Color(palette.accent),
+        emissiveIntensity: kind === "water-live" ? 0.18 : 0.045,
+        roughness: 0.3,
+        metalness: 0,
+        transparent: true,
+        opacity: kind === "water-live" ? 0.32 : 0.1,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      material.userData.entityCastShadow = false;
+    } else if (kind === "fire-rock") {
+      material = new THREE.MeshStandardMaterial({
+        name: "campfire-ring-rock",
+        color: 0x4a4844,
+        roughness: 0.97,
+        metalness: 0,
+        flatShading: true,
+      });
+    } else if (kind === "ore-scar") {
+      material = new THREE.MeshStandardMaterial({
+        name: `ore-worked-scar-${tier}`,
+        color: new THREE.Color(palette.body).multiplyScalar(0.16),
+        roughness: 1,
+        metalness: 0,
+        flatShading: true,
+      });
+    } else {
+      material = new THREE.MeshStandardMaterial({
+        name: `ore-worked-dust-${tier}`,
+        color: new THREE.Color(palette.body).multiplyScalar(0.48),
+        roughness: 1,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.58,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      material.userData.entityCastShadow = false;
+    }
+    this.resourceMaterials.set(key, material);
+    return material;
+  }
+
   // -------------------------------------------------------------- seams
 
   /**
-   * The ore seam geometry for one asset: a ring of angular shards sunk into the upper half of the
-   * rock so a tip pokes out on every bearing.
+   * The ore seam geometry for one asset is a thin, branching fill inside a surface fracture.
    *
    * Built from the ACTUAL bounding box of the collected parts, not the manifest's size, because the
    * manifest records extent and says nothing about where the origin sits — a seam placed off a
    * guessed origin floats beside its rock half the time.
    *
-   * Cached per asset and shared across every tier of it, so this adds exactly one InstancedMesh per
-   * ore group, not one per node.
+   * Cached per asset and authored palette tier. Low-contrast palettes receive a slightly wider
+   * fracture, while every node in the tier still shares one geometry and batches by material cell.
    */
   private seamPart(assetId: string, tier: number, parts: readonly SourcePart[]): SourcePart | null {
-    const geometry = this.seamGeometry(assetId, parts);
+    const geometry = this.seamGeometry(assetId, tier, parts);
     if (!geometry) return null;
     return {
       geometry,
       material: this.materials.oreRock(tier, false),
       matrix: new THREE.Matrix4(),
       triangles: triangleCount(geometry),
+      resourceDetail: { kind: "oreVein" },
     };
   }
 
-  private seamGeometry(assetId: string, parts: readonly SourcePart[]): THREE.BufferGeometry | null {
-    const cached = this.seamGeometries.get(assetId);
+  private seamGeometry(
+    assetId: string,
+    tier: number,
+    parts: readonly SourcePart[],
+  ): THREE.BufferGeometry | null {
+    const palette = paletteForTier(tier);
+    const cacheKey = `${assetId}:${palette.tier}`;
+    const cached = this.seamGeometries.get(cacheKey);
     if (cached) return cached;
 
-    const box = new THREE.Box3();
-    for (const part of parts) {
-      part.geometry.computeBoundingBox();
-      const bounds = part.geometry.boundingBox;
-      if (!bounds) continue;
-      box.union(bounds.clone().applyMatrix4(part.matrix));
-    }
+    const box = this.partsBounds(parts);
     if (box.isEmpty()) return null;
 
     const size = new THREE.Vector3();
@@ -2429,30 +2893,94 @@ export class EntityViews {
     box.getCenter(centre);
     if (size.x <= 0 || size.y <= 0 || size.z <= 0) return null;
 
-    // Deterministic jitter, seeded from the asset id: the same rock always grows the same vein, in
-    // every session and every screenshot.
-    const rng = new Rng(hashString(assetId));
-    const radius = Math.min(size.x, size.z) * 0.34;
-    const shards: THREE.BufferGeometry[] = [];
-    for (let index = 0; index < SEAM_SHARDS; index += 1) {
-      const angle = (index / SEAM_SHARDS) * Math.PI * 2 + rng.float(-0.3, 0.3);
-      const shard = new THREE.OctahedronGeometry(1, 0);
-      shard.scale(size.x * 0.115, size.y * 0.2, size.z * 0.115);
-      shard.rotateZ(rng.float(-0.55, 0.55));
-      shard.rotateY(angle);
-      shard.translate(
-        centre.x + Math.sin(angle) * radius,
-        centre.y + size.y * rng.float(-0.02, 0.28),
-        centre.z + Math.cos(angle) * radius,
-      );
-      shards.push(shard);
+    const rng = new Rng(hashString(`${assetId}:fracture`));
+    const direction = rng.float(0.18, Math.PI * 0.82);
+    const points: Array<readonly [number, number]> = [];
+    for (let index = 0; index < 7; index += 1) {
+      const t = -0.43 + index * (0.86 / 6);
+      const cross = rng.float(-0.055, 0.055);
+      points.push([
+        centre.x + Math.cos(direction) * size.x * t - Math.sin(direction) * size.x * cross,
+        centre.z + Math.sin(direction) * size.z * t + Math.cos(direction) * size.z * cross,
+      ]);
     }
 
-    const merged = mergeGeometries(shards, false);
-    for (const shard of shards) shard.dispose();
+    const surfaceMeshes = parts.map((part) => {
+      const mesh = new THREE.Mesh(part.geometry, part.material);
+      mesh.matrixAutoUpdate = false;
+      mesh.matrix.copy(part.matrix);
+      mesh.matrixWorld.copy(part.matrix);
+      return mesh;
+    });
+    const surfaceRay = new THREE.Raycaster();
+    surfaceRay.near = 0;
+    surfaceRay.far = size.y * 1.5;
+    const rayOrigin = new THREE.Vector3();
+    const veins: THREE.BufferGeometry[] = [];
+    const surfaceY = (x: number, z: number): number => {
+      rayOrigin.set(x, box.max.y + size.y * 0.2, z);
+      surfaceRay.set(rayOrigin, DOWN_AXIS);
+      let sampled = Number.NEGATIVE_INFINITY;
+      for (const mesh of surfaceMeshes) {
+        const hit = surfaceRay.intersectObject(mesh, false)[0];
+        if (hit) sampled = Math.max(sampled, hit.point.y);
+      }
+      if (Number.isFinite(sampled)) return sampled;
+
+      const nx = (x - centre.x) / Math.max(size.x * 0.5, 0.001);
+      const nz = (z - centre.z) / Math.max(size.z * 0.5, 0.001);
+      const radial = Math.min(1, Math.hypot(nx, nz));
+      return box.max.y - size.y * (0.06 + radial * radial * 0.24);
+    };
+    const addSegment = (
+      from: readonly [number, number],
+      to: readonly [number, number],
+      width: number,
+    ): void => {
+      const fromY = surfaceY(from[0], from[1]);
+      const toY = surfaceY(to[0], to[1]);
+      const direction3d = new THREE.Vector3(
+        to[0] - from[0],
+        toY - fromY,
+        to[1] - from[1],
+      );
+      const length = direction3d.length();
+      if (length < 0.001) return;
+      const x = (from[0] + to[0]) * 0.5;
+      const z = (from[1] + to[1]) * 0.5;
+      const thickness = Math.max(size.y * 0.014, 0.007);
+      const vein = new THREE.BoxGeometry(length, thickness, width);
+      vein.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(X_AXIS, direction3d.normalize()));
+      vein.translate(x, (fromY + toY) * 0.5 - thickness * 0.32, z);
+      veins.push(vein);
+    };
+
+    const body = new THREE.Color(palette.body);
+    const metal = new THREE.Color(palette.metal);
+    const bodyLuminance = body.r * 0.2126 + body.g * 0.7152 + body.b * 0.0722;
+    const metalLuminance = metal.r * 0.2126 + metal.g * 0.7152 + metal.b * 0.0722;
+    const luminanceGap = Math.abs(metalLuminance - bodyLuminance);
+    const contrastSupport = 1 - THREE.MathUtils.smoothstep(luminanceGap, 0.08, 0.24);
+    const widthRatio = THREE.MathUtils.lerp(0.032, 0.048, contrastSupport);
+    const width = Math.max(Math.min(size.x, size.z) * widthRatio, 0.016);
+    for (let index = 0; index < points.length - 1; index += 1) {
+      addSegment(points[index]!, points[index + 1]!, width * rng.float(0.72, 1.08));
+    }
+    for (const branchIndex of [1, 3, 5] as const) {
+      const origin = points[branchIndex]!;
+      const branchAngle = direction + (branchIndex % 2 === 0 ? 1 : -1) * rng.float(0.55, 0.92);
+      const branchLength = Math.min(size.x, size.z) * rng.float(0.15, 0.24);
+      addSegment(origin, [
+        origin[0] + Math.cos(branchAngle) * branchLength,
+        origin[1] + Math.sin(branchAngle) * branchLength,
+      ], width * 0.62);
+    }
+
+    const merged = mergeGeometries(veins, false);
+    for (const vein of veins) vein.dispose();
     if (!merged) return null;
     merged.computeBoundingSphere();
-    this.seamGeometries.set(assetId, merged);
+    this.seamGeometries.set(cacheKey, merged);
     return merged;
   }
 
@@ -2823,8 +3351,9 @@ export class EntityViews {
     const maxIndices = Math.max(BATCH_VERTEX_STEP * 3, indices * 2);
     const mesh = new THREE.BatchedMesh(maxInstances, maxVertices, maxIndices, part.material);
     mesh.name = `entity-batch-${this.batches.size}`;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    const castsShadow = part.material.userData.entityCastShadow !== false;
+    mesh.castShadow = castsShadow;
+    mesh.receiveShadow = castsShadow;
     // Per-INSTANCE culling is the whole reason this class is here, and it makes the object-level
     // test both redundant and wrong: a batch's bounding sphere spans every region that uses the
     // material, so it would never cull, while `onBeforeRender` (and `onBeforeShadow`) already drops
@@ -2835,6 +3364,11 @@ export class EntityViews {
     // cell the camera is standing in.
     mesh.frustumCulled = true;
     mesh.perObjectFrustumCulled = true;
+    const detail = part.resourceDetail;
+    if (detail?.kind === "fish") mesh.renderOrder = SUBMERGED_FISH_RENDER_ORDER;
+    else if (detail?.kind === "ripple" || detail?.kind === "bubbles") {
+      mesh.renderOrder = FISH_MARKER_RENDER_ORDER;
+    }
     // The per-frame instance sort only earns its cost when draw order changes the picture.
     mesh.sortObjects = part.material.transparent === true;
     const batch: Batch = {
@@ -2970,7 +3504,12 @@ export class EntityViews {
     const active = spentReady ? group.spent : movingReady ? group.moving : group.live;
 
     for (const draw of active) {
-      transform.multiplyMatrices(placement, draw.part.matrix);
+      const detail = draw.part.resourceDetail;
+      if (detail?.kind === "fish" && detail.schoolIndex >= record.schoolCount) {
+        hideInstance(draw, slot);
+        continue;
+      }
+      this.resourcePartTransform(draw.part, record, placement, transform);
       const instance = this.instanceFor(draw, group, slot);
       draw.batch.mesh.setMatrixAt(instance, transform);
       draw.batch.mesh.setVisibleAt(instance, true);
@@ -2985,6 +3524,57 @@ export class EntityViews {
       if (variant === active) continue;
       for (const draw of variant) hideInstance(draw, slot);
     }
+  }
+
+  /** Adds deterministic local motion to generated resource parts, then applies entity placement. */
+  private resourcePartTransform(
+    part: SourcePart,
+    record: ViewRecord,
+    placement: THREE.Matrix4,
+    out: THREE.Matrix4,
+  ): void {
+    const detail = part.resourceDetail;
+    if (!detail || detail.kind === "oreVein") {
+      out.multiplyMatrices(placement, part.matrix);
+      return;
+    }
+
+    const drawnYScale = Math.max(
+      0.001,
+      record.scale * record.build[1] * record.scaleAxes[1],
+    );
+    SCRATCH_DETAIL_QUATERNION.identity();
+    SCRATCH_DETAIL_SCALE.set(1, 1, 1);
+
+    if (detail.kind === "fish") {
+      const pace = FISH_LOOP_RADIANS_PER_SECOND * (0.88 + detail.schoolIndex * 0.045);
+      const angle = record.schoolPhase + detail.phase + this.resourceTimeSeconds * pace;
+      SCRATCH_DETAIL_POSITION.set(
+        Math.cos(angle) * detail.orbitX,
+        record.waterOffset / drawnYScale
+          + detail.depthJitter
+          + Math.sin(angle * 1.7 + detail.schoolIndex) * Math.abs(detail.depthJitter) * 0.16,
+        Math.sin(angle) * detail.orbitZ,
+      );
+      // Imported fish face along local Z. Turn that axis along the orbit tangent.
+      SCRATCH_DETAIL_QUATERNION.setFromAxisAngle(Y_AXIS, -angle);
+      SCRATCH_DETAIL_SCALE.setScalar(detail.scale);
+    } else if (detail.kind === "ripple") {
+      const speed = detail.recovery ? 0.85 : 1.35;
+      const pulse = 1 + Math.sin(this.resourceTimeSeconds * speed + record.schoolPhase) * 0.06;
+      SCRATCH_DETAIL_POSITION.set(0, 0.018 / drawnYScale, 0);
+      SCRATCH_DETAIL_SCALE.set(pulse, 1, pulse);
+    } else {
+      const lift = Math.sin(this.resourceTimeSeconds * 1.7 + record.schoolPhase) * 0.035;
+      SCRATCH_DETAIL_POSITION.set(0, lift / drawnYScale, 0);
+    }
+
+    SCRATCH_DETAIL.compose(
+      SCRATCH_DETAIL_POSITION,
+      SCRATCH_DETAIL_QUATERNION,
+      SCRATCH_DETAIL_SCALE,
+    );
+    out.multiplyMatrices(placement, SCRATCH_DETAIL).multiply(part.matrix);
   }
 
   /**
@@ -3504,6 +4094,8 @@ export class EntityViews {
     this.records.clear();
     this.animated.clear();
     this.rigCandidates.clear();
+    this.fishingViews.clear();
+    this.resourceTimeSeconds = 0;
     this.viewer = null;
     this.meshCounts.clear();
     this.characterCosts.clear();
@@ -3515,8 +4107,25 @@ export class EntityViews {
     for (const material of this.tintedMaterials.values()) material.dispose();
     this.tintedMaterials.clear();
     for (const geometry of this.seamGeometries.values()) geometry.dispose();
+    for (const entry of this.workedOreGeometries.values()) {
+      entry.scar.dispose();
+      entry.dust.dispose();
+      entry.fragments.dispose();
+    }
+    for (const entry of this.fishingGeometries.values()) {
+      entry.ripple.dispose();
+      entry.bubbles.dispose();
+    }
+    for (const geometry of this.campfireRockGeometries.values()) geometry.dispose();
+    for (const material of this.resourceMaterials.values()) material.dispose();
+    for (const material of this.submergedFishMaterials.values()) material.dispose();
     for (const geometry of this.bakedGeometries) geometry.dispose();
     this.seamGeometries.clear();
+    this.workedOreGeometries.clear();
+    this.fishingGeometries.clear();
+    this.campfireRockGeometries.clear();
+    this.resourceMaterials.clear();
+    this.submergedFishMaterials.clear();
     this.bakedGeometries.length = 0;
     this.sources.clear();
     this.sourceRequests.clear();

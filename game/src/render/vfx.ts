@@ -166,6 +166,9 @@ export class Vfx {
           ? data["name"]
           : prettyItemName(typeof data["itemId"] === "string" ? data["itemId"] : "");
         this.floatAt(at, `+${quantity} ${name}`.trimEnd(), "vfx-xp", nowMs, XP_LIFETIME_MS, 1.4);
+        if (data["source"] === "gather" && data["skill"] === "fishing") {
+          this.ambience?.burst("splash", [at[0], at[1] + 0.08, at[2]], 6, nowMs);
+        }
         break;
       }
       case "level.gained": {

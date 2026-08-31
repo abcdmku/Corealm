@@ -19,6 +19,7 @@ import {
   content, gatherXp, healAmount, respawnSeconds, sellPrice, toolBonus, yieldRange,
 } from "../content/index.js";
 import { REGIONS } from "../content/regions.js";
+import { resourceDef } from "../content/resources.js";
 
 export interface DocEntry {
   id: string;
@@ -190,7 +191,7 @@ export function buildDocs(): DocEntry[] {
       section: "Recipes",
       body:
         `Making ${output} needs ${SKILLS[recipe.skill]?.name ?? recipe.skill} level ${recipe.reqLevel}`
-        + `${recipe.station ? ` at a ${recipe.station.replace(/_/g, " ")}` : ""}. `
+        + `${recipe.stations ? ` at ${recipe.stations.map((kind) => kind.replace(/_/g, " ")).join(" or ")}` : ""}. `
         + `It consumes ${inputs}, produces ${recipe.output.quantity}x ${output}, takes `
         + `${(recipe.durationMs / 1000).toFixed(1)} seconds, and gives ${recipe.xp} experience.`,
       keywords: [recipe.id, recipe.kind, recipe.skill, output.toLowerCase()],
@@ -236,7 +237,10 @@ export function buildDocs(): DocEntry[] {
   // --------------------------------------------------------------- regions
   for (const region of REGIONS) {
     const resources = region.clusters
-      .map((cluster) => `${cluster.name} (tier ${cluster.tier} ${cluster.skill})`)
+      .map((cluster) => {
+        const resource = resourceDef(cluster.resourceId);
+        return `${resource.name} (tier ${resource.tier} ${resource.skill})`;
+      })
       .join(", ");
     entries.push({
       id: `region-${region.id}`,
@@ -268,7 +272,10 @@ export function buildDocs(): DocEntry[] {
     for (const location of region.locations) {
       const clusters = region.clusters
         .filter((cluster) => cluster.locationId === location.id)
-        .map((cluster) => `${cluster.name} (tier ${cluster.tier} ${cluster.skill}, needs level ${cluster.reqLevel})`);
+        .map((cluster) => {
+          const resource = resourceDef(cluster.resourceId);
+          return `${resource.name} (tier ${resource.tier} ${resource.skill}, needs level ${resource.reqLevel})`;
+        });
       entries.push({
         id: `place-${location.id}`,
         title: location.name,

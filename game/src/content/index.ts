@@ -13,21 +13,80 @@
  * FROZEN. Only the root edits this file.
  */
 import type {
-  EquipSlot, ItemDef, ItemId, RecipeId, SkillId, SpellElement, SpellId, SpellRung,
+  EquipSlot, ItemDef, ItemId, RecipeId, SkillId, SpellElement, SpellId, SpellRung, StationKind,
 } from "../contracts.js";
 
 // ---------------------------------------------------------------- resources
+
+export type GatheringResourceArchetype = "ore" | "tree" | "fishing_spot" | "farm_plot";
+
+/** Authored visual rules shared by every cluster that references a resource. */
+export interface ResourcePresentationDef {
+  /** Deterministically selected from the entity id. */
+  availableAssetIds: readonly string[];
+  /** Authored spent state. When absent the renderer may derive a clipped/desaturated fallback. */
+  depletedAssetId?: string;
+  /** Desired largest world-space dimension in metres. */
+  targetWorldSize: number;
+  /** Applied after target-size normalisation, with a deterministic value between the endpoints. */
+  variantScale?: readonly [number, number];
+  /** Vertical offset from the canonical solved water surface. Fishing resources only. */
+  waterOffset?: number;
+  /** Drives the tier-specific mineral, foliage, or fish treatment in the renderer. */
+  materialTier: number;
+}
 
 /** A gatherable node archetype: what it yields, what it needs, how long it lasts. */
 export interface ResourceDef {
   id: string;
   name: string;
+  archetype: GatheringResourceArchetype;
   skill: SkillId;
   tier: number;
   reqLevel: number;
   itemId: ItemId;
   /** Secondary drops, rolled independently per successful gather. */
   bonus?: { itemId: ItemId; chance: number }[];
+  presentation: ResourcePresentationDef;
+}
+
+export interface CampfireFuelDef {
+  logItemId: ItemId;
+  tier: number;
+  buildTimeMs: number;
+  lifetimeMs: number;
+  buildXp: Readonly<{ fletching: number; crafting: number }>;
+  visualLogAssetId: string;
+}
+
+/**
+ * One complete gathering/production unlock row. Systems consume this shape without tier branches,
+ * so a later region adds data rather than another gather, production, or campfire implementation.
+ */
+export interface GatheringProductionTierDef {
+  tier: number;
+  reqLevel: number;
+  metalName: string;
+  woodName: string;
+  resources: Readonly<{
+    mining: readonly string[];
+    fishing: string;
+    woodcutting: string;
+  }>;
+  /** Complete authored gathering rows, including presentation and asset references. */
+  resourceDefs: readonly ResourceDef[];
+  items: Readonly<{
+    ore: ItemId; flux: ItemId; gem: ItemId; bar: ItemId;
+    log: ItemId; shaft: ItemId; handle: ItemId; hide: ItemId;
+    rawFish: ItemId; cookedFish: ItemId; burntFish: ItemId;
+    dagger: ItemId; sword: ItemId; helm: ItemId; body: ItemId; legs: ItemId;
+    boots: ItemId; gloves: ItemId; pickaxe: ItemId; hatchet: ItemId;
+    staff: ItemId; wand: ItemId; focus: ItemId; rod: ItemId; shield: ItemId;
+    meleeRing: ItemId; meleePendant: ItemId; magicRing: ItemId; magicCharm: ItemId;
+    hood: ItemId; robe: ItemId; magicLegs: ItemId; magicBoots: ItemId; wraps: ItemId;
+  }>;
+  smelting: Readonly<{ orePerBar: number; fluxPerBar: number }>;
+  campfire: CampfireFuelDef;
 }
 
 // ------------------------------------------------------------------ recipes
@@ -42,8 +101,8 @@ export interface RecipeDef {
   skill: SkillId;
   reqLevel: number;
   tier: number;
-  /** Station kind this recipe needs. Null means it can be made anywhere. */
-  station: "furnace" | "anvil" | "range" | "crafting_table" | "fletching_bench" | null;
+  /** Accepted station kinds. Null means the recipe can be made anywhere. */
+  stations: readonly StationKind[] | null;
   inputs: { itemId: ItemId; quantity: number }[];
   output: { itemId: ItemId; quantity: number };
   durationMs: number;
@@ -184,8 +243,8 @@ class ContentRegistry {
   }
 
   /** Recipes a station can make, for the production UI. */
-  recipesForStation(station: RecipeDef["station"]): RecipeDef[] {
-    return this.tables.recipes.filter((row) => row.station === station);
+  recipesForStation(station: StationKind): RecipeDef[] {
+    return this.tables.recipes.filter((row) => row.stations?.includes(station));
   }
 
   /** Recipes for a skill, ordered by requirement. The skill guide reads this. */

@@ -10,7 +10,8 @@ import {
   applyGearAppearance, gearAppearance, gearAppearanceParts, weaponAttachment, weaponSocket,
 } from "../game/src/render/equipmentVisuals.js";
 import {
-  PROCEDURAL_GEAR_ASSETS, STAFF_LOOKS, buildStaff, isProceduralGearAsset,
+  PROCEDURAL_GEAR_ASSETS, PROCEDURAL_WAND_ASSETS, STAFF_LOOKS, WAND_LOOKS,
+  buildStaff, buildWand, isProceduralGearAsset,
 } from "../game/src/render/proceduralGear.js";
 import { iconShapeFor } from "../game/src/ui/itemIcons.js";
 
@@ -50,11 +51,10 @@ function kitTotals(kit: keyof typeof KITS): EquipmentBonuses {
 }
 
 describe("the gear ladder", () => {
-  it("has 59 rows, one per id, all of them equippable", () => {
-    // 58 before the magic ladder, plus `worn_staff` — the tier-0 mate of `worn_sword`, so the magic
-    // line now starts in the first minute the way the melee line always did.
-    expect(EQUIPMENT).toHaveLength(59);
-    expect(BY_ID.size).toBe(59);
+  it("has 62 rows, one per id, all of them equippable", () => {
+    // The three functioning wands extend the earlier 59-row ladder.
+    expect(EQUIPMENT).toHaveLength(62);
+    expect(BY_ID.size).toBe(62);
     for (const def of EQUIPMENT) {
       expect(def.equip, `${def.id} has no equip block`).toBeDefined();
       expect(def.category).toBe("equipment");
@@ -148,7 +148,9 @@ describe("gear appearance", () => {
     // publishes it into the same cache `load()` reads, so it will never appear in a manifest that
     // `tools/build-assets.ts` derives from files on disk. Excusing it by prefix would let any typo
     // starting "proc_" through, so it is checked against the real registration list instead.
-    const built = new Set(PROCEDURAL_GEAR_ASSETS.map((asset) => asset.assetId));
+    const built = new Set(
+      [...PROCEDURAL_GEAR_ASSETS, ...PROCEDURAL_WAND_ASSETS].map((asset) => asset.assetId),
+    );
     for (const body of ["male", "female"] as const) {
       for (const def of EQUIPMENT) {
         for (const part of gearAppearanceParts(def.id, body)) {
@@ -196,6 +198,22 @@ describe("gear appearance", () => {
       expect(parts, `${def.id} draws nothing`).toHaveLength(1);
       expect(isProceduralGearAsset(parts[0]!.assetId), `${def.id} -> ${parts[0]!.assetId}`).toBe(true);
       expect(weaponSocket(parts[0]!.assetId), `${def.id} has no socket`).not.toBeNull();
+    }
+  });
+
+  it("builds and sockets every wand as a visible one-handed magic weapon", () => {
+    const order = ["palewood_wand", "duskoak_wand", "cairnpine_wand"] as const;
+    let previousHeight = 0;
+    for (const id of order) {
+      const parts = gearAppearanceParts(id);
+      expect(parts, `${id} draws nothing`).toHaveLength(1);
+      expect(isProceduralGearAsset(parts[0]!.assetId), `${id} -> ${parts[0]!.assetId}`).toBe(true);
+      expect(weaponSocket(parts[0]!.assetId), `${id} has no socket`).not.toBeNull();
+      const look = WAND_LOOKS[id];
+      expect(look, `${id} has no WAND_LOOKS entry`).toBeDefined();
+      const height = new THREE.Box3().setFromObject(buildWand(look!)).getSize(new THREE.Vector3()).y;
+      expect(height).toBeGreaterThan(previousHeight);
+      previousHeight = height;
     }
   });
 
@@ -323,7 +341,7 @@ describe("item icons", () => {
     expect(iconShapeFor(BY_ID.get("kaldite_boots"))).toBe("boot");
   });
 
-  it("gives every one of the 58 rows a shape", () => {
+  it("gives every equipment row a shape", () => {
     for (const def of EQUIPMENT) expect(iconShapeFor(def), def.id).toBeTruthy();
   });
 });

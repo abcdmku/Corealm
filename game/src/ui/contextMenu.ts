@@ -220,6 +220,8 @@ export interface ContextMenuDeps {
   root?: HTMLElement | null;
   /** Override to use `content/skills.ts` display names once a panel owns that mapping. */
   skillLabel?: (skill: SkillId) => string;
+  /** Opens recipe selection without auto-starting the station's highest affordable recipe. */
+  onProduction?: (entityId: EntityId) => void;
 }
 
 export interface OpenOptions {
@@ -287,7 +289,7 @@ export class ContextMenu {
 
     this.open(clientX, clientY, items, {
       title: entity.name,
-      subtitle: `Tier ${entity.tier} · ${entity.state}`,
+      subtitle: entitySubtitle(entity, this.deps.api),
       ...options,
     });
   }
@@ -441,6 +443,10 @@ export class ContextMenu {
       notify(`${seen.name} — tier ${seen.tier}, ${seen.state}.`, "info");
       return;
     }
+    if (interaction === "produce" && entity.station && this.deps.onProduction) {
+      this.deps.onProduction(entity.id);
+      return;
+    }
     reportResult(this.deps.api.interact(entity.id, interaction));
   }
 
@@ -520,4 +526,33 @@ export class ContextMenu {
 
 function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
+}
+
+function entitySubtitle(entity: SemanticEntity, api: GameApi): string {
+  const base = `Tier ${entity.tier} · ${entity.state}`;
+  if (entity.station?.kind !== "campfire") return base;
+  const remainingMs = contextRemainingMs(entity, api);
+  return remainingMs === null ? `${base} · portable fire` : `${base} · ${formatRemaining(remainingMs)} left`;
+}
+
+/** Reads only countdown fields a semantic entity can state in the GameApi sim-clock frame. */
+function contextRemainingMs(entity: SemanticEntity, api: GameApi): number | null {
+  const meta = entity.meta;
+  if (!meta) return null;
+  const directMs = meta["remainingMs"] ?? meta["campfireRemainingMs"];
+  if (typeof directMs === "number" && Number.isFinite(directMs)) return Math.max(0, directMs);
+  const directSeconds = meta["remainingSeconds"] ?? meta["campfireRemainingSeconds"];
+  if (typeof directSeconds === "number" && Number.isFinite(directSeconds)) return Math.max(0, directSeconds * 1_000);
+  const expiresAtMs = meta["expiresAtMs"];
+  if (typeof expiresAtMs === "number" && Number.isFinite(expiresAtMs)) {
+    return Math.max(0, expiresAtMs - api.getTime().simMs);
+  }
+  return null;
+}
+
+function formatRemaining(remainingMs: number): string {
+  const seconds = Math.max(0, Math.ceil(remainingMs / 1_000));
+  const minutes = Math.floor(seconds / 60);
+  const tail = seconds % 60;
+  return minutes > 0 ? `${minutes}:${String(tail).padStart(2, "0")}` : `${tail}s`;
 }

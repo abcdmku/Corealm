@@ -17,7 +17,7 @@ import { STARTING_EQUIPMENT, STARTING_INVENTORY } from "../content/items.js";
 
 export const INVENTORY_SLOTS = 28;
 export const BANK_CAPACITY = 400;
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export type ActivityState =
   | {
@@ -30,7 +30,11 @@ export type ActivityState =
     }
   | { kind: "traversing"; obstacleId: EntityId; endsAtMs: number }
   | { kind: "farming"; op: "rake" | "plant" | "harvest"; plotId: string; endsAtMs: number }
-  | { kind: "eating"; itemId: ItemId; endsAtMs: number };
+  | { kind: "eating"; itemId: ItemId; endsAtMs: number }
+  | {
+      kind: "building_campfire"; logItemId: ItemId; tier: number; regionId: RegionId; position: Vec3;
+      buildTimeMs: number; lifetimeMs: number; endsAtMs: number;
+    };
 
 export interface FarmPlotState {
   plotId: string;
@@ -41,6 +45,15 @@ export interface FarmPlotState {
   /** Wall clock, so crops keep growing between sessions. */
   stageStartedAtMs: number;
   state: "empty" | "raked" | "growing" | "ready";
+}
+
+/** Persisted lifecycle state for one authored gathering node. */
+export interface ResourceNodeState {
+  remaining: number;
+  maxYields: number;
+  state: "available" | "depleted";
+  /** Cumulative played-time deadline in milliseconds. Null while the node is available. */
+  respawnAtMs: number | null;
 }
 
 export interface GameState {
@@ -106,7 +119,7 @@ export interface GameState {
   } | null;
   farming: Record<string, FarmPlotState>;
   world: {
-    nodes: Record<EntityId, { remaining: number; state: "available" | "depleted"; respawnAtMs: number | null }>;
+    nodes: Record<EntityId, ResourceNodeState>;
     enemies: Record<EntityId, {
       health: number;
       state: "idle" | "aggro" | "dead" | "returning";
@@ -118,6 +131,10 @@ export interface GameState {
     lootPiles: Record<EntityId, { position: Vec3; items: ItemStack[]; expiresAtMs: number; ownerOnly: boolean }>;
     recoveryCache: {
       id: EntityId; position: Vec3; regionId: RegionId; items: ItemStack[]; expiresAtMs: number;
+    } | null;
+    campfire: {
+      id: EntityId; position: Vec3; regionId: RegionId; logItemId: ItemId; tier: number;
+      expiresAtPlaySeconds: number;
     } | null;
   };
   discovery: {
@@ -182,7 +199,7 @@ export function createInitialState(seed = 1337, nowMs = 0): GameState {
     quests: {},
     dialogue: null,
     farming: {},
-    world: { nodes: {}, enemies: {}, obstaclesUsed: {}, lootPiles: {}, recoveryCache: null },
+    world: { nodes: {}, enemies: {}, obstaclesUsed: {}, lootPiles: {}, recoveryCache: null, campfire: null },
     discovery: { entities: {}, locations: {}, regions: [DEFAULT_REGION] },
     settings: { cameraDistance: 18, cameraPitchRad: 0.72, overlaysVisible: true, uiScale: 1 },
   };

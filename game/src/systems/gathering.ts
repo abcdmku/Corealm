@@ -26,12 +26,12 @@
 import type {
   ActivitySummary, EntityId, InteractionId, ItemId, Result, SemanticEntity, SkillId,
 } from "../contracts.js";
-import { EQUIP_SLOTS, err, ok } from "../contracts.js";
-import type { ActivityState, GameState, Store } from "../state/store.js";
+import { err, ok } from "../contracts.js";
+import type { ActivityState, GameState, ResourceNodeState, Store } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
 import type { SimClock } from "../core/time.js";
 import { GATHER_TICK_MS } from "../core/time.js";
-import type { Rng, RngStreams } from "../core/rng.js";
+import type { RngStreams } from "../core/rng.js";
 import type { InteractionContext, InteractionDispatcher } from "../world/interactions.js";
 import type { ActivityDriver, ActivityTickResult, EntityLookup, InventoryPort } from "./activity.js";
 import type { ActivitySystem } from "./activity.js";
@@ -43,6 +43,11 @@ import {
 } from "../content/index.js";
 
 export type { EntityLookup, InventoryPort } from "./activity.js";
+
+/** Inventory adds owned by gathering suppress the inventory layer's generic receipt event. */
+export interface GatheringInventoryPort extends InventoryPort {
+  addItem(itemId: ItemId, quantity: number, options?: { silent?: boolean }): Result<number>;
+}
 
 /** The gathering verbs and the skill each one trains. `harvest` is farming's, and lives there. */
 const GATHER_SKILL: Readonly<Record<string, SkillId>> = {
@@ -62,12 +67,8 @@ const GATHER_SKILL: Readonly<Record<string, SkillId>> = {
  */
 const MAX_CATCHUP_ROLLS = 4000;
 
-/** The live runtime record for one node. Mirrors the store's `world.nodes` value type exactly. */
-export interface NodeRuntime {
-  remaining: number;
-  state: "available" | "depleted";
-  respawnAtMs: number | null;
-}
+/** The live runtime record for one node is also its exact persisted shape. */
+export type NodeRuntime = ResourceNodeState;
 
 export interface GatheringDeps {
   store: Store;
@@ -75,7 +76,7 @@ export interface GatheringDeps {
   clock: SimClock;
   rng: RngStreams;
   entities: EntityLookup;
-  inventory: InventoryPort;
+  inventory: GatheringInventoryPort;
   activity: ActivitySystem;
   dispatcher: InteractionDispatcher;
 }
@@ -93,16 +94,10 @@ export class GatheringSystem implements TickSystem {
   /** The activity-side half. Registered with `ActivitySystem` in the constructor. */
   readonly driver: ActivityDriver;
 
-  private readonly gatherRng: Rng;
-  private readonly bonusRng: Rng;
   /** itemId -> ResourceDef. Built lazily: content registers after this object is constructed. */
   private resourceByItem: Map<ItemId, ResourceDef> | null = null;
 
   constructor(private readonly deps: GatheringDeps) {
-    this.gatherRng = deps.rng.get("gather");
-    // Bonus drops roll on the loot stream so a secondary drop can never shift the gather sequence.
-    this.bonusRng = deps.rng.get("loot");
-
     this.driver = {
       kind: "gathering",
       tick: (activity, state, deltaMs, atMs) => this.advance(activity, state, deltaMs, atMs),
@@ -113,6 +108,11 @@ export class GatheringSystem implements TickSystem {
     for (const interaction of ["mine", "chop", "fish"] as const) {
       deps.dispatcher.registerHandler(interaction, (context) => this.handle(context));
     }
+
+    // The world is built before the save is loaded, so its entities still carry freshly rolled
+    // node state at this point. Apply the persisted records now. Waiting for interaction would
+    // draw an exhausted seam, stump, or fishing spot as available until the player touched it.
+    this.hydratePersistedNodes();
   }
 
   /** Satisfies `SystemHooks.gathering` in api/gameApi.ts. */
@@ -126,30 +126,27 @@ export class GatheringSystem implements TickSystem {
    * Respawn timers. A depleted node comes back with a freshly rolled yield count (PRD 2.6), which
    * is what stops a five-node cluster settling into a fixed rotation.
    */
-  tick(_deltaMs: number, atMs: number): void {
+  tick(_deltaMs: number, _atMs: number): void {
     const state = this.deps.store.get();
+    const playedAtMs = state.meta.playSeconds * 1_000;
     let changed = false;
 
     for (const [entityId, node] of Object.entries(state.world.nodes)) {
-      if (node.state !== "depleted") continue;
-      if (node.respawnAtMs === null || atMs < node.respawnAtMs) continue;
-
       const entity = this.deps.entities.get(entityId);
+      if (entity?.resource) this.syncNodeView(entity, node);
+      if (node.state !== "depleted") continue;
+      if (node.respawnAtMs === null || playedAtMs < node.respawnAtMs) continue;
+
       const tier = entity?.tier ?? 1;
       const [min, max] = yieldRange(tier);
-      const rolled = this.gatherRng.int(min, max);
+      const rolled = this.deps.rng.get("gather").int(min, max);
 
       node.remaining = rolled;
+      node.maxYields = rolled;
       node.state = "available";
       node.respawnAtMs = null;
 
-      if (entity) {
-        entity.state = "available";
-        if (entity.resource) {
-          entity.resource.remaining = rolled;
-          entity.resource.maxYields = rolled;
-        }
-      }
+      if (entity?.resource) this.syncNodeView(entity, node);
       changed = true;
     }
 
@@ -259,14 +256,14 @@ export class GatheringSystem implements TickSystem {
       activity.nextRollAtMs += GATHER_TICK_MS;
 
       const chance = gatherSuccessChance(this.effectiveLevel(state, activity.skill), required);
-      if (!this.gatherRng.chance(chance)) continue;
+      if (!this.deps.rng.get("gather").chance(chance)) continue;
 
       // Room is checked per success rather than once at the start: a stack fills mid-session.
       if (!this.deps.inventory.hasRoomFor(itemId, 1)) {
         this.deps.events.emit("inventory.full", { itemId }, entity.id, atMs);
         return stopWith("inventory-full");
       }
-      const added = this.deps.inventory.addItem(itemId, 1);
+      const added = this.deps.inventory.addItem(itemId, 1, { silent: true });
       if (!added.ok || added.value <= 0) {
         this.deps.events.emit("inventory.full", { itemId }, entity.id, atMs);
         return stopWith("inventory-full");
@@ -274,7 +271,13 @@ export class GatheringSystem implements TickSystem {
 
       this.deps.events.emit(
         "item.received",
-        { itemId, quantity: added.value, source: "gather", skill: activity.skill },
+        {
+          itemId,
+          name: content.item(itemId)?.name ?? itemId,
+          quantity: added.value,
+          source: "gather",
+          skill: activity.skill,
+        },
         entity.id,
         atMs,
       );
@@ -322,12 +325,12 @@ export class GatheringSystem implements TickSystem {
   nodeRuntime(state: GameState, entity: SemanticEntity): NodeRuntime {
     const existing = state.world.nodes[entity.id];
     if (existing) {
-      if (entity.resource) entity.resource.remaining = existing.remaining;
-      entity.state = existing.state;
+      this.syncNodeView(entity, existing);
       return existing;
     }
     const created: NodeRuntime = {
       remaining: entity.resource?.remaining ?? 0,
+      maxYields: entity.resource?.maxYields ?? entity.resource?.remaining ?? 0,
       state: entity.state === "depleted" ? "depleted" : "available",
       respawnAtMs: null,
     };
@@ -351,7 +354,8 @@ export class GatheringSystem implements TickSystem {
     const state = this.deps.store.get();
     const entity = this.deps.entities.get(entityId);
     if (!entity?.resource) return false;
-    this.deplete(entity, this.nodeRuntime(state, entity), atMs);
+    const node = this.nodeRuntime(state, entity);
+    this.deplete(entity, node, atMs);
     return true;
   }
 
@@ -361,21 +365,44 @@ export class GatheringSystem implements TickSystem {
    * Expires the timer rather than re-rolling the node here, so the next tick runs the identical
    * respawn path a player would see — including the fresh yield roll from the seeded stream.
    */
-  forceRespawn(entityId: EntityId, atMs: number): boolean {
+  forceRespawn(entityId: EntityId, _atMs: number): boolean {
     const state = this.deps.store.get();
     const entity = this.deps.entities.get(entityId);
     if (!entity?.resource) return false;
     const node = this.nodeRuntime(state, entity);
     if (node.state !== "depleted") return false;
-    node.respawnAtMs = atMs;
+    node.respawnAtMs = state.meta.playSeconds * 1_000;
     return true;
+  }
+
+  /** Debug-only resource fast-forward. It deliberately leaves global played time unchanged. */
+  fastForwardRespawns(seconds: number): void {
+    if (!Number.isFinite(seconds) || seconds <= 0) return;
+    const state = this.deps.store.get();
+    const playedAtMs = state.meta.playSeconds * 1_000;
+    const shiftMs = seconds * 1_000;
+    let changed = false;
+
+    for (const node of Object.values(state.world.nodes)) {
+      if (node.state !== "depleted" || node.respawnAtMs === null) continue;
+      node.respawnAtMs = Math.max(playedAtMs, node.respawnAtMs - shiftMs);
+      changed = true;
+    }
+    if (changed) this.deps.store.markDirty();
+
+    // Use the normal roll, state transition, view sync, and dirty path for anything now due.
+    this.tick(0, this.deps.clock.elapsedMs);
   }
 
   private deplete(entity: SemanticEntity, node: NodeRuntime, atMs: number): void {
     const seconds = entity.resource?.respawnSeconds ?? respawnSeconds(entity.tier);
+    const yieldsTaken = Math.max(0, Math.floor(node.maxYields));
     node.remaining = 0;
     node.state = "depleted";
-    node.respawnAtMs = atMs + seconds * 1000;
+    // This field keeps its save-compatible name, but its clock is cumulative played time. Session
+    // timestamps reset on every boot and made a saved node wait too long or respawn immediately.
+    // Played time survives reload and advances only while the simulation runs.
+    node.respawnAtMs = this.deps.store.get().meta.playSeconds * 1_000 + seconds * 1_000;
 
     entity.state = "depleted";
     if (entity.resource) entity.resource.remaining = 0;
@@ -383,8 +410,13 @@ export class GatheringSystem implements TickSystem {
     this.deps.events.emit(
       "resource.depleted",
       {
+        entityId: entity.id,
         itemId: entity.resource?.itemId,
         tier: entity.tier,
+        respawnInSeconds: seconds,
+        yieldsTaken,
+        // Kept for existing HUD and audio consumers while the canonical event field is
+        // `respawnInSeconds`.
         respawnSeconds: seconds,
         respawnAtMs: node.respawnAtMs,
       },
@@ -397,8 +429,8 @@ export class GatheringSystem implements TickSystem {
   /**
    * Effective level = skill level + the best matching tool bonus.
    *
-   * Reads equipment straight out of the store rather than through the equipment system: a bonus
-   * lookup is a pure read, and another worker owns that file this round.
+   * Gathering tools are carried inventory items rather than wearable equipment. Scanning the pack
+   * also keeps the roll and the fishing rod shown by CharacterRig on the same selection rule.
    */
   effectiveLevel(state: GameState, skill: SkillId): number {
     return state.skills[skill].level + this.toolBonusFor(state, skill);
@@ -406,8 +438,7 @@ export class GatheringSystem implements TickSystem {
 
   toolBonusFor(state: GameState, skill: SkillId): number {
     let best = 0;
-    for (const slot of EQUIP_SLOTS) {
-      const stack = state.equipment[slot];
+    for (const stack of state.inventory.slots) {
       if (!stack) continue;
       const def = content.item(stack.itemId);
       const tool = def?.tool;
@@ -428,29 +459,51 @@ export class GatheringSystem implements TickSystem {
     if (!bonuses || bonuses.length === 0) return;
 
     for (const drop of bonuses) {
-      if (!this.bonusRng.chance(drop.chance)) continue;
+      // Bonus drops stay on the loot stream so they never shift the gather sequence.
+      if (!this.deps.rng.get("loot").chance(drop.chance)) continue;
       if (!this.deps.inventory.hasRoomFor(drop.itemId, 1)) continue;
-      const added = this.deps.inventory.addItem(drop.itemId, 1);
+      const added = this.deps.inventory.addItem(drop.itemId, 1, { silent: true });
       if (!added.ok || added.value <= 0) continue;
       this.deps.events.emit(
         "item.received",
-        { itemId: drop.itemId, quantity: added.value, source: "gather-bonus" },
+        {
+          itemId: drop.itemId,
+          name: content.item(drop.itemId)?.name ?? drop.itemId,
+          quantity: added.value,
+          source: "gather-bonus",
+        },
         entity.id,
         atMs,
       );
     }
   }
 
+  /** Apply every saved node record before the first interaction or render-sync tick. */
+  private hydratePersistedNodes(): void {
+    const state = this.deps.store.get();
+    for (const [entityId, node] of Object.entries(state.world.nodes)) {
+      const entity = this.deps.entities.get(entityId);
+      if (entity?.resource) this.syncNodeView(entity, node);
+    }
+  }
+
+  private syncNodeView(entity: SemanticEntity, node: NodeRuntime): void {
+    if (entity.resource) {
+      entity.resource.remaining = node.remaining;
+      entity.resource.maxYields = node.maxYields;
+    }
+    entity.state = node.state;
+  }
+
   /**
-   * Finds the ResourceDef behind a node. World entities carry `meta.clusterId` and the content
-   * tables are authored separately, so this tries the cluster id first and falls back to matching
-   * on the yielded item. A miss just means no bonus drops, which is the right degradation.
+   * Finds the canonical ResourceDef behind a node. Region clusters stamp `meta.resourceId`; the
+   * item fallback keeps hand-authored test entities useful without reviving cluster aliases.
    */
   private resourceDefFor(entity: SemanticEntity, itemId: ItemId): ResourceDef | undefined {
-    const clusterId = entity.meta?.clusterId;
-    if (typeof clusterId === "string") {
-      const byCluster = content.resource(clusterId);
-      if (byCluster) return byCluster;
+    const resourceId = entity.meta?.resourceId;
+    if (typeof resourceId === "string") {
+      const direct = content.resource(resourceId);
+      if (direct) return direct;
     }
     if (!this.resourceByItem) {
       const index = new Map<ItemId, ResourceDef>();

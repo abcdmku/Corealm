@@ -24,14 +24,15 @@ import { err, ok } from "../contracts.js";
 import type { ActivityState, GameState, Store } from "../state/store.js";
 import { addSkillXp } from "../state/store.js";
 import type { EventBus } from "../core/events.js";
-import type { Rng, RngStreams } from "../core/rng.js";
+import type { RngStreams } from "../core/rng.js";
 import type { TickSystem } from "../app/loop.js";
 import type { InteractionDispatcher } from "../world/interactions.js";
-import { distanceXZ } from "../core/math.js";
+import { distance } from "../core/math.js";
 import { INTERACT_RANGE } from "../app/config.js";
 import type { RecipeDef } from "../content/index.js";
 import { burnChance, content } from "../content/index.js";
 import type { CombatEntityPort, CombatInventoryPort } from "./combat.js";
+import { MAX_STACK } from "./inventory.js";
 
 /**
  * How far the player may drift from the station before the batch stops. Slightly looser than the
@@ -61,7 +62,8 @@ export interface ProductionActivityPort {
 
 /** The subset of `ActivityStopReason` production can produce. A strict subset, so it is assignable. */
 export type ProductionStopReason =
-  | "completed" | "cancelled" | "inventory-full" | "moved" | "failed" | "gone" | "replaced";
+  | "completed" | "cancelled" | "inventory-full" | "moved" | "failed" | "gone"
+  | "station-expired" | "replaced";
 
 export type ProductionTickResult =
   | { done: false }
@@ -81,11 +83,17 @@ export interface ProductionDeps {
   events: EventBus;
   rng: RngStreams;
   entities: CombatEntityPort;
-  inventory: CombatInventoryPort;
+  inventory: ProductionInventoryPort;
   activity: ProductionActivityPort;
   dispatcher: InteractionDispatcher;
   /** Registers a `produce` interaction handler for station entities. Defaults to true. */
   registerInteraction?: boolean;
+}
+
+/** Inventory mutations are silent until a whole repetition has committed. */
+export interface ProductionInventoryPort extends CombatInventoryPort {
+  addItem(itemId: string, quantity: number, options?: { silent?: boolean }): Result<number>;
+  removeItem(itemId: string, quantity: number, options?: { silent?: boolean }): Result<number>;
 }
 
 // ------------------------------------------------------------------- system
@@ -103,20 +111,9 @@ export class ProductionSystem implements TickSystem {
   /** Registered with the activity system by the root: `activity.register(production.driver)`. */
   readonly driver: ProductionDriver;
 
-  /**
-   * The burn roll runs on the `misc` stream, not `combat` or `loot`.
-   *
-   * Deliberate: cooking a batch must not shift the next hit roll or the next drop roll, or a fight
-   * stops replaying from a seed the moment a player cooks between pulls. Still seeded, still
-   * reproducible, still not `Math.random`.
-   */
-  private readonly burnRng: Rng;
-
   private lastAtMs = 0;
 
   constructor(private readonly deps: ProductionDeps) {
-    this.burnRng = deps.rng.get("misc");
-
     this.driver = {
       kind: "production",
       tick: (activity, state, deltaMs, atMs) => this.advance(activity, state, deltaMs, atMs),
@@ -130,17 +127,48 @@ export class ProductionSystem implements TickSystem {
   }
 
   /** Satisfies `SystemHooks.production` in api/gameApi.ts. */
-  hook(): { produce(recipeId: RecipeId, quantity: number): Result<{ queued: number; durationMs: number }> } {
-    return { produce: (recipeId, quantity) => this.produce(recipeId, quantity) };
+  hook(): {
+    produce(recipeId: RecipeId, quantity: number): Result<{ queued: number; durationMs: number }>;
+    produceAt(
+      stationId: EntityId,
+      recipeId: RecipeId,
+      quantity: number,
+    ): Result<{ queued: number; durationMs: number }>;
+  } {
+    return {
+      produce: (recipeId, quantity) => this.produce(recipeId, quantity),
+      produceAt: (stationId, recipeId, quantity) => this.produceAt(stationId, recipeId, quantity),
+    };
   }
 
   tick(_deltaMs: number, atMs: number): void {
     this.lastAtMs = atMs;
   }
 
+  /** Clears the cached simulation clock after a game reset. */
+  reset(atMs = 0): void {
+    this.lastAtMs = atMs;
+  }
+
   // ---------------------------------------------------------------- command
 
   produce(recipeId: RecipeId, quantity: number): Result<{ queued: number; durationMs: number }> {
+    return this.startProduction(recipeId, quantity);
+  }
+
+  produceAt(
+    stationId: EntityId,
+    recipeId: RecipeId,
+    quantity: number,
+  ): Result<{ queued: number; durationMs: number }> {
+    return this.startProduction(recipeId, quantity, stationId);
+  }
+
+  private startProduction(
+    recipeId: RecipeId,
+    quantity: number,
+    exactStationId?: EntityId,
+  ): Result<{ queued: number; durationMs: number }> {
     const state = this.deps.store.get();
     const atMs = this.lastAtMs;
 
@@ -158,16 +186,20 @@ export class ProductionSystem implements TickSystem {
       return err("REQUIREMENTS_NOT_MET", `${recipe.name} needs ${recipe.skill} ${recipe.reqLevel}.`);
     }
 
-    const station = this.findStation(state, recipe);
-    if (recipe.station !== null && !station) {
-      return err("OUT_OF_RANGE", `${recipe.name} needs a ${recipe.station} you are standing at.`);
+    const stationResult = exactStationId === undefined
+      ? ok(this.findStation(state, recipe))
+      : this.validateStation(state, recipe, exactStationId);
+    if (!stationResult.ok) return stationResult;
+    const station = stationResult.value;
+    if (recipe.stations !== null && !station) {
+      return err("OUT_OF_RANGE", `${recipe.name} needs ${formatStations(recipe.stations)} nearby.`);
     }
 
     const missing = this.missingInput(recipe);
     if (missing) {
       return err("NOT_ENOUGH_ITEMS", `${recipe.name} needs ${missing.quantity} ${missing.itemId}.`);
     }
-    if (!this.hasRoomForOutput(recipe)) {
+    if (!this.hasRoomForOutput(recipe, state)) {
       return err("INVENTORY_FULL", "Your inventory is full.");
     }
 
@@ -207,6 +239,7 @@ export class ProductionSystem implements TickSystem {
 
     let best: RecipeDef | undefined;
     for (const recipe of candidates) {
+      if (recipe.stations !== null && !recipe.stations.includes(station.kind)) continue;
       if (state.skills[recipe.skill].level < recipe.reqLevel) continue;
       if (this.missingInput(recipe)) continue;
       if (!best || recipe.reqLevel > best.reqLevel) best = recipe;
@@ -215,7 +248,7 @@ export class ProductionSystem implements TickSystem {
       return err("NOT_ENOUGH_ITEMS", `Nothing you can make at ${entity.name} right now.`, entity.id);
     }
 
-    const result = this.produce(best.id, this.maxRepetitions(best));
+    const result = this.produceAt(entity.id, best.id, this.maxRepetitions(best));
     if (!result.ok) return result;
     return ok({ started: `making ${best.name}` });
   }
@@ -233,10 +266,16 @@ export class ProductionSystem implements TickSystem {
     const recipe = content.recipe(activity.recipeId);
     if (!recipe) return { done: true, reason: "failed" };
 
-    if (recipe.station !== null) {
+    if (recipe.stations !== null) {
       const station = this.deps.entities.get(activity.stationId);
-      if (!station) return { done: true, reason: "gone" };
-      if (distanceXZ(state.player.position, station.position) > STATION_RANGE) {
+      if (!station) {
+        const reason = activity.stationId === "player_campfire" ? "station-expired" : "gone";
+        return { done: true, reason };
+      }
+      if (!station.station || !recipe.stations.includes(station.station.kind)) {
+        return { done: true, reason: station.station?.kind === "campfire" ? "station-expired" : "gone" };
+      }
+      if (station.regionId !== state.player.regionId || distance(state.player.position, station.position) > STATION_RANGE) {
         return { done: true, reason: "moved" };
       }
     }
@@ -246,20 +285,20 @@ export class ProductionSystem implements TickSystem {
       guard += 1;
 
       if (this.missingInput(recipe)) {
-        this.deps.events.emit(
-          "activity.stopped",
-          { kind: "production", recipeId: recipe.id, reason: "no-ingredients" },
-          activity.stationId || undefined,
-          atMs,
-        );
         return { done: true, reason: "failed" };
       }
-      if (!this.hasRoomForOutput(recipe)) {
+      if (!this.hasRoomForOutput(recipe, state)) {
         this.deps.events.emit("inventory.full", { recipeId: recipe.id }, undefined, atMs);
         return { done: true, reason: "inventory-full" };
       }
 
-      this.completeOne(recipe, state, activity.stationId, atMs);
+      const completion = this.completeOne(recipe, state, activity.stationId, atMs);
+      if (!completion.ok) {
+        if (completion.reason === "inventory-full") {
+          this.deps.events.emit("inventory.full", { recipeId: recipe.id }, undefined, atMs);
+        }
+        return { done: true, reason: completion.reason };
+      }
       activity.completed += 1;
       activity.remaining -= 1;
       activity.nextCompleteAtMs += recipe.durationMs;
@@ -271,19 +310,52 @@ export class ProductionSystem implements TickSystem {
   }
 
   /** One repetition: consume, roll (cooking only), produce, award XP, announce. */
-  private completeOne(recipe: RecipeDef, state: GameState, stationId: EntityId, atMs: number): void {
-    for (const input of recipe.inputs) {
-      this.deps.inventory.removeItem(input.itemId, input.quantity);
-    }
-
+  private completeOne(
+    recipe: RecipeDef,
+    state: GameState,
+    stationId: EntityId,
+    atMs: number,
+  ): { ok: true } | { ok: false; reason: "inventory-full" | "failed" } {
     const burnt = this.rollBurn(recipe, state);
     const itemId = burnt && recipe.burntItemId ? recipe.burntItemId : recipe.output.itemId;
     const quantity = burnt ? 1 : recipe.output.quantity;
 
-    const added = this.deps.inventory.addItem(itemId, quantity);
+    // This repeats the preflight immediately before mutation. The game is single-threaded, but a
+    // test or future inventory adapter may expose state that changed between the driver's checks.
+    if (!this.hasRoomForResultAfterInputs(recipe, state, itemId, quantity)) {
+      return { ok: false, reason: "inventory-full" };
+    }
+
+    const removedInputs: { itemId: string; quantity: number }[] = [];
+    for (const input of recipe.inputs) {
+      const removed = this.deps.inventory.removeItem(input.itemId, input.quantity, { silent: true });
+      if (!removed.ok || removed.value !== input.quantity) {
+        this.restoreInputs(removedInputs);
+        return { ok: false, reason: "failed" };
+      }
+      removedInputs.push({ itemId: input.itemId, quantity: input.quantity });
+    }
+
+    const added = this.deps.inventory.addItem(itemId, quantity, { silent: true });
     const delivered = added.ok ? added.value : 0;
+    if (!added.ok || delivered !== quantity) {
+      // The dry-run mirrors InventorySystem exactly, so this path means an injected adapter broke
+      // its contract. Undo any partial result before returning the ingredients.
+      if (delivered > 0) this.deps.inventory.removeItem(itemId, delivered, { silent: true });
+      this.restoreInputs(removedInputs);
+      return { ok: false, reason: "inventory-full" };
+    }
 
     if (!burnt) this.awardXp(state, recipe.skill, recipe.xp, atMs);
+
+    for (const input of recipe.inputs) {
+      this.deps.events.emit(
+        "item.lost",
+        { itemId: input.itemId, name: content.item(input.itemId)?.name ?? input.itemId, quantity: input.quantity },
+        stationId || undefined,
+        atMs,
+      );
+    }
 
     this.deps.events.emit(
       "production.completed",
@@ -299,10 +371,14 @@ export class ProductionSystem implements TickSystem {
       stationId || undefined,
       atMs,
     );
-    if (delivered > 0) {
-      this.deps.events.emit("item.received", { itemId, quantity: delivered }, stationId || undefined, atMs);
-    }
+    this.deps.events.emit(
+      "item.received",
+      { itemId, name: content.item(itemId)?.name ?? itemId, quantity: delivered },
+      stationId || undefined,
+      atMs,
+    );
     this.deps.store.markDirty();
+    return { ok: true };
   }
 
   /**
@@ -313,7 +389,8 @@ export class ProductionSystem implements TickSystem {
     if (recipe.skill !== "cooking" || !recipe.burntItemId) return false;
     const chance = burnChance(state.skills.cooking.level, recipe.reqLevel);
     if (chance <= 0) return false;
-    return this.burnRng.chance(chance);
+    // Resolve the stream for every roll. RngStreams.reseed replaces its stream objects on reset.
+    return this.deps.rng.get("misc").chance(chance);
   }
 
   // ---------------------------------------------------------------- summary
@@ -361,7 +438,10 @@ export class ProductionSystem implements TickSystem {
     const rows = station.recipeIds.length > 0
       ? station.recipeIds.map((id) => content.recipe(id)).filter(isRecipe)
       : content.recipesForSkill(station.skill);
-    return rows.filter((recipe) => state.skills[recipe.skill].level >= recipe.reqLevel);
+    return rows.filter((recipe) =>
+      state.skills[recipe.skill].level >= recipe.reqLevel
+      && (recipe.stations === null || recipe.stations.includes(station.kind))
+    );
   }
 
   // -------------------------------------------------------------- internals
@@ -369,30 +449,62 @@ export class ProductionSystem implements TickSystem {
   /**
    * The nearest station in range that matches the recipe.
    *
-   * `meta.stationKind` is what the region builder writes, so that is the primary match. The skill
-   * on the station block is the fallback, which keeps a hand-placed station working without meta.
+   * The explicit semantic station kind is authoritative. This keeps a cooking range and a portable
+   * campfire interchangeable without accidentally accepting another Cooking-tagged entity.
    */
   private findStation(state: GameState, recipe: RecipeDef): SemanticEntity | undefined {
-    if (recipe.station === null) return undefined;
+    if (recipe.stations === null) return undefined;
 
     let best: SemanticEntity | undefined;
     let bestDistance = Number.POSITIVE_INFINITY;
 
     for (const entity of this.deps.entities.all()) {
       if (entity.archetype !== "station" || !entity.station) continue;
+      if (entity.regionId !== state.player.regionId) continue;
 
-      const kind = entity.meta?.stationKind;
-      const kindMatches = typeof kind === "string" ? kind === recipe.station : false;
-      const skillMatches = entity.station.skill === recipe.skill;
+      const kindMatches = recipe.stations.includes(entity.station.kind);
       const listed = entity.station.recipeIds.includes(recipe.id);
-      if (!kindMatches && !skillMatches && !listed) continue;
+      if (!kindMatches || (entity.station.recipeIds.length > 0 && !listed)) continue;
 
-      const gap = distanceXZ(state.player.position, entity.position);
-      if (gap > STATION_RANGE || gap >= bestDistance) continue;
+      const gap = distance(state.player.position, entity.position);
+      if (gap > INTERACT_RANGE) continue;
+      if (gap > bestDistance || (gap === bestDistance && best && entity.id >= best.id)) continue;
       bestDistance = gap;
       best = entity;
     }
     return best;
+  }
+
+  /** Validates the exact station selected by the panel, interaction, or agent command. */
+  private validateStation(
+    state: GameState,
+    recipe: RecipeDef,
+    stationId: EntityId,
+  ): Result<SemanticEntity | undefined> {
+    const station = this.deps.entities.get(stationId);
+    if (!station || station.archetype !== "station" || !station.station) {
+      return err("NOT_FOUND", `No production station with id ${stationId}`, stationId);
+    }
+    if (recipe.stations === null) {
+      return err("INVALID_ARGUMENT", `${recipe.name} does not use a production station.`, stationId);
+    }
+    const kindMatches = recipe.stations.includes(station.station.kind);
+    const listed = station.station.recipeIds.includes(recipe.id);
+    if (!kindMatches || (station.station.recipeIds.length > 0 && !listed)) {
+      return err("INVALID_ARGUMENT", `${station.name} cannot make ${recipe.name}.`, stationId);
+    }
+    if (station.regionId !== state.player.regionId) {
+      return err("OUT_OF_RANGE", `${station.name} is in another region.`, stationId);
+    }
+    const gap = distance(state.player.position, station.position);
+    if (gap > INTERACT_RANGE) {
+      return err(
+        "OUT_OF_RANGE",
+        `${station.name} is ${gap.toFixed(1)} m away; you need to be within ${INTERACT_RANGE.toFixed(1)} m.`,
+        stationId,
+      );
+    }
+    return ok(station);
   }
 
   private missingInput(recipe: RecipeDef): { itemId: string; quantity: number } | undefined {
@@ -403,13 +515,68 @@ export class ProductionSystem implements TickSystem {
   }
 
   /**
-   * Room for the result. The inputs come out of the bag first, so a one-for-one recipe worked at a
-   * full inventory is fine; only a recipe that nets slots is refused.
+   * Checks the inventory after a hypothetical ingredient removal. Cooking checks both the cooked
+   * and burnt result before rolling, so either deterministic outcome can complete atomically.
    */
-  private hasRoomForOutput(recipe: RecipeDef): boolean {
-    if (this.deps.inventory.hasRoomFor(recipe.output.itemId, recipe.output.quantity)) return true;
-    // Consuming at least one non-stacking input frees the slot the output lands in.
-    return recipe.inputs.some((input) => this.deps.inventory.countItem(input.itemId) >= input.quantity);
+  private hasRoomForOutput(recipe: RecipeDef, state: GameState): boolean {
+    if (!this.hasRoomForResultAfterInputs(
+      recipe,
+      state,
+      recipe.output.itemId,
+      recipe.output.quantity,
+    )) return false;
+
+    const canBurn = recipe.skill === "cooking"
+      && recipe.burntItemId !== undefined
+      && burnChance(state.skills.cooking.level, recipe.reqLevel) > 0;
+    return !canBurn || this.hasRoomForResultAfterInputs(recipe, state, recipe.burntItemId!, 1);
+  }
+
+  /** Dry-runs the same slot order, stacking rules and stack ceiling as InventorySystem. */
+  private hasRoomForResultAfterInputs(
+    recipe: RecipeDef,
+    state: GameState,
+    itemId: string,
+    quantity: number,
+  ): boolean {
+    if (!Number.isFinite(quantity) || quantity < 1) return false;
+
+    const slots = state.inventory.slots.map((slot) => slot ? { ...slot } : null);
+    for (const input of recipe.inputs) {
+      const inputDef = content.item(input.itemId);
+      if (!inputDef) return false;
+      if (inputDef.category === "currency") continue;
+
+      let left = input.quantity;
+      for (let index = 0; index < slots.length && left > 0; index += 1) {
+        const slot = slots[index];
+        if (!slot || slot.itemId !== input.itemId) continue;
+        const taken = Math.min(slot.quantity, left);
+        slot.quantity -= taken;
+        left -= taken;
+        if (slot.quantity <= 0) slots[index] = null;
+      }
+      if (left > 0) return false;
+    }
+
+    const outputDef = content.item(itemId);
+    if (!outputDef) return false;
+    if (outputDef.category === "currency") return true;
+
+    const wanted = Math.floor(quantity);
+    if (outputDef.stackable) {
+      const existing = slots.find((slot) => slot !== null && slot.itemId === itemId);
+      if (existing) return MAX_STACK - existing.quantity >= wanted;
+      return slots.includes(null) && wanted <= MAX_STACK;
+    }
+    return slots.reduce((free, slot) => free + (slot === null ? 1 : 0), 0) >= wanted;
+  }
+
+  private restoreInputs(inputs: readonly { itemId: string; quantity: number }[]): void {
+    for (let index = inputs.length - 1; index >= 0; index -= 1) {
+      const input = inputs[index];
+      if (input) this.deps.inventory.addItem(input.itemId, input.quantity, { silent: true });
+    }
   }
 
   private awardXp(state: GameState, skill: SkillId, amount: number, atMs: number): void {
@@ -430,6 +597,11 @@ export class ProductionSystem implements TickSystem {
 
 function isRecipe(value: RecipeDef | undefined): value is RecipeDef {
   return value !== undefined;
+}
+
+function formatStations(stations: readonly string[]): string {
+  const names = stations.map((kind) => kind.replace(/_/g, " "));
+  return names.length < 2 ? `a ${names[0] ?? "station"}` : names.map((name) => `a ${name}`).join(" or ");
 }
 
 function clamp01(value: number): number {

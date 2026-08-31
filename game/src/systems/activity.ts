@@ -41,6 +41,7 @@ export type ActivityStopReason =
   | "dead"
   | "failed"
   | "gone"
+  | "station-expired"
   | "replaced";
 
 export type ActivityTickResult = { done: false } | { done: true; reason: ActivityStopReason };
@@ -98,7 +99,7 @@ export interface InventoryPort {
  * because PRD 2.7 has eating block attacks for 1.8 s, not pin the player in place.
  */
 const CANCELLED_BY_MOVEMENT: ReadonlySet<ActivityKind> = new Set<ActivityKind>([
-  "gathering", "production", "farming",
+  "gathering", "production", "farming", "building_campfire",
 ]);
 
 /**
@@ -106,7 +107,7 @@ const CANCELLED_BY_MOVEMENT: ReadonlySet<ActivityKind> = new Set<ActivityKind>([
  * halfway would leave the player in a state the obstacle never defines.
  */
 const CANCELLED_BY_DAMAGE: ReadonlySet<ActivityKind> = new Set<ActivityKind>([
-  "gathering", "production", "farming",
+  "gathering", "production", "farming", "building_campfire",
 ]);
 
 export class ActivitySystem implements TickSystem {
@@ -305,6 +306,7 @@ export function entityIdOf(activity: ActivityState): EntityId | undefined {
     case "production": return activity.stationId;
     case "traversing": return activity.obstacleId;
     case "farming": return activity.plotId;
+    case "building_campfire": return "player_campfire";
     case "eating": return undefined;
   }
 }
@@ -316,6 +318,7 @@ export function skillOf(activity: ActivityState): SkillId | undefined {
     case "production": return activity.skill;
     case "traversing": return "agility";
     case "farming": return "farming";
+    case "building_campfire": return "fletching";
     case "eating": return undefined;
   }
 }

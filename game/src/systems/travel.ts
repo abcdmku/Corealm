@@ -35,6 +35,8 @@ export interface TravelDeps {
   entities: TravelEntityPort;
   nav: TravelNavPort;
   dispatcher: InteractionDispatcher;
+  /** Portal placement interrupts any timed action before the player's region changes. */
+  activity?: { stop(reason: "moved", atMs: number): boolean };
   /** Places the player and resyncs the views. The root owns the camera and scene. */
   place(position: Vec3, regionId: RegionId): void;
 }
@@ -73,6 +75,7 @@ export class TravelSystem {
       return err("NOT_REACHABLE", `${entity.name} does not lead anywhere yet.`, entity.id);
     }
 
+    this.deps.activity?.stop("moved", this.deps.clock.elapsedMs);
     this.deps.place(destination.position, destination.regionId);
 
     // Entering somewhere is a discovery: the location becomes known, so `observe({scope:"known"})`

@@ -63,6 +63,8 @@ export interface AssetPack {
   author: string;
   source: string;
   license: string;
+  /** Lowercase SHA-256 of the pinned source archive for reproducible provenance. */
+  archiveSha256?: string;
 }
 
 export interface AssetManifest {

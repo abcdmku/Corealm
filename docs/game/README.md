@@ -13,5 +13,7 @@ These pages are regenerated from the same content tables the game runs.
 - [Recipes](./recipes)
 - [Resources](./resources)
 - [Skills](./skills)
+- [Gathering and production](./gathering-production)
+- [Campfires](./campfires)
 - [Experience table](./experience)
 - [Spells and shops](./spells-and-shops)

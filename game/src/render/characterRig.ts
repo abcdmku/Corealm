@@ -34,6 +34,11 @@ import { MOVEMENT } from "../app/config.js";
 import type { AssetRegistry } from "./assets.js";
 import * as equipmentVisuals from "./equipmentVisuals.js";
 import {
+  FISHING_ROD_LOOKS,
+  fishingRodAssetId,
+  fishingRodItemForTier,
+} from "./proceduralGear.js";
+import {
   applyHeadCap,
   collectBones,
   collectSkinnedMeshes,
@@ -388,6 +393,10 @@ export interface PoseInput {
   activityKind: string | null;
   /** `ActivitySummary.skill`. "mining" | "woodcutting" | "fishing" for a gathering activity. */
   activitySkill?: string | null;
+  /** Resource tier for a gathering activity. Fishing uses it to choose the held rod color. */
+  activityTier?: number | null;
+  /** Selected tool when the gathering system exposes one. This wins over `activityTier`. */
+  activityToolItemId?: ItemId | null;
 }
 
 export class CharacterRig {
@@ -438,6 +447,8 @@ export class CharacterRig {
   private boneAttachments = new Map<EquipSlot, THREE.Object3D>();
   private boneAttachmentMaterials = new Map<EquipSlot, THREE.Material[]>();
   private slotEpoch = new Map<EquipSlot, number>();
+  /** Temporary gathering tool shown during its activity. Worn gear remains in `gearBySlot`. */
+  private activityMainHandKey: string | null = null;
   /**
    * Defaults to the real `render/equipmentVisuals.ts`, so worn gear renders with no wiring at all.
    * `setGearVisuals` overrides it — a test hands in a stub, and null turns equipment visuals off.
@@ -780,18 +791,54 @@ export class CharacterRig {
    * frames of continuous movement exactly one landed in the walk band and `Walk_Loop` was dead.
    */
   poseFor(input: PoseInput): CharacterPose {
+    this.syncActivityGear(input);
     if (input.dead) return "death";
     if (input.activityKind === "gathering") {
       if (input.activitySkill === "woodcutting") return "chop";
       if (input.activitySkill === "fishing") return "fish";
       return "mine";
     }
-    if (input.activityKind === "production") return "produce";
+    if (input.activityKind === "production" || input.activityKind === "building_campfire") return "produce";
     if (input.activityKind === "farming") return "farm";
     if (input.activityKind === "eating") return "eat";
     if (input.activityKind === "traversing") return "climb";
     if (input.moving) return input.speed > MOVEMENT.walkPoseThreshold ? "run" : "walk";
     return "idle";
+  }
+
+  /** Gathering temporarily shows the carried tool, then restores the worn main-hand item. */
+  private syncActivityGear(input: PoseInput): void {
+    if (!this.ready) return;
+    const fishing = !input.dead
+      && input.activityKind === "gathering"
+      && input.activitySkill === "fishing";
+    const miningOrWoodcutting = !input.dead
+      && input.activityKind === "gathering"
+      && (input.activitySkill === "mining" || input.activitySkill === "woodcutting");
+    let nextAppearance: GearAppearanceLike | null = null;
+    let nextKey: string | null = null;
+    if (fishing) {
+      const requested = input.activityToolItemId;
+      const rodItemId = requested && FISHING_ROD_LOOKS[requested]
+        ? requested
+        : fishingRodItemForTier(input.activityTier);
+      const assetId = fishingRodAssetId(rodItemId);
+      nextAppearance = { assetId, slot: "mainHand", attach: "bone" };
+      nextKey = `${rodItemId}:${assetId}`;
+    } else if (miningOrWoodcutting && input.activityToolItemId) {
+      nextAppearance = equipmentVisuals.gatheringToolAppearance(input.activityToolItemId);
+      if (nextAppearance) nextKey = `${input.activityToolItemId}:${nextAppearance.assetId}`;
+    }
+    if (nextKey === this.activityMainHandKey) return;
+
+    this.activityMainHandKey = nextKey;
+    if (nextAppearance) {
+      void this.attachBoneSlot("mainHand", nextAppearance);
+      return;
+    }
+
+    const worn = (this.gearBySlot.get("mainHand") ?? []).find((part) => !isSkinPart(part)) ?? null;
+    void this.attachBoneSlot("mainHand", worn);
   }
 
   // ------------------------------------------------------------- equipment
@@ -817,7 +864,11 @@ export class CharacterRig {
 
       if (previous.some(isSkinPart) || parts.some(isSkinPart)) skinChanged = true;
       // At most one rigid attachment per slot: a hand holds one thing and a head wears one helmet.
-      work.push(this.attachBoneSlot(slot, parts.find((part) => !isSkinPart(part)) ?? null));
+      // A fishing rod temporarily owns the visible main hand. The worn item is still recorded
+      // above and will be attached when fishing ends.
+      if (slot !== "mainHand" || !this.activityMainHandKey) {
+        work.push(this.attachBoneSlot(slot, parts.find((part) => !isSkinPart(part)) ?? null));
+      }
     }
 
     if (skinChanged) work.push(this.rebuildLayers());
@@ -892,10 +943,17 @@ export class CharacterRig {
       }
       this.gear?.applyGearAppearance?.(object, appearance);
       const cloned = clonedMaterialsOf(object, source);
-      if (cloned.length > 0) this.boneAttachmentMaterials.set(slot, cloned);
       this.setSlot(slot, object, socket.bone);
+      // `setSlot` disposes the previous attachment's material clones. Record this attachment only
+      // after that cleanup, or it would dispose its own fresh tint and forget the old one.
+      if (this.boneAttachments.get(slot) === object && cloned.length > 0) {
+        this.boneAttachmentMaterials.set(slot, cloned);
+      } else {
+        for (const material of cloned) material.dispose();
+      }
     } catch {
-      this.setSlot(slot, null);
+      // A stale failed load must not clear a newer attachment that already won this slot.
+      if (this.slotEpoch.get(slot) === epoch) this.setSlot(slot, null);
     }
   }
 

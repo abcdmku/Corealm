@@ -16,6 +16,7 @@ export type ItemIconPrimitive =
   | "dagger"
   | "fish"
   | "focus"
+  | "handle"
   | "hide"
   | "ingot"
   | "log"
@@ -133,6 +134,9 @@ put("vell_amber", [asset("ore_crystal_green", 0xc47b2b)]);
 put("cairn_garnet", [asset("ore_crystal_pink", 0x8e2337)]);
 for (const id of ["palewood_shaft", "duskoak_shaft", "cairnpine_shaft"] as const) {
   put(id, [primitive("shaft", wood(id), tierMetal(id))], { rotation: [0, 0, -0.25] });
+}
+for (const id of ["palewood_handle", "duskoak_handle", "cairnpine_handle"] as const) {
+  put(id, [primitive("handle", wood(id), tierBody(id))], { rotation: [0, 0, -0.3], frameScale: 1.08 });
 }
 put("coarse_hide", [primitive("hide", 0x9a7654, 0x5b4432)]);
 put("bramble_hide", [primitive("hide", 0x65503d, 0x362d26)]);

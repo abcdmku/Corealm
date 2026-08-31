@@ -1,7 +1,7 @@
 /**
  * Gear the asset library does not contain, BUILT from primitives instead of loaded from a file.
  *
- * Today that is exactly the staff line. Measured from game/public/assets/manifest.json the weapon
+ * This started with the staff line. Measured from game/public/assets/manifest.json the weapon
  * category holds four GLBs — axe, pickaxe, shield, sword — and there is no staff anywhere in the
  * 213-asset library, so `palewood_staff`, `duskoak_staff` and `cairnpine_staff` put NOTHING in the
  * player's hand: a mage held empty air. `worn_staff`, the staff a new character is handed, would
@@ -67,6 +67,28 @@ export interface StaffLook {
    */
   length: number;
   crown: "chip" | "cage" | "cluster";
+}
+
+/** A shorter one-handed magic weapon built from the same wood and gem palette as its staff. */
+export interface WandLook {
+  shaft: number;
+  binding: number;
+  gem: number;
+  gemEmissive: number;
+  /** Total shaft length in metres. The origin remains at the grip. */
+  length: number;
+}
+
+/** A held fishing tool with its line and bobber baked into one painted mesh. */
+export interface FishingRodLook {
+  shaft: number;
+  binding: number;
+  line: number;
+  bobber: number;
+  /** Butt to tip, before the slight authored bend. */
+  length: number;
+  /** Sideways displacement of the tip in metres. */
+  bend: number;
 }
 
 // ------------------------------------------------------------------------ palette
@@ -199,6 +221,48 @@ export const STAFF_LOOKS: Readonly<Record<string, StaffLook>> = {
 };
 
 /**
+ * Wands use the same material progression as their matching staffs. Their shorter shaft and single
+ * grip ring keep the silhouette separate even when both weapons use the same gem.
+ */
+export const WAND_LOOKS: Readonly<Record<string, WandLook>> = {
+  palewood_wand: {
+    shaft: PALEWOOD, binding: MARCHHIDE, gem: QUARTZ, gemEmissive: 0x9ab0cc,
+    length: 0.56,
+  },
+  duskoak_wand: {
+    shaft: DUSKOAK, binding: CORVEN, gem: AMBER, gemEmissive: 0xd08a20,
+    length: 0.62,
+  },
+  cairnpine_wand: {
+    shaft: CAIRNPINE, binding: KALDITE, gem: GARNET, gemEmissive: 0xc4304a,
+    length: 0.68,
+  },
+};
+
+/**
+ * Rods grow slightly with tier. The bobber repeats the tier gem color so the upgrade reads after
+ * the thin wood shaft recedes against water.
+ */
+export const FISHING_ROD_LOOKS: Readonly<Record<string, FishingRodLook>> = {
+  worn_rod: {
+    shaft: WORN_WOOD, binding: CORD, line: 0x39332c, bobber: QUARTZ_DULL,
+    length: 1.18, bend: 0.09,
+  },
+  palewood_rod: {
+    shaft: PALEWOOD, binding: MARCHHIDE, line: 0x403a32, bobber: QUARTZ,
+    length: 1.30, bend: 0.11,
+  },
+  duskoak_rod: {
+    shaft: DUSKOAK, binding: CORVEN, line: 0x302e2b, bobber: AMBER,
+    length: 1.42, bend: 0.13,
+  },
+  cairnpine_rod: {
+    shaft: CAIRNPINE, binding: KALDITE, line: 0x29282a, bobber: GARNET,
+    length: 1.54, bend: 0.15,
+  },
+};
+
+/**
  * The asset id a built staff is registered under.
  *
  * Prefixed so it is obvious at a glance — in a stack trace, in `AssetRegistry.stats()`, in a dump of
@@ -210,22 +274,59 @@ export function staffAssetId(itemId: string): string {
   return `proc_staff_${itemId.replace(/_staff$/, "")}`;
 }
 
+/** Asset id for one of the three functioning wand items. */
+export function wandAssetId(itemId: string): string {
+  return `proc_wand_${itemId.replace(/_wand$/, "")}`;
+}
+
+/** Asset id for a fishing rod, including its line and bobber. */
+export function fishingRodAssetId(itemId: string): string {
+  return `proc_rod_${itemId.replace(/_rod$/, "")}`;
+}
+
 export interface ProceduralGearAsset {
   /** What `AssetRegistry.load` will answer to. */
   assetId: string;
-  /** The equipment id in `content/equipment.ts` that wears it. */
+  /** The equipment or tool item that uses it. */
   itemId: string;
 }
 
-/** Every built asset and the item it belongs to, in ladder order. */
+/**
+ * The original staff-only export stays staff-only because equipmentVisuals and seedMagic use that
+ * promise. New procedural families have their own lists below.
+ */
 export const PROCEDURAL_GEAR_ASSETS: readonly ProceduralGearAsset[] =
   Object.keys(STAFF_LOOKS).map((itemId) => ({ assetId: staffAssetId(itemId), itemId }));
 
-const PROCEDURAL_ASSET_IDS = new Set(PROCEDURAL_GEAR_ASSETS.map((asset) => asset.assetId));
+export const PROCEDURAL_WAND_ASSETS: readonly ProceduralGearAsset[] =
+  Object.keys(WAND_LOOKS).map((itemId) => ({ assetId: wandAssetId(itemId), itemId }));
+
+export const PROCEDURAL_FISHING_ROD_ASSETS: readonly ProceduralGearAsset[] =
+  Object.keys(FISHING_ROD_LOOKS).map((itemId) => ({ assetId: fishingRodAssetId(itemId), itemId }));
+
+/** Every generated held asset registered during boot. */
+export const ALL_PROCEDURAL_GEAR_ASSETS: readonly ProceduralGearAsset[] = [
+  ...PROCEDURAL_GEAR_ASSETS,
+  ...PROCEDURAL_WAND_ASSETS,
+  ...PROCEDURAL_FISHING_ROD_ASSETS,
+];
+
+const PROCEDURAL_ASSET_IDS = new Set(ALL_PROCEDURAL_GEAR_ASSETS.map((asset) => asset.assetId));
 
 /** True for an asset id that is built here, so it will never appear in the generated manifest. */
 export function isProceduralGearAsset(assetId: string): boolean {
   return PROCEDURAL_ASSET_IDS.has(assetId);
+}
+
+/**
+ * Picks the authored rod that matches a resource tier. The worn rod is the safe fallback when the
+ * activity input has no tier yet.
+ */
+export function fishingRodItemForTier(tier: number | null | undefined): string {
+  if (tier !== null && tier !== undefined && tier >= 10) return "cairnpine_rod";
+  if (tier !== null && tier !== undefined && tier >= 5) return "duskoak_rod";
+  if (tier !== null && tier !== undefined && tier >= 1) return "palewood_rod";
+  return "worn_rod";
 }
 
 /**
@@ -244,15 +345,24 @@ export interface BuiltAssetSink {
  * built — `CharacterRig.preloadGear` warms gear assets during `build()` and `attachBoneSlot` goes
  * through `AssetRegistry.load`, which is where these have to already be.
  *
- * Returns the ids it registered, so the caller can log or assert on them. Cheap enough to sit on
- * the boot path: four staves is 8 geometries, 8 materials, 123 KB of vertex data (measured) and no
- * I/O at all — against `assets.load("sword")` taking 3366 ms on its first request.
+ * Returns the ids it registered, so the caller can log or assert on them. The eleven current items
+ * total 18 meshes and 2,668 triangles, with no file fetch or parse on the boot path.
  */
 export function registerProceduralGear(sink: BuiltAssetSink): readonly string[] {
   const registered: string[] = [];
   for (const [itemId, look] of Object.entries(STAFF_LOOKS)) {
     const assetId = staffAssetId(itemId);
     sink.registerBuilt(assetId, buildStaff(look));
+    registered.push(assetId);
+  }
+  for (const [itemId, look] of Object.entries(WAND_LOOKS)) {
+    const assetId = wandAssetId(itemId);
+    sink.registerBuilt(assetId, buildWand(look));
+    registered.push(assetId);
+  }
+  for (const [itemId, look] of Object.entries(FISHING_ROD_LOOKS)) {
+    const assetId = fishingRodAssetId(itemId);
+    sink.registerBuilt(assetId, buildFishingRod(look));
     registered.push(assetId);
   }
   return registered;
@@ -301,6 +411,97 @@ export function buildStaff(look: StaffLook): THREE.Group {
   group.name = "procedural-staff";
   group.add(mergedMesh(structure, structureMaterial(), "staff-structure"));
   group.add(mergedMesh(gems, gemMaterial(look), "staff-gem"));
+  return group;
+}
+
+/**
+ * A one-handed wand in metres, Y-up, with its origin at the grip. The whole model stays at two
+ * draws: painted wood and binding in one merged mesh, then the emissive gem.
+ */
+export function buildWand(look: WandLook): THREE.Group {
+  const gripFraction = 0.23;
+  const tipY = look.length * (1 - gripFraction);
+  const buttY = -look.length * gripFraction;
+  const structure: THREE.BufferGeometry[] = [];
+  const gems: THREE.BufferGeometry[] = [];
+
+  const shaft = new THREE.CylinderGeometry(0.012, 0.019, look.length, RADIAL_SEGMENTS);
+  shaft.translate(0, (tipY + buttY) / 2, 0);
+  structure.push(paint(shaft, look.shaft));
+
+  structure.push(paint(tube(0.023, 0.023, 0.036, -0.055), look.binding));
+  structure.push(paint(tube(0.021, 0.019, 0.035, buttY + 0.0175), look.binding));
+
+  // Three short claws make the gem read as mounted rather than glued to the cut end.
+  for (let index = 0; index < 3; index += 1) {
+    const angle = (index / 3) * Math.PI * 2;
+    const claw = new THREE.CylinderGeometry(0.004, 0.007, 0.072, 5);
+    claw.translate(0, 0.036, 0);
+    claw.rotateZ(0.20);
+    claw.rotateY(angle);
+    claw.translate(0, tipY - 0.008, 0);
+    structure.push(paint(claw, look.binding));
+  }
+  gems.push(gem(0.031, 0, tipY + 0.050, 0));
+
+  const group = new THREE.Group();
+  group.name = "procedural-wand";
+  group.add(mergedMesh(structure, structureMaterial("proc-wand-structure"), "wand-structure"));
+  group.add(mergedMesh(gems, gemMaterial(look), "wand-gem"));
+  return group;
+}
+
+/**
+ * A rod, bowed line, and bobber in one vertex-painted mesh. The line is four-sided geometry rather
+ * than a Three Line object, so the complete tool remains one draw and keeps a stable pixel width.
+ */
+export function buildFishingRod(look: FishingRodLook): THREE.Group {
+  const buttY = -look.length * 0.18;
+  const tipY = look.length * 0.82;
+  const structure: THREE.BufferGeometry[] = [];
+  const rodPoints = [
+    new THREE.Vector3(0, buttY, 0),
+    new THREE.Vector3(look.bend * 0.12, look.length * 0.14, 0),
+    new THREE.Vector3(look.bend * 0.42, look.length * 0.48, 0),
+    new THREE.Vector3(look.bend, tipY, 0),
+  ];
+  const radii = [0.020, 0.017, 0.012, 0.006];
+  for (let index = 0; index < rodPoints.length - 1; index += 1) {
+    const start = rodPoints[index];
+    const end = rodPoints[index + 1];
+    if (!start || !end) continue;
+    structure.push(paint(
+      segmentBetween(start, end, radii[index + 1] ?? 0.006, radii[index] ?? 0.020),
+      look.shaft,
+    ));
+  }
+
+  structure.push(paint(tube(0.024, 0.024, 0.035, -0.070), look.binding));
+  structure.push(paint(tube(0.022, 0.022, 0.030, 0.045), look.binding));
+
+  const tip = rodPoints[rodPoints.length - 1] ?? new THREE.Vector3(look.bend, tipY, 0);
+  const linePoints = [
+    tip.clone(),
+    new THREE.Vector3(tip.x + 0.015, tip.y + 0.15, 0.16),
+    new THREE.Vector3(tip.x + 0.010, tip.y + 0.29, 0.37),
+    new THREE.Vector3(tip.x, tip.y + 0.34, 0.54),
+  ];
+  for (let index = 0; index < linePoints.length - 1; index += 1) {
+    const start = linePoints[index];
+    const end = linePoints[index + 1];
+    if (!start || !end) continue;
+    structure.push(paint(segmentBetween(start, end, 0.0024, 0.0024, 4), look.line));
+  }
+
+  const bobberPosition = linePoints[linePoints.length - 1] ?? tip;
+  const bobber = new THREE.IcosahedronGeometry(0.035, 1);
+  bobber.scale(0.82, 1.15, 0.82);
+  bobber.translate(bobberPosition.x, bobberPosition.y, bobberPosition.z);
+  structure.push(paint(bobber, look.bobber));
+
+  const group = new THREE.Group();
+  group.name = "procedural-fishing-rod";
+  group.add(mergedMesh(structure, structureMaterial("proc-rod-painted"), "rod-line-bobber"));
   return group;
 }
 
@@ -402,6 +603,30 @@ function tube(
   return geometry;
 }
 
+/** A low-sided cylinder aligned between two points. */
+function segmentBetween(
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  topRadius: number,
+  bottomRadius: number,
+  radialSegments = RADIAL_SEGMENTS,
+): THREE.BufferGeometry {
+  const delta = end.clone().sub(start);
+  const length = delta.length();
+  const geometry = new THREE.CylinderGeometry(topRadius, bottomRadius, length, radialSegments);
+  const rotation = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    delta.normalize(),
+  );
+  geometry.applyQuaternion(rotation);
+  geometry.translate(
+    (start.x + end.x) / 2,
+    (start.y + end.y) / 2,
+    (start.z + end.z) / 2,
+  );
+  return geometry;
+}
+
 /** The tapered shaft's radius at a height, so a ring fits the shaft it is wrapped around. */
 function shaftRadiusAt(look: StaffLook, y: number): number {
   const buttY = -look.length * GRIP_FRACTION;
@@ -465,9 +690,9 @@ function mergedMesh(
  * cool hue and from standing 6 mm proud of the shaft, not from the BRDF, and splitting it out would
  * DOUBLE a held staff's draw calls for one 3 cm ring against a 397/400 budget.
  */
-function structureMaterial(): THREE.MeshStandardMaterial {
+function structureMaterial(name = "proc-staff-structure"): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    name: "proc-staff-structure",
+    name,
     color: 0xffffff,
     vertexColors: true,
     roughness: 0.74,
@@ -475,7 +700,7 @@ function structureMaterial(): THREE.MeshStandardMaterial {
   });
 }
 
-function gemMaterial(look: StaffLook): THREE.MeshStandardMaterial {
+function gemMaterial(look: Pick<StaffLook, "gem" | "gemEmissive">): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     name: "proc-staff-gem",
     color: look.gem,

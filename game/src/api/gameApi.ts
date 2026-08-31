@@ -69,7 +69,17 @@ export interface SystemHooks {
     equip(itemId: ItemId): Result<{ slot: EquipSlot; replaced: ItemId | null }>;
     unequip(slot: EquipSlot): Result<{ itemId: ItemId }>;
   };
-  production?: { produce(recipeId: RecipeId, quantity: number): Result<{ queued: number; durationMs: number }> };
+  production?: {
+    produce(recipeId: RecipeId, quantity: number): Result<{ queued: number; durationMs: number }>;
+    produceAt(
+      stationId: EntityId,
+      recipeId: RecipeId,
+      quantity: number,
+    ): Result<{ queued: number; durationMs: number }>;
+  };
+  campfire?: {
+    build(logItemId: ItemId): Result<{ entityId: EntityId; lifetimeMs: number; position: Vec3 }>;
+  };
   combat?: {
     attack(entityId: EntityId): Result<{ targetId: EntityId; attackSpeedMs: number }>;
     cast(spellId: SpellId, entityId: EntityId): Result<{ targetId: EntityId; castMs: number }>;
@@ -416,8 +426,29 @@ export class CorealmGameApi implements GameApiContract {
   produce(recipeId: RecipeId, quantity: number): Result<{ queued: number; durationMs: number }> {
     const hook = this.hooks.production;
     if (!hook) return err("UNAVAILABLE", "Production system is not available yet");
-    if (!Number.isFinite(quantity) || quantity < 1) return err("INVALID_ARGUMENT", "Quantity must be at least 1");
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > 28) {
+      return err("INVALID_ARGUMENT", "Quantity must be between 1 and 28");
+    }
     return hook.produce(recipeId, Math.floor(quantity));
+  }
+
+  produceAt(
+    stationId: EntityId,
+    recipeId: RecipeId,
+    quantity: number,
+  ): Result<{ queued: number; durationMs: number }> {
+    const hook = this.hooks.production;
+    if (!hook) return err("UNAVAILABLE", "Production system is not available yet");
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > 28) {
+      return err("INVALID_ARGUMENT", "Quantity must be between 1 and 28");
+    }
+    return hook.produceAt(stationId, recipeId, Math.floor(quantity));
+  }
+
+  buildCampfire(logItemId: ItemId): Result<{ entityId: EntityId; lifetimeMs: number; position: Vec3 }> {
+    const hook = this.hooks.campfire;
+    if (!hook) return err("UNAVAILABLE", "Campfire building is not available yet");
+    return hook.build(logItemId);
   }
 
   // ----------------------------------------------------------------- combat

@@ -7,7 +7,7 @@
  *
  * Conventions this file holds to, all from PRD 2.10:
  *  - `value` is the shop BUY price. Selling pays `sellPrice(value)` = round(value * 0.6).
- *  - Stackable kinds are currency, essence shards, seeds, shafts and gems. Everything else takes a
+ *  - Stackable kinds are currency, essence shards, seeds, shafts, handles and gems. Everything else takes a
  *    slot per unit, including every ore, log, fish, bar and equipment piece.
  *  - Reference prices from the PRD's table are reproduced exactly in `value`. Two of the PRD's
  *    quoted SELL prices used a floor where `sellPrice()` rounds, so Duskoak log sells for 23 (PRD
@@ -129,7 +129,7 @@ const BARS: readonly ItemDef[] = [
 ];
 
 // ------------------------------------------------------------------------------ components
-// Gems and shafts stack (PRD 2.10). Hides do not, along with everything else.
+// Gems, shafts, and handles stack. Hides do not, along with everything else.
 
 const COMPONENTS: readonly ItemDef[] = [
   // gems, the secondary drop off every ore node
@@ -163,6 +163,22 @@ const COMPONENTS: readonly ItemDef[] = [
     id: "cairnpine_shaft", name: "Cairnpine Shaft", tier: 10,
     description: "Resinous, springy, and heavy. Takes a Kaldite ferrule without splitting.",
     stackable: true, value: 32, category: "component",
+  },
+  // handles, the shared fletching input for metal weapons and gathering tools
+  {
+    id: "palewood_handle", name: "Palewood Handle", tier: 1,
+    description: "A short palewood grip, shaped for a Grithe tang or tool head.",
+    stackable: true, value: 6, category: "component",
+  },
+  {
+    id: "duskoak_handle", name: "Duskoak Handle", tier: 5,
+    description: "Oiled duskoak with enough weight to balance a Corven head.",
+    stackable: true, value: 23, category: "component",
+  },
+  {
+    id: "cairnpine_handle", name: "Cairnpine Handle", tier: 10,
+    description: "Cairnpine shaped around the grain so a Kaldite tang will not split it.",
+    stackable: true, value: 53, category: "component",
   },
   // hides, the crafting input for the magic line
   {
@@ -321,7 +337,7 @@ const TOOLS: readonly ItemDef[] = [
   },
 ];
 
-/** Everything except equipment. 48 rows; the "45" this comment used to claim was three stale. */
+/** Everything except equipment. 51 rows. */
 export const ITEMS: readonly ItemDef[] = [
   ...CURRENCY,
   ...RESOURCE_ITEMS,
@@ -332,7 +348,7 @@ export const ITEMS: readonly ItemDef[] = [
   ...TOOLS,
 ];
 
-/** The table the root registers as `items`. 48 + 59 = 107 rows. */
+/** The table the root registers as `items`. 51 + 62 = 113 rows. */
 export const ALL_ITEMS: readonly ItemDef[] = [...ITEMS, ...EQUIPMENT];
 
 /** The currency item id, so nothing else has to spell it. PRD 2.10: currency is marks. */

@@ -6,6 +6,7 @@
  */
 import type { Vec3 } from "../contracts.js";
 import { REGIONS } from "../content/regions.js";
+import { resourceDef } from "../content/resources.js";
 import {
   WorldScene, pavingStampFromRect,
   type PavingStamp, type RoadStamp, type WaterStamp,
@@ -116,7 +117,7 @@ export function collectWaterStamps(scene: WorldScene): WaterStamp[] {
   const stamps: WaterStamp[] = [];
   for (const region of REGIONS) {
     for (const cluster of region.clusters) {
-      if (cluster.archetype !== "fishing_spot") continue;
+      if (resourceDef(cluster.resourceId).archetype !== "fishing_spot") continue;
       const [x, z] = cluster.centre;
       const basin = waterBasinForCluster(cluster);
       stamps.push({
@@ -134,7 +135,7 @@ export function buildWaterBodies(scene: WorldScene): number {
   let built = 0;
   for (const region of REGIONS) {
     for (const cluster of region.clusters) {
-      if (cluster.archetype !== "fishing_spot") continue;
+      if (resourceDef(cluster.resourceId).archetype !== "fishing_spot") continue;
       const [x, z] = cluster.centre;
       const half = waterBasinForCluster(cluster).crestRadius;
       const floor = scene.heightAt(region.id, x, z);

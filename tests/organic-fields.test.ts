@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildWorldTerrainSpec } from "../game/src/app/worldSpec.js";
 import { REGIONS } from "../game/src/content/regions.js";
+import { resourceDef } from "../game/src/content/resources.js";
 import {
   organicDistance,
   organicRadiusScale,
@@ -59,7 +60,7 @@ describe("organic world fields", () => {
 
   it("gives each authored lake one bounded silhouette while preserving its fishing floor", () => {
     const clusters = REGIONS.flatMap((region) => region.clusters)
-      .filter((cluster) => cluster.archetype === "fishing_spot");
+      .filter((cluster) => resourceDef(cluster.resourceId).archetype === "fishing_spot");
     const basins = clusters.map(waterBasinForCluster);
 
     expect(clusters.map((cluster) => cluster.id)).toEqual([

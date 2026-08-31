@@ -66,8 +66,8 @@ function addResources(skill: SkillId, add: (unlock: SkillUnlock) => void): void 
 
   for (const resource of resources) {
     if (resource.skill !== skill) continue;
-    // RESOURCES also contains one lookup alias for each world cluster. An alias is not a new
-    // unlock, so keep one row per named resource, output and requirement.
+    // Keep one guide row per named resource, output, and requirement. This defensive key also
+    // prevents a future presentation variant from appearing as a second skill unlock.
     const key = `${resource.reqLevel}|${resource.itemId}|${resource.name}`;
     if (seen.has(key)) continue;
     seen.add(key);

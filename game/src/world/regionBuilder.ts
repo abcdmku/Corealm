@@ -8,7 +8,7 @@
  *
  *   regions in REGIONS order
  *     -> clusters in declaration order
- *       -> nodes 0..count-1: placement jitter, then the yield roll
+ *       -> nodes 0..count-1: placement jitter, then the yield roll and one compatibility draw
  *     -> enemy groups in declaration order
  *       -> members 0..count-1: placement jitter
  *   -> the dungeon, last
@@ -32,8 +32,10 @@ import type {
 import { INTERACT_RANGE } from "../app/config.js";
 import { RngStreams, type Rng } from "../core/rng.js";
 import { content } from "../content/index.js";
+import type { GatheringResourceArchetype, ResourceDef } from "../content/index.js";
 import { enemyIdFor } from "../content/enemies.js";
 import { QUESTS } from "../content/quests.js";
+import { resourceDef } from "../content/resources.js";
 import {
   REGIONS, WALK_SPEED_MPS,
   type BuildingDef, type DungeonDef, type EnemyGroupDef, type LocationDef, type ObstacleDef,
@@ -47,6 +49,7 @@ import {
 } from "../render/buildings.js";
 import { tierSilhouetteScale } from "../core/math.js";
 import type { KnownLocation } from "./entities.js";
+import { WATER_FILL_DEPTH } from "./waterBodies.js";
 
 // ------------------------------------------------------------------ formulas
 
@@ -519,6 +522,44 @@ function drawnScale(archetype: Archetype, viewScale: number | undefined, tier: n
   return (viewScale ?? 1) * silhouette;
 }
 
+function presentationAsset(resource: ResourceDef, entityId: string): string {
+  const variants = resource.presentation.availableAssetIds;
+  if (variants.length === 0) throw new Error(`Resource "${resource.id}" has no available asset.`);
+  return variants[variantSeed(entityId) % variants.length]!;
+}
+
+function presentationScale(
+  ctx: BuildContext,
+  resource: ResourceDef,
+  assetId: string,
+  entityId: string,
+): number {
+  const size = ctx.assetSize(assetId);
+  const largest = size ? Math.max(size.x, size.y, size.z) : 1;
+  const targetScale = resource.presentation.targetWorldSize / Math.max(0.001, largest);
+  const range = resource.presentation.variantScale ?? [1, 1];
+  const unit = ((variantSeed(`${entityId}:scale`) >>> 8) & 0xffff) / 0xffff;
+  const drawn = targetScale * (range[0] + (range[1] - range[0]) * unit);
+  // EntityViews applies the shared tier silhouette multiplier. Store the inverse-adjusted view
+  // scale so the authored target remains the final world size rather than being enlarged twice.
+  return round4(drawn / tierSilhouetteScale(resource.tier));
+}
+
+/** Resource-facing is presentation data, so a stable node id must always produce the same yaw. */
+function presentationRotation(entityId: string): number {
+  const unit = variantSeed(`${entityId}:rotation`) / 0x1_0000_0000;
+  return round2(unit * Math.PI * 2);
+}
+
+/**
+ * Resource rotation used to draw once from the world stream. Keep that slot so changing how a
+ * node faces does not move later nodes or reroll their yields. New presentation values must use
+ * id hashes instead of this discarded value.
+ */
+function preserveLegacyResourceRotationDraw(rng: Rng): void {
+  rng.next();
+}
+
 /**
  * Puts the asset's own bounding-box floor on the terrain instead of its origin.
  *
@@ -815,14 +856,15 @@ function pushClusterSolid(
   ctx: BuildContext,
   id: string,
   position: Vec3,
-  cluster: ResourceClusterDef,
+  resource: ResourceDef,
+  assetId: string,
   scale: number,
 ): void {
-  if (cluster.archetype !== "tree" && cluster.archetype !== "ore") return;
-  const size = ctx.assetSize(cluster.assetId);
+  if (resource.archetype !== "tree" && resource.archetype !== "ore") return;
+  const size = ctx.assetSize(assetId);
   if (!size) return;
   const footprintRadius = (size.x + size.z) * 0.25 * scale;
-  const radius = cluster.archetype === "tree"
+  const radius = resource.archetype === "tree"
     ? Math.min(0.9, Math.max(0.3, footprintRadius * TREE_TRUNK_FRACTION))
     : Math.max(0.35, footprintRadius * 0.8);
   if (radius < 0.2) return;
@@ -942,7 +984,7 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
       position,
       state: "idle",
       interactions: ["inspect", "produce"],
-      station: { skill: station.skill, recipeIds: station.recipeIds },
+      station: { kind: station.kind, skill: station.skill, recipeIds: station.recipeIds },
       view: {
         assetId: station.assetId,
         rotationY: station.rotationY,
@@ -1590,14 +1632,18 @@ function buildCluster(
   normal: (spot: Spot) => readonly [number, number, number] | undefined,
   ctx: BuildContext,
 ): void {
-  const respawn = respawnSeconds(cluster.tier);
-  const interaction = gatherInteraction(cluster.archetype);
-  const scale = drawnScale(cluster.archetype, cluster.scale, cluster.tier);
+  const resource = resourceDef(cluster.resourceId);
+  const respawn = respawnSeconds(resource.tier);
+  const interaction = gatherInteraction(resource.archetype);
   const out = ctx.out;
 
   for (let index = 0; index < cluster.count; index += 1) {
+    const id = `${cluster.id}_${index + 1}`;
+    const assetId = presentationAsset(resource, id);
+    const viewScale = presentationScale(ctx, resource, assetId, id);
+    const scale = drawnScale(resource.archetype, viewScale, resource.tier);
     let spot = spiralSpot(cluster.centre, cluster.radius, index, cluster.count, rng);
-    if (cluster.archetype === "tree" || cluster.archetype === "ore") {
+    if (resource.archetype === "tree" || resource.archetype === "ore") {
       // Resource clusters are semantic content rather than procedural scatter, so the scatter
       // exclusion registry cannot move them. Retry the same deterministic spiral at finer phases
       // until the solid node clears the worn road and its shoulders.
@@ -1607,45 +1653,58 @@ function buildCluster(
         );
       }
     }
-    const position = place(spot, cluster.assetId, scale);
-    const id = `${cluster.id}_${index + 1}`;
+    const grounded = place(spot, assetId, scale);
+    // Fishing semantics live at the canonical solved water plane. The renderer lowers the fish
+    // school by its authored waterOffset while the interaction proxy stays on the surface. Do not
+    // use the fish mesh's floor-corrected `grounded.y`: its authored pivot is presentation data and
+    // used to lift the proxy by up to 21 cm above the actual water.
+    const position: Vec3 = resource.archetype === "fishing_spot"
+      ? [spot[0], round2(ctx.heightAt(regionId, spot[0], spot[1]) + WATER_FILL_DEPTH), spot[1]]
+      : grounded;
 
-    if (cluster.archetype === "farm_plot") {
+    if (resource.archetype === "farm_plot") {
       // Plots are not gather nodes: their lifecycle lives in `state.farming` and advances off the
       // wall clock so a crop planted before a reload keeps growing (PRD 2.9). No `resource` block.
+      const rotationY = presentationRotation(id);
+      preserveLegacyResourceRotationDraw(rng);
       out.push({
         id,
         archetype: "farm_plot",
-        name: cluster.name,
-        tier: cluster.tier,
+        name: resource.name,
+        tier: resource.tier,
         regionId,
         position,
         state: "empty",
-        requirements: { farming: cluster.reqLevel },
+        requirements: { farming: resource.reqLevel },
         interactions: ["inspect", "rake", "plant", "harvest"],
         view: {
-          assetId: cluster.assetId,
-          depletedAssetId: cluster.depletedAssetId,
-          scale: cluster.scale,
-          rotationY: round2(rng.float(0, Math.PI * 2)),
-          materialTier: cluster.tier,
+          assetId,
+          depletedAssetId: resource.presentation.depletedAssetId,
+          scale: viewScale,
+          rotationY,
+          materialTier: resource.presentation.materialTier,
           labelHeight: 1.2,
         },
-        meta: { plotId: id, cropItemId: cluster.itemId, clusterId: cluster.id, locationId: cluster.locationId },
+        meta: {
+          plotId: id, cropItemId: resource.itemId, resourceId: resource.id,
+          clusterId: cluster.id, locationId: cluster.locationId,
+        },
       });
-      emitPlotBed(ctx, regionId, cluster, id, spot);
+      emitPlotBed(ctx, regionId, cluster, resource, id, spot);
       continue;
     }
 
-    const maxYields = rollYield(rng, cluster.tier);
+    const maxYields = rollYield(rng, resource.tier);
+    const rotationY = presentationRotation(id);
+    preserveLegacyResourceRotationDraw(rng);
     const requirements: Partial<Record<SkillId, number>> = {};
-    requirements[cluster.skill] = cluster.reqLevel;
+    requirements[resource.skill] = resource.reqLevel;
 
     out.push({
       id,
-      archetype: cluster.archetype,
-      name: cluster.name,
-      tier: cluster.tier,
+      archetype: resource.archetype,
+      name: resource.name,
+      tier: resource.tier,
       regionId,
       position,
       state: "available",
@@ -1655,23 +1714,29 @@ function buildCluster(
         remaining: maxYields,
         maxYields,
         respawnSeconds: respawn,
-        itemId: cluster.itemId,
+        itemId: resource.itemId,
       },
       view: {
-        assetId: cluster.assetId,
-        depletedAssetId: cluster.depletedAssetId,
-        scale: cluster.scale,
-        rotationY: round2(rng.float(0, Math.PI * 2)),
+        assetId,
+        depletedAssetId: resource.presentation.depletedAssetId,
+        scale: viewScale,
+        rotationY,
         // Ore has no dedicated mesh, so tier is carried entirely by the material tint. Trees and
         // fishing spots set it too, so `render/materials.ts` has one rule and no special cases.
-        materialTier: cluster.tier,
-        labelHeight: labelHeightFor(cluster.archetype),
+        materialTier: resource.presentation.materialTier,
+        labelHeight: labelHeightFor(resource.archetype),
         groundNormal: normal(spot),
-        tiltStrength: TILT_STRENGTH[cluster.archetype],
+        tiltStrength: TILT_STRENGTH[resource.archetype],
       },
-      meta: { clusterId: cluster.id, locationId: cluster.locationId, skill: cluster.skill },
+      meta: {
+        resourceId: resource.id, clusterId: cluster.id, locationId: cluster.locationId,
+        skill: resource.skill,
+        ...(resource.presentation.waterOffset === undefined
+          ? {}
+          : { waterOffset: resource.presentation.waterOffset }),
+      },
     });
-    pushClusterSolid(ctx, id, position, cluster, scale);
+    pushClusterSolid(ctx, id, position, resource, assetId, scale);
   }
 }
 
@@ -1698,13 +1763,14 @@ function emitPlotBed(
   ctx: BuildContext,
   regionId: RegionId,
   cluster: ResourceClusterDef,
+  resource: ResourceDef,
   plotId: string,
   spot: Spot,
 ): void {
   const meta = { plotId, clusterId: cluster.id, scenery: true };
   const ground = ctx.heightAt(regionId, spot[0], spot[1]);
   ctx.out.push(sceneryEntity(
-    `${plotId}#bed`, cluster.name, cluster.tier, regionId,
+    `${plotId}#bed`, resource.name, resource.tier, regionId,
     [round2(spot[0]), round2(ground + PAVING_LIFT_METRES), round2(spot[1])],
     PLOT_BED_ASSET, 1, 0, 0.3, meta,
   ));
@@ -1718,7 +1784,7 @@ function emitPlotBed(
     const x = spot[0] + rail[0];
     const z = spot[1] + rail[1];
     ctx.out.push(sceneryEntity(
-      `${plotId}#rail${index}`, cluster.name, cluster.tier, regionId,
+      `${plotId}#rail${index}`, resource.name, resource.tier, regionId,
       [round2(x), round2(ctx.heightAt(regionId, x, z) - ctx.baseY(PLOT_RAIL_ASSET)), round2(z)],
       PLOT_RAIL_ASSET, 1, rail[2], 0.9, meta,
     ));
@@ -1830,7 +1896,7 @@ function buildObstacle(
 
 // ------------------------------------------------------------------ helpers
 
-function gatherInteraction(archetype: ResourceClusterDef["archetype"]): InteractionId {
+function gatherInteraction(archetype: GatheringResourceArchetype): InteractionId {
   switch (archetype) {
     case "ore": return "mine";
     case "tree": return "chop";
@@ -1839,7 +1905,7 @@ function gatherInteraction(archetype: ResourceClusterDef["archetype"]): Interact
   }
 }
 
-function labelHeightFor(archetype: ResourceClusterDef["archetype"]): number {
+function labelHeightFor(archetype: GatheringResourceArchetype): number {
   switch (archetype) {
     case "tree": return 6.5;
     case "ore": return 2.6;

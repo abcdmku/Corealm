@@ -9,6 +9,7 @@ import {
   type ItemIconPrimitive,
   type ItemIconPrimitivePart,
 } from "./itemIconAppearances.js";
+import { isProceduralGearAsset, registerProceduralGear } from "./proceduralGear.js";
 
 interface ItemIconRendererApi {
   ready: boolean;
@@ -23,6 +24,7 @@ declare global {
 
 const SIZE = 256;
 const assets = new AssetRegistry();
+registerProceduralGear(assets);
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
   alpha: true,
@@ -182,6 +184,22 @@ function buildPrimitive(part: ItemIconPrimitivePart): THREE.Group {
       orbit.rotation.x = Math.PI / 2.6;
       group.add(orbit);
     },
+    handle: () => {
+      const grip = ownedMesh(new THREE.CylinderGeometry(0.11, 0.15, 1.22, 14), primary);
+      group.add(grip);
+      for (const y of [-0.42, 0, 0.42]) {
+        const ridge = ownedMesh(new THREE.TorusGeometry(0.132, 0.018, 8, 20), secondary.clone());
+        ridge.rotation.x = Math.PI / 2;
+        ridge.position.y = y;
+        group.add(ridge);
+      }
+      const butt = ownedMesh(new THREE.CylinderGeometry(0.17, 0.15, 0.1, 14), secondary.clone());
+      butt.position.y = -0.64;
+      group.add(butt);
+      const shoulder = ownedMesh(new THREE.CylinderGeometry(0.13, 0.11, 0.1, 14), secondary);
+      shoulder.position.y = 0.64;
+      group.add(shoulder);
+    },
     hide: () => {
       const shape = new THREE.Shape();
       shape.moveTo(-0.72, 0.8);
@@ -334,20 +352,26 @@ async function buildAppearance(appearance: ItemIconAppearance): Promise<THREE.Gr
     if (part.scale !== undefined) object.scale.multiplyScalar(part.scale);
     tintObject(object, part.colour, part.accent);
     container.add(object);
-    const entry = assets.entry(part.assetId);
-    if (!entry) throw new Error(`Missing manifest entry for item icon asset: ${part.assetId}`);
     const scale = part.scale ?? 1;
-    const min = new THREE.Vector3(
-      entry.base?.x ?? -entry.size.x / 2,
-      entry.base?.y ?? -entry.size.y / 2,
-      entry.base?.z ?? -entry.size.z / 2,
-    ).multiplyScalar(scale);
-    const max = new THREE.Vector3(
-      (entry.base?.x ?? -entry.size.x / 2) + entry.size.x,
-      (entry.base?.y ?? -entry.size.y / 2) + entry.size.y,
-      (entry.base?.z ?? -entry.size.z / 2) + entry.size.z,
-    ).multiplyScalar(scale);
-    localBounds.union(new THREE.Box3(min, max));
+    const entry = assets.entry(part.assetId);
+    if (entry) {
+      const min = new THREE.Vector3(
+        entry.base?.x ?? -entry.size.x / 2,
+        entry.base?.y ?? -entry.size.y / 2,
+        entry.base?.z ?? -entry.size.z / 2,
+      ).multiplyScalar(scale);
+      const max = new THREE.Vector3(
+        (entry.base?.x ?? -entry.size.x / 2) + entry.size.x,
+        (entry.base?.y ?? -entry.size.y / 2) + entry.size.y,
+        (entry.base?.z ?? -entry.size.z / 2) + entry.size.z,
+      ).multiplyScalar(scale);
+      localBounds.union(new THREE.Box3(min, max));
+    } else if (isProceduralGearAsset(part.assetId)) {
+      object.updateMatrixWorld(true);
+      localBounds.union(new THREE.Box3().setFromObject(object));
+    } else {
+      throw new Error(`Missing manifest entry for item icon asset: ${part.assetId}`);
+    }
   }
   if (appearance.rotation) container.rotation.set(...appearance.rotation);
   container.userData["itemIconLocalBounds"] = {

@@ -1,4 +1,5 @@
 import type { ResourceClusterDef } from "../content/regions.js";
+import { resourceDef } from "../content/resources.js";
 import { seedFromText, type OrganicShapeSpec } from "./organicFields.js";
 
 /** Vertical distance from the dry ground at a body's centre to its basin floor. */
@@ -69,7 +70,7 @@ function basinShape(id: string): OrganicShapeSpec {
 
 /** One source for the terrain carve, water mesh search bounds, and later shoreline consumers. */
 export function waterBasinForCluster(cluster: ResourceClusterDef): WaterBasinSpec {
-  if (cluster.archetype !== "fishing_spot") {
+  if (resourceDef(cluster.resourceId).archetype !== "fishing_spot") {
     throw new Error(`Water basin requested for non-fishing cluster "${cluster.id}".`);
   }
   const shape = basinShape(cluster.id);

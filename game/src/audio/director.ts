@@ -60,6 +60,13 @@ export function cueForGameEvent(event: GameEvent): AudioCueId | null {
     case "dialogue.closed": return "interaction.dialogue_close";
     case "item.equipped":
     case "item.unequipped": return "interaction.equip";
+    case "item.received": {
+      const data = event.data as Record<string, unknown>;
+      if (data["source"] === "gather" && data["skill"] === "fishing") {
+        return "gather.fishing_catch";
+      }
+      return null;
+    }
     case "activity.started":
       return cueForActivity(dataAsActivity(event.data, "started"));
     case "activity.stopped":

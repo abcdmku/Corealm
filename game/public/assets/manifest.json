@@ -1,61 +1,85 @@
 {
-  "generatedAt": "2026-08-28T03:25:48.046Z",
+  "generatedAt": "2026-08-30T20:41:23.918Z",
   "packs": [
     {
       "id": "stylized-nature-megakit",
       "name": "Stylized Nature MegaKit",
       "author": "Quaternius",
       "source": "https://quaternius.itch.io/stylized-nature-megakit",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "archiveSha256": "298f6732b872e4cf7b30e6e7abf9641c7f6dc6b326df37ac089533ed7e3d58c9"
     },
     {
       "id": "medieval-village-megakit",
       "name": "Medieval Village MegaKit",
       "author": "Quaternius",
       "source": "https://quaternius.itch.io/medieval-village-megakit",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "archiveSha256": "e60dea67c10f30dccccfbff92a7933f5ea5cfe99be0e2a0fa5118cceabeec5c4"
     },
     {
       "id": "fantasy-props-megakit",
       "name": "Fantasy Props MegaKit",
       "author": "Quaternius",
       "source": "https://quaternius.itch.io/fantasy-props-megakit",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "archiveSha256": "8b6f7e806d222e585478f0e1bdc6b271bbc7bc6f84dd6af8ca703a7c64f0cb1e"
     },
     {
       "id": "universal-base-characters",
       "name": "Universal Base Characters",
       "author": "Quaternius",
       "source": "https://quaternius.itch.io/universal-base-characters",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "archiveSha256": "fdbf1804c90dfc1ea03e992bff7da2dfd1a79318e13270a660180f9308455f40"
     },
     {
       "id": "modular-character-outfits-fantasy",
       "name": "Modular Character Outfits - Fantasy",
       "author": "Quaternius",
       "source": "https://quaternius.itch.io/modular-character-outfits-fantasy",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "archiveSha256": "c3468b18871cc8c8f05ab14df7712baf22cb9f389cbd870babf130e595187f70"
     },
     {
       "id": "ultimate-platformer-pack",
       "name": "Ultimate Platformer Pack",
       "author": "Quaternius",
       "source": "https://quaternius.itch.io/ultimate-platformer-pack",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "archiveSha256": "2d0cac0f3cb58f6845f779a4c6b4a92be6fa27d118ee0b976ead55c6834a53d4"
     },
     {
       "id": "universal-animation-library",
       "name": "Universal Animation Library",
       "author": "Quaternius",
       "source": "https://quaternius.itch.io/universal-animation-library",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "archiveSha256": "cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724"
     },
     {
       "id": "universal-animation-library-2",
       "name": "Universal Animation Library 2",
       "author": "Quaternius",
       "source": "https://quaternius.itch.io/universal-animation-library-2",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "archiveSha256": "4008ea208a604773a2b2177d965f0f5d3195498b5bf838c3f5785d68e95f2a68"
+    },
+    {
+      "id": "ultimate-nature-pack",
+      "name": "Ultimate Nature Pack",
+      "author": "Quaternius",
+      "source": "https://quaternius.com/packs/ultimatenature.html",
+      "license": "CC0-1.0",
+      "archiveSha256": "865e4ae735116181923fe6ace410da3cec29e814935dc90fb298e0af3a4ff869"
+    },
+    {
+      "id": "animated-fish-pack",
+      "name": "Animated Fish Pack",
+      "author": "Quaternius",
+      "source": "https://quaternius.com/packs/animatedfish.html",
+      "license": "CC0-1.0",
+      "archiveSha256": "1fc56d63ae16497add1c187d8bafb430f4d0a1e6d89e04396d23f4b58519ac1c"
     }
   ],
   "assets": [
@@ -2275,6 +2299,93 @@
       ]
     },
     {
+      "id": "fish_cragfin",
+      "file": "models/nature/fish_cragfin.glb",
+      "pack": "animated-fish-pack",
+      "category": "nature",
+      "is": "fish",
+      "tags": [
+        "fish",
+        "cragfin",
+        "fishing",
+        "school",
+        "water"
+      ],
+      "bytes": 32692,
+      "size": {
+        "x": 0.344,
+        "y": 0.818,
+        "z": 1.525
+      },
+      "base": {
+        "x": -0.105,
+        "y": -0.344,
+        "z": -0.905
+      },
+      "animations": [],
+      "materials": [
+        "Fish3-vertex-colours"
+      ]
+    },
+    {
+      "id": "fish_minnow",
+      "file": "models/nature/fish_minnow.glb",
+      "pack": "animated-fish-pack",
+      "category": "nature",
+      "is": "fish",
+      "tags": [
+        "fish",
+        "minnow",
+        "fishing",
+        "school",
+        "water"
+      ],
+      "bytes": 26904,
+      "size": {
+        "x": 0.466,
+        "y": 1.059,
+        "z": 3.202
+      },
+      "base": {
+        "x": -0.233,
+        "y": -0.396,
+        "z": -2
+      },
+      "animations": [],
+      "materials": [
+        "Fish1-vertex-colours"
+      ]
+    },
+    {
+      "id": "fish_trout",
+      "file": "models/nature/fish_trout.glb",
+      "pack": "animated-fish-pack",
+      "category": "nature",
+      "is": "fish",
+      "tags": [
+        "fish",
+        "trout",
+        "fishing",
+        "school",
+        "water"
+      ],
+      "bytes": 24528,
+      "size": {
+        "x": 0.437,
+        "y": 1.218,
+        "z": 1.994
+      },
+      "base": {
+        "x": -0.266,
+        "y": -0.581,
+        "z": -1.323
+      },
+      "animations": [],
+      "materials": [
+        "Fish2-vertex-colours"
+      ]
+    },
+    {
       "id": "flower_a_group",
       "file": "models/nature/flower_a_group.glb",
       "pack": "stylized-nature-megakit",
@@ -2548,6 +2659,178 @@
       "animations": [],
       "materials": [
         "Mushrooms"
+      ]
+    },
+    {
+      "id": "nature_tree_stump",
+      "file": "models/nature/nature_tree_stump.glb",
+      "pack": "ultimate-nature-pack",
+      "category": "nature",
+      "is": "stump",
+      "tags": [
+        "stump",
+        "tree",
+        "depleted",
+        "palewood"
+      ],
+      "bytes": 12156,
+      "size": {
+        "x": 1.36,
+        "y": 0.622,
+        "z": 1.031
+      },
+      "base": {
+        "x": -0.806,
+        "y": -0.006,
+        "z": -0.447
+      },
+      "animations": [],
+      "materials": [
+        "TreeStump-vertex-colours"
+      ]
+    },
+    {
+      "id": "nature_tree_stump_moss",
+      "file": "models/nature/nature_tree_stump_moss.glb",
+      "pack": "ultimate-nature-pack",
+      "category": "nature",
+      "is": "stump",
+      "tags": [
+        "stump",
+        "tree",
+        "depleted",
+        "moss",
+        "duskoak"
+      ],
+      "bytes": 12196,
+      "size": {
+        "x": 1.36,
+        "y": 0.622,
+        "z": 1.031
+      },
+      "base": {
+        "x": -0.806,
+        "y": -0.006,
+        "z": -0.447
+      },
+      "animations": [],
+      "materials": [
+        "TreeStump_Moss-vertex-colours"
+      ]
+    },
+    {
+      "id": "nature_tree_stump_snow",
+      "file": "models/nature/nature_tree_stump_snow.glb",
+      "pack": "ultimate-nature-pack",
+      "category": "nature",
+      "is": "stump",
+      "tags": [
+        "stump",
+        "tree",
+        "depleted",
+        "snow",
+        "cairnpine"
+      ],
+      "bytes": 13412,
+      "size": {
+        "x": 1.36,
+        "y": 0.622,
+        "z": 1.031
+      },
+      "base": {
+        "x": -0.806,
+        "y": -0.006,
+        "z": -0.447
+      },
+      "animations": [],
+      "materials": [
+        "TreeStump_Snow-vertex-colours"
+      ]
+    },
+    {
+      "id": "nature_wood_log",
+      "file": "models/nature/nature_wood_log.glb",
+      "pack": "ultimate-nature-pack",
+      "category": "nature",
+      "is": "log",
+      "tags": [
+        "log",
+        "wood",
+        "campfire",
+        "palewood"
+      ],
+      "bytes": 23188,
+      "size": {
+        "x": 0.633,
+        "y": 0.748,
+        "z": 2.67
+      },
+      "base": {
+        "x": -0.303,
+        "y": -0.001,
+        "z": -1.498
+      },
+      "animations": [],
+      "materials": [
+        "WoodLog-vertex-colours"
+      ]
+    },
+    {
+      "id": "nature_wood_log_moss",
+      "file": "models/nature/nature_wood_log_moss.glb",
+      "pack": "ultimate-nature-pack",
+      "category": "nature",
+      "is": "log",
+      "tags": [
+        "log",
+        "wood",
+        "campfire",
+        "moss",
+        "duskoak"
+      ],
+      "bytes": 30496,
+      "size": {
+        "x": 0.897,
+        "y": 0.688,
+        "z": 2.67
+      },
+      "base": {
+        "x": -0.566,
+        "y": -0.001,
+        "z": -1.498
+      },
+      "animations": [],
+      "materials": [
+        "WoodLog_Moss-vertex-colours"
+      ]
+    },
+    {
+      "id": "nature_wood_log_snow",
+      "file": "models/nature/nature_wood_log_snow.glb",
+      "pack": "ultimate-nature-pack",
+      "category": "nature",
+      "is": "log",
+      "tags": [
+        "log",
+        "wood",
+        "campfire",
+        "snow",
+        "cairnpine"
+      ],
+      "bytes": 14364,
+      "size": {
+        "x": 0.627,
+        "y": 0.584,
+        "z": 2.495
+      },
+      "base": {
+        "x": -0.369,
+        "y": -0.019,
+        "z": -1.174
+      },
+      "animations": [],
+      "materials": [
+        "WoodLog_Snow-vertex-colours"
       ]
     },
     {

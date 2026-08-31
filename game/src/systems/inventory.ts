@@ -45,10 +45,11 @@ export interface InventoryDeps {
   /** Sim clock milliseconds, for event timestamps. */
   now: () => number;
   /**
-   * Optional. The activity system takes ownership of the 1.8 s eat delay and returns true when it
-   * accepted. When it is absent or refuses, the heal lands immediately and the delay is skipped.
+   * Optional boot seam for the eating activity driver. The inventory owns validation and the
+   * eventual item move; the driver owns only the timer. No food is consumed when this seam is
+   * absent or refuses the activity.
    */
-  beginEating?: (itemId: ItemId, durationMs: number) => boolean;
+  beginEating?: (itemId: ItemId, durationMs: number, atMs: number) => boolean;
   /**
    * Optional. Lets `use()` on a wearable equip it, which is what a player expects from a click.
    * The root wires `EquipmentSystem.equip`; without it, `use()` on gear returns UNAVAILABLE.
@@ -290,26 +291,55 @@ export class InventorySystem {
   private eat(def: ItemDef): Result<{ effect: string }> {
     const state = this.state;
     if (state.player.health <= 0) return err("DEAD", "The player is dead");
-    if (state.activity?.kind === "eating") return err("BUSY", "Still eating");
+    if (state.combat.targetId !== null) return err("BUSY", "You cannot eat while attacking");
+    if (state.activity) {
+      return err("BUSY", state.activity.kind === "eating" ? "Still eating" : "Another activity is in progress");
+    }
     if (this.countOf(def.id) < 1) return err("NOT_ENOUGH_ITEMS", `You have no ${def.name}`);
 
-    // The authored heal wins when the table supplies one; otherwise fall back to the PRD 2.7 curve.
-    const authored = def.food?.healAmount;
-    const heal = typeof authored === "number" && Number.isFinite(authored) && authored > 0
-      ? Math.round(authored)
-      : healAmount(def.tier);
+    const beginEating = this.deps.beginEating;
+    if (!beginEating) return err("UNAVAILABLE", "Eating activity is not available");
+    if (!beginEating(def.id, EAT_DURATION_MS, this.deps.now())) {
+      return err("BUSY", "Eating could not be started");
+    }
+    return ok({ effect: `started eating ${def.name}` });
+  }
 
-    const removed = this.removeItem(def.id, 1);
+  /**
+   * The eating driver's single completion point.
+   *
+   * Starting an eat reserves nothing. That makes cancel, death and replacement lossless. The item
+   * is removed and its healing applied atomically only after the matching activity reaches its
+   * deadline. Rechecking combat and ownership closes the two races that can occur during the
+   * timer: the player can target an enemy, or another system can move the food out of the pack.
+   */
+  completeEating(itemId: ItemId, atMs: number): Result<{ restored: number; effect: string }> {
+    const state = this.state;
+    const activity = state.activity;
+    if (!activity || activity.kind !== "eating" || activity.itemId !== itemId) {
+      return err("BUSY", "No matching eating activity is in progress");
+    }
+    if (atMs < activity.endsAtMs) return err("BUSY", "Still eating");
+    if (state.player.health <= 0) return err("DEAD", "The player is dead");
+    if (state.combat.targetId !== null) return err("BUSY", "You cannot eat while attacking");
+
+    const def = content.item(itemId);
+    if (!def) return err("NOT_FOUND", `No item with id ${itemId}`);
+    if (!def.food) return err("INVALID_ARGUMENT", `${def.name} is not edible`);
+    if (this.countOf(itemId) < 1) return err("NOT_ENOUGH_ITEMS", `You have no ${def.name}`);
+
+    // The authored heal wins when the table supplies one; otherwise fall back to the PRD 2.7 curve.
+    const authored = def.food.healAmount;
+    const heal = Number.isFinite(authored) && authored > 0 ? Math.round(authored) : healAmount(def.tier);
+
+    const removed = this.removeItem(itemId, 1);
     if (!removed.ok) return { ok: false, error: removed.error };
 
     const before = state.player.health;
-    // Overheal is burned, not banked: eating at full health wastes the item, exactly as PRD 2.7 says.
+    // Overheal is burned, not banked: eating at full health still consumes the completed item.
     state.player.health = Math.min(state.player.maxHealth, before + heal);
     const restored = state.player.health - before;
     this.deps.store.markDirty();
-
-    const timed = this.deps.beginEating?.(def.id, EAT_DURATION_MS) ?? false;
-    const suffix = timed ? "" : " (instantly — the 1.8 s eat delay is not wired to the activity system)";
-    return ok({ effect: `ate ${def.name}, restored ${restored} health${suffix}` });
+    return ok({ restored, effect: `ate ${def.name}, restored ${restored} health` });
   }
 }

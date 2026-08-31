@@ -218,12 +218,28 @@ export function createTools(api: GameApi): ToolDef[] {
       description:
         "Start a production job at a station: smelt, smith, cook, craft, or fletch. Runs `quantity` "
         + "repetitions back to back and stops on missing ingredients, a full pack, movement, or "
-        + "damage. The character must already be at the right station.",
+        + "damage. Pass stationId to bind the exact selected station; otherwise the nearest valid "
+        + "station is used for compatibility. The character must already be at the right station.",
       inputSchema: obj({
         recipeId: STR("Recipe id from corealm_search_docs"),
         quantity: NUM("How many to make. Default 1."),
+        stationId: STR("Optional exact range, campfire, furnace, anvil, bench, or crafting station id"),
       }, ["recipeId"]),
-      execute: (args) => unwrap(api.produce(asString(args.recipeId) as RecipeId, asNumber(args.quantity, 1))),
+      execute: (args) => {
+        const recipeId = asString(args.recipeId) as RecipeId;
+        const quantity = asNumber(args.quantity, 1);
+        return unwrap(typeof args.stationId === "string"
+          ? api.produceAt(args.stationId, recipeId, quantity)
+          : api.produce(recipeId, quantity));
+      },
+    },
+    {
+      name: "corealm_build_campfire",
+      description:
+        "Build a portable cooking fire from one carried log. The game chooses the first valid "
+        + "nearby dry placement; the three-second build consumes the log only when it completes.",
+      inputSchema: obj({ logItemId: STR("Palewood, Duskoak, or Cairnpine log item id") }, ["logItemId"]),
+      execute: (args) => unwrap(api.buildCampfire(asString(args.logItemId))),
     },
 
     // ------------------------------------------------------------ combat

@@ -11,10 +11,9 @@
  * `armour`; magical defence uses **Magic** plus `magicArmour`. That is a settled root decision, and
  * it is why an enemy row carries one `defenceLevel` and two armour numbers rather than two levels.
  *
- * Combat is deliberately NOT an activity. It lives in `state.combat` so the player can eat, bank,
- * or have an agent issue any other call while auto-attacks keep resolving on the 600 ms combat
- * tick. Routing it through `systems/activity.ts` would make Ordrun unwinnable, because the boss
- * fight is a 165 s exchange that costs about nine pieces of food.
+ * Combat is deliberately not an activity. It lives in `state.combat` so movement, targeting, and
+ * enemy responses have their own lifecycle. Food rejects an active attack target, and the combat
+ * tick also pauses while an already-started eating activity completes.
  *
  * Everything random goes through the seeded `combat` stream (hit rolls, damage rolls) and the
  * seeded `loot` stream (drop rolls), so a fight replays identically from a seed and a tick count.
@@ -909,6 +908,8 @@ export class CombatSystem implements TickSystem {
   /** Adds an enemy to `state.combat.engagedBy`. `systems/enemyAI.ts` is the only real caller. */
   engageEnemy(enemyId: EntityId, atMs: number): void {
     const state = this.deps.store.get();
+    const current = this.deps.activity?.current();
+    if (current && current.kind !== "eating") this.deps.activity?.cancel(atMs);
     if (!state.combat.engagedBy.includes(enemyId)) {
       state.combat.engagedBy.push(enemyId);
       this.deps.events.emit("combat.started", { by: enemyId, initiator: "enemy" }, enemyId, atMs);

@@ -6,10 +6,19 @@
  */
 import { SAVE_VERSION, createInitialState, type GameState } from "../state/store.js";
 import { levelForXp } from "../content/xp.js";
-import { SKILL_IDS } from "../contracts.js";
+import { CAMPFIRE_FUELS } from "../content/gatheringProductionTiers.js";
+import { SKILL_IDS, type RegionId } from "../contracts.js";
 import { migrate, type MigrationResult } from "./migrate.js";
 
 const SAVE_KEY = "corealm.save.v1";
+
+/** Runtime membership check for the frozen RegionId union. Record keeps this list exhaustive. */
+const REGION_IDS: Readonly<Record<RegionId, true>> = {
+  fallowmarch: true,
+  vellenwood: true,
+  karrowmoor: true,
+  gravelmaw: true,
+};
 
 export interface LoadOutcome {
   status: "loaded" | "empty" | "failed";
@@ -49,19 +58,33 @@ export class SaveService {
     } catch {
       return { status: "failed", reason: "localStorage read failed" };
     }
-    if (!raw) return { status: "empty" };
+    if (raw === null) return { status: "empty" };
 
+    return this.loadSerialized(raw);
+  }
+
+  /** Runs the same import pipeline as load(), without writing the supplied text to localStorage. */
+  loadSerialized(json: string): LoadOutcome {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(json);
     } catch {
       return { status: "failed", reason: "Save is not valid JSON" };
     }
 
-    const result: MigrationResult = migrate(parsed);
+    let result: MigrationResult;
+    try {
+      result = migrate(parsed);
+    } catch {
+      return { status: "failed", reason: "Save migration failed" };
+    }
     if (!result.ok || !result.state) return { status: "failed", reason: result.reason ?? "Migration failed" };
 
-    return { status: "loaded", state: recompute(result.state) };
+    try {
+      return { status: "loaded", state: recompute(result.state) };
+    } catch {
+      return { status: "failed", reason: "Save repair failed" };
+    }
   }
 
   /** The raw JSON that would be written. Used by the debug API and the export-on-failure path. */
@@ -97,12 +120,22 @@ function recompute(state: GameState): GameState {
   }
 
   // Slices added after a save was written.
-  state.world = state.world ?? fresh.world;
-  state.world.nodes = state.world.nodes ?? {};
-  state.world.enemies = state.world.enemies ?? {};
-  state.world.obstaclesUsed = state.world.obstaclesUsed ?? {};
-  state.world.lootPiles = state.world.lootPiles ?? {};
-  state.world.recoveryCache = state.world.recoveryCache ?? null;
+  const savedWorld: Record<string, unknown> = isRecord(state.world) ? state.world : {};
+  state.world = { ...fresh.world, ...savedWorld } as GameState["world"];
+  state.world.nodes = repairResourceNodes(savedWorld.nodes);
+  state.world.enemies = isRecord(savedWorld.enemies)
+    ? savedWorld.enemies as GameState["world"]["enemies"]
+    : {};
+  state.world.obstaclesUsed = isRecord(savedWorld.obstaclesUsed)
+    ? savedWorld.obstaclesUsed as GameState["world"]["obstaclesUsed"]
+    : {};
+  state.world.lootPiles = isRecord(savedWorld.lootPiles)
+    ? savedWorld.lootPiles as GameState["world"]["lootPiles"]
+    : {};
+  state.world.recoveryCache = isRecord(savedWorld.recoveryCache)
+    ? savedWorld.recoveryCache as NonNullable<GameState["world"]["recoveryCache"]>
+    : null;
+  state.world.campfire = repairCampfire(savedWorld.campfire);
   state.discovery = state.discovery ?? fresh.discovery;
   state.discovery.entities = state.discovery.entities ?? {};
   state.discovery.locations = state.discovery.locations ?? {};
@@ -112,8 +145,17 @@ function recompute(state: GameState): GameState {
   state.bank = state.bank ?? fresh.bank;
   state.bank.slots = state.bank.slots ?? [];
   state.equipment = { ...fresh.equipment, ...(state.equipment ?? {}) };
-  state.combat = state.combat ?? fresh.combat;
+  state.combat = {
+    ...fresh.combat,
+    ...(isRecord(state.combat) ? state.combat : {}),
+  } as GameState["combat"];
   state.settings = { ...fresh.settings, ...(state.settings ?? {}) };
+
+  // Activity deadlines are measured on the per-session simulation clock. Reloading starts that
+  // clock at zero, so carrying an absolute deadline across sessions can leave the character busy
+  // for the previous session's entire uptime. Reload is an interruption: no pending ingredient,
+  // food, or campfire log has completed yet, so dropping the activity consumes nothing.
+  state.activity = null;
 
   // A conversation does not survive a reload.
   //
@@ -136,6 +178,85 @@ function recompute(state: GameState): GameState {
   state.inventory = { slots };
 
   return state;
+}
+
+type PersistedCampfire = NonNullable<GameState["world"]["campfire"]>;
+type PersistedResourceNode = GameState["world"]["nodes"][string];
+
+/**
+ * Adds the capacity field introduced after save v3 without changing the save version. A legacy
+ * half-worked node cannot reveal how many yields were already taken, so its saved remainder is the
+ * only honest fallback. The next normal respawn replaces both counts with one fresh roll.
+ */
+function repairResourceNodes(value: unknown): GameState["world"]["nodes"] {
+  if (!isRecord(value)) return {};
+
+  const repaired: GameState["world"]["nodes"] = {};
+  for (const [entityId, candidate] of Object.entries(value)) {
+    if (!isRecord(candidate)) continue;
+
+    const remaining = validYieldCount(candidate.remaining) ? candidate.remaining : 0;
+    const savedMax = validYieldCount(candidate.maxYields) ? candidate.maxYields : remaining;
+    const maxYields = Math.max(remaining, savedMax);
+    const state = candidate.state === "depleted" ? "depleted" : "available";
+    const respawnAtMs = candidate.respawnAtMs === null
+      || (typeof candidate.respawnAtMs === "number" && Number.isFinite(candidate.respawnAtMs))
+      ? candidate.respawnAtMs as number | null
+      : null;
+
+    repaired[entityId] = { remaining, maxYields, state, respawnAtMs } satisfies PersistedResourceNode;
+  }
+  return repaired;
+}
+
+function validYieldCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+/**
+ * A portable fire is reconstructed as a live station during boot, so malformed persisted data must
+ * not reach that boundary. Valid records are copied into the exact JSON-safe shape the runtime
+ * expects; invalid or obsolete records become an absent fire.
+ */
+function repairCampfire(value: unknown): PersistedCampfire | null {
+  if (!isRecord(value)) return null;
+
+  const position = value.position;
+  if (
+    value.id !== "campfire:player"
+    || !Array.isArray(position)
+    || position.length !== 3
+    || !position.every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate))
+    || !isRegionId(value.regionId)
+    || typeof value.logItemId !== "string"
+    || !Number.isSafeInteger(value.tier)
+    || (value.tier as number) < 1
+    || typeof value.expiresAtPlaySeconds !== "number"
+    || !Number.isFinite(value.expiresAtPlaySeconds)
+    || value.expiresAtPlaySeconds < 0
+  ) {
+    return null;
+  }
+
+  const fuel = CAMPFIRE_FUELS.find((entry) => entry.logItemId === value.logItemId);
+  if (!fuel || fuel.tier !== value.tier) return null;
+
+  return {
+    id: "campfire:player",
+    position: [position[0] as number, position[1] as number, position[2] as number],
+    regionId: value.regionId,
+    logItemId: value.logItemId,
+    tier: value.tier as number,
+    expiresAtPlaySeconds: value.expiresAtPlaySeconds,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isRegionId(value: unknown): value is RegionId {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(REGION_IDS, value);
 }
 
 function detectStorage(): boolean {

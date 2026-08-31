@@ -1,6 +1,6 @@
 /**
- * What worn gear looks like: the 59 equippable ids in `content/equipment.ts` mapped onto the assets
- * that actually exist — and, for the staff line alone, onto one that had to be built — plus the
+ * What worn gear looks like: every equippable id in `content/equipment.ts` mapped onto the assets
+ * that actually exist, with generated geometry for staffs and wands, plus the
  * hand sockets and the tier tints.
  *
  * This file exists because the render half of equipment was never written. Measured before this
@@ -62,7 +62,12 @@ import { tierSilhouetteScale } from "./materials.js";
 // temporal dead zone, and which one would depend on load order. `registerProceduralGear` and
 // `isProceduralGearAsset` are therefore imported from there by boot and by the test, not re-exported
 // through here.
-import { PROCEDURAL_GEAR_ASSETS, staffAssetId } from "./proceduralGear.js";
+import {
+  PROCEDURAL_GEAR_ASSETS,
+  PROCEDURAL_WAND_ASSETS,
+  staffAssetId,
+  wandAssetId,
+} from "./proceduralGear.js";
 
 /** Which base body the parts are resolved against. `boot.ts` builds the player as `base_male`. */
 export type CharacterBody = "male" | "female";
@@ -146,7 +151,7 @@ const GARNET = 0x7a1a2c;
 
 type OutfitKit = "ranger" | "peasant";
 type OutfitPart = "hood" | "chest" | "legs" | "boots" | "gloves" | "pauldron";
-type WeaponAsset = "sword" | "shield";
+type WeaponAsset = "sword" | "shield" | "axe" | "pickaxe";
 
 /**
  * A resolved part before the body variant is chosen. One item can be more than one part.
@@ -177,11 +182,11 @@ interface LadderTier {
   /** Tint for the off-hand shield or focus. */
   offHandTint: number;
   /**
-   * `sword` covers both dagger and sword geometry; `built` means `render/proceduralGear.ts` makes
-   * the mesh. `scale` is only meaningful for a library GLB — a built staff is authored at its true
+   * `sword` covers both dagger and sword geometry; `staff` and `wand` mean
+   * `render/proceduralGear.ts` makes the mesh. `scale` is only meaningful for a library GLB — a built staff is authored at its true
    * length, so there is nothing to fit.
    */
-  mainHand: readonly { id: ItemId; asset: WeaponAsset | "built"; scale?: number }[];
+  mainHand: readonly { id: ItemId; asset: WeaponAsset | "staff" | "wand"; scale?: number }[];
   offHand: { id: ItemId; scale: number };
   head: ItemId;
   body: ItemId;
@@ -233,7 +238,10 @@ const LADDER: readonly LadderTier[] = [
   },
   {
     tier: 1, kit: "peasant", cloth: MARCHHIDE, weapon: MARCHHIDE, offHandTint: QUARTZ,
-    mainHand: [{ id: "palewood_staff", asset: "built" }],
+    mainHand: [
+      { id: "palewood_staff", asset: "staff" },
+      { id: "palewood_wand", asset: "wand" },
+    ],
     offHand: { id: "quartz_focus", scale: 0.4 },
     head: "marchhide_hood", body: "marchhide_robe", legs: "marchhide_leggings",
     feet: "marchhide_boots", hands: "marchhide_wraps",
@@ -241,7 +249,10 @@ const LADDER: readonly LadderTier[] = [
   },
   {
     tier: 5, kit: "peasant", cloth: BRAMBLEHIDE, weapon: BRAMBLEHIDE, offHandTint: AMBER,
-    mainHand: [{ id: "duskoak_staff", asset: "built" }],
+    mainHand: [
+      { id: "duskoak_staff", asset: "staff" },
+      { id: "duskoak_wand", asset: "wand" },
+    ],
     offHand: { id: "amber_focus", scale: 0.4 },
     head: "bramblehide_hood", body: "bramblehide_robe", legs: "bramblehide_leggings",
     feet: "bramblehide_boots", hands: "bramblehide_wraps",
@@ -249,7 +260,10 @@ const LADDER: readonly LadderTier[] = [
   },
   {
     tier: 10, kit: "peasant", cloth: WIGHTSHROUD, weapon: WIGHTSHROUD, offHandTint: GARNET,
-    mainHand: [{ id: "cairnpine_staff", asset: "built" }],
+    mainHand: [
+      { id: "cairnpine_staff", asset: "staff" },
+      { id: "cairnpine_wand", asset: "wand" },
+    ],
     offHand: { id: "garnet_focus", scale: 0.4 },
     head: "wightshroud_hood", body: "wightshroud_robe", legs: "wightshroud_leggings",
     feet: "wightshroud_boots", hands: "wightshroud_wraps",
@@ -315,9 +329,11 @@ function buildTable(): Map<ItemId, GearVisual> {
     for (const hand of row.mainHand) {
       table.set(hand.id, {
         slot: "mainHand",
-        parts: [hand.asset === "built"
+        parts: [hand.asset === "staff"
           ? builtPart(staffAssetId(hand.id))
-          : weaponPart(hand.asset, row.weapon, (hand.scale ?? 1) * silhouette, row.weaponAccent)],
+          : hand.asset === "wand"
+            ? builtPart(wandAssetId(hand.id))
+            : weaponPart(hand.asset, row.weapon, (hand.scale ?? 1) * silhouette, row.weaponAccent)],
       });
     }
     table.set(row.offHand.id, {
@@ -349,7 +365,24 @@ function buildTable(): Map<ItemId, GearVisual> {
 
 const GEAR_VISUALS = buildTable();
 
-/** Every id this file covers. 59 today, and the test asserts it equals the content table exactly. */
+/** Carried gathering tools shown only while their activity is running. */
+const GATHERING_TOOL_APPEARANCES = new Map<ItemId, GearAppearance>([
+  ["worn_pickaxe", { assetId: "pickaxe", slot: "mainHand", attach: "bone", tint: WORN, scale: 0.84 }],
+  ["grithe_pickaxe", { assetId: "pickaxe", slot: "mainHand", attach: "bone", tint: GRITHE, scale: tierSilhouetteScale(1) }],
+  ["corven_pickaxe", { assetId: "pickaxe", slot: "mainHand", attach: "bone", tint: CORVEN, scale: tierSilhouetteScale(5) }],
+  ["kaldite_pickaxe", { assetId: "pickaxe", slot: "mainHand", attach: "bone", tint: KALDITE, scale: tierSilhouetteScale(10), accent: KALDITE_GARNET }],
+  ["worn_hatchet", { assetId: "axe", slot: "mainHand", attach: "bone", tint: WORN, scale: 0.84 }],
+  ["grithe_hatchet", { assetId: "axe", slot: "mainHand", attach: "bone", tint: GRITHE, scale: tierSilhouetteScale(1) }],
+  ["corven_hatchet", { assetId: "axe", slot: "mainHand", attach: "bone", tint: CORVEN, scale: tierSilhouetteScale(5) }],
+  ["kaldite_hatchet", { assetId: "axe", slot: "mainHand", attach: "bone", tint: KALDITE, scale: tierSilhouetteScale(10), accent: KALDITE_GARNET }],
+]);
+
+/** Appearance of a carried pickaxe or hatchet while gathering, if the item is one. */
+export function gatheringToolAppearance(itemId: ItemId): GearAppearance | null {
+  return GATHERING_TOOL_APPEARANCES.get(itemId) ?? null;
+}
+
+/** Every id this file covers. The test asserts it equals the content table exactly. */
 export const GEAR_APPEARANCE_IDS: readonly ItemId[] = [...GEAR_VISUALS.keys()];
 
 /**
@@ -379,6 +412,7 @@ export function gearAssetIds(body: CharacterBody = "male"): readonly string[] {
       ids.add(resolve(spec, visual.slot, body).assetId);
     }
   }
+  for (const appearance of GATHERING_TOOL_APPEARANCES.values()) ids.add(appearance.assetId);
   return [...ids];
 }
 
@@ -510,7 +544,10 @@ const SOCKET_PARTS: Readonly<Record<string, SocketParts>> = {
   shield: { bone: "hand_l", fist: FIST_LEFT, grip: [0.022, 0, 0], rotation: [Math.PI / 2, -Math.PI / 2, 0] },
   // Spread rather than four literal `proc_staff_*` keys, so the ids stay derived from
   // `staffAssetId` in exactly one place and a fifth staff cannot arrive with no socket.
-  ...Object.fromEntries(PROCEDURAL_GEAR_ASSETS.map((asset) => [asset.assetId, STAFF_SOCKET])),
+  ...Object.fromEntries(
+    [...PROCEDURAL_GEAR_ASSETS, ...PROCEDURAL_WAND_ASSETS]
+      .map((asset) => [asset.assetId, STAFF_SOCKET]),
+  ),
 };
 
 function socketAt(assetId: string, scale: number): WeaponSocket | null {
