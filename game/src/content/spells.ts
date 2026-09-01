@@ -7,8 +7,8 @@
  * that have not resolved a weapon yet.
  *
  * The entry rung follows region progression: wind at Magic 1, earth at 5, water at 10, and fire at
- * 15. Fire remains visible but uncastable because Fire Essence and elemental weapons are not yet
- * released.
+ * 15. Fire fuel and weapons released with the tier-20 Kilnhalt region, so every rung is castable
+ * once its element's Essence is in hand.
  */
 import type { SpellRung } from "../contracts.js";
 import type { SpellDef } from "./index.js";
@@ -73,7 +73,7 @@ export const SPELLS: readonly SpellDef[] = [
     baseXp: 30,
     castMs: 3000,
     cost: { element: "fire", charges: 1 },
-    description: "A thin whip of fire. It remains future progression until Fire magic is released.",
+    description: "A thin whip of fire, the first thing the Kilnhalt altar teaches a hand to hold.",
   },
 
   // -------------------------------------------------------------------- bolt, Magic 17-35

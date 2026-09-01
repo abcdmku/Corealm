@@ -44,6 +44,12 @@ const FARMING_RESOURCES: readonly ResourceDef[] = [
     bonus: [{ itemId: "cairnleaf_seed", chance: 0.25 }],
     presentation: { availableAssetIds: ["crop_carrot"], targetWorldSize: 1, materialTier: 10 },
   },
+  {
+    id: "plot_coalroot", name: "Emberfast Plot", archetype: "farm_plot", skill: "farming",
+    tier: 20, reqLevel: 20, itemId: "coalroot",
+    bonus: [{ itemId: "coalroot_seed", chance: 0.25 }],
+    presentation: { availableAssetIds: ["crop_carrot"], targetWorldSize: 1, materialTier: 20 },
+  },
 ];
 
 /** Canonical archetypes only. Cluster aliases are deliberately unsupported. */
@@ -99,5 +105,10 @@ export const CROPS: readonly CropDef[] = [
   {
     seedItemId: "cairnleaf_seed", cropItemId: "cairnleaf", tier: 10, reqLevel: 10,
     stages: 5, secondsPerStage: 180, yieldRange: [2, 5], harvestXp: gatherXp(10), plantXp: 7,
+  },
+  {
+    // plantXp continues round(gatherXp(tier) * 0.2), the same derivation as campfire build XP.
+    seedItemId: "coalroot_seed", cropItemId: "coalroot", tier: 20, reqLevel: 20,
+    stages: 5, secondsPerStage: 240, yieldRange: [2, 5], harvestXp: gatherXp(20), plantXp: 10,
   },
 ];

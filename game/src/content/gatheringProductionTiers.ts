@@ -228,6 +228,76 @@ export const GATHERING_PRODUCTION_TIERS: readonly GatheringProductionTierDef[] =
     smelting: { orePerBar: 2, fluxPerBar: 2 },
     campfire: campfireFuel("cairnpine_log", 10, "nature_wood_log_snow"),
   }),
+  defineTier({
+    tier: 20,
+    reqLevel: 20,
+    metalName: "Emberite",
+    woodName: "Cinderpine",
+    items: {
+      ore: "emberite_ore", flux: "kilnstone", gem: "fire_opal", bar: "emberite_bar",
+      log: "cinderpine_log", shaft: "cinderpine_shaft", handle: "cinderpine_handle", hide: "charhide",
+      rawFish: "ashfin", cookedFish: "seared_ashfin", burntFish: "burnt_ashfin",
+      rawMeat: "raw_ember_haunch", cookedMeat: "roast_ember_haunch", burntMeat: "burnt_ember_haunch",
+      dagger: "emberite_dagger", sword: "emberite_sword", helm: "emberite_helm", body: "emberite_plate",
+      legs: "emberite_greaves", boots: "emberite_boots", gloves: "emberite_gauntlets",
+      pickaxe: "emberite_pickaxe", hatchet: "emberite_hatchet",
+      staff: "cinderpine_staff", wand: "cinderpine_wand",
+      rod: "cinderpine_rod", shield: "cinderpine_shield",
+      meleeRing: "emberite_ring", meleePendant: "emberite_pendant",
+      magicRing: "cinder_ring", magicCharm: "cinder_charm",
+      hood: "charhide_hood", robe: "charhide_robe", magicLegs: "charhide_leggings",
+      magicBoots: "charhide_boots", wraps: "charhide_wraps",
+    },
+    magic: {
+      element: "fire", essence: "fire_essence", orb: "fire_orb",
+      staff: "fire_staff", wand: "fire_wand",
+    },
+    resourceDefs: [
+      {
+        id: "ore_emberite", name: "Emberite Seam", archetype: "ore", skill: "mining",
+        itemId: "emberite_ore", bonus: [{ itemId: "fire_opal", chance: 0.07 }],
+        presentation: {
+          availableAssetIds: ["rock_medium_1", "rock_medium_3"], targetWorldSize: 1.8,
+          variantScale: [0.92, 1.08], materialTier: 20,
+        },
+      },
+      {
+        // Kilnstone is tier 20's own flux the way March Stone is tiers 1-10's: mined beside the
+        // ore it fluxes, so the Clinker Rows circuit feeds the furnace without a trip south.
+        id: "ore_kilnstone", name: "Kilnstone Face", archetype: "ore", skill: "mining",
+        itemId: "kilnstone", bonus: [{ itemId: "fire_opal", chance: 0.03 }],
+        presentation: {
+          availableAssetIds: ["rock_medium_2"], targetWorldSize: 1.5,
+          variantScale: [0.94, 1.06], materialTier: 20,
+        },
+      },
+      {
+        id: "tree_cinderpine", name: "Cinderpine", archetype: "tree", skill: "woodcutting",
+        itemId: "cinderpine_log",
+        presentation: {
+          // The twisted silhouettes read as fire-shaped survivors; tier-20 material treatment
+          // carries the char. The regular stump reads best against dark soil.
+          availableAssetIds: ["tree_twisted_2", "tree_twisted_1"],
+          depletedAssetId: "nature_tree_stump", targetWorldSize: 9,
+          variantScale: [0.92, 1.08], materialTier: 20,
+        },
+      },
+      {
+        id: "fish_ashfin", name: "Ashfin Spring", archetype: "fishing_spot", skill: "fishing",
+        itemId: "ashfin",
+        presentation: {
+          // Reuses the cragfin mesh: the shipped fish pack has three bodies, and the tier-20
+          // material treatment recolours it. The draw size and offset stay exactly the tarn row's
+          // because the clearance arithmetic is millimetre-tight: at 0.98 the bob measured only
+          // 2.1 mm over the spring's basin floor against the 18 mm minimum.
+          availableAssetIds: ["fish_cragfin"], targetWorldSize: 0.92,
+          waterOffset: -0.22, materialTier: 20,
+        },
+      },
+    ],
+    smelting: { orePerBar: 3, fluxPerBar: 2 },
+    campfire: campfireFuel("cinderpine_log", 20, "nature_wood_log"),
+  }),
 ];
 
 export const CAMPFIRE_FUELS: readonly CampfireFuelDef[] =

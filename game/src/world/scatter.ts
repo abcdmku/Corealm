@@ -2545,6 +2545,92 @@ export const DEFAULT_SCATTER: Record<RegionId, RegionScatterSpec> = {
     ],
   },
 
+  // Ember foothills: SPARSE burned woodland over warm dark soil. The counts are deliberately
+  // below Karrowmoor's — the region reads as ground the fire has already been through, so open
+  // space is the point, and the draw-call budget for the new northern band stays comfortable.
+  kilnhalt: {
+    regionId: "kilnhalt",
+    layers: [
+      {
+        // The survivors: twisted silhouettes matching the Cinderpine cluster's vocabulary, with
+        // dead spars mixed through. Sparse spacing so single trees read against the sky.
+        id: "burnwood",
+        species: [
+          { assetId: "tree_twisted_3", weight: 3, scale: [0.8, 1.2] },
+          { assetId: "tree_twisted_4", weight: 2, scale: [0.75, 1.15] },
+          { assetId: "tree_dead_2", weight: 2, scale: [0.7, 1.1] },
+          { assetId: "tree_dead_4", weight: 1, scale: [0.7, 1.05] },
+        ],
+        maxCount: 120, scale: [0.8, 1.3], sizeBias: 1.5,
+        tilt: 0.12, castShadow: true, mirror: true,
+        exclusion: TREE_EXCLUSION,
+        terrain: { slopeMax: 0.6, altitude: [0.05, 0.9], altitudeFade: 6 },
+        cluster: { spacing: 34, radius: [9, 18], memberSpacing: 6.5, accept: 0.72, falloff: 0.7, dominance: 1 },
+        mask: { strength: 0.4, featureSize: 88 },
+      },
+      {
+        // Dark foothill outcrops, the same textured rock family every region shares.
+        id: "ember_crags",
+        species: [
+          { assetId: "rock_medium_3", weight: 3, scale: [0.7, 1.2] },
+          { assetId: "rock_medium_1", weight: 2, scale: [0.7, 1.2] },
+        ],
+        maxCount: 150, scale: [0.8, 1.7], sizeBias: 1.7, mirror: true,
+        tilt: 0.3, sink: 0.55, castShadow: true,
+        exclusion: SHRUB_EXCLUSION,
+        terrain: { slopeBias: { low: 0.25, high: 0.55, flat: 0.55, steep: 2.2 } },
+        cluster: { spacing: 28, radius: [9, 17], memberSpacing: 4.8, accept: 0.82, falloff: 0.7, dominance: 0.6 },
+        mask: { strength: 0.28, featureSize: 78 },
+      },
+      {
+        // Clinker and loose dark stone on the slopes, thinner than Karrowmoor scree.
+        id: "clinker", species: STONE_SPECIES,
+        maxCount: 900, scale: [0.4, 1.2], sizeBias: 1.9, tilt: 1, sink: 0.06, mirror: true,
+        exclusion: LITTER_EXCLUSION,
+        terrain: { slopeBias: { low: 0.25, high: 0.55, flat: 0.2, steep: 3.4 } },
+        cluster: { spacing: 19, radius: [4, 12], memberSpacing: 1.3, accept: 0.7, falloff: 0.8, dominance: 0.45 },
+        road: { band: [0.4, 4.6], perMetre: 0.4 },
+        shore: { band: [1.2, 9], perMetre: 0.4 },
+      },
+      {
+        // Dry gold brush between the burns; the wispy grass carries the region's warm read.
+        id: "dry_scrub",
+        species: [
+          { assetId: "grass_wispy_short", weight: 4, scale: [0.7, 1.3], tilt: 0.2 },
+          { assetId: "plant_leafy_small", weight: 2 },
+        ],
+        maxCount: 3000, scale: [0.6, 1.15], tilt: 0.5, mirror: true,
+        exclusion: SHRUB_EXCLUSION,
+        terrain: { slopeBias: { low: 0.3, high: 0.7, flat: 1.2, steep: 0.5 } },
+        cluster: { spacing: 11.5, radius: [4, 12], memberSpacing: 1.3, accept: 0.76, falloff: 0.68, dominance: 0.7 },
+        mask: { strength: 0.38, featureSize: 62 },
+      },
+      {
+        // Sparse warm groundcover: plants coming back through ash, not a lawn.
+        id: "groundcover", species: UPLAND_COVER,
+        maxCount: 24000, scale: [0.2, 0.4], sizeBias: 1.15, tilt: 0.6, mirror: true,
+        exclusion: COVER_EXCLUSION,
+        terrain: {
+          slopeBias: { low: 0.25, high: 0.8, flat: 1.25, steep: 0.45 },
+          moisture: { reach: 16, boost: 2.4 },
+        },
+        cluster: { spacing: 5.6, radius: [2.3, 5.6], memberSpacing: 0.6, accept: 0.78, falloff: 0.52, dominance: 0.58 },
+        mask: { strength: 0.34, featureSize: 50 },
+        road: { band: [2.6, 6.5], perMetre: 2.3 },
+        shore: { band: [-0.6, 8], perMetre: 2.1 },
+      },
+      {
+        // Thin dry blade fields with strong masking, so bare warm soil stays visible in patches.
+        id: "bladecarpet", species: UPLAND_BLADES,
+        maxCount: 90000, scale: [0.14, 0.33], sizeBias: 1.3, tilt: 0.55,
+        exclusion: COVER_EXCLUSION,
+        terrain: { slopeBias: { low: 0.25, high: 0.78, flat: 1.1, steep: 0.25 } },
+        cluster: { spacing: 14, radius: [7, 13], memberSpacing: 0.48, accept: 0.9, falloff: 0.38, dominance: 0.7 },
+        mask: { strength: 0.68, featureSize: 92 },
+      },
+    ],
+  },
+
   // Underground. Dressed by hand from the dungeon kit in a later round; scattering rubble in a
   // corridor produces nonsense.
   gravelmaw: { regionId: "gravelmaw", layers: [] },

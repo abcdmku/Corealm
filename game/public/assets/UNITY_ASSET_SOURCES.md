@@ -1,6 +1,6 @@
 # Unity Asset Store source ledger
 
-Corealm publishes six GLBs and one texture atlas derived from four Unity Asset Store packages. These outputs are not CC0. The local package files and their hashes identify the exact inputs used on this machine, but they do not prove account ownership or a transferable licence. The project owner must confirm that the shipping project has the required Asset Store entitlement.
+Corealm publishes twelve GLBs and one texture atlas derived from seven Unity Asset Store packages. These outputs are not CC0. The local package files and their hashes identify the exact inputs used on this machine, but they do not prove account ownership or a transferable licence. The project owner must confirm that the shipping project has the required Asset Store entitlement.
 
 Do not redistribute the `.unitypackage` files. Use of the derived files remains subject to the [Standard Unity Asset Store EULA](https://unity.com/legal/as-terms).
 
@@ -12,8 +12,11 @@ Do not redistribute the `.unitypackage` files. Use of the derived files remains 
 | Rocks FREE pack | DEXSOFT | [Unity Asset Store](https://assetstore.unity.com/packages/3d/props/exterior/rocks-free-pack-98219) | `C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\DEXSOFT\3D ModelsPropsExterior\Rocks FREE pack.unitypackage` | 96,479,935 | `A81E0968A134F1720B028A534634377784A84F72294A95590B8361A8D176F5D2` |
 | Altar Ruins Free | Underhill Labz | [Unity Asset Store](https://marketplace.unity.com/packages/3d/environments/fantasy/altar-ruins-free-109065) | `C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\Underhill Labz\3D ModelsEnvironmentsFantasy\Altar Ruins Free.unitypackage` | 1,227,562,495 | `FFFF7748CD1643D9A4F901E592836C7E09BACF3DB51B8C9BB7F704CF87D018D9` |
 | Magic Effects FREE | Hovl Studio | [Unity Asset Store](https://assetstore.unity.com/packages/vfx/particles/spells/magic-effects-free-247933) | `C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\Hovl Studio\Particle SystemsMagic\Magic Effects FREE.unitypackage` | 38,212,995 | `2228DE7BA7F19934BE8B58C96E1D8CE50F20AC51777FCDAA7B4478EA64D0B44D` |
+| Fantasy Monster 3D Model 02 - Game Ready | PixeliusVita | [Unity Asset Store (search)](https://assetstore.unity.com/?q=Fantasy%20Monster%203D%20Model%2002%20PixeliusVita) | `C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\PixeliusVita\3D ModelsCharactersCreatures\Fantasy Monster 3D Model 02 - Game Ready - PixeliusVita.unitypackage` | 198,118,775 | `6F94F3D37FC05AAB31DF03BC8BDB9F89EC138974B99146FD42AC5CC09E1C9D95` |
+| FREE - Low Poly Swords - RPG Weapons | Blink | [Unity Asset Store (search)](https://assetstore.unity.com/?q=FREE%20Low%20Poly%20Swords%20RPG%20Weapons) | `C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\Blink\3D ModelsPropsWeapons\FREE - Low Poly Swords - RPG Weapons.unitypackage` | 190,059,232 | `A0F5483B685EF97927F8E7925C5CA9EAE8C23FCD8602D5E61F618269BE101FE9` |
+| FREE - Stylized Weapons | Blink | [Unity Asset Store (search)](https://assetstore.unity.com/?q=FREE%20Stylized%20Weapons%20Blink) | `C:\Users\Borg\AppData\Roaming\Unity\Asset Store-5.x\Blink\3D ModelsPropsWeapons\FREE - Stylized Weapons.unitypackage` | 121,292,264 | `89B83B98F6A09959B9E8C12BF608037EA70E86137C14F83EAE70EFB94C03E596` |
 
-`tools/import-unity-magic-assets.ps1` checks the first three package hashes before it opens Unity. `tools/import-unity-magic-assets.ts` does not read the source packages. It normalizes the altar textures to a 2048 px maximum, audits the six exported GLBs, and enforces their recorded output hashes. The Hovl package hash is a reproduction record; `tools/build-assets.ts --verify` enforces the committed atlas hash recorded in `manifest.json`.
+`tools/import-unity-magic-assets.ps1` checks the first three package hashes before it opens Unity. `tools/import-unity-magic-assets.ts` does not read the source packages. It normalizes the altar textures to a 2048 px maximum, audits the six exported GLBs, and enforces their recorded output hashes. The Hovl package hash is a reproduction record; `tools/build-assets.ts --verify` enforces the committed atlas hash recorded in `manifest.json`. The PixeliusVita and two later Blink packages are converted by `tools/build-minibosses.ts` (three.js FBX conversion in headless Chromium, not Unity); their search URLs resolve to the products but are not permanent product ids and should be pinned once the purchasing account can be checked.
 
 ## Weapon and rock source paths
 
@@ -59,6 +62,39 @@ The surrounding ruin site reuses the stone-kit prefab instances authored in `Ass
 
 The Hovl atlas uses the sixteen source sprites listed in `vfx/ATTRIBUTION.md`. No Hovl prefab, material, shader, scene, or mesh is published. `tools/build-vfx-atlas.ts` converts those sprites into one greyscale 4x4 atlas for Corealm's Three.js particle renderer.
 
+## Miniboss and rare-weapon source paths
+
+All four miniboss variants use the same rig and animation takes:
+
+- `Assets/Stylized3DMonster/Monster02/Monster02_AllAnim.fbx` (takes `Monster02_Idle`, `Monster02_Walk`, `Monster02_Run`, `Monster02_Attack01`, `Monster02_GetHit`, `Monster02_Die`)
+
+Per variant, one base-colour map:
+
+- `miniboss_galeskin`: `Assets/Stylized3DMonster/Monster02/Shader_Texture/Texture/Monster02_Color06.png`
+- `miniboss_mossbound`: `Assets/Stylized3DMonster/Monster02/Shader_Texture/Texture/Monster02_Color02.png`
+- `miniboss_tideworn`: `Assets/Stylized3DMonster/Monster02/Shader_Texture/Texture/Monster02_Color05.png`
+- `miniboss_cinderwake`: `Assets/Stylized3DMonster/Monster02/Shader_Texture/Texture/Monster02_Color04.png`
+
+The sword uses the Iron variant of Sword15:
+
+- `Assets/Blink/Art/Weapons/LowPoly/FreeSwords/Prefabs/Sword15_Iron.prefab`
+- `Assets/Blink/Art/Weapons/LowPoly/FreeSwords/Sword15/Sword15_FBX.fbx`
+- `Assets/Blink/Art/Weapons/LowPoly/FreeSwords/Sword15/Sword15_Material_Iron.mat`
+- `Assets/Blink/Art/Weapons/LowPoly/FreeSwords/Sword15/Textures/Sword15_Albedo_Iron.png`
+- `Assets/Blink/Art/Weapons/LowPoly/FreeSwords/Sword15/Textures/Sword15_Normal_Iron.png`
+- `Assets/Blink/Art/Weapons/LowPoly/FreeSwords/Sword15/Textures/Sword15_Emission_Iron.png`
+
+The staff uses the Staff2_2_6 prefab, whose mesh GUID resolves to `STAFF_EVO_02_V2.fbx`:
+
+- `Assets/Blink/Art/Weapons/Stylized/Staves/_PrefabsStaves/Staff2_2_6.prefab`
+- `Assets/Blink/Art/Weapons/Stylized/Staves/Meshes_Staves/STAFF_EVO_02_V2.fbx`
+- `Assets/Blink/Art/Weapons/Stylized/Staves/Materials_Staves/Staff2_2_6.mat`
+- `Assets/Blink/Art/Weapons/Stylized/Staves/Textures_Staves/Staff2_2_6_S06_BaseColor.png`
+- `Assets/Blink/Art/Weapons/Stylized/Staves/Textures_Staves/Staff2_2_6_S06_Normal.png`
+- `Assets/Blink/Art/Weapons/Stylized/Staves/Textures_Staves/Staff2_2_6_S06_Emissive.png`
+
+Both weapons drop the packs' metallic and AO maps (glTF wants them repacked into one ORM image; the stylized albedos already carry the read). Their published base-colour and emissive maps are hue-neutralized derivatives produced by `tools/minibosses/stage-textures.py`, not the authored files: the runtime recolours each regional drop by multiplying an accent over these maps, so the strongly-coloured regions (the staff crystal, the sword's ember runes) are greyed and the emissive maps ship as normalized grayscale with a white emissive factor at `KHR_materials_emissive_strength` 1.2, replacing the authored `_EmissionColor` values (2.828427 / 6.0628657). The monster's lettered `Color01a`-`Color09g` texture variants, its remaining five takes, and every other sword and staff in the two Blink packs are not published.
+
 ## Transactional GLB conversion
 
 The converter uses a disposable Unity `6000.4.8f1` project and locally cached `com.unity.cloud.gltfast` `6.14.1`:
@@ -85,6 +121,12 @@ Bounds are post-conversion glTF world-space axis-aligned bounds in metres. Verte
 | `rocks_free_essence_node` | `models/magic/rocks_free_essence_node.glb` | 1,979,224 | 5.283702 / 5.158862 / 5.287107 | -2.462837 / -2.508910 / -2.477444 | 1,075 | 1,560 | `C1C3C2AF9EAED4027D80C84ED64422C9FB261EABC8BC275334A6A834FB541A1D` |
 | `altar_ruins_altar` | `models/magic/altar_ruins_altar.glb` | 11,951,032 | 2.099449 / 0.946015 / 0.954679 | -1.049726 / 0.007741 / -0.477339 | 862 | 796 | `821047016861542C1244638237BA634D32BAA5D2DF3C15F069E7B8109E2CDF18` |
 | `altar_ruins_site` | `models/magic/altar_ruins_site.glb` | 13,229,416 | 20.169445 / 9.601515 / 19.854203 | -10.271879 / -2.270430 / -9.288219 | 27,136 | 14,720 | `63BB98E1C5ED8714E5AEF1F282BBAD7DFC2B6642C978B891041DB38E71C288BA` |
+| `miniboss_galeskin` | `models/miniboss/miniboss_galeskin.glb` | 786,436 | 0.926382 / 1.997404 / 0.649783 | -0.466819 / 0.000497 / -0.373602 | 4,996 | 5,768 | `962F0847A90DE38D05F134ED7CCD375B551C69E5558C438BE2D3C623A0C9D6C3` |
+| `miniboss_mossbound` | `models/miniboss/miniboss_mossbound.glb` | 775,928 | 0.926382 / 1.997404 / 0.649783 | -0.466819 / 0.000497 / -0.373602 | 4,996 | 5,768 | `2A9E8142643C1DEBBE9A4D9AFD18B089989A98D10E8EC9AE06A4AB7302EC34EE` |
+| `miniboss_tideworn` | `models/miniboss/miniboss_tideworn.glb` | 778,252 | 0.926382 / 1.997404 / 0.649783 | -0.466819 / 0.000497 / -0.373602 | 4,996 | 5,768 | `2C9AA129F2CC9070BDB5AD3118770EB9C481AA4957CFE83E52D744C049E9B694` |
+| `miniboss_cinderwake` | `models/miniboss/miniboss_cinderwake.glb` | 772,232 | 0.926382 / 1.997404 / 0.649783 | -0.466819 / 0.000497 / -0.373602 | 4,996 | 5,768 | `76EBFAE6A832923255353916EC6B9592F2FCCF9C52800701C04BA4A351048CBC` |
+| `miniboss_sword` | `models/miniboss/miniboss_sword.glb` | 147,780 | 0.236419 / 1.249957 / 0.069389 | -0.118210 / -0.862045 / -0.034694 | 1,655 | 1,606 | `A28DE7A93A3FE1AD7A4CB383D3FDA1C796C8966AD8F8E30D48A237F27A899993` |
+| `miniboss_staff` | `models/miniboss/miniboss_staff.glb` | 185,852 | 0.171177 / 1.749956 / 0.246025 | -0.085589 / -1.540775 / -0.072450 | 1,109 | 1,836 | `E44DBEAA15A1192A200DF6C51A0965016F36884FD997525CEE4FD20DB89984C7` |
 
 | Artifact ID | File | Bytes | Dimensions | SHA-256 |
 | --- | --- | ---: | ---: | --- |
@@ -95,4 +137,5 @@ Run the committed-output audits without launching Unity:
 ```powershell
 npx tsx tools/import-unity-magic-assets.ts
 npx tsx tools/build-assets.ts --verify
+npx tsx tools/minibosses/audit.mjs
 ```

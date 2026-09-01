@@ -41,6 +41,15 @@
  * Without a window a clip uses the full range Unity recorded for it in its .meta sidecar. That is
  * not the same as the whole file: the `_exp` rigs pack every motion into ONE take, so the range is
  * what separates the frog's hop from its death. See tools/animals/stage-clip-ranges.py.
+ *
+ * NAMED TAKES are the other way a file can hold several motions, and the converter supports them
+ * even though no animal needs one. Every file in THIS pack holds a single take (always "Take 001"),
+ * so the tuple entries below say nothing about takes and the converter reads `animations[0]`. A
+ * pack that ships eleven named AnimStacks in one FBX - the miniboss rig does - instead passes
+ * `take` on its clip entries (see tools/minibosses/catalog.mjs, which uses the object form
+ * `{ take, name }`). A named take that is not in the file fails that clip's build outright; there
+ * is deliberately no fall-back to `animations[0]`, because the wrong take still plays SOMETHING
+ * and the defect ships silently.
  */
 export const ANIMALS = [
   // ---------------------------------------------------------------- plains, Fallowmarch

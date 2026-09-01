@@ -36,6 +36,7 @@ import { CONTINUE, awardXp, clamp01, progressToward, stopWith } from "./activity
 import type { GatheringSystem, NodeRuntime } from "./gathering.js";
 import type { TickSystem } from "../app/loop.js";
 import { content, gatherSuccessChance, gatherXp } from "../content/index.js";
+import { CROPS } from "../content/resources.js";
 
 /** Raking and planting both take 1.8 s, matching the gather tick. PRD 2.9. */
 export const FARM_ACTION_MS = 1800;
@@ -46,8 +47,14 @@ export const RAKE_XP = 3;
 /** Bound on catch-up harvest rolls in one tick. Same reasoning as gathering's. */
 const MAX_CATCHUP_ROLLS = 4000;
 
-/** Authored stage lengths for the Phase 1 tiers. Everything else interpolates. */
-const STAGE_SECONDS: Readonly<Record<number, number>> = { 1: 60, 5: 120, 10: 180 };
+/**
+ * The canonical crop rows, by tier. `content/resources.ts: CROPS` is the authored table; this
+ * system used to re-derive stage length and yields from formulas that happened to reproduce the
+ * tiers 1/5/10 rows, and the Kilnhalt world proof caught tier 20 drifting on both (312 s per
+ * stage against the authored 240, yields [1,4] against [2,5]). The table wins; the formulas
+ * below remain only as the fallback for a tier no row authors yet.
+ */
+const AUTHORED_CROPS = new Map(CROPS.map((crop) => [crop.tier, crop] as const));
 
 export interface CropProfile {
   tier: number;
@@ -67,12 +74,23 @@ export interface CropProfile {
  * exactly. A tier 20 crop added later needs no new table.
  */
 export function cropProfile(tier: number): CropProfile {
+  const authored = AUTHORED_CROPS.get(tier);
+  if (authored) {
+    return {
+      tier,
+      stageCount: authored.stages,
+      stageSeconds: authored.secondsPerStage,
+      yieldRange: [authored.yieldRange[0], authored.yieldRange[1]],
+      plantXp: authored.plantXp,
+      harvestXp: authored.harvestXp,
+    };
+  }
   const harvestXp = gatherXp(tier);
   const min = Math.max(1, Math.round(3 - 0.1 * (tier - 1)));
   return {
     tier,
     stageCount: tier <= 1 ? 4 : 5,
-    stageSeconds: STAGE_SECONDS[tier] ?? Math.round(48 + 13.2 * tier),
+    stageSeconds: Math.round(48 + 13.2 * tier),
     yieldRange: [min, min + 3],
     plantXp: Math.round(harvestXp * 0.2),
     harvestXp,

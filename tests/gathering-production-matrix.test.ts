@@ -61,8 +61,8 @@ describe("frozen gathering and production formulas", () => {
 });
 
 describe("generated gathering and production matrix", () => {
-  it("has one complete, self-contained recipe row at levels 1, 5, and 10", () => {
-    expect(GATHERING_PRODUCTION_TIERS.map((definition) => definition.tier)).toEqual([1, 5, 10]);
+  it("has one complete, self-contained recipe row at levels 1, 5, 10, and 20", () => {
+    expect(GATHERING_PRODUCTION_TIERS.map((definition) => definition.tier)).toEqual([1, 5, 10, 20]);
 
     for (const definition of GATHERING_PRODUCTION_TIERS) {
       const { tier, items } = definition;

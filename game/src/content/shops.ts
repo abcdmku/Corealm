@@ -1,5 +1,5 @@
 /**
- * Shop stock for the five shops `content/regions.ts` places.
+ * Shop stock for the seven shops `content/regions.ts` places.
  *
  * Owned by W-CONTENT.
  *
@@ -114,6 +114,43 @@ export const SHOPS: readonly ShopDef[] = [
       { itemId: "kaldite_boots", quantity: 2 },
       { itemId: "kaldite_gauntlets", quantity: 2 },
       { itemId: "cairnpine_shield", quantity: 2 },
+    ],
+  },
+  {
+    id: "emberfast_general",
+    name: "Emberfast Provisioners",
+    buyMultiplier: BUY_MULTIPLIER,
+    sellMultiplier: SELL_MULTIPLIER,
+    stock: [
+      { itemId: "emberite_pickaxe", quantity: 3 },
+      { itemId: "emberite_hatchet", quantity: 3 },
+      { itemId: "cinderpine_rod", quantity: 3 },
+      // The Cinderwake food budget: the arena fight costs roughly 187 damage against an 87 health
+      // pool, which is ten Seared Ashfin at healAmount(20) = 19 plus eat time.
+      { itemId: "seared_ashfin", quantity: 40 },
+      { itemId: "seared_cragfin", quantity: 20 },
+      { itemId: "coalroot_seed", quantity: 30 },
+      // Fire Essence sells locally like the other elements at their region stores.
+      { itemId: "fire_essence", quantity: 300 },
+      { itemId: "cinderpine_shaft", quantity: 60 },
+      { itemId: "charhide", quantity: 8 },
+    ],
+  },
+  {
+    id: "emberfast_smith",
+    name: "Kiln Row Smith",
+    buyMultiplier: BUY_MULTIPLIER,
+    sellMultiplier: SELL_MULTIPLIER,
+    stock: [
+      { itemId: "kaldite_bar", quantity: 25 },
+      { itemId: "emberite_bar", quantity: 20 },
+      { itemId: "kilnstone", quantity: 80 },
+      { itemId: "kaldite_sword", quantity: 2 },
+      { itemId: "kaldite_helm", quantity: 2 },
+      { itemId: "emberite_dagger", quantity: 2 },
+      { itemId: "emberite_boots", quantity: 2 },
+      { itemId: "emberite_gauntlets", quantity: 2 },
+      { itemId: "cinderpine_shield", quantity: 2 },
     ],
   },
 ];

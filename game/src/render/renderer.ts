@@ -192,6 +192,18 @@ export function drawDistanceMetres(distance: DrawDistancePreset): number {
   return DRAW_DISTANCE[distance].cameraFar;
 }
 
+/**
+ * Metres at which one draw-distance setting's fog becomes fully opaque.
+ *
+ * Residency radii should track THIS rather than the camera far plane: anything between the two
+ * distances renders as pure fog colour, so keeping it resident buys draw calls and nothing else.
+ * Measured at the Kilnhalt arena pose, structures held to the camera-far radius put a completely
+ * fogged Emberfast into the frame for ~90 draws.
+ */
+export function fogOpaqueMetres(distance: DrawDistancePreset): number {
+  return DRAW_DISTANCE[distance].fogFar;
+}
+
 /** Rows in the gradient. 256 is smooth enough that no banding survives the 8-bit output. */
 const SKY_TEXTURE_HEIGHT = 256;
 

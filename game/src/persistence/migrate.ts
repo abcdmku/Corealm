@@ -15,6 +15,7 @@ const ALTAR_BY_ORB: Readonly<Record<string, string>> = {
   air_orb: "fallowmarch_air_altar",
   earth_orb: "vellenwood_earth_altar",
   water_orb: "karrowmoor_water_altar",
+  fire_orb: "kilnhalt_fire_altar",
 };
 
 const LEGACY_ITEM_REPLACEMENTS: Readonly<Record<string, string>> = {
@@ -26,12 +27,13 @@ const LEGACY_ITEM_REPLACEMENTS: Readonly<Record<string, string>> = {
 };
 
 const TWO_HANDED_STAFFS = new Set([
-  "basic_wooden_staff", "palewood_staff", "duskoak_staff", "cairnpine_staff",
-  "air_staff", "earth_staff", "water_staff",
+  "basic_wooden_staff", "palewood_staff", "duskoak_staff", "cairnpine_staff", "cinderpine_staff",
+  "air_staff", "earth_staff", "water_staff", "fire_staff",
+  "galeskin_staff", "mossbound_staff", "tideworn_staff", "cinderwake_staff",
 ]);
 
 function isReleasedOrb(itemId: string): boolean {
-  return /^(air|earth|water)_orb$/.test(itemId);
+  return /^(air|earth|water|fire)_orb$/.test(itemId);
 }
 
 function clampCharges(value: unknown): number {

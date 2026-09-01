@@ -1,6 +1,6 @@
 /**
- * The equipment ladder: a full 9-slot kit at tiers 1, 5 and 10, in two mechanically distinct
- * lines.
+ * The equipment ladder: a full 9-slot kit at tiers 1, 5, 10 and 20, in two mechanically distinct
+ * lines, plus the eight rare miniboss weapons derived from the craftable ladder.
  *
  * Owned by W-CONTENT. `items.ts` re-exports these rows inside `ALL_ITEMS`; nothing else should
  * import `EQUIPMENT` directly, because the registry only ever sees the concatenated table.
@@ -145,6 +145,7 @@ const ORB_ROWS: readonly OrbRow[] = [
   { id: "air_orb", name: "Air Orb", tier: 1, element: "wind", released: true },
   { id: "earth_orb", name: "Earth Orb", tier: 5, element: "earth", released: true },
   { id: "water_orb", name: "Water Orb", tier: 10, element: "water", released: true },
+  { id: "fire_orb", name: "Fire Orb", tier: 20, element: "fire", released: true },
 ];
 
 /** Singleton boss drops consumed by the elemental-weapon recipes. They are never equipment. */
@@ -397,6 +398,143 @@ const MELEE_TIER_10: readonly ItemDef[] = [
   }),
 ];
 
+// ------------------------------------------------------------------ melee, tier 20 (Emberite)
+// Kit totals: accuracy 75, power 45 (sword), armour 95, magicArmour 32, vitality 22.
+// The sword's power 45 is PRD 2.4's own tier-20 checkpoint row: floor(2 + (20 + 45)/4.2) = 17.
+// Accuracy and armour continue the solved ladder's ratios (11/23/42 and 16/33/58 at 1/5/10); the
+// Kilnhalt stat blocks in `enemies.ts` are solved AGAINST these totals to hold the 25-40 s
+// on-tier band, so a change here means re-solving those rows too.
+
+const MELEE_TIER_20: readonly ItemDef[] = [
+  gear({
+    id: "emberite_dagger", name: "Emberite Dagger", tier: 20, slot: "mainHand", value: 1700,
+    description: "A hand-width of Emberite that never fully cools. It goes in easier than it comes out.",
+    requires: { melee: 19 }, attackSpeedMs: MELEE_SPEED_MS,
+    bonuses: { accuracy: 42, power: 38 },
+  }),
+  gear({
+    id: "emberite_sword", name: "Emberite Sword", tier: 20, slot: "mainHand", value: 3200,
+    description: "Kiln-forged and quenched twice. The edge holds a dull orange line in the dark.",
+    requires: { melee: 20 }, attackSpeedMs: MELEE_SPEED_MS,
+    // Power 45 is the PRD 2.4 level-20 checkpoint; accuracy 48 continues the 7/14/28 weapon line.
+    bonuses: { accuracy: 48, power: 45 },
+  }),
+  gear({
+    id: "cinderpine_shield", name: "Cinderpine Shield", tier: 20, slot: "offHand", value: 1250,
+    description: "Scorched pine faced in Emberite. Char does not catch twice.",
+    requires: { melee: 20 },
+    bonuses: { accuracy: 3, armour: 22, magicArmour: 9, vitality: 2 },
+  }),
+  gear({
+    id: "emberite_helm", name: "Emberite Helm", tier: 20, slot: "head", value: 1950,
+    description: "A closed helm with a smoke-vent crown. Built for standing close to heat.",
+    requires: { melee: 20 },
+    bonuses: { accuracy: 4, armour: 14, magicArmour: 4, vitality: 3 },
+  }),
+  gear({
+    id: "emberite_plate", name: "Emberite Plate", tier: 20, slot: "body", value: 3900,
+    description: "Five bars of Emberite. It keeps the warmth of the forge for a full day's walk.",
+    requires: { melee: 20 },
+    bonuses: { accuracy: 6, armour: 30, magicArmour: 7, vitality: 7 },
+  }),
+  gear({
+    id: "emberite_greaves", name: "Emberite Greaves", tier: 20, slot: "legs", value: 3600,
+    description: "Full leg plate, smoke-blued. Ember and scree both stay outside it.",
+    requires: { melee: 20 },
+    bonuses: { accuracy: 4, armour: 19, magicArmour: 5, vitality: 5 },
+  }),
+  gear({
+    id: "emberite_boots", name: "Emberite Boots", tier: 20, slot: "feet", value: 1350,
+    description: "Soled in charhide over Emberite shanks. Warm ground stops mattering.",
+    requires: { melee: 20 },
+    bonuses: { accuracy: 2, armour: 6, magicArmour: 2, vitality: 2 },
+  }),
+  gear({
+    id: "emberite_gauntlets", name: "Emberite Gauntlets", tier: 20, slot: "hands", value: 1350,
+    description: "Fingered plate with fire-opal rivets. They tick as they cool.",
+    requires: { melee: 20 },
+    bonuses: { accuracy: 4, armour: 4, magicArmour: 2, vitality: 3 },
+  }),
+  gear({
+    id: "emberite_ring", name: "Emberite Ring", tier: 20, slot: "accessory1", value: 1750,
+    description: "A warm band set with a fire opal. The Emberfast smith stamps a kiln mark inside.",
+    requires: { melee: 20 },
+    bonuses: { accuracy: 2 },
+  }),
+  gear({
+    id: "emberite_pendant", name: "Emberite Pendant", tier: 20, slot: "accessory2", value: 1900,
+    description: "A fire opal in an Emberite claw. It glows faintly when the wearer stops moving.",
+    requires: { melee: 20 },
+    bonuses: { accuracy: 2, magicAccuracy: 2, magicArmour: 3 },
+  }),
+];
+
+// ------------------------------------------------------------------ magic, tier 20 (Charhide)
+// Kit totals with the uncharged Cinderpine staff: magicAccuracy 75, magicPower 50, armour 9,
+// magicArmour 82, vitality 18 — continuing the solved 12/24/47 and 9/16/32 lines. The canonical
+// KITS row wears the charged Fire Staff (as every tier's magic kit wears its element's staff),
+// which lifts those to 84/56, and the Kilnhalt bear/boar rows in `enemies.ts` hold the style
+// gate against BOTH reads: the Ashback stays a staff answer and the Cinder Boar a sword answer.
+
+const MAGIC_TIER_20: readonly ItemDef[] = [
+  gear({
+    id: "cinderpine_wand", name: "Cinderpine Wand", tier: 20, slot: "mainHand", value: 1900,
+    description: "Char-dark pine with an empty Emberite socket. It stays unlit until the altar takes it.",
+    requires: { magic: 20 }, attackSpeedMs: WAND_CAST_SPEED_MS,
+    magicWeapon: { kind: "wand", hands: 1 },
+    bonuses: { magicAccuracy: 27, magicPower: 23, magicArmour: 5 },
+  }),
+  gear({
+    id: "cinderpine_staff", name: "Cinderpine Staff", tier: 20, slot: "mainHand", value: 2700,
+    description: "A two-handed cinderpine shaft crowned with an empty Emberite cage, dark until charged.",
+    requires: { magic: 20 }, attackSpeedMs: STAFF_CAST_SPEED_MS,
+    magicWeapon: { kind: "staff", hands: 2 },
+    bonuses: { power: 7, magicAccuracy: 40, magicPower: 34, magicArmour: 7 },
+  }),
+  gear({
+    id: "charhide_hood", name: "Charhide Hood", tier: 20, slot: "head", value: 1650,
+    description: "Seared hide with the grain still showing. Kiln heat rolls off it.",
+    requires: { magic: 20 },
+    bonuses: { armour: 2, magicAccuracy: 8, magicPower: 4, magicArmour: 15, vitality: 3 },
+  }),
+  gear({
+    id: "charhide_robe", name: "Charhide Robe", tier: 20, slot: "body", value: 3300,
+    description: "Three charhides stitched with Emberite wire. The Cinderwake arena is survivable in this.",
+    requires: { magic: 20 },
+    bonuses: { armour: 3, magicAccuracy: 12, magicPower: 6, magicArmour: 26, vitality: 6 },
+  }),
+  gear({
+    id: "charhide_leggings", name: "Charhide Leggings", tier: 20, slot: "legs", value: 2950,
+    description: "Charhide to the ankle, weighted so foothill gusts leave it alone.",
+    requires: { magic: 20 },
+    bonuses: { armour: 2, magicAccuracy: 7, magicPower: 4, magicArmour: 18, vitality: 4 },
+  }),
+  gear({
+    id: "charhide_boots", name: "Charhide Boots", tier: 20, slot: "feet", value: 1150,
+    description: "Silent on warm rock. Ash does not hold a footprint in these.",
+    requires: { magic: 20 },
+    bonuses: { armour: 1, magicAccuracy: 2, magicArmour: 5, vitality: 2 },
+  }),
+  gear({
+    id: "charhide_wraps", name: "Charhide Wraps", tier: 20, slot: "hands", value: 1150,
+    description: "Seared strips wound to the wrist, fire-opal dust in the weave.",
+    requires: { magic: 20 },
+    bonuses: { armour: 1, magicAccuracy: 2, magicArmour: 5, vitality: 2 },
+  }),
+  gear({
+    id: "cinder_ring", name: "Cinder Ring", tier: 20, slot: "accessory1", value: 1750,
+    description: "A dark band that is always a shade warmer than the hand wearing it.",
+    requires: { magic: 20 },
+    bonuses: { magicAccuracy: 2, magicPower: 1, magicArmour: 2 },
+  }),
+  gear({
+    id: "cinder_charm", name: "Cinder Charm", tier: 20, slot: "accessory2", value: 1900,
+    description: "A fire opal cracked in the kiln and wire-caged. Emberlash comes easier holding it.",
+    requires: { magic: 20 },
+    bonuses: { magicAccuracy: 2, magicPower: 1, magicArmour: 4, vitality: 1 },
+  }),
+];
+
 // -------------------------------------------------------------------- the magic-weapon ladder
 // Each released wood has a wand and a staff. Wands use two matching shafts; staffs use three.
 // Orbs are boss rewards used to turn these plain weapons into charged elemental weapons.
@@ -596,7 +734,7 @@ const MAGIC_TIER_10: readonly ItemDef[] = [
   }),
 ];
 
-/** Authored for the tier-15 region, but unobtainable until that region ships. */
+/** A base wood weapon re-issued with an element's charge by its awakened regional altar. */
 function chargedWeapon(
   base: ItemDef,
   id: string,
@@ -630,8 +768,16 @@ function chargedWeapon(
 }
 
 function magicBase(id: string): ItemDef {
-  const found = [...MAGIC_TIER_1, ...MAGIC_TIER_5, ...MAGIC_TIER_10].find((item) => item.id === id);
+  const found = [...MAGIC_TIER_1, ...MAGIC_TIER_5, ...MAGIC_TIER_10, ...MAGIC_TIER_20]
+    .find((item) => item.id === id);
   if (!found) throw new Error(`Missing magic weapon base ${id}`);
+  return found;
+}
+
+function meleeBase(id: string): ItemDef {
+  const found = [...MELEE_TIER_1, ...MELEE_TIER_5, ...MELEE_TIER_10, ...MELEE_TIER_20]
+    .find((item) => item.id === id);
+  if (!found) throw new Error(`Missing melee weapon base ${id}`);
   return found;
 }
 
@@ -647,7 +793,11 @@ const WATER_CHARGE: ElementalWeaponChargeSpec = {
   element: "water", capacity: 1000, initialCharges: 1000,
   rechargeItemId: "water_essence", rechargeCost: 100, orbItemId: "water_orb", released: true,
 };
-/** Released awakened-altar weapon outputs. Fire remains absent until its region ships. */
+const FIRE_CHARGE: ElementalWeaponChargeSpec = {
+  element: "fire", capacity: 1000, initialCharges: 1000,
+  rechargeItemId: "fire_essence", rechargeCost: 100, orbItemId: "fire_orb", released: true,
+};
+/** Released awakened-altar weapon outputs, one wand and staff per element. */
 export const ELEMENTAL_MAGIC_WEAPONS: readonly ItemDef[] = [
   chargedWeapon(magicBase("palewood_wand"), "air_wand", "Air Wand", AIR_CHARGE,
     { magicAccuracy: 1, magicPower: 1, magicArmour: 2 }),
@@ -661,6 +811,65 @@ export const ELEMENTAL_MAGIC_WEAPONS: readonly ItemDef[] = [
     { armour: 2, magicAccuracy: 6, magicPower: 4, magicArmour: 6, vitality: 1 }),
   chargedWeapon(magicBase("cairnpine_staff"), "water_staff", "Water Staff", WATER_CHARGE,
     { armour: 2, magicAccuracy: 6, magicPower: 4, magicArmour: 6, vitality: 1 }),
+  chargedWeapon(magicBase("cinderpine_wand"), "fire_wand", "Fire Wand", FIRE_CHARGE,
+    { armour: 3, magicAccuracy: 9, magicPower: 6, magicArmour: 9, vitality: 2 }),
+  chargedWeapon(magicBase("cinderpine_staff"), "fire_staff", "Fire Staff", FIRE_CHARGE,
+    { armour: 3, magicAccuracy: 9, magicPower: 6, magicArmour: 9, vitality: 2 }),
+];
+
+// ------------------------------------------------------------------ rare miniboss weapons
+/**
+ * Each regional miniboss rolls its named sword and staff at 10% per kill (independent rolls).
+ *
+ * The rule is mechanical, not hand-tuned: a rare sword copies the host region's craftable sword and
+ * applies ceil(base x 1.10) to accuracy and power; a rare staff applies the same rule to the local
+ * uncharged staff's OFFENSIVE magic stats only. The staves carry no charge and never bypass the
+ * Orb-and-altar progression — they are simply the best plain staff at their tier. Requirements
+ * copy the base weapon, so drops always match the host region's requirement tier.
+ */
+function rare(
+  base: ItemDef,
+  id: string,
+  name: string,
+  description: string,
+  boosted: readonly (keyof EquipmentBonuses)[],
+): ItemDef {
+  if (!base.equip) throw new Error(`Rare weapon base ${base.id} is not equipment`);
+  const upgraded = { ...base.equip.bonuses };
+  for (const key of boosted) upgraded[key] = Math.ceil(base.equip.bonuses[key] * 1.10);
+  return {
+    ...base,
+    id,
+    name,
+    description,
+    value: Math.round(base.value * 1.5),
+    equip: { ...base.equip, bonuses: upgraded },
+  };
+}
+
+const RARE_SWORD_STATS: readonly (keyof EquipmentBonuses)[] = ["accuracy", "power"];
+const RARE_STAFF_STATS: readonly (keyof EquipmentBonuses)[] = ["magicAccuracy", "magicPower"];
+
+export const RARE_MINIBOSS_WEAPONS: readonly ItemDef[] = [
+  rare(meleeBase("grithe_sword"), "galeskin_sword", "Galeskin Sword",
+    "Grithe pattern, but the edge whistles on the backswing. Galeskin carried it point-down.",
+    RARE_SWORD_STATS),
+  rare(magicBase("palewood_staff"), "galeskin_staff", "Galeskin Staff",
+    "Palewood scoured silver by wind. The empty socket hums in weather.", RARE_STAFF_STATS),
+  rare(meleeBase("corven_sword"), "mossbound_sword", "Mossbound Sword",
+    "A Corven blade grown through with moss that will not die. It never rusts.", RARE_SWORD_STATS),
+  rare(magicBase("duskoak_staff"), "mossbound_staff", "Mossbound Staff",
+    "Duskoak with a living green seam. Warm at the grip like a root in summer.", RARE_STAFF_STATS),
+  rare(meleeBase("kaldite_sword"), "tideworn_sword", "Tideworn Sword",
+    "Kaldite worked smooth as sea glass. It swings like it remembers the water.", RARE_SWORD_STATS),
+  rare(magicBase("cairnpine_staff"), "tideworn_staff", "Tideworn Staff",
+    "Cairnpine bleached and salt-cured. The cage weeps a little in the cold.", RARE_STAFF_STATS),
+  rare(meleeBase("emberite_sword"), "cinderwake_sword", "Cinderwake Sword",
+    "Emberite quenched in the arena's own spring. The orange line down the edge never fades.",
+    RARE_SWORD_STATS),
+  rare(magicBase("cinderpine_staff"), "cinderwake_staff", "Cinderwake Staff",
+    "Cinderpine the fire chose not to eat. The empty cage sheds a slow drift of sparks.",
+    RARE_STAFF_STATS),
 ];
 
 /**
@@ -669,9 +878,10 @@ export const ELEMENTAL_MAGIC_WEAPONS: readonly ItemDef[] = [
  */
 export const EQUIPMENT: readonly ItemDef[] = [
   ...STARTER_EQUIPMENT,
-  ...MELEE_TIER_1, ...MELEE_TIER_5, ...MELEE_TIER_10,
-  ...MAGIC_TIER_1, ...MAGIC_TIER_5, ...MAGIC_TIER_10,
+  ...MELEE_TIER_1, ...MELEE_TIER_5, ...MELEE_TIER_10, ...MELEE_TIER_20,
+  ...MAGIC_TIER_1, ...MAGIC_TIER_5, ...MAGIC_TIER_10, ...MAGIC_TIER_20,
   ...ELEMENTAL_MAGIC_WEAPONS,
+  ...RARE_MINIBOSS_WEAPONS,
 ];
 
 /**
@@ -692,6 +902,10 @@ export const KITS: Readonly<Record<string, readonly string[]>> = {
     "kaldite_sword", "cairnpine_shield", "kaldite_helm", "kaldite_plate", "kaldite_greaves",
     "kaldite_boots", "kaldite_gauntlets", "kaldite_ring", "kaldite_pendant",
   ],
+  melee_t20: [
+    "emberite_sword", "cinderpine_shield", "emberite_helm", "emberite_plate", "emberite_greaves",
+    "emberite_boots", "emberite_gauntlets", "emberite_ring", "emberite_pendant",
+  ],
   magic_t1: [
     "air_staff", "marchhide_hood", "marchhide_robe", "marchhide_leggings",
     "marchhide_boots", "marchhide_wraps", "ember_ring", "ember_charm",
@@ -703,5 +917,9 @@ export const KITS: Readonly<Record<string, readonly string[]>> = {
   magic_t10: [
     "water_staff", "cairnpelt_hood", "cairnpelt_robe", "cairnpelt_leggings",
     "cairnpelt_boots", "cairnpelt_wraps", "storm_ring", "storm_charm",
+  ],
+  magic_t20: [
+    "fire_staff", "charhide_hood", "charhide_robe", "charhide_leggings",
+    "charhide_boots", "charhide_wraps", "cinder_ring", "cinder_charm",
   ],
 };

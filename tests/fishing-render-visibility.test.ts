@@ -30,6 +30,9 @@ const EXPECTED_FISH_PRESENTATION: Readonly<Record<number, {
   1: { targetWorldSize: 0.42, waterOffset: -0.32 },
   5: { targetWorldSize: 0.72, waterOffset: -0.23 },
   10: { targetWorldSize: 0.92, waterOffset: -0.22 },
+  // Ashfin reuses the cragfin mesh under the tier-20 material treatment, with the tarn row's
+  // exact draw numbers: the basin clearance margin has no room for a larger fish.
+  20: { targetWorldSize: 0.92, waterOffset: -0.22 },
 };
 
 const MIN_BASIN_FLOOR_CLEARANCE = 0.018;

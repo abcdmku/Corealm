@@ -19,7 +19,7 @@ const ELEMENT_BLURBS: Readonly<Record<SpellElement, string>> = {
   wind: "Tier 1",
   water: "Tier 10",
   earth: "Tier 5",
-  fire: "Coming at tier 15",
+  fire: "Tier 20",
 };
 
 const RUNG_LABELS: Readonly<Record<SpellRung, string>> = {
@@ -172,7 +172,7 @@ export class SpellbookPanel implements ManagedPanel {
       "aria-label",
       released
         ? `${ELEMENT_LABELS[element]} spells, ${ELEMENT_BLURBS[element]}`
-        : `${ELEMENT_LABELS[element]}. Coming at tier 15. Unreleased.`,
+        : `${ELEMENT_LABELS[element]}. Unreleased.`,
     );
 
     const line = document.createElement("div");

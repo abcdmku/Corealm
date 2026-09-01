@@ -227,7 +227,10 @@ async function main(): Promise<void> {
   const runCandidate = argValue(args, "--run");
   if (!runCandidate) throw new Error("Usage: npx tsx tools/perf-test.ts --run runs/<id> [--shots a,b] [--seconds 6]");
   const shots = (argValue(args, "--shots") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
-  const seconds = Number(argValue(args, "--seconds") ?? 6);
+  // 5 rather than 6: the Kilnhalt poses take the registry to 32 shots, and 32 x 6 = 192
+  // sample-seconds trips the tool's own 180 s shard cap. 32 x 5 = 160 keeps the plain
+  // `npm run perf -- --run runs/corealm` invocation measuring the complete pose set.
+  const seconds = Number(argValue(args, "--seconds") ?? 5);
 
   const report = await runPerfTest(runCandidate, shots, seconds);
   console.log(JSON.stringify({

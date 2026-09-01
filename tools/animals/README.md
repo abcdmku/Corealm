@@ -114,6 +114,13 @@ physically leapt 1.35 m on every step and every swing.
 the crab ships with no `Idle` at all. Ranges that tight get widened in `catalog.mjs`. The same
 mechanism is what turns a 230-frame chicken feeding loop into a 38-frame peck.
 
+**A file is not always ONE take, either.** This pack's files each hold a single take, so the
+converter's historical `animations[0]` read is right here — but a pack can ship many named
+AnimStacks in one FBX (the miniboss rig carries eleven). A clip entry may therefore carry a `take`
+naming the AnimStack it wants, and several clips may pull different takes from the same file. A
+named take missing from the file fails that clip loudly instead of falling back to `animations[0]`:
+the wrong take still animates, so a silent fallback is a defect that plays convincingly.
+
 **The run cycle was shipped as the walk cycle, for every animal.** The catalog mapped `_Run` to
 `"Walk"` across the pack, on the reasoning that enemies only ever moved while pursuing, so the run
 was the honest gait for the only speed that existed. That reasoning aged out — creatures potter

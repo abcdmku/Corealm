@@ -18,6 +18,7 @@ const REGION_NAMES: Record<string, string> = {
   fallowmarch: "The Fallowmarch",
   vellenwood: "Vellenwood",
   karrowmoor: "Karrowmoor",
+  kilnhalt: "Kilnhalt",
   gravelmaw: "The Gravelmaw",
 };
 

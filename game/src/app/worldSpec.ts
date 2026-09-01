@@ -40,6 +40,8 @@ function characterOf(regionId: RegionId): RegionTerrainSpec["character"] {
   switch (regionId) {
     case "vellenwood": return "woodland";
     case "karrowmoor": return "highlands";
+    // Ember foothills: rolling highland relief at a 34 m amplitude, without Karrowmoor's terraces.
+    case "kilnhalt": return "highlands";
     case "gravelmaw": return "cavern";
     default: return "plains";
   }
@@ -227,8 +229,11 @@ const COREALM_BIOMES: OrganicBiomeSpec<RegionId> = {
         { id: "earth-essence-cache", centre: [262, 176], radius: 34, strength: 1.2 },
         { id: "cairn-gate", centre: [250, 24], radius: 28, holdRadius: 5, strength: 1.45 },
         { id: "gorge-head", centre: [104, 192], radius: 32, strength: 1.2 },
-        { id: "rainfold", centre: [-45, 245], radius: 26, strength: 1.05 },
-        { id: "north-hollow", centre: [20, 270], radius: 24, strength: 1.0 },
+        // These two claimed the old render collar past z = 200. Now that band is playable
+        // Kilnhalt, they shrink to a feathered overreach just across the seam, so the woodland
+        // hands off to ember footland smoothly rather than at a straight z = 200 line.
+        { id: "rainfold", centre: [-45, 218], radius: 20, strength: 0.9 },
+        { id: "north-hollow", centre: [20, 224], radius: 18, strength: 0.85 },
       ],
       corridors: [
         { from: [-26, 118], to: [60, 120], halfWidth: 25, strength: 0.68 },
@@ -265,6 +270,38 @@ const COREALM_BIOMES: OrganicBiomeSpec<RegionId> = {
         { from: [194, -132], to: [140, -176], halfWidth: 24, strength: 0.52 },
         { from: [206, -88], to: [284, -110], halfWidth: 26, strength: 0.58 },
         { from: [0, -245], to: [45, -290], halfWidth: 16, strength: 0.5 },
+      ],
+    },
+    {
+      // Ember footland: warm and dry against every southern neighbour, so the unclaimed land
+      // north of the seam falls to it naturally and the border with the woodland forks rather
+      // than tracking z = 200.
+      id: "kilnhalt",
+      seed: seedFromText("corealm:biome:kilnhalt"),
+      climateTarget: [0.08, 0.52],
+      climateTolerance: [0.66, 0.6],
+      bias: 0.08,
+      anchors: [
+        { id: "emberfast", centre: [0, 330], radius: 50, strength: 1.65 },
+        { id: "kilnroad-fork", centre: [0, 254], radius: 34, strength: 1.2 },
+        { id: "clinker-quarry", centre: [-250, 330], radius: 42, strength: 1.35 },
+        { id: "cinderpine-stand", centre: [240, 340], radius: 38, strength: 1.35 },
+        { id: "ashfin-springs", centre: [210, 250], radius: 34, strength: 1.3 },
+        { id: "fire-cache", centre: [290, 400], radius: 36, strength: 1.25 },
+        { id: "cinderwake-arena", centre: [286, 420], radius: 26, strength: 1.2 },
+        { id: "west-burn", centre: [-200, 410], radius: 42, strength: 1.05 },
+        { id: "northwest-rise", centre: [-320, 430], radius: 32, strength: 1.0 },
+        { id: "seam-west", centre: [-160, 232], radius: 30, strength: 1.1 },
+        { id: "seam-mid", centre: [60, 228], radius: 28, strength: 1.0 },
+        { id: "north-shoulder", centre: [80, 440], radius: 36, strength: 1.0 },
+      ],
+      corridors: [
+        { from: [0, 254], to: [0, 330], halfWidth: 26, strength: 0.64 },
+        { from: [0, 330], to: [-250, 330], halfWidth: 28, strength: 0.58 },
+        { from: [0, 330], to: [240, 340], halfWidth: 26, strength: 0.58 },
+        { from: [210, 250], to: [240, 340], halfWidth: 22, strength: 0.52 },
+        { from: [240, 340], to: [290, 400], halfWidth: 20, strength: 0.52 },
+        { from: [-160, 232], to: [-250, 330], halfWidth: 22, strength: 0.5 },
       ],
     },
   ],

@@ -253,8 +253,12 @@ function createCreatureEntity(
       `Enemy group "${group.id}" (family "${group.family}", tier ${group.tier}) has no stat block in content/enemies.ts`,
     );
   }
-  const archetype = group.boss ? "boss" as const : "enemy" as const;
-  const viewScale = group.boss ? group.scale * 1.6 : group.scale;
+  // Same rank rule as `buildEnemyGroup`: minibosses share the boss archetype at 1.3x scale.
+  const bossRank = group.boss ? "boss" as const : group.miniBoss ? "miniboss" as const : null;
+  const archetype = bossRank === null ? "enemy" as const : "boss" as const;
+  const viewScale = bossRank === "boss" ? group.scale * 1.6
+    : bossRank === "miniboss" ? group.scale * 1.3
+    : group.scale;
   const drawnScale = viewScale * tierSilhouetteScale(group.tier);
   const position = placeOnFlatGround(placement.groundPosition, baseY, drawnScale);
   // Widest ground axis, halved, at the size the creature is actually drawn. Same derivation as
@@ -287,7 +291,7 @@ function createCreatureEntity(
       scale: viewScale,
       rotationY: round2(placement.rotationY ?? 0),
       materialTier: group.tier,
-      labelHeight: group.boss ? 3.4 : 2.2,
+      labelHeight: bossRank !== null ? 3.4 : 2.2,
     },
     meta: {
       family: group.family,
@@ -295,6 +299,7 @@ function createCreatureEntity(
       behaviour: stats.behaviour,
       spawnX: round2(position[0]),
       spawnZ: round2(position[2]),
+      ...(bossRank === null ? {} : { rank: bossRank }),
     },
   };
 }

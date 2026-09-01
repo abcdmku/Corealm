@@ -33,6 +33,8 @@
  *  crab         underground        armour 82, the highest in the game
  *  reaver       every region       humanoid raider: aggro 14 m and 2.4x the mark drop
  *  quarrykeeper Gravelmaw          Ordrun: 200 health, two phases, a telegraphed slam
+ *  galeskin/mossbound/tideworn/cinderwake — the four regional minibosses, one Monster02 rig in
+ *               four texture variants, each rolling its region's rare sword and staff at 10%
  *
  * Behaviour is the second axis and it is doing real work. Passive hens, frogs and coneys, and
  * territorial cattle, deer, ibex, aurochs, vipers and crabs, can all be walked past, so the
@@ -579,6 +581,164 @@ const BLOCKS: readonly EnemyDef[] = [
       { itemId: "cairn_garnet", quantity: [1, 1], chance: 0.10 },
     ],
   },
+  // ---------------------------------------------------------------- Kilnhalt, tier 20
+  // Solved against the tier-20 kits in equipment.ts (kit accuracy 75, sword power 45 -> attack
+  // roll 50.75, maxHit 17; magic kit magicAccuracy 75 / magicPower 50 -> Emberlash attack roll
+  // 58.4, maxHit 20). Every ordinary row lands in the amendment's 25-40 s on-tier band, and the
+  // bear/boar pair restates the Karrowmoor style gate at tier 20: the Ashback answers to a staff
+  // in 27.6 s against melee's 36.5, the Cinder Boar answers to a sword in 29.1 against magic's 34.9.
+  {
+    id: "bear_t20", name: "Ashback Bear", family: "bear", tier: 20,
+    // The staff answer, one tier up: armour 110 against magicArmour 15. Melee 20 in the full
+    // Emberite kit takes 36.5 s; Emberlash in the Charhide kit takes 27.6 s. MAGIC WINS by 24%.
+    maxHealth: 60, attackLevel: 26, defenceLevel: 22,
+    accuracy: 20, armour: 110, magicArmour: 15,
+    maxHit: 10, attackSpeedMs: 2400, aggroRadius: 10, moveSpeedMps: 3.06, walkSpeedMps: 0.74, behaviour: "aggressive",
+    marks: marksFor(20),
+    drops: [
+      { itemId: "charhide", quantity: [1, 1], chance: 0.50 },
+      { itemId: "raw_ember_haunch", quantity: [1, 2], chance: 0.45 },
+      { itemId: "ashback_claw", quantity: [1, 2], chance: 0.28 },
+      { itemId: "emberite_ore", quantity: [1, 2], chance: 0.18 },
+      { itemId: "fire_opal", quantity: [1, 1], chance: 0.08 },
+    ],
+  },
+  {
+    id: "boar_t20", name: "Cinder Boar", family: "boar", tier: 20,
+    // The sword answer: magicArmour 130 continues the Scree Boar's mud-caked rule at tier 20.
+    // Melee takes 29.1 s, the staff 34.9 s. MELEE WINS by 17%.
+    maxHealth: 56, attackLevel: 24, defenceLevel: 21,
+    accuracy: 18, armour: 60, magicArmour: 130,
+    maxHit: 9, attackSpeedMs: 2400, aggroRadius: 8, moveSpeedMps: 1.5, walkSpeedMps: 0.67, behaviour: "aggressive",
+    marks: marksFor(20),
+    drops: [
+      { itemId: "charhide", quantity: [1, 1], chance: 0.45 },
+      { itemId: "raw_ember_haunch", quantity: [1, 2], chance: 0.40 },
+      { itemId: "cinder_tusk", quantity: [1, 1], chance: 0.25 },
+      { itemId: "emberite_ore", quantity: [1, 2], chance: 0.15 },
+    ],
+  },
+  {
+    id: "ibex_t20", name: "Emberhorn Ibex", family: "ibex", tier: 20,
+    // The out-fight-it block, as at tier 10: near-symmetric 80/60 with the biggest ordinary
+    // health pool in the region. 35.3 s at Melee 20; neither style shortcuts it.
+    maxHealth: 62, attackLevel: 27, defenceLevel: 23,
+    accuracy: 22, armour: 80, magicArmour: 60,
+    maxHit: 11, attackSpeedMs: 3000, aggroRadius: 11, moveSpeedMps: 2.26, walkSpeedMps: 0.6, behaviour: "territorial",
+    marks: marksFor(20),
+    drops: [
+      { itemId: "charhide", quantity: [1, 2], chance: 0.50 },
+      { itemId: "emberhorn", quantity: [1, 1], chance: 0.28 },
+      { itemId: "raw_ember_haunch", quantity: [1, 2], chance: 0.35 },
+      { itemId: "cinderpine_log", quantity: [1, 2], chance: 0.15 },
+      { itemId: "fire_opal", quantity: [1, 1], chance: 0.10 },
+    ],
+  },
+  {
+    id: "viper_t20", name: "Cinder Adder", family: "viper", tier: 20,
+    // The family's glass cannon, kept honest at the fast end of the band: 25.7 s at Melee 20,
+    // and maxHit 14 at 3000 ms is the hardest ordinary blow in Kilnhalt when it lands.
+    maxHealth: 58, attackLevel: 30, defenceLevel: 18,
+    accuracy: 26, armour: 25, magicArmour: 75,
+    maxHit: 14, attackSpeedMs: 3000, aggroRadius: 8, moveSpeedMps: 1.2, walkSpeedMps: 0.5, behaviour: "territorial",
+    marks: marksFor(20),
+    drops: [
+      { itemId: "kiln_fang", quantity: [1, 2], chance: 0.40 },
+      { itemId: "venom_gland", quantity: [1, 2], chance: 0.25 },
+      { itemId: "charhide", quantity: [1, 1], chance: 0.20 },
+      { itemId: "fire_essence", quantity: [1, 2], chance: 0.12 },
+    ],
+  },
+  {
+    id: "reaver_t20", name: "Kilnroad Reaver", family: "reaver", tier: 20,
+    // The family rule holds at tier 20: symmetric 62/60, aggro 14, and a pursuit at 4.05 m/s -
+    // still under the player's 4.2, and the closest any reaver comes. 31.2 s at Melee 20, purse
+    // pays 140-540 marks.
+    maxHealth: 58, attackLevel: 28, defenceLevel: 23,
+    accuracy: 22, armour: 62, magicArmour: 60,
+    maxHit: 10, attackSpeedMs: 2400, aggroRadius: 14, moveSpeedMps: 4.05, walkSpeedMps: 0.9, behaviour: "aggressive",
+    marks: purseMarksFor(20),
+    drops: [
+      { itemId: "charhide", quantity: [1, 1], chance: 0.30 },
+      { itemId: "emberite_ore", quantity: [1, 3], chance: 0.30 },
+      { itemId: "fire_essence", quantity: [1, 3], chance: 0.20 },
+      { itemId: "emberite_boots", quantity: [1, 1], chance: 0.03 },
+    ],
+  },
+
+  // ---------------------------------------------------------------- regional minibosses
+  // One Monster02 rig in four texture variants, one per region, each holding the region's rare
+  // sword and staff at independent 10% rolls (see equipment.ts RARE_MINIBOSS_WEAPONS). They use
+  // the "boss" semantic archetype and the boss respawn window, publish `meta.rank: "miniboss"`,
+  // and draw at 1.3x authored scale against the major bosses' 1.6x (world/regionBuilder.ts).
+  // Movement speeds follow the one-rig-one-gait rule: the pipeline measured the Monster02 walk
+  // cycle at 0.82 m/s implied and the run at 2.22, so the authored walk matches the cycle and the
+  // 2.0 m/s pursuit sits under the run clip's rate and well under the player's 4.2.
+  {
+    id: "galeskin_t1", name: "Galeskin", family: "galeskin", tier: 1,
+    // Sized between the road reavers and the Tempest Roc: a fight a tier-1 player chooses, long
+    // but survivable, and territorial so the choice is real.
+    maxHealth: 50, attackLevel: 8, defenceLevel: 6,
+    accuracy: 8, armour: 14, magicArmour: 14,
+    maxHit: 5, attackSpeedMs: 3000, aggroRadius: 16, moveSpeedMps: 2.0, walkSpeedMps: 0.82, behaviour: "territorial",
+    marks: [40, 90],
+    drops: [
+      { itemId: "galeskin_sword", quantity: [1, 1], chance: 0.10 },
+      { itemId: "galeskin_staff", quantity: [1, 1], chance: 0.10 },
+      { itemId: "air_essence", quantity: [2, 5], chance: 0.50 },
+      { itemId: "pale_quartz", quantity: [1, 2], chance: 0.50 },
+      { itemId: "coarse_hide", quantity: [1, 2], chance: 0.40 },
+    ],
+  },
+  {
+    id: "mossbound_t5", name: "Mossbound", family: "mossbound", tier: 5,
+    maxHealth: 95, attackLevel: 14, defenceLevel: 10,
+    accuracy: 12, armour: 34, magicArmour: 30,
+    maxHit: 7, attackSpeedMs: 3000, aggroRadius: 16, moveSpeedMps: 2.0, walkSpeedMps: 0.82, behaviour: "territorial",
+    marks: [180, 320],
+    drops: [
+      { itemId: "mossbound_sword", quantity: [1, 1], chance: 0.10 },
+      { itemId: "mossbound_staff", quantity: [1, 1], chance: 0.10 },
+      { itemId: "earth_essence", quantity: [2, 5], chance: 0.50 },
+      { itemId: "vell_amber", quantity: [1, 2], chance: 0.50 },
+      { itemId: "duskoak_log", quantity: [2, 4], chance: 0.40 },
+    ],
+  },
+  {
+    id: "tideworn_t10", name: "Tideworn", family: "tideworn", tier: 10,
+    maxHealth: 140, attackLevel: 20, defenceLevel: 14,
+    accuracy: 16, armour: 50, magicArmour: 40,
+    maxHit: 9, attackSpeedMs: 3000, aggroRadius: 18, moveSpeedMps: 2.0, walkSpeedMps: 0.82, behaviour: "territorial",
+    marks: [450, 750],
+    drops: [
+      { itemId: "tideworn_sword", quantity: [1, 1], chance: 0.10 },
+      { itemId: "tideworn_staff", quantity: [1, 1], chance: 0.10 },
+      { itemId: "water_essence", quantity: [2, 5], chance: 0.50 },
+      { itemId: "cairn_garnet", quantity: [1, 2], chance: 0.50 },
+      { itemId: "kaldite_ore", quantity: [1, 3], chance: 0.40 },
+    ],
+  },
+  {
+    id: "cinderwake_t20", name: "Cinderwake", family: "cinderwake", tier: 20,
+    // Kilnhalt's arena fight and the Fire Orb's keeper. 260 health at Melee 20 in the Emberite
+    // kit runs about 149 s and roughly 187 incoming damage - a boss you can lose, exactly like
+    // Ordrun. The Orb drop is 100% and singleton: once it is owned or consumed, the shared
+    // duplicate-Orb suppression in the loot path withholds later copies.
+    maxHealth: 260, attackLevel: 32, defenceLevel: 24,
+    accuracy: 22, armour: 78, magicArmour: 45,
+    maxHit: 15, attackSpeedMs: 3000, aggroRadius: 22, moveSpeedMps: 2.0, walkSpeedMps: 0.82, behaviour: "territorial",
+    marks: [1800, 2800],
+    drops: [
+      { itemId: "fire_orb", quantity: [1, 1], chance: 1.00 },
+      { itemId: "cinderwake_sword", quantity: [1, 1], chance: 0.10 },
+      { itemId: "cinderwake_staff", quantity: [1, 1], chance: 0.10 },
+      { itemId: "emberite_bar", quantity: [1, 3], chance: 1.00 },
+      { itemId: "fire_opal", quantity: [1, 3], chance: 0.75 },
+      { itemId: "charhide", quantity: [1, 2], chance: 0.60 },
+    ],
+  },
+
+  // ---------------------------------------------------------------- Gravelmaw boss
   {
     id: "quarrykeeper_t10", name: "Ordrun the Quarrykeeper", family: "quarrykeeper", tier: 10,
     // Same 2.1 m/s as the other two orb bosses. He is heavier than anything else on the floor and
@@ -660,6 +820,17 @@ const GROUP_BLOCK: readonly (readonly [string, string])[] = [
   ["terrace_aurochs", "aurochs_t10"],
   ["tarn_coyotes", "coyote_t10"],
   ["karrow_reavers", "reaver_t10"],
+  // Kilnhalt, tier 20 - ember foothills
+  ["ashback_bears", "bear_t20"],
+  ["cinder_boars", "boar_t20"],
+  ["emberhorn_ibex", "ibex_t20"],
+  ["cinder_adders", "viper_t20"],
+  ["kilnroad_reavers", "reaver_t20"],
+  // Minibosses, count 1 each, so the entity id is the group id.
+  ["galeskin", "galeskin_t1"],
+  ["mossbound", "mossbound_t5"],
+  ["tideworn", "tideworn_t10"],
+  ["cinderwake", "cinderwake_t20"],
   // Gravelmaw, tier 10 - underground
   ["gravelmaw_ch1_rats", "rat_t10"],
   ["gravelmaw_ch1_reavers", "reaver_t10"],
@@ -677,10 +848,10 @@ const GROUP_ALIASES: readonly EnemyDef[] = GROUP_BLOCK.flatMap(([groupId, blockI
   return base === undefined ? [] : [{ ...base, id: groupId }];
 });
 
-/** Twenty-six stat blocks plus twenty-nine group aliases: 55 rows. */
+/** Thirty-five stat blocks plus thirty-eight group aliases: 73 rows. */
 export const ENEMIES: readonly EnemyDef[] = [...BLOCKS, ...GROUP_ALIASES];
 
-/** The twenty-six canonical stat blocks, without the group aliases. For docs and the bestiary. */
+/** The thirty-five canonical stat blocks, without the group aliases. For docs and the bestiary. */
 export const ENEMY_BLOCKS: readonly EnemyDef[] = BLOCKS;
 
 const BY_ANY_ID = new Map(ENEMIES.map((row) => [row.id, row] as const));

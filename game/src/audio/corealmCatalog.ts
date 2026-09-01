@@ -136,6 +136,9 @@ export const COREALM_AUDIO_CATALOG = defineAudioCatalog({
     },
     vellenwood: { music: "music.deep-woodland", ambient: "ambient.deep-woodland" },
     karrowmoor: { music: "music.stone-city", ambient: "ambient.rocky-highlands" },
+    // The supplied music library names no ember-foothills theme, so Kilnhalt ships ambience only,
+    // exactly like the Gravelmaw. Dry upland wind is the closest rights-traced ambience family.
+    kilnhalt: { ambient: "ambient.rocky-highlands" },
     gravelmaw: { ambient: "ambient.cave" },
   },
 });

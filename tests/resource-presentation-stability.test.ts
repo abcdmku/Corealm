@@ -79,14 +79,15 @@ describe("resource presentation stability", () => {
   // one region's clusters and the next region's. So this hash moves whenever a group's `count`
   // changes, even though no resource was touched: swapping the monster roster for animals changed
   // Vellenwood and Karrowmoor yields while Fallowmarch, which is built before the first changed
-  // group, stayed byte-identical. Node ids and the node count (85) are the invariant here; when
+  // group, stayed byte-identical. Node ids and the node count (114) are the invariant here; when
   // this hash moves, check those first, and only rebaseline once they have not.
   it("keeps the authored placement and yield stream aligned", () => {
-    // Rebaselined at the rebase onto main: the merged world carries BOTH the animal roster (this
-    // branch) and the essence altar rites (main), and either alone already moves the stream. The
-    // node-id and node-count invariants below were checked first, per the rule above.
+    // Rebaselined for the Kilnhalt expansion: the count moved 85 -> 114, and the 29 additions are
+    // exactly the authored Kilnhalt clusters (6+2 quarry, 8 cinderpine, 4 springs, 4 plots,
+    // 5 fire essence) with every pre-existing node id unchanged — checked before rebaselining,
+    // per the rule above.
     expect(placementAndYieldFingerprint(buildWorld(SEED, FLAT_GROUND))).toBe(
-      "0529240d1e0490a46ad9f4a9b976d2a8c142588689e01040d27489c2262d723f",
+      "f15aad5b4a2958a50e92a8069eb10a377a2c7a9756d214ce3df5dbb1fa35fb88",
     );
   });
 });

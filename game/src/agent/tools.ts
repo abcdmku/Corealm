@@ -335,8 +335,8 @@ export function createTools(api: GameApi): ToolDef[] {
         + "requiredElement, fuelCost, unlocked, castable, blockedBy, and description. The top-level "
         + "result returns preferredSpellId, activeSpellId, magicLevel, equippedWeapon, carried Essence by "
         + "element, and releasedElements. equippedWeapon includes live charges, capacity, rechargeItemId, "
-        + "and rechargeCost. A cast requires a wand or staff plus matching Essence. Air, Earth, "
-        + "and Water are released. Fire stays visible as unreleased tier-15 content. Selecting a locked "
+        + "and rechargeCost. A cast requires a wand or staff plus matching Essence. All four "
+        + "elements are released; Fire released with the tier-20 Kilnhalt region. Selecting a locked "
         + "or currently incompatible spell is allowed; automatic selection stands in until it becomes "
         + "castable. Pass an explicit null spellId to restore automatic selection.",
       inputSchema: obj({

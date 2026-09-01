@@ -91,18 +91,42 @@ const CORVEN = 0x7f8589;
 /** Melee tier 10: full-white multiply, the brightest the textured source steel can render. */
 const KALDITE = 0xffffff;
 const KALDITE_GARNET = 0x5c1522;
+/**
+ * Melee tier 20: kiln steel. A multiply can never lighten, so Emberite cannot be "brighter than
+ * Kaldite"; instead it is as bright as the texture allows with a warm cast, against Kaldite's
+ * neutral white — heat against cold, at equal value.
+ */
+const EMBERITE = 0xffc9a0;
+const EMBERITE_OPAL = 0xb8481e;
 /** Magic tier 1: blue. */
 const MARCHHIDE = 0x416f9d;
 /** Magic tier 5: dark green. */
 const BRAMBLEHIDE = 0x2f4f3b;
 /** Magic tier 10: charcoal black, light enough to keep seams visible under gameplay lighting. */
 const WIGHTSHROUD = 0x4a4d52;
+/** Magic tier 20: seared warm grey-brown, the charhide read against the tier 10 cold charcoal. */
+const CHARHIDE = 0x5c4a3c;
 
 /** Magic tiers share geometry. Their unlit wood colour is the only tier-specific treatment. */
 const BASIC_WOOD = 0x8a5a32;
 const PALEWOOD = 0xd7bd8e;
 const DUSKOAK = 0x53341f;
 const CAIRNPINE = 0x596162;
+const CINDERPINE = 0x40322b;
+
+/**
+ * The four rare miniboss weapon tints, from the Phase 2 amendment: one shared imported sword and
+ * staff geometry, identified per region purely by material tint through this production path and
+ * the icon path. Applied over the Blink meshes' own textures, so each stays a real object with a
+ * regional colour identity rather than four recolour-flat silhouettes.
+ */
+const GALESKIN_TINT = 0xaadfe4;   // Fallowmarch: pale cyan.
+const MOSSBOUND_TINT = 0x6f8f4a;  // Vellenwood: moss green...
+const MOSSBOUND_OCHRE = 0xc09a4a; // ...and ochre.
+const TIDEWORN_TINT = 0x3556b0;   // Karrowmoor: cobalt...
+const TIDEWORN_TEAL = 0x2f9ba0;   // ...and teal.
+const CINDERWAKE_TINT = 0xd86a2e; // Kilnhalt: ember orange...
+const CINDERWAKE_CRIMSON = 0x9c2420; // ...and crimson.
 
 /** Source bounds are 2.212 m for the staff and 0.985 m for the wand. */
 const MAGIC_STAFF_SCALE = 0.82;
@@ -112,7 +136,9 @@ const MAGIC_WAND_SCALE = 0.80;
 
 type OutfitKit = "ranger" | "knight";
 type OutfitPart = "helmet" | "hood" | "chest" | "legs" | "boots" | "gloves" | "pauldron" | "scarf";
-type WeaponAsset = "sword" | "shield" | "axe" | "pickaxe" | "rpg_weapon_staff" | "rpg_weapon_wand";
+type WeaponAsset =
+  | "sword" | "shield" | "axe" | "pickaxe" | "rpg_weapon_staff" | "rpg_weapon_wand"
+  | "miniboss_sword" | "miniboss_staff";
 
 /**
  * A resolved part before the body variant is chosen. One item can be more than one part.
@@ -228,6 +254,48 @@ const LADDER: readonly LadderTier[] = [
     feet: "cairnpelt_boots", hands: "cairnpelt_wraps",
     accessories: ["storm_ring", "storm_charm"],
   },
+  {
+    tier: 20, kit: "knight", cloth: EMBERITE,
+    weapon: EMBERITE, weaponAccent: EMBERITE_OPAL, offHandTint: EMBERITE,
+    mainHand: [
+      { id: "emberite_dagger", asset: "sword", scale: 0.62 },
+      { id: "emberite_sword", asset: "sword", scale: 1 },
+    ],
+    offHand: { id: "cinderpine_shield", scale: 1 },
+    head: "emberite_helm", body: "emberite_plate", legs: "emberite_greaves",
+    feet: "emberite_boots", hands: "emberite_gauntlets",
+    accessories: ["emberite_ring", "emberite_pendant"],
+  },
+  {
+    tier: 20, kit: "ranger", cloth: CHARHIDE, weapon: CINDERPINE,
+    mainHand: [
+      { id: "cinderpine_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
+      { id: "cinderpine_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
+      { id: "fire_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
+      { id: "fire_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
+    ],
+    head: "charhide_hood", body: "charhide_robe", legs: "charhide_leggings",
+    feet: "charhide_boots", hands: "charhide_wraps",
+    accessories: ["cinder_ring", "cinder_charm"],
+  },
+];
+
+/**
+ * The eight rare miniboss weapons: one shared imported sword mesh and one shared staff mesh, four
+ * regional tints. The Blink meshes are authored at real-world size with grips at the origin, so
+ * the staves take no extra scale and the swords take only the tier silhouette factor.
+ */
+const RARE_WEAPON_VISUALS: readonly {
+  id: ItemId; asset: WeaponAsset; tier: number; tint: number; accent?: number;
+}[] = [
+  { id: "galeskin_sword", asset: "miniboss_sword", tier: 1, tint: GALESKIN_TINT, accent: GALESKIN_TINT },
+  { id: "galeskin_staff", asset: "miniboss_staff", tier: 1, tint: GALESKIN_TINT, accent: GALESKIN_TINT },
+  { id: "mossbound_sword", asset: "miniboss_sword", tier: 5, tint: MOSSBOUND_TINT, accent: MOSSBOUND_OCHRE },
+  { id: "mossbound_staff", asset: "miniboss_staff", tier: 5, tint: MOSSBOUND_TINT, accent: MOSSBOUND_OCHRE },
+  { id: "tideworn_sword", asset: "miniboss_sword", tier: 10, tint: TIDEWORN_TINT, accent: TIDEWORN_TEAL },
+  { id: "tideworn_staff", asset: "miniboss_staff", tier: 10, tint: TIDEWORN_TINT, accent: TIDEWORN_TEAL },
+  { id: "cinderwake_sword", asset: "miniboss_sword", tier: 20, tint: CINDERWAKE_TINT, accent: CINDERWAKE_CRIMSON },
+  { id: "cinderwake_staff", asset: "miniboss_staff", tier: 20, tint: CINDERWAKE_TINT, accent: CINDERWAKE_CRIMSON },
 ];
 
 /** Visible-slot ids that still lack a mesh. Accessories are intentionally indirect. */
@@ -308,6 +376,19 @@ function buildTable(): Map<ItemId, GearVisual> {
     }
   }
 
+  for (const rare of RARE_WEAPON_VISUALS) {
+    const swordScale = round3(tierSilhouetteScale(rare.tier));
+    table.set(rare.id, {
+      slot: "mainHand",
+      parts: [weaponPart(
+        rare.asset,
+        rare.tint,
+        rare.asset === "miniboss_staff" ? 1 : swordScale,
+        rare.accent,
+      )],
+    });
+  }
+
   return table;
 }
 
@@ -323,6 +404,8 @@ const GATHERING_TOOL_APPEARANCES = new Map<ItemId, GearAppearance>([
   ["grithe_hatchet", { assetId: "axe", slot: "mainHand", attach: "bone", tint: GRITHE, scale: tierSilhouetteScale(1) }],
   ["corven_hatchet", { assetId: "axe", slot: "mainHand", attach: "bone", tint: CORVEN, scale: tierSilhouetteScale(5) }],
   ["kaldite_hatchet", { assetId: "axe", slot: "mainHand", attach: "bone", tint: KALDITE, scale: tierSilhouetteScale(10), accent: KALDITE_GARNET }],
+  ["emberite_pickaxe", { assetId: "pickaxe", slot: "mainHand", attach: "bone", tint: EMBERITE, scale: tierSilhouetteScale(20), accent: EMBERITE_OPAL }],
+  ["emberite_hatchet", { assetId: "axe", slot: "mainHand", attach: "bone", tint: EMBERITE, scale: tierSilhouetteScale(20), accent: EMBERITE_OPAL }],
 ]);
 
 /** Appearance of a carried pickaxe or hatchet while gathering, if the item is one. */
@@ -520,6 +603,23 @@ const SOCKET_PARTS: Readonly<Record<string, SocketParts>> = {
   rpg_weapon_wand: {
     bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.200], rotation: [Math.PI / 2, 0, 0],
   },
+  // The imported rare weapons keep their authored grip pivots: the sword's crossguard sits exactly
+  // on its origin (grip centre a hand-width down the handle), and the staff's grip is its origin.
+  // Verified in the feature lab, like every other socket in this table.
+  miniboss_sword: {
+    // Rx(-90) rather than the CC0 sword's Rx(+90): the imported blade runs +Y from a crossguard
+    // origin, and the first lab sweep showed +90 hanging it point-down into the ground. With the
+    // flip the handle (-Y) lands at +Z, so the grip centre sits a hand-width up the handle.
+    bone: "hand_r", fist: FIST_RIGHT, grip: [0, 0, 0.100], rotation: [-Math.PI / 2, 0, 0],
+  },
+  miniboss_staff: {
+    // The mesh origin sits at the authored grip just under the crystal, i.e. near the TOP of the
+    // 1.75 m shaft. Holding the origin put the crystal at fist height with the foot dragging the
+    // ground (first lab sweep); 0.55 m down the shaft holds it mid-staff like the pack staffs,
+    // crystal above the shoulder, foot clear of the ground.
+    bone: "hand_r", fist: FIST_RIGHT, grip: [0.043, -0.021, 0.55],
+    rotation: [Math.PI * 0.53, 0, -Math.PI * 0.06],
+  },
 };
 
 function socketAt(assetId: string, scale: number): WeaponSocket | null {
@@ -587,9 +687,11 @@ function tintedMaterial(material: THREE.Material, appearance: GearAppearance): T
   }
   if (appearance.accent !== undefined && shaded.emissive instanceof THREE.Color) {
     shaded.emissive.setHex(appearance.accent);
-    // The weapon GLB has one material and no emissive map, so this is a restrained uniform gem
-    // cast rather than a localized glow. The armour itself has no accent and remains plain steel.
-    shaded.emissiveIntensity = 0.15;
+    // On a material with no emissive map this is a restrained uniform gem cast rather than a
+    // localized glow, so it stays faint. The imported rare weapons DO carry an authored emissive
+    // map (the staff crystal, the sword's edge line); there the accent recolours that authored
+    // glow and must stay bright enough to read as one at gameplay distance.
+    shaded.emissiveIntensity = shaded.emissiveMap ? 1.2 : 0.15;
   }
   if (isRangerOutfitAsset(appearance.assetId)
     && appearance.tint !== undefined

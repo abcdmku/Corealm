@@ -25,7 +25,7 @@ import { Store, addSkillXp, computeMaxHealth } from "../state/store.js";
 import { EventBus } from "../core/events.js";
 import { SimClock } from "../core/time.js";
 import { RngStreams } from "../core/rng.js";
-import { drawDistanceMetres, Renderer } from "../render/renderer.js";
+import { drawDistanceMetres, fogOpaqueMetres, Renderer } from "../render/renderer.js";
 import { OrbitCamera } from "../render/camera.js";
 import { AssetRegistry } from "../render/assets.js";
 import { ALL_PROCEDURAL_GEAR_ASSETS, registerProceduralGear } from "../render/proceduralGear.js";
@@ -139,7 +139,9 @@ const ENTITY_ACTIVE_REPOSITION_DISTANCE = 8;
 const STRUCTURE_RESIDENCY_MARGIN = ENTITY_ACTIVE_REPOSITION_DISTANCE + CAMERA.maxDistance + 4;
 
 function structureResidencyRadius(distance: UiSettings["drawDistance"]): number {
-  return drawDistanceMetres(distance) + STRUCTURE_RESIDENCY_MARGIN;
+  // Fog-opaque rather than camera-far: a structure between the two renders as solid fog colour,
+  // so residency past the fog wall spends draw calls on an invisible building.
+  return fogOpaqueMetres(distance) + STRUCTURE_RESIDENCY_MARGIN;
 }
 
 export interface BootOptions {
@@ -1067,6 +1069,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
     assets.setActiveRegion(regionId);
     scatterStreaming.setActivePosition(position[0], position[2]);
+    // Distance-culls resident scatter shards against the fog wall. Without this the arena and
+    // canopy poses drew every in-frustum tile across the whole island; see updateStreaming.
+    scene.updateStreaming(position[0], position[2]);
     if (regionChanged || force) entityViews.sync(entitiesForVisualRegion(regionId));
     entityViews.updateActivePosition(position);
     activeVisualCentre = [...position];

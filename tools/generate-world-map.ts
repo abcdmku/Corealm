@@ -19,7 +19,16 @@ const TILE_BLEED_PIXELS = 128;
 const SOURCE_IMAGE_FILE = "world-map.png";
 const METADATA_FILE = "world-map.json";
 const MINIMAP_MAX_BYTES = 150_000;
-const DETAIL_MAX_BYTES = 750_000;
+/**
+ * REVIEWED for the Kilnhalt expansion, per this tripwire's own instruction: the canonical image
+ * grew 33% in pixels (4800x3600 -> 4800x4800) and the northern band's dry-brush ground texture
+ * compresses ~15% worse per pixel than the pre-Kilnhalt average, putting the top detail level at
+ * 1.14 MB against the historical 750 KB. The capture itself is correct — the encode quality is
+ * unchanged and every level is a lazy-loaded zoom asset, never boot payload
+ * (`tests/map-payload.test.ts` keeps them out of the boot request path separately) — so the
+ * ceiling moves to 1.25 MB rather than the quality moving down.
+ */
+const DETAIL_MAX_BYTES = 1_250_000;
 
 interface RenditionSpec {
   id: string;
@@ -31,12 +40,15 @@ interface RenditionSpec {
   maxBytes: number;
 }
 
+// Heights are DERIVED from the canonical layout at generation time (`sizedRendition`): the specs
+// carry only the width identity. They used to hard-code the old 4:3 world's heights, which made
+// the Kilnhalt capture throw "distorts the canonical image bounds" on the new square island.
 const MINIMAP_RENDITION: RenditionSpec = {
   id: "minimap",
   role: "minimap",
   file: "world-map-minimap.webp",
   width: 800,
-  height: 600,
+  height: 0,
   quality: 92,
   maxBytes: MINIMAP_MAX_BYTES,
 };
@@ -49,7 +61,7 @@ const DETAIL_RENDITIONS: readonly RenditionSpec[] = [
     role: "detail",
     file: "world-map-detail-4800.webp",
     width: 4800,
-    height: 3600,
+    height: 0,
     quality: 60,
     maxBytes: DETAIL_MAX_BYTES,
   },
@@ -58,7 +70,7 @@ const DETAIL_RENDITIONS: readonly RenditionSpec[] = [
     role: "detail",
     file: "world-map-detail-2400.webp",
     width: 2400,
-    height: 1800,
+    height: 0,
     quality: 82,
     maxBytes: DETAIL_MAX_BYTES,
   },
@@ -67,7 +79,7 @@ const DETAIL_RENDITIONS: readonly RenditionSpec[] = [
     role: "detail",
     file: "world-map-detail-1200.webp",
     width: 1200,
-    height: 900,
+    height: 0,
     quality: 86,
     maxBytes: DETAIL_MAX_BYTES,
   },
@@ -144,11 +156,17 @@ function buildMapLayout(): MapLayout {
   // Stop at the first full tile boundary outside the coastal mesh. That keeps the whole collar in
   // frame and leaves a strip of the ocean plane around it instead of ending on the skirt's edge.
   const imagePaddingMetres = (Math.floor(coast.collar / TILE_METRES) + 1) * TILE_METRES;
+  // Snap each padded bound OUTWARD to the tile grid. The old world's 700 x 400 m playable extent
+  // happened to be a tile multiple, so padding alone tiled exactly; Kilnhalt's 660 m z extent is
+  // not, and the previous hard "must tile exactly" throw turned that into a failed capture. The
+  // outward snap keeps at least the collar padding on every side and guarantees integer tiling.
+  const snapDown = (value: number): number => Math.floor(value / TILE_METRES) * TILE_METRES;
+  const snapUp = (value: number): number => Math.ceil(value / TILE_METRES) * TILE_METRES;
   const imageBounds: MapBounds = {
-    minX: spec.bounds.minX - imagePaddingMetres,
-    maxX: spec.bounds.maxX + imagePaddingMetres,
-    minZ: spec.bounds.minZ - imagePaddingMetres,
-    maxZ: spec.bounds.maxZ + imagePaddingMetres,
+    minX: snapDown(spec.bounds.minX - imagePaddingMetres),
+    maxX: snapUp(spec.bounds.maxX + imagePaddingMetres),
+    minZ: snapDown(spec.bounds.minZ - imagePaddingMetres),
+    maxZ: snapUp(spec.bounds.maxZ + imagePaddingMetres),
   };
   const columnCount = (imageBounds.maxX - imageBounds.minX) / TILE_METRES;
   const rowCount = (imageBounds.maxZ - imageBounds.minZ) / TILE_METRES;
@@ -170,6 +188,20 @@ function buildMapLayout(): MapLayout {
       bleedPixels: TILE_BLEED_PIXELS,
     },
   };
+}
+
+/**
+ * Fills in a rendition's height (exact canonical aspect) and, for detail levels, its area-scaled
+ * byte budget. Throws when a width cannot divide the canonical bounds into integer pixels.
+ */
+function sizedRendition(layout: MapLayout, spec: RenditionSpec): RenditionSpec {
+  const height = (spec.width * layout.height) / layout.width;
+  if (!Number.isInteger(height)) {
+    throw new Error(
+      `Map rendition width ${spec.width} cannot render the ${layout.width}x${layout.height} canonical image at an integer height.`,
+    );
+  }
+  return { ...spec, height };
 }
 
 function exactMetresPerPixel(layout: MapLayout, width: number, height: number): number {
@@ -201,13 +233,23 @@ async function normalizeOceanBackdrop(layout: MapLayout, sourceImage: Buffer): P
   const coast = buildWorldTerrainSpec().coast;
   if (!coast) throw new Error("World-map ocean normalization needs the authored coast spec.");
   const metresPerPixel = exactMetresPerPixel(layout, layout.width, layout.height);
-  const backdropMetres = layout.imagePaddingMetres - coast.collar;
-  const backdropPixels = backdropMetres / metresPerPixel;
-  if (backdropMetres <= 0 || !Number.isInteger(backdropPixels)) {
-    throw new Error(
-      `World-map ocean backdrop is ${backdropMetres} m (${backdropPixels} px); expected a positive whole-pixel strip.`,
-    );
+
+  // The coast-floor rectangle in PIXELS, computed per side from the playable bounds plus the
+  // collar. The strip widths are no longer uniform: the tile-grid snap in `buildMapLayout` can
+  // pad one side more than another (the Kilnhalt image carries 290 m at the north edge against
+  // 250 m elsewhere), and the old single `imagePaddingMetres - collar` strip width mislabelled
+  // the extra band as coast floor — that was the pale bar across the top of the first capture.
+  const toPixelX = (metres: number): number => (metres - layout.imageBounds.minX) / metresPerPixel;
+  // Image rows run north (maxZ) at row 0.
+  const toPixelY = (metres: number): number => (layout.imageBounds.maxZ - metres) / metresPerPixel;
+  const floorLeft = Math.round(toPixelX(layout.playableBounds.minX - coast.collar));
+  const floorRight = Math.round(toPixelX(layout.playableBounds.maxX + coast.collar));
+  const floorTop = Math.round(toPixelY(layout.playableBounds.maxZ + coast.collar));
+  const floorBottom = Math.round(toPixelY(layout.playableBounds.minZ - coast.collar));
+  if (floorLeft <= 0 || floorTop <= 0 || floorRight >= layout.width || floorBottom >= layout.height) {
+    throw new Error("World-map ocean backdrop strip collapsed; the image bounds must exceed the coast floor.");
   }
+
   const safeOceanMetres = coast.collar - coast.shoreline[1];
   if (safeOceanMetres <= metresPerPixel * 2) {
     throw new Error("The authored coast leaves no safe ocean-only band for backdrop normalization.");
@@ -223,58 +265,38 @@ async function normalizeOceanBackdrop(layout: MapLayout, sourceImage: Buffer): P
     throw new Error("World-map ocean normalization needs an RGB capture at the authored dimensions.");
   }
 
-  const outerHistograms = Array.from({ length: 3 }, () => new Uint32Array(256));
   const innerHistograms = Array.from({ length: 3 }, () => new Uint32Array(256));
-  let outerCount = 0;
   let innerCount = 0;
-  const right = info.width - backdropPixels;
-  const bottom = info.height - backdropPixels;
-  for (let y = 0; y < info.height; y += 1) {
-    for (let x = 0; x < info.width; x += 1) {
-      const outer = x < backdropPixels || x >= right || y < backdropPixels || y >= bottom;
-      const insideCoastFloor = x >= backdropPixels && x < right && y >= backdropPixels && y < bottom;
-      const inner = insideCoastFloor && (
-        x < backdropPixels + referenceBandPixels
-        || x >= right - referenceBandPixels
-        || y < backdropPixels + referenceBandPixels
-        || y >= bottom - referenceBandPixels
-      );
-      if (!outer && !inner) continue;
+  for (let y = floorTop; y < floorBottom; y += 1) {
+    for (let x = floorLeft; x < floorRight; x += 1) {
+      const inner = x < floorLeft + referenceBandPixels
+        || x >= floorRight - referenceBandPixels
+        || y < floorTop + referenceBandPixels
+        || y >= floorBottom - referenceBandPixels;
+      if (!inner) continue;
       const offset: number = (y * info.width + x) * info.channels;
-      const histograms = outer ? outerHistograms : innerHistograms;
       for (let channel = 0; channel < 3; channel += 1) {
-        const histogram = histograms[channel]!;
+        const histogram = innerHistograms[channel]!;
         const value = data[offset + channel]!;
         histogram[value] = (histogram[value] ?? 0) + 1;
       }
-      if (outer) outerCount += 1;
-      else innerCount += 1;
+      innerCount += 1;
     }
   }
-  const outerMedian = outerHistograms.map((histogram) => medianFromHistogram(histogram, outerCount));
   const innerMedian = innerHistograms.map((histogram) => medianFromHistogram(histogram, innerCount));
-  const channelOffsets = innerMedian.map((value, channel) => value - outerMedian[channel]!);
-  const minimumOffset = Math.min(...channelOffsets);
-  const maximumOffset = Math.max(...channelOffsets);
-  if (minimumOffset < -32 || maximumOffset > 1 || maximumOffset - minimumOffset > 2) {
-    throw new Error(
-      `Unsafe ocean backdrop correction ${JSON.stringify(channelOffsets)} from `
-        + `${JSON.stringify(outerMedian)} to ${JSON.stringify(innerMedian)}.`,
-    );
-  }
-  // A normalized checked-in source comes through this path on every targeted regeneration.
-  if (channelOffsets.every((offset) => Math.abs(offset) <= 1)) return sourceImage;
 
+  // PAINT the whole backdrop with the sampled guaranteed-ocean colour instead of offsetting it.
+  // Beyond the coast floor the capture shows the transparent ocean plane over whatever the scene
+  // background resolved to per tile — the old small uniform offset could match a well-behaved
+  // strip but not the sky-gradient leaks the snapped corners exposed. A flat fill of the median
+  // ocean colour is deterministic, idempotent, and byte-exact inside the coast floor.
   const corrected = Buffer.from(data);
   for (let y = 0; y < info.height; y += 1) {
     for (let x = 0; x < info.width; x += 1) {
-      if (x >= backdropPixels && x < right && y >= backdropPixels && y < bottom) continue;
+      if (x >= floorLeft && x < floorRight && y >= floorTop && y < floorBottom) continue;
       const offset: number = (y * info.width + x) * info.channels;
       for (let channel = 0; channel < 3; channel += 1) {
-        corrected[offset + channel] = Math.max(
-          0,
-          Math.min(255, corrected[offset + channel]! + channelOffsets[channel]!),
-        );
+        corrected[offset + channel] = innerMedian[channel]!;
       }
     }
   }
@@ -334,10 +356,14 @@ async function writeWorldMapArtifacts(layout: MapLayout, sourceImage: Buffer): P
   ]);
   await writeFile(path.join(outputDir, SOURCE_IMAGE_FILE), normalizedSourceImage);
 
-  const minimap = await renderRendition(normalizedSourceImage, outputDir, layout, MINIMAP_RENDITION);
+  const minimap = await renderRendition(
+    normalizedSourceImage, outputDir, layout, sizedRendition(layout, MINIMAP_RENDITION),
+  );
   const detail: MapRenditionMetadata[] = [];
   for (const rendition of DETAIL_RENDITIONS) {
-    detail.push(await renderRendition(normalizedSourceImage, outputDir, layout, rendition));
+    detail.push(await renderRendition(
+      normalizedSourceImage, outputDir, layout, sizedRendition(layout, rendition),
+    ));
   }
 
   const sourceSha256 = createHash("sha256").update(normalizedSourceImage).digest("hex");

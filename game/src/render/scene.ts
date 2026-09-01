@@ -722,7 +722,7 @@ export class WorldScene {
         });
       }
     }
-    if (spec.coast) steps.push(...this.coastBuildSteps(spec.coast));
+    if (spec.coast) steps.push(...this.coastBuildSteps(spec.coast, spec));
     return steps;
   }
 
@@ -849,8 +849,13 @@ export class WorldScene {
    * Neither mesh is walkable or raycast as terrain: content, nav, physics, and the map keep their
    * existing bounds while the camera sees a shoreline instead of the end of a rectangular slab.
    */
-  private coastBuildSteps(spec: CoastSpec): Array<() => void> {
-    const bounds = this.world?.bounds;
+  private coastBuildSteps(spec: CoastSpec, world: WorldTerrainSpec): Array<() => void> {
+    // Read the bounds off the SPEC being built, never `this.world`: the step list is assembled
+    // before the first step assigns `this.world`, so on a fresh scene that field is still null
+    // here and this guard silently dropped the whole coast. That is how the island lost its
+    // coastline when boot went incremental — the committed world map still had one because it was
+    // captured before that refactor, and nothing walks to the edge in any gate.
+    const bounds = world.bounds;
     if (!bounds || spec.gridStep <= 0 || spec.oceanSize <= 0) return [];
 
     const minimumReach = Math.max(0.001, Math.min(spec.shoreline[0], spec.shoreline[1]));
@@ -861,7 +866,7 @@ export class WorldScene {
       );
     }
 
-    const terrainStep = this.world?.metresPerQuad ?? spec.gridStep;
+    const terrainStep = world.metresPerQuad ?? spec.gridStep;
     if (Math.abs(terrainStep - spec.gridStep) > COAST_GRID_EPSILON) {
       throw new Error(
         `Coast gridStep ${spec.gridStep} m must match terrain metresPerQuad ${terrainStep} m.`,
@@ -2846,6 +2851,23 @@ export class WorldScene {
       instanced.instanceMatrix.needsUpdate = true;
       instanced.computeBoundingSphere();
 
+      // Size-classed cull radius, consumed by `updateStreaming`. The fog wall justifies hiding
+      // ANY shard past ~195 m (fog is opaque at 210 m from the CAMERA, which trails the player
+      // by up to ~30 m); knee-high detail earns a nearer 170 m horizon on readability
+      // grounds — at that range the fog is 79% opaque and the piece itself is a pixel or two, so
+      // drawing it out to the wall buys nothing. 170 rather than a tighter figure because a 130 m
+      // sweep left a visible bare arc where the plains ground cover stopped (cull-march_road).
+      let maxScale = 0;
+      for (const entry of placements) {
+        const s = typeof entry.scale === "number"
+          ? entry.scale
+          : Math.max(entry.scale[0], entry.scale[1], entry.scale[2]);
+        if (s > maxScale) maxScale = s;
+      }
+      part.geometry.computeBoundingSphere();
+      const drawnRadius = (part.geometry.boundingSphere?.radius ?? 1) * maxScale;
+      instanced.userData.cullRadius = drawnRadius < 1.5 ? 170 : undefined;
+
       this.scatterGroup.add(instanced);
       created.push(instanced);
       if (options.regionId) this.registerScatter(options.regionId, instanced);
@@ -2905,6 +2927,8 @@ export class WorldScene {
     instanced.instanceMatrix.needsUpdate = true;
     if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
     instanced.computeBoundingSphere();
+    // Grass blades are the smallest thing scattered; see the cull-radius note in scatterInstanced.
+    instanced.userData.cullRadius = 170;
     this.scatterGroup.add(instanced);
     if (options.regionId) this.registerScatter(options.regionId, instanced);
     return [instanced];
@@ -2968,23 +2992,61 @@ export class WorldScene {
     this.materials.setTime(seconds);
   }
 
+  /** The centre and radius of the last streaming cull, applied to late-arriving shards. */
+  private lastScatterCull: { x: number; z: number; radius: number } | null = null;
+
   /** Registers legacy region scatter and organic biome recipe shards under their recipe id. */
   registerScatter(regionId: RegionId, object: THREE.Object3D): void {
     const list = this.scatterByRegion.get(regionId) ?? [];
     list.push(object);
     this.scatterByRegion.set(regionId, list);
+    // Background streaming keeps delivering tiles while the player stands still, and a shard that
+    // arrives after the last updateStreaming sweep would otherwise stay visible at any distance.
+    if (this.lastScatterCull && this.world?.biomes !== undefined) {
+      this.applyScatterCull(object, this.lastScatterCull.x, this.lastScatterCull.z, this.lastScatterCull.radius);
+    }
+  }
+
+  private applyScatterCull(object: THREE.Object3D, x: number, z: number, radius: number): void {
+    if (radius === Infinity) {
+      object.visible = true;
+      return;
+    }
+    const sphere = (object as THREE.InstancedMesh).boundingSphere
+      ?? (object as THREE.Mesh).geometry?.boundingSphere
+      ?? null;
+    if (!sphere) {
+      object.visible = true;
+      return;
+    }
+    const dx = sphere.center.x - x;
+    const dz = sphere.center.z - z;
+    const cull = Math.min(radius, (object.userData.cullRadius as number | undefined) ?? radius);
+    object.visible = Math.hypot(dx, dz) - sphere.radius < cull;
   }
 
   /**
    * Legacy region scatter switches off beyond its semantic rectangle. Organic biome recipe shards
-   * can occur anywhere on the island, so their 128 m bounding spheres and Three.js frustum culling
-   * own visibility instead.
+   * can occur anywhere on the island; their tile-sized bounding spheres give frustum culling
+   * something to reject, but frustum culling alone stopped being enough when Kilnhalt grew the
+   * island by 65%: a pose looking across the map submitted every in-frustum tile at any distance,
+   * and the Cinderwake arena view measured 633 draw calls against the 400 budget. The "far"
+   * preset's fog is fully opaque at 210 m, so hiding a shard whose nearest edge sits past the
+   * 240 m default is visually lossless and pays for the whole northern band.
    */
-  updateStreaming(x: number, z: number, radius = 240): void {
+  updateStreaming(x: number, z: number, radius = 195): void {
     const organicBiomes = this.world?.biomes !== undefined;
+    this.lastScatterCull = { x, z, radius };
     for (const [regionId, objects] of this.scatterByRegion) {
-      const rect = organicBiomes ? null : this.getRegionRect(regionId);
-      const visible = organicBiomes || rect === null || signedDepth(rect, x, z) > -radius;
+      if (organicBiomes) {
+        // An InstancedMesh composes its instances into its OWN boundingSphere; a plain mesh keeps
+        // the sphere on the geometry. Both sit unparented at the origin, so the sphere centre is
+        // already in world space. See applyScatterCull.
+        for (const object of objects) this.applyScatterCull(object, x, z, radius);
+        continue;
+      }
+      const rect = this.getRegionRect(regionId);
+      const visible = rect === null || signedDepth(rect, x, z) > -radius;
       for (const object of objects) object.visible = visible;
     }
   }
@@ -3262,6 +3324,8 @@ function characterFor(regionId: RegionId): RegionCharacter {
   switch (regionId) {
     case "vellenwood": return "woodland";
     case "karrowmoor": return "highlands";
+    // Ember foothills: highland relief without terraces; see app/worldSpec.ts characterOf.
+    case "kilnhalt": return "highlands";
     case "gravelmaw": return "cavern";
     default: return "plains";
   }

@@ -17,6 +17,7 @@ const REGION_IDS: Readonly<Record<RegionId, true>> = {
   fallowmarch: true,
   vellenwood: true,
   karrowmoor: true,
+  kilnhalt: true,
   gravelmaw: true,
 };
 

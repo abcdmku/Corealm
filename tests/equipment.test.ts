@@ -49,9 +49,9 @@ function kitTotals(kit: keyof typeof KITS): EquipmentBonuses {
 }
 
 describe("the gear ladder", () => {
-  it("has 66 equippable rows with unique ids", () => {
-    expect(EQUIPMENT).toHaveLength(66);
-    expect(BY_ID.size).toBe(66);
+  it("has 95 equippable rows with unique ids", () => {
+    expect(EQUIPMENT).toHaveLength(95);
+    expect(BY_ID.size).toBe(95);
     for (const def of EQUIPMENT) {
       expect(def.equip, `${def.id} has no equip block`).toBeDefined();
       expect(def.category).toBe("equipment");
@@ -74,6 +74,15 @@ describe("the gear ladder", () => {
       ["earth_staff", "staff", 2, 3000],
       ["water_wand", "wand", 1, 2200],
       ["water_staff", "staff", 2, 3000],
+      ["cinderpine_wand", "wand", 1, 2200],
+      ["cinderpine_staff", "staff", 2, 3000],
+      ["fire_wand", "wand", 1, 2200],
+      ["fire_staff", "staff", 2, 3000],
+      // The rare miniboss staves stay uncharged plain staffs on the standard cadence.
+      ["galeskin_staff", "staff", 2, 3000],
+      ["mossbound_staff", "staff", 2, 3000],
+      ["tideworn_staff", "staff", 2, 3000],
+      ["cinderwake_staff", "staff", 2, 3000],
     ] as const;
     expect(EQUIPMENT.filter((def) => def.magicWeapon)).toHaveLength(expected.length);
     for (const [id, kind, hands, cadence] of expected) {
@@ -89,6 +98,7 @@ describe("the gear ladder", () => {
       ["air_orb", "wind", true],
       ["earth_orb", "earth", true],
       ["water_orb", "water", true],
+      ["fire_orb", "fire", true],
     ] as const;
     expect(MAGIC_ORBS).toHaveLength(expected.length);
     for (const [id, element, released] of expected) {
@@ -99,7 +109,7 @@ describe("the gear ladder", () => {
     }
   });
 
-  it("dresses exactly one item per slot in each of the six kits", () => {
+  it("dresses exactly one item per slot in each of the eight kits", () => {
     for (const kit of Object.keys(KITS)) {
       const ids = KITS[kit] ?? [];
       const slots = ids.map((id) => BY_ID.get(id)?.equip?.slot);

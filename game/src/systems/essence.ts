@@ -10,7 +10,8 @@ import type { EventBus } from "../core/events.js";
 import type { GameState, Store } from "../state/store.js";
 import type { InteractionDispatcher } from "../world/interactions.js";
 
-export const RELEASED_MAGIC_ELEMENTS: readonly SpellElement[] = ["wind", "earth", "water"] as const;
+export const RELEASED_MAGIC_ELEMENTS: readonly SpellElement[] =
+  ["wind", "earth", "water", "fire"] as const;
 
 export const ELEMENT_LABELS: Readonly<Record<SpellElement, string>> = {
   wind: "Air",
@@ -23,12 +24,14 @@ export const ESSENCE_BY_ELEMENT: Readonly<Partial<Record<SpellElement, ItemId>>>
   wind: "air_essence",
   earth: "earth_essence",
   water: "water_essence",
+  fire: "fire_essence",
 };
 
 export const ORB_BY_ELEMENT: Readonly<Partial<Record<SpellElement, ItemId>>> = {
   wind: "air_orb",
   earth: "earth_orb",
   water: "water_orb",
+  fire: "fire_orb",
 };
 
 export interface MagicLoadout {

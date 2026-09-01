@@ -1971,10 +1971,16 @@ function buildEnemyGroup(
     );
   }
   const stats = enemyBlock;
-  const archetype: Archetype = group.boss ? "boss" : "enemy";
+  // A miniboss shares the boss archetype — same respawn window, same semantic reading, same
+  // label height — and differs only in draw scale and the published rank.
+  const bossRank = group.boss ? "boss" : group.miniBoss ? "miniboss" : null;
+  const archetype: Archetype = bossRank === null ? "enemy" : "boss";
   // A boss should not be the same size as the things guarding it. 1.6x on top of the authored
-  // scale is the difference between "another enemy" and "the thing in the room".
-  const viewScale = group.boss ? group.scale * 1.6 : group.scale;
+  // scale is the difference between "another enemy" and "the thing in the room"; a regional
+  // miniboss draws at 1.3x, above the crowd and clearly below the three Orb bosses.
+  const viewScale = bossRank === "boss" ? group.scale * 1.6
+    : bossRank === "miniboss" ? group.scale * 1.3
+    : group.scale;
   const scale = drawnScale(archetype, viewScale, group.tier);
   // Widest of the two ground axes, halved: a stag is longer than it is wide and it is the long
   // axis that decides whether two of them are standing in each other. Null when the asset is not in
@@ -2031,7 +2037,7 @@ function buildEnemyGroup(
         scale: viewScale,
         rotationY: round2(rng.float(0, Math.PI * 2)),
         materialTier: group.tier,
-        labelHeight: group.boss ? 3.4 : 2.2,
+        labelHeight: bossRank !== null ? 3.4 : 2.2,
       },
       meta: {
         family: group.family,
@@ -2039,6 +2045,9 @@ function buildEnemyGroup(
         behaviour: stats.behaviour,
         spawnX: round2(position[0]),
         spawnZ: round2(position[2]),
+        // "boss" for the three Orb bosses, "miniboss" for the four regional minibosses, absent
+        // for ordinary enemies. Tools and tests read this instead of re-deriving it from scale.
+        ...(bossRank === null ? {} : { rank: bossRank }),
       },
     });
   }

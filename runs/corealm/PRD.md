@@ -104,6 +104,104 @@ The formulas are `lifetimeSeconds = 60 + 12 * tier` and `buildXpPerSkill = round
 
 ---
 
+## Approved amendment: Phase 2 — Kilnhalt tier-20 expansion
+
+The project owner approved this amendment on September 1, 2026 by directing implementation of the complete Kilnhalt tier-20 expansion plan. That directive satisfies the approval gate in `AGENTS.md`. It opens Phase 2 content: the fourth surface region, the tier-20 production row, the Fire element release, and four regional minibosses. Everything here is meant to be implemented literally.
+
+### World extension
+
+- The playable world extends north from `z = 200` to `z = 460`. Kilnhalt occupies the full existing width, `x = -350..350`: a 700 m × 260 m region on a 700 m × 660 m overall map. Fallowmarch, Vellenwood, Karrowmoor, and the Gravelmaw keep their current rectangles; Kilnhalt sits above both Fallowmarch and Vellenwood.
+- The entire southern border at `z = 200` stays open. No gates, walls, portals, cliffs, or level checks block it; a player can walk into Kilnhalt at any x. Road guidance and multiple semantic route connections (adjacency and route nodes) cross the old northern edge, but physical traversal is open everywhere along the seam.
+- Terrain blends continuously across the complete `z = 200` seam: no height cliffs, material snaps, or navmesh breaks. Kilnhalt is ember foothills: warm dark soil, dark rock, sparse burned woodland, its own climate field in the organic biome system, its own 8-swatch ground palette and architecture palette, regional scatter, ambience, and coastline. The coast collar, ocean plane, world map bounds, generated map renditions, and navmesh are regenerated for the new extents.
+- `"kilnhalt"` joins `RegionId`. Every exhaustive region map is filled: persistence region validation, terrain character, region and architecture palettes, scatter, audio (footstep surface, ambience), map rendering, UI region labels, and asset preloading. Kilnhalt has region ambience; it ships no music until the owner-supplied library names a matching ember-foothills theme, exactly as Gravelmaw does.
+- Full-world terrain, biome, coast, scatter, and map work is the documented lab-first exception. Reusable actors, structures, and equipment still take the lab-first path.
+
+### Layout
+
+| Feature | Position note | Contents |
+| --- | --- | --- |
+| Emberfast | Region centre, near `[0, 330]` | Settlement: bank, general store, smith shop, furnace, anvil, range, crafting table, fletching bench, respawn point |
+| Clinker Quarry | West, near `[-250, 330]` | 6 Emberite ore nodes (tier 20), 2 Kilnstone nodes |
+| Cinderpine Stand | East, near `[240, 340]` | 8 Cinderpine trees (tier 20) |
+| Ashfin Springs | South-east, near `[210, 250]` | 4 fishing spots, Ashfin (tier 20) |
+| Coalroot Terrace | Beside Emberfast | 4 farm plots, Coalroot seeds |
+| Kilnhalt Altar Ruins | North-east, near `[290, 400]` | The Fire altar on its ruined court, 5 Fire Essence nodes ringing it |
+| Cinderwake Arena | North-east, near `[286, 420]` | Cinderwake, the tier-20 miniboss |
+| The Kilnroads | Open ground | Tier-20 enemy groups |
+
+Roads link Emberfast to every named site and to route nodes on the Fallowmarch and Vellenwood sides of the old northern edge.
+
+### Tier-20 gathering and production row
+
+One `defineTier` row extends the canonical table; adding it must not require a gathering or production system change. Formulas are the existing ones: gather XP 52, node yields 7–14, respawn 65 s, tool bonus +17, level-20 requirements throughout.
+
+| Role | Name | Id |
+| --- | --- | --- |
+| Ore / bar | Emberite | `emberite_ore`, `emberite_bar` |
+| Flux | Kilnstone | `kilnstone` |
+| Gem | Fire Opal | `fire_opal` |
+| Wood | Cinderpine | `cinderpine_log`, `cinderpine_shaft`, `cinderpine_handle` |
+| Hide | Charhide | `charhide` |
+| Fish | Ashfin | `ashfin`, `seared_ashfin`, `burnt_ashfin` |
+| Meat | Ember Haunch | `raw_ember_haunch`, `roast_ember_haunch`, `burnt_ember_haunch` |
+| Crop | Coalroot | `coalroot`, `coalroot_seed`, plot `plot_coalroot` |
+
+- Smelting: one Emberite bar consumes 3 ore plus 2 Kilnstone, continuing the 1+1 / 2+1 / 2+2 escalation. Kilnstone is the tier-20 flux; March Stone remains the flux for tiers 1–10.
+- Emberite produces the full metal set: dagger, sword, helm, plate, greaves, boots, gauntlets, pickaxe, hatchet, ring, pendant (`emberite_*`), using Cinderpine handles. Cinderpine produces staff, wand, rod, and shield; Charhide produces the magic set `charhide_hood/robe/leggings/boots/wraps`; magic jewellery is `cinder_ring` and `cinder_charm`. Stats follow the existing per-tier balance derivation in `content/equipment.ts` so that a full tier-20 melee kit lands near the PRD 2.4 checkpoint of +45 gearPower at level 20.
+- Recipes generate from the existing craft-weight table (bar 42 XP, sword 182 XP, body 260 XP, cooked Ashfin 78 XP, and so on). Seared Ashfin heals 19. Coalroot: 5 stages at 240 s, yield 2–5, harvest 52 XP, plant 10 XP.
+- Cinderpine campfires burn 300 s and award 10 Fletching and 10 Crafting XP, from the existing formulas.
+- Shops `emberfast_general` and `emberfast_smith` mirror the Highcairn pair at tier 20, including Fire Essence stocked locally like the other elements. Skill guides, icons, and equipment visuals extend automatically from the canonical row plus one icon appearance per new item and tier-20 entries in the tier-keyed icon tables.
+
+### Fire release
+
+- `fire` joins the released elements. `fire_essence`, `fire_orb`, `fire_wand`, and `fire_staff` become obtainable; the essence, Orb, altar, and charged-weapon tables gain their fire rows. `SpellElement`, the spell ids, and the frozen Magic 1–70 ladder do not change — Emberlash simply becomes castable once fire fuel exists.
+- The Kilnhalt Altar Ruins follow the regional essence altar rites amendment exactly: an Altar Ruins Free court, dormant until the Fire Orb awakens it, ember-orange element wash when awakened, five matching Fire Essence nodes ringing the court. The awakened altar crafts `fire_wand` and `fire_staff` from Cinderpine base weapons and recharges fire weapons at the standard 100 Essence for 1,000 charges. The rare miniboss staves stay uncharged and never bypass this progression.
+- The Fire Orb is a singleton: Cinderwake drops it at 100% until that Orb is owned or consumed, after which the existing duplicate-Orb suppression applies. Saves that already hold or consumed a Fire Orb awaken the Kilnhalt altar during migration, matching the other three elements.
+- All obsolete "tier 15" fire copy — spellbook subtitles, contract comments, agent tool prose, spell-table headers — is corrected to tier 20. Save schema stays at version 6; the existing flexible maps carry the new region and items, validation extends to cover them, and old saves must load unchanged.
+
+### Enemies
+
+Tier-20 encounters use existing production creature paths (rig families already shipped) with new `*_t20` stat blocks: Ashback Bear, Cinder Boar, Emberhorn Ibex, Cinder Adder, and Kilnroad Reaver. Ordinary encounters balance to a 25–40 second kill for an on-tier player in tier-20 gear, and physical-versus-magic resistance differences stay meaningful: at least one family favours melee and one favours magic, in the spirit of PRD 2.4. Drops feed the tier-20 economy: Charhide and Ember Haunch from beasts, marks from all, purse marks from the Reaver.
+
+### Minibosses
+
+- An internal `miniBoss` placement flag joins enemy group authoring. A miniboss keeps the existing `"boss"` semantic archetype and the existing three-minute boss respawn, exposes `meta.rank: "miniboss"`, and renders at 1.3× authored scale. The three existing Orb bosses gain `meta.rank: "boss"` and are otherwise untouched; no existing boss is replaced.
+- Four minibosses share the PixeliusVita Monster02 rig, built as four GLBs from one FBX using package texture variants, with canonical `Idle`, `Walk`, `Run`, `Attack`, `Hit`, and `Death` clips selected by named take:
+
+| Miniboss | Tier | Region | Placement | Texture variant |
+| --- | --- | --- | --- | --- |
+| Galeskin | 1 | Fallowmarch | near `[-300, 145]` | 06 |
+| Mossbound | 5 | Vellenwood | near `[318, 72]` | 02 |
+| Tideworn | 10 | Karrowmoor | near `[18, -164]` | 05 |
+| Cinderwake | 20 | Kilnhalt | near `[286, 420]` | 04 |
+
+- Each miniboss independently rolls its named sword and its named staff at 10% each per kill (`galeskin_sword`/`galeskin_staff`, `mossbound_*`, `tideworn_*`, `cinderwake_*`). Requirements match the host region's tier. A rare sword copies the local craftable sword and applies `ceil(base × 1.10)` to accuracy and power; a rare staff applies the same rule to the local uncharged staff's offensive magic stats. Cinderwake additionally carries the Fire Orb drop above.
+- All four actors and all eight rare weapons are proven in the production-backed feature lab — animation transitions, ground contact, grip sockets, clipping, scale, tint readability, icons, both body types — before world placement.
+
+### Unity assets
+
+Three locally cached Unity Asset Store packages are registered under their store provenance. No `.unitypackage` files or staging directories are committed; package and output SHA-256 values, authors, EULA position, source asset paths, dimensions, materials, textures, animations, and tags go into `UNITY_ASSET_SOURCES.md` and the asset manifest, following the existing ledger format.
+
+| Package | Used asset |
+| --- | --- |
+| FREE - Low Poly Swords - RPG Weapons | `Sword15` — the one shared rare-sword geometry |
+| FREE - Stylized Weapons | `Staff2_2_6` — the one shared rare-staff geometry |
+| Fantasy Monster 3D Model 02 - Game Ready (PixeliusVita) | `Monster02_AllAnim.fbx` + texture variants 06/02/05/04 |
+
+Per-item material tints apply through the production equipment and icon paths, not per-item geometry: Fallowmarch pale cyan, Vellenwood moss green and ochre, Karrowmoor cobalt and teal, Kilnhalt ember orange and crimson. The FBX conversion input gains an optional named-take selector so an all-animation FBX can emit canonical clips (`Attack01` → `Attack`, `GetHit` → `Hit`, `Die` → `Death`) instead of always taking `animations[0]`; requesting a missing take is a hard conversion failure.
+
+### Out of scope
+
+No dungeon, quest chain, new spell ids, ranged combat, or elemental melee-damage system. The Fire Orb-and-altar sequence is Kilnhalt's progression mini quest. The cached packages are authorized for this project under their recorded Unity Asset Store licenses. Routine screenshots, conversion staging, and browser reports stay ignored unless deliberately promoted as durable evidence.
+
+### Acceptance
+
+- Unit and integrity: region exhaustiveness, world bounds, deterministic content, item references, recipes, shops, resource presentations, equipment coverage, icons, manifest provenance, named-take extraction, required clips, root-motion removal, loop seams, stride measurements, independent seeded 10% loot rolls (neither / sword / staff / both), Fire Orb singleton custody, altar awakening, essence consumption, fire casting, charged-weapon production and recharge, tier-20 skill loops, combat target bands, save/reload in Kilnhalt, and backward save compatibility.
+- Browser: cross the north seam at `x = -300, -150, 0, 150, 300` with continuous movement, navmesh paths, terrain height, and semantic region changes and no teleporting; gather and process every tier-20 resource; craft and equip both armour styles; kill Cinderwake, awaken the Fire altar, collect Fire Essence, cast a fire spell — comparing semantic state before and after each action; kill each regional miniboss and validate combat, animation, respawn, loot piles, equipment visuals, and persistence.
+- Visual and performance: feature-lab screenshots of every Monster02 variant and weapon tint; final-world screenshots of the full northern band, the open border, Emberfast, the production sites, the Fire altar, normal combat, and the Cinderwake fight; regenerated world preview and map; typecheck, unit tests, build, docs, lab gate, creature gate, smoke, world checks, and the combined gate all green; 60 FPS target, 55 FPS floor, under 400 draw calls at 1920×1080 in Kilnhalt's densest view and the existing Vellenwood and Highcairn regression views.
+
+---
+
 ## 0. Scope decisions
 
 ### In scope

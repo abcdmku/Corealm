@@ -26,7 +26,7 @@ export const SKILL_IDS: readonly SkillId[] = [
   "agility",
 ] as const;
 
-export type RegionId = "fallowmarch" | "vellenwood" | "karrowmoor" | "gravelmaw";
+export type RegionId = "fallowmarch" | "vellenwood" | "karrowmoor" | "kilnhalt" | "gravelmaw";
 
 // ------------------------------------------------------------------- audio
 
@@ -106,7 +106,7 @@ export type QuestId = string;
  * resistance stat: `EquipmentBonuses` carries one `magicArmour`, every enemy row carries one
  * `magicArmour`, and inventing a second axis would mean re-solving the whole PRD 2.4 magic balance
  * against four columns instead of one. What separates them is when their Essence and spells unlock.
- * Air, Earth, and Water are released in the current world; Fire remains authored future progression.
+ * All four are released: Air, Earth, and Water with the Phase 1 regions, Fire with Kilnhalt (tier 20).
  *
  * `wind` covers gale and charge, which is why Voltrend — a garnet cracked for the charge in it —
  * is a wind spell rather than a fifth element. The tier-10 magic kit already calls its accessories
@@ -133,7 +133,7 @@ export const SPELL_RUNGS: readonly SpellRung[] = ["lash", "bolt", "burst", "surg
  * Every attack spell, in unlock order, Magic 1 to Magic 70.
  *
  * Four rungs of four. The first rung follows the region ladder: Air at 1, Earth at 5, Water at 10,
- * and the future Fire spell at 15.
+ * and Fire at 15 — castable since fire fuel released with the tier-20 Kilnhalt region.
  *
  * Widened from a three-way union together with its callers, per AGENTS.md rule 5: `content/spells.ts`,
  * `systems/combat.ts`, `agent/tools.ts` and `ui/spellbookPanel.ts`. Kept as a literal union rather
@@ -239,7 +239,7 @@ export interface ElementalWeaponChargeSpec {
   rechargeCost: number;
   /** The singleton boss drop consumed to awaken this element's altar. */
   orbItemId: ItemId;
-  /** False for authored future content such as Fire weapons. */
+  /** False for authored future content whose region has not shipped. */
   released: boolean;
 }
 
@@ -253,7 +253,7 @@ export interface MagicWeaponSpec {
 
 export interface EssenceOrbSpec {
   element: SpellElement;
-  /** False for authored future content such as the tier-15 Fire Orb. */
+  /** False for authored future content whose region has not shipped. */
   released: boolean;
 }
 
@@ -741,7 +741,7 @@ export interface SpellbookView {
   equippedWeapon: EquippedMagicWeaponView | null;
   /** Matching essence carried in the 28-slot inventory, including zeroes. */
   essence: Record<SpellElement, number>;
-  /** Fire is intentionally absent until its tier-15 region ships. */
+  /** Every released element. Fire joined the list with the tier-20 Kilnhalt region. */
   releasedElements: SpellElement[];
 }
 

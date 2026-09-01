@@ -108,6 +108,7 @@ const WOOD: Readonly<Record<number, number>> = {
   1: 0xb99a6b,
   5: 0x51372a,
   10: 0x765238,
+  20: 0x4a3a30,
 };
 
 /** Exact solid colours used by the worn Blink meshes in equipmentVisuals.ts. */
@@ -116,6 +117,7 @@ const MAGIC_WOOD: Readonly<Record<number, number>> = {
   1: 0xd7bd8e,
   5: 0x53341f,
   10: 0x596162,
+  20: 0x40322b,
 };
 
 function wood(id: ItemId): number {
@@ -132,44 +134,51 @@ put("grithe_ore", [asset("ore_crystal_pink", tierMetal("grithe_ore"))]);
 put("march_stone", [asset("rock_small_2", 0xb8aa91)]);
 put("corven_ore", [asset("ore_crystal_green", tierMetal("corven_ore"))]);
 put("kaldite_ore", [asset("ore_crystal_blue", tierMetal("kaldite_ore"))]);
+put("emberite_ore", [asset("ore_crystal_pink", tierMetal("emberite_ore"))]);
+put("kilnstone", [asset("rock_small_1", 0x4a443c)]);
 
-for (const id of ["palewood_log", "duskoak_log", "cairnpine_log"] as const) {
+for (const id of ["palewood_log", "duskoak_log", "cairnpine_log", "cinderpine_log"] as const) {
   put(id, [primitive("log", wood(id), tierBody(id))], { rotation: [0, 0, -0.2] });
 }
 
 put("silt_minnow", [primitive("fish", 0x7f98a3, 0xc4d4d7)]);
 put("bramble_trout", [primitive("fish", 0x4f5962, 0x9d6d54)]);
 put("cragfin", [primitive("fish", 0x53697b, 0xb9c4c5)]);
+put("ashfin", [primitive("fish", 0x574a44, 0xd88a56)]);
 put("bittergrain", [asset("grass_wispy_tall", 0xc6a75a)]);
 put("duskberry", [asset("bush_common", 0x644477)]);
 put("cairnleaf", [asset("plant_broad_large", 0x8e978d)]);
+put("coalroot", [primitive("gland", 0x352c26, 0x6b4a34)]);
 
 // Processed resources and components.
-for (const id of ["grithe_bar", "corven_bar", "kaldite_bar"] as const) {
+for (const id of ["grithe_bar", "corven_bar", "kaldite_bar", "emberite_bar"] as const) {
   put(id, [primitive("ingot", tierMetal(id), tierBody(id))]);
 }
 
 put("pale_quartz", [asset("ore_crystal_blue", 0xe3ded2)]);
 put("vell_amber", [asset("ore_crystal_green", 0xc47b2b)]);
 put("cairn_garnet", [asset("ore_crystal_pink", 0x8e2337)]);
-for (const id of ["palewood_shaft", "duskoak_shaft", "cairnpine_shaft"] as const) {
+put("fire_opal", [asset("ore_crystal_pink", 0xe57a2e)]);
+for (const id of ["palewood_shaft", "duskoak_shaft", "cairnpine_shaft", "cinderpine_shaft"] as const) {
   put(id, [primitive("shaft", wood(id), tierMetal(id))], { rotation: [0, 0, -0.25] });
 }
-for (const id of ["palewood_handle", "duskoak_handle", "cairnpine_handle"] as const) {
+for (const id of ["palewood_handle", "duskoak_handle", "cairnpine_handle", "cinderpine_handle"] as const) {
   put(id, [primitive("handle", wood(id), tierBody(id))], { rotation: [0, 0, -0.3], frameScale: 1.08 });
 }
 put("coarse_hide", [primitive("hide", 0x9a7654, 0x5b4432)]);
 put("bramble_hide", [primitive("hide", 0x65503d, 0x362d26)]);
 put("cairn_pelt", [primitive("hide", 0x8b7f70, 0x4c443c)]);
+put("charhide", [primitive("hide", 0x574840, 0x2e2622)]);
 
 /** Element colour stays consistent between the loose essence and the boss-won orb. */
 const ELEMENT_COLOURS = {
   air: { body: 0x78cce8, glow: 0xd8f7ff },
   earth: { body: 0x668c43, glow: 0xb9d66b },
   water: { body: 0x327fc2, glow: 0xa9e6ff },
+  fire: { body: 0xe06428, glow: 0xffcf9e },
 } as const;
 
-for (const element of ["air", "earth", "water"] as const) {
+for (const element of ["air", "earth", "water", "fire"] as const) {
   const colours = ELEMENT_COLOURS[element];
   put(`${element}_essence`, [primitive("essence", colours.body, colours.glow)], { frameScale: 1.2 });
 }
@@ -196,6 +205,10 @@ put("aurochs_horn", [primitive("horn", 0xc8b995, 0x6f6349)]);
 put("rat_tail", [primitive("horn", 0x9b7f74, 0x5c4a42)]);
 put("scorpion_stinger", [primitive("claw", 0xc9a24a, 0x6f5620)]);
 put("crab_claw", [primitive("claw", 0xc4552f, 0x71291a)]);
+put("ashback_claw", [primitive("claw", 0x8a8378, 0x4d463d)]);
+put("cinder_tusk", [primitive("horn", 0x5a4c40, 0x2e2520)]);
+put("emberhorn", [primitive("horn", 0x8a5a44, 0x53301f)]);
+put("kiln_fang", [primitive("claw", 0xb5764a, 0x6e3a1e)]);
 
 // Game meat. Raw, cooked and burnt share one model; colour carries preparation state, exactly the
 // convention the fish line below already uses.
@@ -208,26 +221,32 @@ put("burnt_venison", [primitive("meat", 0x2f2926, 0x615a53)]);
 put("raw_haunch", [primitive("meat", 0xa1544d, 0xe8ddc6)]);
 put("roast_haunch", [primitive("meat", 0x7d4527, 0xdcd0b7)]);
 put("burnt_haunch", [primitive("meat", 0x2a2422, 0x585149)]);
+put("raw_ember_haunch", [primitive("meat", 0xa8524a, 0xf0e2c8)]);
+put("roast_ember_haunch", [primitive("meat", 0x84431f, 0xe2d3b6)]);
+put("burnt_ember_haunch", [primitive("meat", 0x241f1d, 0x4f4841)]);
 
 // Seeds and food. Raw and cooked fish share a model, while colour carries preparation state.
 put("bittergrain_seed", [primitive("seed", 0xc9a65a, 0x765829)]);
 put("duskberry_seed", [primitive("seed", 0x6a477e, 0x9d7ab0)]);
 put("cairnleaf_seed", [primitive("seed", 0x9aa397, 0x56645e)]);
+put("coalroot_seed", [primitive("seed", 0x453a30, 0x8a6a3e)]);
 put("seared_minnow", [primitive("fish", 0xc58a54, 0xf0c781)]);
 put("burnt_minnow", [primitive("fish", 0x3b3029, 0x72533d)]);
 put("seared_trout", [primitive("fish", 0xa76a48, 0xdfad70)]);
 put("burnt_trout", [primitive("fish", 0x312925, 0x654837)]);
 put("seared_cragfin", [primitive("fish", 0x9e704f, 0xe3b877)]);
 put("burnt_cragfin", [primitive("fish", 0x282322, 0x59443a)]);
+put("seared_ashfin", [primitive("fish", 0xa06342, 0xe8ab6a)]);
+put("burnt_ashfin", [primitive("fish", 0x231f1e, 0x4f3c32)]);
 
 // Tools use the authored meshes where the library has them. Fishing rods are purpose-built.
-for (const id of ["worn_pickaxe", "grithe_pickaxe", "corven_pickaxe", "kaldite_pickaxe"] as const) {
+for (const id of ["worn_pickaxe", "grithe_pickaxe", "corven_pickaxe", "kaldite_pickaxe", "emberite_pickaxe"] as const) {
   put(id, [asset("pickaxe", id === "worn_pickaxe" ? 0x6d6256 : tierMetal(id))], { rotation: [0, 0, -0.28] });
 }
-for (const id of ["worn_hatchet", "grithe_hatchet", "corven_hatchet", "kaldite_hatchet"] as const) {
+for (const id of ["worn_hatchet", "grithe_hatchet", "corven_hatchet", "kaldite_hatchet", "emberite_hatchet"] as const) {
   put(id, [asset("axe", id === "worn_hatchet" ? 0x6d6256 : tierMetal(id))], { rotation: [0, 0, -0.28] });
 }
-for (const id of ["worn_rod", "palewood_rod", "duskoak_rod", "cairnpine_rod"] as const) {
+for (const id of ["worn_rod", "palewood_rod", "duskoak_rod", "cairnpine_rod", "cinderpine_rod"] as const) {
   put(id, [primitive("rod", wood(id), id === "worn_rod" ? 0x77716a : tierMetal(id))], { rotation: [0, 0, -0.18] });
 }
 
@@ -245,9 +264,19 @@ for (const item of ALL_ITEMS.filter((entry) => entry.orb !== undefined)) {
 // Equipment normally reuses the same appearance the character rig wears. Magic weapons are
 // explicit here because their silhouettes come from Blink's FREE - RPG Weapons pack. The wood
 // tint carries the log tier while the absent accent keeps an unequipped weapon visibly unlit.
+/**
+ * The rare miniboss staves carry `magicWeapon` but must NOT take the shared Blink rpg silhouette:
+ * their look is the imported miniboss staff mesh with the regional tint, which
+ * `gearAppearanceParts` already resolves. Listing them here routes them down that branch.
+ */
+const RARE_MINIBOSS_WEAPONS = new Set<ItemId>([
+  "galeskin_sword", "galeskin_staff", "mossbound_sword", "mossbound_staff",
+  "tideworn_sword", "tideworn_staff", "cinderwake_sword", "cinderwake_staff",
+]);
+
 for (const item of ALL_ITEMS.filter((entry) => entry.category === "equipment")) {
   const id = item.id;
-  if (item.magicWeapon) {
+  if (item.magicWeapon && !RARE_MINIBOSS_WEAPONS.has(id)) {
     const assetId = item.magicWeapon.kind === "staff" ? "rpg_weapon_staff" : "rpg_weapon_wand";
     put(id, [asset(assetId, magicWood(id))], { rotation: [0, 0, -0.2] });
     continue;

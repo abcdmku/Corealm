@@ -182,6 +182,45 @@ export const SHOTS: readonly CameraShot[] = [
     yaw: 3.1, pitch: 0.36, distance: 15,
     intent: "The Canopy Walk trailhead, with its raised balcony and clear approach.",
   },
+
+  // ---------------------------------------------------------------- Kilnhalt (Phase 2)
+  {
+    id: "kilnhalt_seam", locationId: "kilnroad_fork", regionId: "kilnhalt",
+    // Camera south of the fork looking north: the old border band behind the player, the open
+    // walk into the ember foothills ahead, and Emberfast's rampart up the road.
+    yaw: SOUTH, pitch: 0.42, distance: 26,
+    intent: "The open northern band: continuous ground across the old z=200 edge, no gate, warm footland ahead.",
+  },
+  {
+    id: "emberfast", locationId: "emberfast_town", regionId: "kilnhalt",
+    yaw: SOUTH, pitch: 0.72, distance: 28,
+    intent: "The tier 20 kiln camp: walls, forge, market and works rows, and the ore cart in one yard. Kilnhalt's densest view.",
+  },
+  {
+    id: "clinker_quarry", locationId: "clinker_quarry", regionId: "kilnhalt",
+    yaw: EAST, pitch: 0.58, distance: 20,
+    intent: "Tier 20 Emberite seams and Kilnstone faces. Must read hotter and higher-tier than Kaldite.",
+  },
+  {
+    id: "cinderpine_stand", locationId: "cinderpine_stand", regionId: "kilnhalt",
+    yaw: WEST, pitch: 0.5, distance: 20,
+    intent: "Sparse burned woodland: scorched but choppable Cinderpine against open warm ground.",
+  },
+  {
+    id: "ashfin_springs", locationId: "ashfin_springs", regionId: "kilnhalt",
+    yaw: NORTH, pitch: 0.5, distance: 18,
+    intent: "Warm spring pools with fishing spots on real water.",
+  },
+  {
+    id: "kilnhalt_fire_altar", locationId: "kilnhalt_fire_cache", regionId: "kilnhalt",
+    yaw: EAST, pitch: 0.46, distance: 22,
+    intent: "The Fire altar ruins: a levelled stone court ringed by Fire Essence, dormant until Cinderwake's Orb.",
+  },
+  {
+    id: "cinderwake_arena", locationId: "cinderwake_arena", regionId: "kilnhalt",
+    yaw: NORTH + 0.4, pitch: 0.42, distance: 24,
+    intent: "Cinderwake on its swept arena floor, visibly a miniboss: above the roster, below the Orb bosses.",
+  },
 ];
 
 export function shotIds(): string[] {

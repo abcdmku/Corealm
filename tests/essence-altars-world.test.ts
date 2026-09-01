@@ -37,10 +37,11 @@ describe("regional Essence Altar mini-quests", () => {
       ["fallowmarch", REGIONAL_ESSENCE_ALTARS.fallowmarch, "wind", "air_essence"],
       ["vellenwood", REGIONAL_ESSENCE_ALTARS.vellenwood, "earth", "earth_essence"],
       ["karrowmoor", REGIONAL_ESSENCE_ALTARS.karrowmoor, "water", "water_essence"],
+      ["kilnhalt", REGIONAL_ESSENCE_ALTARS.kilnhalt, "fire", "fire_essence"],
     ] as const;
 
     const essenceStations = world.entities.filter((entity) => entity.meta?.essenceAltar === true);
-    expect(essenceStations).toHaveLength(3);
+    expect(essenceStations).toHaveLength(4);
 
     for (const [regionId, definition, element, essenceItemId] of expectations) {
       const region = REGIONS.find((candidate) => candidate.id === regionId)!;

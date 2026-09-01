@@ -111,7 +111,8 @@ describe("starter casting", () => {
     setSkillLevel(fixture.store.get(), "magic", 99);
     expect(fixture.inventory.removeItem("air_essence", 50).ok).toBe(true);
     expect(spellBlockReason(fixture.store.get(), spell("voltrend"))).toMatch(/Carry 1 Air Essence/i);
-    expect(spellBlockReason(fixture.store.get(), spell("emberlash"))).toMatch(/not released yet/i);
+    // Fire released with Kilnhalt: an empty-handed Emberlash now asks for fuel, not for a region.
+    expect(spellBlockReason(fixture.store.get(), spell("emberlash"))).toMatch(/Carry 1 Fire Essence/i);
   });
 });
 

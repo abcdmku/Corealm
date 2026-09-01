@@ -412,6 +412,8 @@ function defaultSurface(regionId: RegionId): FootstepSurface {
   switch (regionId) {
     case "vellenwood": return "forest";
     case "karrowmoor": return "stone";
+    // Warm ash and soil underfoot, not turf: the ember foothills default to the dirt family.
+    case "kilnhalt": return "dirt";
     case "gravelmaw": return "cave";
     default: return "grass";
   }

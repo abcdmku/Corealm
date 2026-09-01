@@ -52,7 +52,7 @@ function trackTargets(clip) {
 }
 
 /** Clips that play on LoopRepeat, and therefore have to join back to their own first frame. */
-const LOOPING_CLIPS = new Set(["Idle", "Walk"]);
+const LOOPING_CLIPS = new Set(["Idle", "Walk", "Run"]);
 
 /** Angle between two quaternions, in degrees, sign-insensitive. */
 function quatAngle(v, i, j) {
@@ -233,17 +233,21 @@ function synthesiseAttack(rootBone, idleClip, sizeZ, options) {
   return new THREE.AnimationClip("Attack", seconds, tracks);
 }
 
-async function loadTexture(url) {
-  let cached = textureCache.get(url);
+async function loadTexture(url, { linear = false } = {}) {
+  // Linear and sRGB reads of one file are different textures to the exporter, so they cache apart.
+  const key = linear ? `linear:${url}` : url;
+  let cached = textureCache.get(key);
   if (!cached) {
     cached = texLoader.loadAsync(url).then((texture) => {
-      texture.colorSpace = THREE.SRGBColorSpace;
+      // Normal maps are vector data, not colour: run them through the sRGB transfer curve and
+      // every surface acquires a subtle skew toward its own tangent.
+      texture.colorSpace = linear ? THREE.NoColorSpace : THREE.SRGBColorSpace;
       texture.flipY = false;
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
       return texture;
     });
-    textureCache.set(url, cached);
+    textureCache.set(key, cached);
   }
   return cached;
 }
@@ -284,9 +288,17 @@ window.probeFbx = async (url) => {
  * spec: {
  *   rig: url, texture: url, textureOverrides?: { [meshNameSubstring]: url },
  *   emissive?: url, emissiveIntensity?: number,   // bosses only; animals ship base colour alone
- *   clips: [{ url, name }],
+ *   materialName?: string,   // minibosses only; see the tier-tint contract note below
+ *   clips: [{ url, name, frames?, take? }],
  *   dropRigClips?: boolean   // the rig's own stub "Take 001" is 0.03 s of nothing
  * }
+ *
+ * `take` names the FBX AnimStack the clip comes from, for packs that ship EVERY motion as its own
+ * named take inside one file (the miniboss rig carries eleven). Without it the entry keeps the
+ * historical `animations[0]` behaviour, which is correct for the animal and boss packs where each
+ * file holds exactly one take. A named take that is not in the file is a hard per-clip failure in
+ * the report - never a silent fall-back to `animations[0]`, because the wrong take plays SOME
+ * animation and the mistake only surfaces as "the monster idles through its own death".
  */
 window.convertAnimal = async (spec) => {
   const root = await fbxLoader.loadAsync(spec.rig);
@@ -328,7 +340,10 @@ window.convertAnimal = async (spec) => {
       alphaTest: spec.alphaTest ?? 0,
       side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
     });
-    material.name = `${spec.id}_mat`;
+    // `render/entityViews.ts` exempts materials matching /^(animal|boss)_/i from the tier tint,
+    // so an id that starts with neither (miniboss_*) must override the name to keep its authored
+    // texture. The override is the caller's contract with that regex, not a cosmetic choice.
+    material.name = spec.materialName ?? `${spec.id}_mat`;
     if (Array.isArray(node.material)) node.material = node.material.map(() => material);
     else node.material = material;
     node.frustumCulled = false;
@@ -362,8 +377,19 @@ window.convertAnimal = async (spec) => {
 
   for (const entry of spec.clips) {
     const source = await fbxLoader.loadAsync(entry.url);
-    let clip = source.animations[0];
-    if (!clip) { clipReport.push({ name: entry.name, ok: false, reason: "no clip in file" }); continue; }
+    // A named take selects its AnimStack exactly; anything else keeps the historical "first take"
+    // read. Missing takes are reported and NOT substituted - see the spec comment above.
+    let clip = entry.take
+      ? source.animations.find((candidate) => candidate.name === entry.take)
+      : source.animations[0];
+    if (!clip) {
+      const available = source.animations.map((candidate) => candidate.name).join(", ") || "(none)";
+      clipReport.push({
+        name: entry.name, ok: false,
+        reason: entry.take ? `take "${entry.take}" not in file; has: ${available}` : "no clip in file",
+      });
+      continue;
+    }
 
     // Cut the clip down to the frame range Unity recorded for it.
     //
@@ -558,10 +584,18 @@ window.convertAnimal = async (spec) => {
  * the speed the simulation actually moves the enemy, it gives the playback rate that puts the feet
  * back on the ground.
  */
-window.probeStride = async (rigUrl, clipUrl, frames, name) => {
+window.probeStride = async (rigUrl, clipUrl, frames, name, take) => {
   const rig = await fbxLoader.loadAsync(rigUrl);
   const source = await fbxLoader.loadAsync(clipUrl);
-  let clip = source.animations[0];
+  // Same take rule as convertAnimal: a named take resolves exactly or the probe fails out loud.
+  let clip = take
+    ? source.animations.find((candidate) => candidate.name === take)
+    : source.animations[0];
+  if (!clip) {
+    throw new Error(
+      `take "${take}" not in ${clipUrl}; has: ${source.animations.map((c) => c.name).join(", ") || "(none)"}`,
+    );
+  }
   if (frames && frames[1] > frames[0]) {
     const total = Math.round(clip.duration * SOURCE_FPS);
     if (!(frames[0] <= 1 && frames[1] >= total)) {
@@ -600,5 +634,97 @@ window.probeStride = async (rigUrl, clipUrl, frames, name) => {
     strideM,
     duration: clip.duration,
     impliedMps: clip.duration > 0 ? strideM / clip.duration : 0,
+  };
+};
+
+/**
+ * Build one STATIC prop GLB - no skeleton, no clips. Used for the miniboss weapon drops.
+ *
+ * The same loader/exporter stack as convertAnimal rather than a second pipeline, because the two
+ * failure classes it already solved - textures that need explicit colour spaces, and sources whose
+ * units are centimetres - are exactly the ones a new stack would rediscover.
+ *
+ * spec: {
+ *   id, mesh: url, materialName,
+ *   baseColor: url, normal?: url,
+ *   emissive?: url, emissiveColor?: [r,g,b], emissiveIntensity?: number,
+ *   roughness?: number, metalness?: number,
+ *   extraScale?: number,   // on top of CM_TO_M, measured per source like RHINO_EXTRA_SCALE
+ *   recenterXZ?: boolean,  // for meshes parked away from their file's origin (a lineup artefact)
+ * }
+ *
+ * Unlike the creatures, a weapon keeps its authored normal map: the imported `rpg_weapon_*` GLBs
+ * ship theirs, and an equipped item is inspected close-up where baked shading detail earns its
+ * bytes. Metallic/AO maps are still dropped - glTF wants them packed into one ORM image and the
+ * repacking is not worth it for stylized props whose albedo already paints the metal.
+ */
+window.convertStatic = async (spec) => {
+  const root = await fbxLoader.loadAsync(spec.mesh);
+
+  const baseTexture = await loadTexture(spec.baseColor);
+  const normalTexture = spec.normal ? await loadTexture(spec.normal, { linear: true }) : null;
+  const emissiveTexture = spec.emissive ? await loadTexture(spec.emissive) : null;
+
+  const meshNames = [];
+  root.traverse((node) => {
+    if (!node.isMesh && !node.isSkinnedMesh) return;
+    meshNames.push(node.name);
+    const material = new THREE.MeshStandardMaterial({
+      map: baseTexture,
+      roughness: spec.roughness ?? 0.8,
+      metalness: spec.metalness ?? 0,
+      ...(normalTexture ? { normalMap: normalTexture } : {}),
+      ...(emissiveTexture
+        ? {
+            emissiveMap: emissiveTexture,
+            // The authored Unity _EmissionColor, split into a unit colour and an intensity so the
+            // over-1 part survives as KHR_materials_emissive_strength (same trap the bosses hit).
+            emissive: new THREE.Color(...(spec.emissiveColor ?? [1, 1, 1])),
+            emissiveIntensity: spec.emissiveIntensity ?? 1,
+          }
+        : {}),
+    });
+    material.name = spec.materialName;
+    if (Array.isArray(node.material)) node.material = node.material.map(() => material);
+    else node.material = material;
+  });
+
+  root.scale.setScalar(CM_TO_M * (spec.extraScale ?? 1));
+  root.updateMatrixWorld(true);
+
+  // Some source files park the mesh metres away from the origin on X/Z - a lineup position from
+  // the artist's master scene, not a grip convention. Recentring the horizontal axes keeps the
+  // authored Y pivot (which IS the grip) and discards the lineup.
+  if (spec.recenterXZ) {
+    const before = boxOf(root);
+    root.position.x -= (before.min.x + before.max.x) / 2;
+    root.position.z -= (before.min.z + before.max.z) / 2;
+    root.updateMatrixWorld(true);
+  }
+
+  const box = boxOf(root);
+  const size = box.getSize(new THREE.Vector3());
+
+  const glb = await new Promise((resolve, reject) => {
+    new GLTFExporter().parse(
+      root,
+      (result) => resolve(result),
+      (error) => reject(error),
+      { binary: true, animations: [], embedImages: true, onlyVisible: false },
+    );
+  });
+
+  const bytes = new Uint8Array(glb);
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return {
+    base64: btoa(binary),
+    bytes: bytes.length,
+    size: [size.x, size.y, size.z],
+    base: [box.min.x, box.min.y, box.min.z],
+    meshNames,
   };
 };

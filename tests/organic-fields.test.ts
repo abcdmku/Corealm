@@ -68,6 +68,7 @@ describe("organic world fields", () => {
       "blackwater_spots",
       "cairn_tarn_spots",
       "far_tarn_spots",
+      "ashfin_spring_spots",
     ]);
     expect(new Set(basins.map((basin) => (
       `${basin.shape.aspectRatio}:${basin.shape.irregularity}:${basin.shape.lobes}`

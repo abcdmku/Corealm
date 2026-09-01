@@ -148,6 +148,12 @@ export const REGION_PALETTES: Record<RegionId, RegionPalette> = {
     groundLow: 0x5c6169, groundHigh: 0x7c7a6d, soil: 0x655f54, rock: 0x545a64,
     foliage: 0x53664c, timber: 0x5d554b, water: 0x46606b, accent: 0xd08a44,
   },
+  // Ember foothills: warm dark soil, dark rock, dry brush, one ember-orange accent.
+  kilnhalt: {
+    id: "kilnhalt", name: "Kilnhalt",
+    groundLow: 0x6e5f4b, groundHigh: 0x87755a, soil: 0x5a4a3a, rock: 0x463c34,
+    foliage: 0x7d7248, timber: 0x4c3f36, water: 0x4f5e57, accent: 0xd06a34,
+  },
   // Underground. Dark, near-monochrome, lit by torch only.
   gravelmaw: {
     id: "gravelmaw", name: "Gravelmaw",
@@ -200,6 +206,15 @@ export const ARCHITECTURE_PALETTES: Record<RegionId, ArchitecturePalette> = {
     stone: 0x626a73,
     timber: 0x403d39,
     moss: 0x566047,
+  },
+  kilnhalt: {
+    // Fired brick and dark stone with an ember cast: the stone kit re-graded warm, which is how
+    // the kiln camp gets its own vernacular without a fourth building kit.
+    roof: 0x6d4436,
+    plaster: 0x9a8a78,
+    stone: 0x6b5c50,
+    timber: 0x453931,
+    moss: 0x6b6039,
   },
   gravelmaw: {
     roof: 0x3d3430,
@@ -289,6 +304,7 @@ export const GROUND_COLOURS = {
   fallowmarch: REGION_PALETTES.fallowmarch.groundHigh,
   vellenwood: REGION_PALETTES.vellenwood.groundHigh,
   karrowmoor: REGION_PALETTES.karrowmoor.groundHigh,
+  kilnhalt: REGION_PALETTES.kilnhalt.groundHigh,
   gravelmaw: REGION_PALETTES.gravelmaw.groundHigh,
 } as const;
 

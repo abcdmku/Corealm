@@ -58,6 +58,19 @@ const BOSSES = [
   { presetId: "gravelmaw:ordrun", label: "Ordrun the Quarrykeeper", assetId: "boss_rhino_water" },
 ] as const;
 
+/**
+ * The four regional minibosses: one Monster02 rig in four texture variants, built by named-take
+ * selection from a single all-animation FBX. Spawning each one proves the take selector shipped
+ * exactly the canonical clip set the renderer keys on, and the drawn-size band proves the 1.3x
+ * miniboss scale landed between the ordinary roster and the 1.6x Orb bosses.
+ */
+const MINIBOSSES = [
+  { presetId: "galeskin", label: "Galeskin", assetId: "miniboss_galeskin" },
+  { presetId: "mossbound", label: "Mossbound", assetId: "miniboss_mossbound" },
+  { presetId: "tideworn", label: "Tideworn", assetId: "miniboss_tideworn" },
+  { presetId: "cinderwake", label: "Cinderwake", assetId: "miniboss_cinderwake" },
+] as const;
+
 /** Inside the goat's 8 m radius and well outside the hen's 3 m. One distance, opposite outcomes. */
 const AGGRO_PROBE_DISTANCE = 6;
 
@@ -263,8 +276,15 @@ try {
     await capture(page, path.join(screenshotDir, `boss-${boss.assetId}.png`));
   }
 
+  stage = "minibosses";
+  const minibosses: BossEvidence[] = [];
+  for (const boss of MINIBOSSES) {
+    minibosses.push(await observeBoss(page, boss));
+    await capture(page, path.join(screenshotDir, `miniboss-${boss.assetId}.png`));
+  }
+
   const final = await readState(page);
-  const bossCatalog = Object.fromEntries(BOSSES.map((boss) => [
+  const bossCatalog = Object.fromEntries([...BOSSES, ...MINIBOSSES].map((boss) => [
     boss.presetId,
     catalog.targets.creature.some((preset) => preset.id === boss.presetId),
   ]));
@@ -311,6 +331,17 @@ try {
     )),
     orbBossesAreVisiblyBigger: bosses.every((boss) => boss.drawnMetres > 3),
 
+    everyMinibossSpawnsWithItsRig:
+      minibosses.every((boss) => boss.spawned && boss.archetype === "boss"),
+    everyMinibossCarriesItsStatBlock: minibosses.every((boss) => (
+      boss.maxHealth !== null && boss.maxHealth > 0 && boss.aggroRadius > 0 && boss.level > 0
+    )),
+    // The Monster02 rig is 0.93 x 0.65 m on the ground; at 1.3x and the tier silhouette the
+    // widest axis lands between ~1.1 m (tier 1) and ~1.5 m (tier 20) - clearly not the 3 m+
+    // Orb-boss read, and clearly bigger than a hen.
+    minibossesDrawBetweenRosterAndBosses:
+      minibosses.every((boss) => boss.drawnMetres > 0.9 && boss.drawnMetres < 3),
+
     screenshotsCaptured: screenshots.length >= 9,
     noRuntimeErrors: final.errors.length === 0
       && consoleErrors.length === 0 && pageErrors.length === 0,
@@ -331,6 +362,7 @@ try {
       corpsePick,
       respawn,
       bosses,
+      minibosses,
       bossCatalog,
     },
     screenshots,

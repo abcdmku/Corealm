@@ -13,8 +13,11 @@
  * COORDINATE SYSTEM
  * ---------------------------------------------------------------------------------------------
  * One connected world. X grows east, Z grows north, Y is up. All units are metres.
- * The three surface regions tile a single 700 x 400 m rectangle with no overlap and no gaps:
+ * The four surface regions tile a single 700 x 660 m rectangle with no overlap and no gaps:
  *
+ *        z=+460  +---------------------------------------------------+
+ *                |                     KILNHALT                      |
+ *                |               x [-350,350] z [200,460]            |
  *        z=+200  +-------------------+-------------------------------+
  *                |                   |                               |
  *                |                   |          VELLENWOOD           |
@@ -26,6 +29,10 @@
  *                |                   |    x [-20,350] z [-200,10]    |
  *        z=-200  +-------------------+-------------------------------+
  *              x=-350             x=-20                          x=350
+ *
+ * The Kilnhalt seam at z = +200 is deliberately OPEN: no gates, walls, portals or level checks.
+ * Terrain blends continuously across the whole 700 m line, and the route graph crosses it at
+ * three semantic links (from Fallowmarch and Vellenwood), but a player can walk in at any x.
  *
  * Fallowmarch is middle-west, Vellenwood north-east of it, Karrowmoor east and south-east and
  * considerably higher. The regions share terrain edges, so the navmesh is continuous: a path from
@@ -89,6 +96,7 @@ import {
 // share. Those files import `SettlementDef` back from here with `import type`, so the cycle is
 // erased at compile time and there is no runtime import loop.
 import { COLDBRACE } from "./settlements/coldbrace.js";
+import { EMBERFAST } from "./settlements/emberfast.js";
 import { HIGHCAIRN } from "./settlements/highcairn.js";
 import { ROOTFALL } from "./settlements/rootfall.js";
 import { resourceDef } from "./resources.js";
@@ -515,6 +523,12 @@ export interface EnemyGroupDef {
    */
   scale: number;
   boss?: boolean;
+  /**
+   * A regional miniboss: keeps the `"boss"` semantic archetype and the boss respawn window, but
+   * draws at 1.3x authored scale (against a major boss's 1.6x) and publishes
+   * `meta.rank: "miniboss"` so tools and tests can tell the two apart. Never set with `boss`.
+   */
+  miniBoss?: boolean;
 }
 
 /**
@@ -679,7 +693,7 @@ export interface RegionDef {
 /** Movement speed the route graph costs walking edges at. Mirrors `app/config.ts` PLAYER_SPEED. */
 export const WALK_SPEED_MPS = 4.2;
 
-export const WORLD_BOUNDS: RegionBounds = { min: [-350, -200], max: [350, 200] };
+export const WORLD_BOUNDS: RegionBounds = { min: [-350, -200], max: [350, 460] };
 
 /** One boss-keyed crafting altar at each matching Essence Cache. */
 export const ESSENCE_ALTAR_COURT_RADIUS = 16;
@@ -702,6 +716,11 @@ export const REGIONAL_ESSENCE_ALTARS = {
     id: "karrowmoor_water_altar", name: "Water Essence Altar", kind: "essence_altar", skill: "magic",
     position: [328, -176], rotationY: 0, assetId: "altar_ruins_altar", scale: 1,
     recipeIds: ["craft_water_wand", "craft_water_staff"], essenceElement: "water",
+  },
+  kilnhalt: {
+    id: "kilnhalt_fire_altar", name: "Fire Essence Altar", kind: "essence_altar", skill: "magic",
+    position: [290, 400], rotationY: 0, assetId: "altar_ruins_altar", scale: 1,
+    recipeIds: ["craft_fire_wand", "craft_fire_staff"], essenceElement: "fire",
   },
 } as const satisfies Readonly<Record<Exclude<RegionId, "gravelmaw">, StationDef>>;
 
@@ -758,6 +777,8 @@ const FALLOWMARCH: RegionDef = {
       blurb: "A snapped March Company marker where the pit road bends around the rise." },
     { id: "bracken_pit", name: "Bracken Pit", position: [-160, 80], kind: "seam", routeNode: true,
       blurb: "A shallow Grithe pit 160 m north of Coldbrace. Six seams and two stone faces." },
+    { id: "fallowmarch_kiln_road", name: "Kiln Road South", position: [-160, 192], kind: "junction", routeNode: true,
+      blurb: "Where the pit track runs on toward the ember foothills. No gate; the border is open ground." },
     { id: "palewood_copse", name: "Palewood Copse", position: [-334, -64], kind: "grove", routeNode: true,
       blurb: "Eight Palewood on the western track. The only shade on the plain." },
     { id: "redsill_shallows", name: "Redsill Shallows", position: [-40, -60], kind: "water", routeNode: true,
@@ -787,6 +808,7 @@ const FALLOWMARCH: RegionDef = {
     { from: "north_milestone", to: "marchfield_farm" },
     { from: "north_milestone", to: "bracken_pit" },
     { from: "bracken_pit", to: "fallowmarch_north_gate" },
+    { from: "bracken_pit", to: "fallowmarch_kiln_road" },
     { from: "town_entrance", to: "corven_ford" },
     { from: "corven_ford", to: "redsill_shallows" },
     { from: "town_center", to: "west_track" },
@@ -959,6 +981,17 @@ const FALLOWMARCH: RegionDef = {
       assetId: "boss_rhino_air", scale: 1,
       boss: true,
     },
+    {
+      // The tier 1 regional miniboss, on the open rise north-west of the Palewood Copse — well
+      // off every road and outside the copse cluster, so meeting it is a choice. `miniBoss` keeps
+      // the "boss" archetype and respawn window but draws at 1.3x rather than 1.6x and stamps
+      // `meta.rank: "miniboss"`. Stats, drops and the 10% rare-weapon rolls live on
+      // `galeskin_t1` in content/enemies.ts.
+      id: "galeskin", family: "galeskin", name: "Galeskin", tier: 1,
+      count: 1, centre: [-300, 145], radius: 0,
+      assetId: "miniboss_galeskin", scale: 1,
+      miniBoss: true,
+    },
   ],
 
   landmarks: [
@@ -1022,6 +1055,9 @@ const FALLOWMARCH: RegionDef = {
 
   adjacency: [
     { toRegionId: "vellenwood", fromLocationId: "fallowmarch_north_gate", toLocationId: "vellenwood_marchgate", meters: 14.6 },
+    // The open Kilnhalt seam: a route edge with no gate entity, because the border is walkable
+    // at any x. (-160,192) -> (-160,214) is 22 m of plain ground.
+    { toRegionId: "kilnhalt", fromLocationId: "fallowmarch_kiln_road", toLocationId: "kilnhalt_south_track", meters: 22 },
   ],
 };
 
@@ -1081,6 +1117,10 @@ const VELLENWOOD: RegionDef = {
       blurb: "An old stone heart under the eastern canopy, split through with earth essence." },
     { id: "vellenwood_east_gate", name: "Cairn Gate", position: [250, 24], kind: "gate", routeNode: true,
       blurb: "The east gate. On a clear day you can see the Karrowmoor ridge from it." },
+    { id: "vellenwood_kiln_path", name: "Kiln Path", position: [150, 194], kind: "junction", routeNode: true,
+      blurb: "A foot track over the northern ridge toward the ember foothills. No gate; it never needed one." },
+    { id: "vellenwood_ember_edge", name: "Ember Edge", position: [286, 194], kind: "junction", routeNode: true,
+      blurb: "The canopy's last shade line. North of here the trees stand scorched and far apart." },
   ],
 
   roads: [
@@ -1097,6 +1137,8 @@ const VELLENWOOD: RegionDef = {
     { from: "gorge_head", to: "thornline_camp" },
     { from: "thornline_camp", to: "vellenwood_earth_cache" },
     { from: "thornline_camp", to: "vellenwood_east_gate" },
+    { from: "gorge_head", to: "vellenwood_kiln_path" },
+    { from: "vellenwood_earth_cache", to: "vellenwood_ember_edge" },
   ],
 
   clusters: [
@@ -1240,6 +1282,16 @@ const VELLENWOOD: RegionDef = {
       assetId: "boss_rhino_earth", scale: 1,
       boss: true,
     },
+    {
+      // The tier 5 regional miniboss, on the dry ground south-east of the Thornline where the
+      // canopy opens — clear of the gorge reavers' patrol and the two east roads. Same rig as the
+      // other three minibosses in this pack's moss variant; stats and the rare rolls live on
+      // `mossbound_t5` in content/enemies.ts.
+      id: "mossbound", family: "mossbound", name: "Mossbound", tier: 5,
+      count: 1, centre: [318, 72], radius: 0,
+      assetId: "miniboss_mossbound", scale: 1,
+      miniBoss: true,
+    },
   ],
 
   landmarks: [
@@ -1291,6 +1343,9 @@ const VELLENWOOD: RegionDef = {
   adjacency: [
     { toRegionId: "fallowmarch", fromLocationId: "vellenwood_marchgate", toLocationId: "fallowmarch_north_gate", meters: 14.6 },
     { toRegionId: "karrowmoor", fromLocationId: "vellenwood_east_gate", toLocationId: "karrowmoor_north_gate", meters: 22.8 },
+    // Two open crossings of the Kilnhalt seam, gateless like Fallowmarch's.
+    { toRegionId: "kilnhalt", fromLocationId: "vellenwood_kiln_path", toLocationId: "kilnhalt_vellen_track", meters: 20 },
+    { toRegionId: "kilnhalt", fromLocationId: "vellenwood_ember_edge", toLocationId: "kilnhalt_east_track", meters: 20.4 },
   ],
 };
 
@@ -1513,6 +1568,15 @@ const KARROWMOOR: RegionDef = {
       count: 4, centre: [148, -128], radius: 12,
       assetId: "outfit_male_ranger", scale: 0.90,
     },
+    {
+      // The tier 10 regional miniboss, on the bare top-terrace shelf west of the Great Cairn —
+      // above the Scree Slide entrance and away from every road, so the climb to it is deliberate.
+      // Stats and the rare rolls live on `tideworn_t10` in content/enemies.ts.
+      id: "tideworn", family: "tideworn", name: "Tideworn", tier: 10,
+      count: 1, centre: [18, -164], radius: 0,
+      assetId: "miniboss_tideworn", scale: 1,
+      miniBoss: true,
+    },
   ],
 
   landmarks: [
@@ -1687,10 +1751,213 @@ const KARROWMOOR: RegionDef = {
   },
 };
 
+// =============================================================== KILNHALT
+
+/**
+ * Tier 20 ember foothills, the Phase 2 amendment's region: the full 700 m width above the old
+ * northern edge, z [200,460]. The southern border is OPEN — no gates, no walls, no checks — and
+ * the terrain blends continuously across the whole z = 200 seam, so the region is entered by
+ * walking north anywhere. Three semantic route links cross the seam (one from Fallowmarch, two
+ * from Vellenwood); they are guidance, not doors.
+ *
+ * Layout, per the amendment: Emberfast at the centre with the complete station set, the Emberite
+ * quarry west, the Cinderpine stand east, the Ashfin springs south-east, the Coalroot plots
+ * beside town, and the Fire altar ruins and Cinderwake's arena in the north-east.
+ */
+const KILNHALT: RegionDef = {
+  id: "kilnhalt",
+  name: "Kilnhalt",
+  tier: 20,
+  lore:
+    "The foothills north of the old survey line, where the ground runs warm and the pines grow " +
+    "back scorched. Somebody fired kilns here long before the March Company drew its maps, and " +
+    "the ground never entirely went out. Emberfast is the camp that grew up on the warm flat in " +
+    "the middle: smiths, mostly, because Emberite is the first metal since Kaldite worth the " +
+    "walk, and the walk is why they stay. Nobody watches the southern border. There is no " +
+    "border. You just notice, somewhere past the last milestone, that the wind has gone warm.",
+  bounds: { min: [-350, 200], max: [350, 460] },
+  terrainSeed: 0x1c11a7,
+  terrainAmplitude: 34,
+  baseHeight: 6,
+  // Warm dark soil, dark rock, dry brush, charred timber, one ember-orange accent.
+  groundPalette: ["#6e5f4b", "#87755a", "#5a4a3a", "#463c34", "#7d7248", "#4c3f36", "#d06a34", "#d8cdbb"],
+  fogStart: 170,
+  spawnPoint: [0, 254],
+  // The Kilnroad fork looks north at Emberfast's south rampart: atan2(2, 71) = 0.03.
+  spawnFacingRad: 0.03,
+  respawnPointId: "emberfast",
+
+  locations: [
+    { id: "kilnhalt_south_track", name: "Kiln Road South", position: [-160, 214], kind: "junction", routeNode: true,
+      blurb: "The pit track out of Fallowmarch, on warm ground now. The border is somewhere behind you." },
+    { id: "kilnhalt_vellen_track", name: "Ridge Track", position: [150, 214], kind: "junction", routeNode: true,
+      blurb: "The foot track down off the Vellenwood ridge. The first scorched pines start here." },
+    { id: "kilnhalt_east_track", name: "Ember Edge Track", position: [290, 214], kind: "junction", routeNode: true,
+      blurb: "Where the canopy shade gives out for good. The springs lie north-west of here." },
+    { id: "kilnroad_fork", name: "Kilnroad Fork", position: [0, 254], kind: "junction", routeNode: true,
+      blurb: "Both southern tracks meet here. Emberfast's rampart torches are visible up the road." },
+    { id: "emberfast_south_bend", name: "South Bend", position: [40, 300], kind: "junction", routeNode: true,
+      blurb: "The road swings east around Emberfast's rampart to reach the gate." },
+    { id: "emberfast_town", name: "Emberfast", position: [2, 325], kind: "settlement", routeNode: true,
+      blurb: "A walled kiln camp with every counter and bench a tier-20 trade needs inside one wall." },
+    { id: "emberfast_bank", name: "Emberfast Bank", position: [8, 321], kind: "bank", routeNode: true,
+      blurb: "One chest under a porch. The vault ledger smells faintly of smoke." },
+    { id: "emberfast_east_gate", name: "Emberfast Gate", position: [24, 333], kind: "gate", routeNode: true,
+      blurb: "The east gatehouse. Carts to the stand and the springs leave this way." },
+    { id: "emberfast_west_postern", name: "Quarry Postern", position: [-24, 333], kind: "gate", routeNode: true,
+      blurb: "The west gatehouse, opening onto the plots and the quarry road." },
+    { id: "emberfast_plots", name: "Coalroot Plots", position: [-32, 326], kind: "farm", routeNode: true,
+      blurb: "Four beds in the warm soil against the west wall. Coalroot takes twenty minutes." },
+    { id: "clinker_quarry", name: "Clinker Quarry", position: [-250, 330], kind: "seam", routeNode: true,
+      blurb: "Six Emberite seams and two Kilnstone faces, still warm at the break." },
+    { id: "ashfin_springs", name: "Ashfin Springs", position: [210, 250], kind: "water", routeNode: true,
+      blurb: "Four warm pools where the ashfin run heavy. The water steams at dawn." },
+    { id: "cinderpine_stand", name: "Cinderpine Stand", position: [240, 340], kind: "grove", routeNode: true,
+      blurb: "Eight cinderpine, scorched black outside and sound within. The fire chose not to eat them." },
+    { id: "kilnhalt_fire_cache", name: "Fire Essence Cache", position: [290, 400], kind: "landmark", routeNode: true,
+      blurb: "A ruined stone court where fire essence beads out of the warm rock. The altar is dark." },
+    { id: "cinderwake_arena", name: "Cinderwake Arena", position: [286, 420], kind: "landmark", routeNode: true,
+      blurb: "A swept circle of scorched stone past the altar court. Something keeps it swept." },
+  ],
+
+  roads: [
+    { from: "kilnhalt_south_track", to: "kilnroad_fork" },
+    { from: "kilnhalt_vellen_track", to: "kilnroad_fork" },
+    { from: "kilnhalt_vellen_track", to: "ashfin_springs" },
+    { from: "kilnhalt_east_track", to: "ashfin_springs" },
+    { from: "kilnroad_fork", to: "emberfast_south_bend" },
+    { from: "emberfast_south_bend", to: "emberfast_east_gate" },
+    { from: "emberfast_east_gate", to: "emberfast_town" },
+    { from: "emberfast_town", to: "emberfast_bank" },
+    { from: "emberfast_town", to: "emberfast_west_postern" },
+    { from: "emberfast_west_postern", to: "emberfast_plots" },
+    { from: "emberfast_west_postern", to: "clinker_quarry" },
+    { from: "emberfast_east_gate", to: "cinderpine_stand" },
+    { from: "emberfast_south_bend", to: "ashfin_springs" },
+    { from: "ashfin_springs", to: "cinderpine_stand" },
+    { from: "cinderpine_stand", to: "kilnhalt_fire_cache" },
+    { from: "kilnhalt_fire_cache", to: "cinderwake_arena" },
+  ],
+
+  clusters: [
+    {
+      id: "clinker_emberite", resourceId: "ore_emberite",
+      count: 6, centre: [-250, 330], radius: 12,
+      locationId: "clinker_quarry",
+    },
+    {
+      // The tier's flux, mined beside the ore the way March Stone sits beside the Grithe pit.
+      id: "clinker_kilnstone", resourceId: "ore_kilnstone",
+      count: 2, centre: [-238, 318], radius: 6,
+      locationId: "clinker_quarry",
+    },
+    {
+      id: "cinderpine_stand_trees", resourceId: "tree_cinderpine",
+      count: 8, centre: [240, 340], radius: 18,
+      locationId: "cinderpine_stand",
+    },
+    {
+      id: "ashfin_spring_spots", resourceId: "fish_ashfin",
+      count: 4, centre: [210, 250], radius: 9,
+      locationId: "ashfin_springs",
+    },
+    {
+      id: "emberfast_plot_beds", resourceId: "plot_coalroot",
+      count: 4, centre: [-32, 326], radius: 6,
+      locationId: "emberfast_plots",
+    },
+    {
+      id: "kilnhalt_fire_essence_cache", resourceId: "essence_fire",
+      count: 5, centre: [290, 400], radius: 12, ringRadius: 12,
+      essenceElement: "fire",
+      locationId: "kilnhalt_fire_cache",
+    },
+  ],
+
+  stations: [REGIONAL_ESSENCE_ALTARS.kilnhalt],
+  settlement: EMBERFAST,
+
+  // No new Agility obstacles ship with the amendment; the region's routes are open ground, and
+  // the shortcut vocabulary stays a Phase 1-3 lever rather than a per-region obligation.
+  obstacles: [],
+
+  enemyGroups: [
+    // Kilnhalt is warm open foothill: bears on the ash slopes, boar in the burned woodland,
+    // ibex on the western rise, adders around the springs, and reavers working the Kilnroad.
+    {
+      // The staff answer at tier 20, and the region's biggest ordinary silhouette.
+      id: "ashback_bears", family: "bear", name: "Ashback Bear", tier: 20,
+      count: 4, centre: [-120, 400], radius: 26,
+      assetId: "animal_bear", scale: 1.05,
+    },
+    {
+      // The sword answer: the boar's mud-caked rule continues at tier 20.
+      id: "cinder_boars", family: "boar", name: "Cinder Boar", tier: 20,
+      count: 5, centre: [80, 380], radius: 24,
+      assetId: "animal_boar", scale: 1.05,
+    },
+    {
+      id: "emberhorn_ibex", family: "ibex", name: "Emberhorn Ibex", tier: 20,
+      count: 3, centre: [-260, 420], radius: 18,
+      assetId: "animal_ibex", scale: 1.0,
+    },
+    {
+      // Around the warm water, where the fishing is: the springs' standing risk.
+      id: "cinder_adders", family: "viper", name: "Cinder Adder", tier: 20,
+      count: 3, centre: [170, 300], radius: 14,
+      assetId: "animal_viper", scale: 1.25,
+    },
+    {
+      id: "kilnroad_reavers", family: "reaver", name: "Kilnroad Reaver", tier: 20,
+      count: 4, centre: [-40, 262], radius: 14,
+      assetId: "outfit_male_ranger", scale: 0.90,
+    },
+    {
+      // The tier 20 miniboss and the Fire Orb's keeper, alone on its swept arena floor past the
+      // altar court. Stats, the guaranteed singleton Orb, and the rare rolls live on
+      // `cinderwake_t20` in content/enemies.ts.
+      id: "cinderwake", family: "cinderwake", name: "Cinderwake", tier: 20,
+      count: 1, centre: [286, 420], radius: 0,
+      assetId: "miniboss_cinderwake", scale: 1,
+      miniBoss: true,
+    },
+  ],
+
+  landmarks: [
+    {
+      id: "kilnhalt_fire_altar_ruins", name: "Fire Altar Ruins", position: [290, 400],
+      assetId: "altar_ruins_site", scale: 1, rotationY: 0, solid: false, originOnGround: true,
+      blurb: "A heat-cracked stone court ringed by Fire Essence. Cinderwake's Orb is its missing light.",
+    },
+    {
+      // The fork waystone, same composition vocabulary as the other regions' road markers.
+      id: "kilnroad_waystone", name: "Kilnroad Waystone", position: [6, 248],
+      assetId: "corner_brick", scale: 0.85, rotationY: 0.8,
+      composition: "path_waypoint",
+      blurb: "Three arms: Fallowmarch, the ridge, and Emberfast. The southern arm is newest.",
+    },
+    {
+      // The arena's edge stone: a semantic anchor a player can inspect from outside the fight.
+      id: "cinderwake_ring_stone", name: "Arena Ring Stone", position: [274, 414],
+      assetId: "rock_medium_2", scale: 1.6, rotationY: 1.1,
+      blurb: "One of the ring stones. The scorch marks on it are layered, oldest at the bottom.",
+    },
+  ],
+
+  // The southern border is open: no gate entities, only the three adjacency links above it.
+  gates: [],
+
+  adjacency: [
+    { toRegionId: "fallowmarch", fromLocationId: "kilnhalt_south_track", toLocationId: "fallowmarch_kiln_road", meters: 22 },
+    { toRegionId: "vellenwood", fromLocationId: "kilnhalt_vellen_track", toLocationId: "vellenwood_kiln_path", meters: 20 },
+    { toRegionId: "vellenwood", fromLocationId: "kilnhalt_east_track", toLocationId: "vellenwood_ember_edge", meters: 20.4 },
+  ],
+};
+
 // ------------------------------------------------------------------- exports
 
-/** The three surface regions, in a fixed order. `buildWorld` iterates this to stay deterministic. */
-export const REGIONS: readonly RegionDef[] = [FALLOWMARCH, VELLENWOOD, KARROWMOOR];
+/** The four surface regions, in a fixed order. `buildWorld` iterates this to stay deterministic. */
+export const REGIONS: readonly RegionDef[] = [FALLOWMARCH, VELLENWOOD, KARROWMOOR, KILNHALT];
 
 export const STARTING_REGION: RegionId = "fallowmarch";
 

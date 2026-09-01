@@ -1,0 +1,267 @@
+{
+  "packs": [
+    {
+      "id": "pixelius-fantasy-monster-02",
+      "name": "Fantasy Monster 3D Model 02 - Game Ready",
+      "author": "PixeliusVita",
+      "source": "https://assetstore.unity.com/?q=Fantasy%20Monster%203D%20Model%2002%20PixeliusVita",
+      "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
+    },
+    {
+      "id": "blink-free-low-poly-swords",
+      "name": "FREE - Low Poly Swords - RPG Weapons",
+      "author": "Blink",
+      "source": "https://assetstore.unity.com/?q=FREE%20Low%20Poly%20Swords%20RPG%20Weapons",
+      "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
+    },
+    {
+      "id": "blink-free-stylized-weapons",
+      "name": "FREE - Stylized Weapons",
+      "author": "Blink",
+      "source": "https://assetstore.unity.com/?q=FREE%20Stylized%20Weapons%20Blink",
+      "license": "Standard Unity Asset Store EULA; project owner must confirm entitlement"
+    }
+  ],
+  "assets": [
+    {
+      "id": "miniboss_cinderwake",
+      "file": "models/miniboss/miniboss_cinderwake.glb",
+      "pack": "pixelius-fantasy-monster-02",
+      "category": "character",
+      "is": "cinderwake",
+      "tags": [
+        "miniboss",
+        "cinderwake",
+        "fire",
+        "cinder",
+        "ember",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 772232,
+      "size": {
+        "x": 0.926,
+        "y": 1.997,
+        "z": 0.65
+      },
+      "base": {
+        "x": -0.467,
+        "y": 0,
+        "z": -0.374
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Hit",
+        "Death"
+      ],
+      "materials": [
+        "boss_miniboss_cinderwake_mat"
+      ],
+      "sha256": "76EBFAE6A832923255353916EC6B9592F2FCCF9C52800701C04BA4A351048CBC",
+      "impliedWalkMps": 0.82,
+      "walkClipSeconds": 1.333,
+      "impliedRunMps": 2.22,
+      "runClipSeconds": 0.767
+    },
+    {
+      "id": "miniboss_galeskin",
+      "file": "models/miniboss/miniboss_galeskin.glb",
+      "pack": "pixelius-fantasy-monster-02",
+      "category": "character",
+      "is": "galeskin",
+      "tags": [
+        "miniboss",
+        "galeskin",
+        "air",
+        "wind",
+        "storm",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 786436,
+      "size": {
+        "x": 0.926,
+        "y": 1.997,
+        "z": 0.65
+      },
+      "base": {
+        "x": -0.467,
+        "y": 0,
+        "z": -0.374
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Hit",
+        "Death"
+      ],
+      "materials": [
+        "boss_miniboss_galeskin_mat"
+      ],
+      "sha256": "962F0847A90DE38D05F134ED7CCD375B551C69E5558C438BE2D3C623A0C9D6C3",
+      "impliedWalkMps": 0.82,
+      "walkClipSeconds": 1.333,
+      "impliedRunMps": 2.22,
+      "runClipSeconds": 0.767
+    },
+    {
+      "id": "miniboss_mossbound",
+      "file": "models/miniboss/miniboss_mossbound.glb",
+      "pack": "pixelius-fantasy-monster-02",
+      "category": "character",
+      "is": "mossbound",
+      "tags": [
+        "miniboss",
+        "mossbound",
+        "earth",
+        "moss",
+        "forest",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 775928,
+      "size": {
+        "x": 0.926,
+        "y": 1.997,
+        "z": 0.65
+      },
+      "base": {
+        "x": -0.467,
+        "y": 0,
+        "z": -0.374
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Hit",
+        "Death"
+      ],
+      "materials": [
+        "boss_miniboss_mossbound_mat"
+      ],
+      "sha256": "2A9E8142643C1DEBBE9A4D9AFD18B089989A98D10E8EC9AE06A4AB7302EC34EE",
+      "impliedWalkMps": 0.82,
+      "walkClipSeconds": 1.333,
+      "impliedRunMps": 2.22,
+      "runClipSeconds": 0.767
+    },
+    {
+      "id": "miniboss_staff",
+      "file": "models/miniboss/miniboss_staff.glb",
+      "pack": "blink-free-stylized-weapons",
+      "category": "weapon",
+      "is": "staff",
+      "tags": [
+        "staff",
+        "magic",
+        "two-handed",
+        "equip",
+        "rare-drop",
+        "emissive",
+        "hue-neutral"
+      ],
+      "bytes": 185852,
+      "size": {
+        "x": 0.171,
+        "y": 1.75,
+        "z": 0.246
+      },
+      "base": {
+        "x": -0.086,
+        "y": -1.541,
+        "z": -0.072
+      },
+      "animations": [],
+      "materials": [
+        "miniboss_staff_material"
+      ],
+      "sha256": "E44DBEAA15A1192A200DF6C51A0965016F36884FD997525CEE4FD20DB89984C7"
+    },
+    {
+      "id": "miniboss_sword",
+      "file": "models/miniboss/miniboss_sword.glb",
+      "pack": "blink-free-low-poly-swords",
+      "category": "weapon",
+      "is": "sword",
+      "tags": [
+        "sword",
+        "melee",
+        "one-handed",
+        "equip",
+        "rare-drop",
+        "iron-variant",
+        "hue-neutral"
+      ],
+      "bytes": 147780,
+      "size": {
+        "x": 0.236,
+        "y": 1.25,
+        "z": 0.069
+      },
+      "base": {
+        "x": -0.118,
+        "y": -0.862,
+        "z": -0.035
+      },
+      "animations": [],
+      "materials": [
+        "miniboss_sword_material"
+      ],
+      "sha256": "A28DE7A93A3FE1AD7A4CB383D3FDA1C796C8966AD8F8E30D48A237F27A899993"
+    },
+    {
+      "id": "miniboss_tideworn",
+      "file": "models/miniboss/miniboss_tideworn.glb",
+      "pack": "pixelius-fantasy-monster-02",
+      "category": "character",
+      "is": "tideworn",
+      "tags": [
+        "miniboss",
+        "tideworn",
+        "water",
+        "tide",
+        "coast",
+        "elemental",
+        "monster",
+        "territorial"
+      ],
+      "bytes": 778252,
+      "size": {
+        "x": 0.926,
+        "y": 1.997,
+        "z": 0.65
+      },
+      "base": {
+        "x": -0.467,
+        "y": 0,
+        "z": -0.374
+      },
+      "animations": [
+        "Idle",
+        "Walk",
+        "Run",
+        "Attack",
+        "Hit",
+        "Death"
+      ],
+      "materials": [
+        "boss_miniboss_tideworn_mat"
+      ],
+      "sha256": "2C9AA129F2CC9070BDB5AD3118770EB9C481AA4957CFE83E52D744C049E9B694",
+      "impliedWalkMps": 0.82,
+      "walkClipSeconds": 1.333,
+      "impliedRunMps": 2.22,
+      "runClipSeconds": 0.767
+    }
+  ]
+}

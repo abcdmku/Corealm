@@ -58,6 +58,16 @@ const RESOURCE_ITEMS: readonly ItemDef[] = [
     description: "Black Karrowmoor ore with a blue fracture. It takes a furnace twice to give anything up.",
     stackable: false, value: 95, category: "resource",
   },
+  {
+    id: "emberite_ore", name: "Emberite Ore", tier: 20,
+    description: "Rust-orange Kilnhalt ore, warm off the seam. It smells faintly of a banked fire.",
+    stackable: false, value: 210, category: "resource",
+  },
+  {
+    id: "kilnstone", name: "Kilnstone", tier: 20,
+    description: "Grey-black flux off the Clinker Rows. Emberite refuses to run without it.",
+    stackable: false, value: 12, category: "resource",
+  },
   // woodcutting
   {
     id: "palewood_log", name: "Palewood Log", tier: 1,
@@ -73,6 +83,11 @@ const RESOURCE_ITEMS: readonly ItemDef[] = [
     id: "cairnpine_log", name: "Cairnpine Log", tier: 10,
     description: "Ridge pine, resin-heavy and stubborn. It holds a Kaldite ferrule without splitting.",
     stackable: false, value: 88, category: "resource",
+  },
+  {
+    id: "cinderpine_log", name: "Cinderpine Log", tier: 20,
+    description: "Foothill pine, bark scorched black and heartwood sound. It burns long and splits clean.",
+    stackable: false, value: 195, category: "resource",
   },
   // fishing (raw, inedible until cooked)
   {
@@ -90,6 +105,11 @@ const RESOURCE_ITEMS: readonly ItemDef[] = [
     description: "A slab-sided tarn fish with a spined dorsal. Highcairn eats little else.",
     stackable: false, value: 96, category: "resource",
   },
+  {
+    id: "ashfin", name: "Ashfin", tier: 20,
+    description: "A dark-finned spring fish that thrives where the water runs warm. Oily and rich.",
+    stackable: false, value: 215, category: "resource",
+  },
   // farming crops
   {
     id: "bittergrain", name: "Bittergrain", tier: 1,
@@ -105,6 +125,11 @@ const RESOURCE_ITEMS: readonly ItemDef[] = [
     id: "cairnleaf", name: "Cairnleaf", tier: 10,
     description: "Broad grey leaves off the Highcairn beds. Chewed by quarry crews against the cold.",
     stackable: false, value: 74, category: "resource",
+  },
+  {
+    id: "coalroot", name: "Coalroot", tier: 20,
+    description: "A black tuber out of the warm Kilnhalt soil. Roasts to something close to sweet.",
+    stackable: false, value: 165, category: "resource",
   },
 ];
 
@@ -125,6 +150,11 @@ const BARS: readonly ItemDef[] = [
     id: "kaldite_bar", name: "Kaldite Bar", tier: 10,
     description: "Black with a blue sheen. Holds an edge through cairn stone, which is why Highcairn exists.",
     stackable: false, value: 250, category: "bar",
+  },
+  {
+    id: "emberite_bar", name: "Emberite Bar", tier: 20,
+    description: "Three ores and two kilnstones a bar, and it comes off the furnace still glowing at the core.",
+    stackable: false, value: 760, category: "bar",
   },
 ];
 
@@ -148,6 +178,11 @@ const COMPONENTS: readonly ItemDef[] = [
     description: "Deep red, cut square by the rock itself. Highcairn jewellers cage it in Kaldite.",
     stackable: true, value: 160, category: "component",
   },
+  {
+    id: "fire_opal", name: "Fire Opal", tier: 20,
+    description: "An orange stone with a live spark in it. Emberfast cages them in Emberite claws.",
+    stackable: true, value: 350, category: "component",
+  },
   // shafts, the fletching intermediate
   {
     id: "palewood_shaft", name: "Palewood Shaft", tier: 1,
@@ -164,6 +199,11 @@ const COMPONENTS: readonly ItemDef[] = [
     description: "Resinous, springy, and heavy. Takes a Kaldite ferrule without splitting.",
     stackable: true, value: 32, category: "component",
   },
+  {
+    id: "cinderpine_shaft", name: "Cinderpine Shaft", tier: 20,
+    description: "Scorch-hardened pine, shaved true. It keeps its spring in the kiln heat.",
+    stackable: true, value: 70, category: "component",
+  },
   // handles, the shared fletching input for metal weapons and gathering tools
   {
     id: "palewood_handle", name: "Palewood Handle", tier: 1,
@@ -179,6 +219,11 @@ const COMPONENTS: readonly ItemDef[] = [
     id: "cairnpine_handle", name: "Cairnpine Handle", tier: 10,
     description: "Cairnpine shaped around the grain so a Kaldite tang will not split it.",
     stackable: true, value: 53, category: "component",
+  },
+  {
+    id: "cinderpine_handle", name: "Cinderpine Handle", tier: 20,
+    description: "A charred-and-oiled grip that an Emberite tang seats into without a wedge.",
+    stackable: true, value: 117, category: "component",
   },
   // Hides, the crafting input for the whole magic line and every fishing rod.
   //
@@ -202,6 +247,11 @@ const COMPONENTS: readonly ItemDef[] = [
     description: "Winter coat off something that lived above the treeline. Takes no dye and does not tear.",
     stackable: false, value: 130, category: "component",
   },
+  {
+    id: "charhide", name: "Charhide", tier: 20,
+    description: "Foothill hide seared grey at the edges. Sheds heat the way cairn pelt sheds cold.",
+    stackable: false, value: 290, category: "component",
+  },
 ];
 
 // ------------------------------------------------------------------------------ elemental essence
@@ -221,6 +271,11 @@ const ESSENCES: readonly ItemDef[] = [
     id: "water_essence", name: "Water Essence", tier: 10,
     description: "Cold blue essence gathered from the far Karrowmoor cache.",
     stackable: true, value: 55, category: "resource",
+  },
+  {
+    id: "fire_essence", name: "Fire Essence", tier: 20,
+    description: "A hot orange charge mined at the Kilnhalt altar ruins. It never quite cools.",
+    stackable: true, value: 120, category: "resource",
   },
 ];
 
@@ -334,6 +389,28 @@ const TROPHIES: readonly ItemDef[] = [
     description: "Off a sump crab, and big enough to have taken a pick handle in half.",
     stackable: false, value: 158, category: "component",
   },
+
+  // tier 20, Kilnhalt
+  {
+    id: "ashback_claw", name: "Ashback Claw", tier: 20,
+    description: "Grey to the root, like the bear it came off. Emberfast doors hang two, crossed.",
+    stackable: true, value: 320, category: "component",
+  },
+  {
+    id: "cinder_tusk", name: "Cinder Tusk", tier: 20,
+    description: "A boar tusk stained kiln-black. The point still goes through boot leather.",
+    stackable: false, value: 300, category: "component",
+  },
+  {
+    id: "emberhorn", name: "Emberhorn", tier: 20,
+    description: "Ridged ibex horn with a red cast the foothill dust never washes out of.",
+    stackable: false, value: 360, category: "component",
+  },
+  {
+    id: "kiln_fang", name: "Kiln Fang", tier: 20,
+    description: "An adder fang the colour of cooling slag. Hot to the touch for a day after the kill.",
+    stackable: true, value: 310, category: "component",
+  },
 ];
 
 // ------------------------------------------------------------------------------ game meat
@@ -396,6 +473,21 @@ const GAME_MEAT: readonly ItemDef[] = [
     description: "Ruined, and it was the biggest thing you killed all week.",
     stackable: false, value: 1, category: "food",
   },
+  {
+    id: "raw_ember_haunch", name: "Raw Ember Haunch", tier: 20,
+    description: "A hind quarter off a foothill beast, marbled from a life spent on warm ground.",
+    stackable: false, value: 190, category: "resource",
+  },
+  {
+    id: "roast_ember_haunch", name: "Roast Ember Haunch", tier: 20,
+    description: "Cooked slow over cinderpine coals. Emberfast calls it a wage, not a meal.",
+    stackable: false, value: 255, category: "food", food: { healAmount: healAmount(20) },
+  },
+  {
+    id: "burnt_ember_haunch", name: "Burnt Ember Haunch", tier: 20,
+    description: "The one place in Kilnhalt where more fire was not the answer.",
+    stackable: false, value: 1, category: "food",
+  },
 ];
 
 // ------------------------------------------------------------------------------ seeds
@@ -415,6 +507,11 @@ const SEEDS: readonly ItemDef[] = [
     id: "cairnleaf_seed", name: "Cairnleaf Seed", tier: 10,
     description: "Fifteen minutes to a Highcairn harvest. Plant it and go do something else.",
     stackable: true, value: 52, category: "seed", seed: { cropId: "cairnleaf" },
+  },
+  {
+    id: "coalroot_seed", name: "Coalroot Seed", tier: 20,
+    description: "Twenty minutes in warm Kilnhalt soil. The beds beside Emberfast run on nothing else.",
+    stackable: true, value: 115, category: "seed", seed: { cropId: "coalroot" },
   },
 ];
 
@@ -452,6 +549,16 @@ const FOOD: readonly ItemDef[] = [
   {
     id: "burnt_cragfin", name: "Burnt Cragfin", tier: 10,
     description: "Ninety-six marks of fish, ruined. Highcairn has opinions about this.",
+    stackable: false, value: 1, category: "food",
+  },
+  {
+    id: "seared_ashfin", name: "Seared Ashfin", tier: 20,
+    description: "The oil crisps its own skin. What a Cinderwake attempt is provisioned with.",
+    stackable: false, value: 150, category: "food", food: { healAmount: healAmount(20) },
+  },
+  {
+    id: "burnt_ashfin", name: "Burnt Ashfin", tier: 20,
+    description: "It cooked itself the rest of the way while you watched.",
     stackable: false, value: 1, category: "food",
   },
 ];
@@ -529,9 +636,24 @@ const TOOLS: readonly ItemDef[] = [
     description: "Built for cragfin, which fight like something with a grudge. Nine effective Fishing levels.",
     stackable: false, value: 480, category: "tool", tool: { skill: "fishing", gatherBonus: toolBonus(10) },
   },
+  {
+    id: "emberite_pickaxe", name: "Emberite Pickaxe", tier: 20,
+    description: "An Emberite head on cinderpine. Seventeen effective Mining levels.",
+    stackable: false, value: 1400, category: "tool", tool: { skill: "mining", gatherBonus: toolBonus(20) },
+  },
+  {
+    id: "emberite_hatchet", name: "Emberite Hatchet", tier: 20,
+    description: "Bites through scorched bark without a second swing. Seventeen effective Woodcutting levels.",
+    stackable: false, value: 1350, category: "tool", tool: { skill: "woodcutting", gatherBonus: toolBonus(20) },
+  },
+  {
+    id: "cinderpine_rod", name: "Cinderpine Rod", tier: 20,
+    description: "Springy scorched pine for ashfin, which run heavy. Seventeen effective Fishing levels.",
+    stackable: false, value: 1100, category: "tool", tool: { skill: "fishing", gatherBonus: toolBonus(20) },
+  },
 ];
 
-/** Everything except equipment. 78 rows: 51 base, plus 18 animal trophies and 9 game meats. */
+/** Everything except equipment. 102 rows: 68 base, plus 22 animal trophies and 12 game meats. */
 export const ITEMS: readonly ItemDef[] = [
   ...CURRENCY,
   ...RESOURCE_ITEMS,
