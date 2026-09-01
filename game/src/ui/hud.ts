@@ -15,6 +15,7 @@
  */
 import type { GameEvent, SkillId } from "../contracts.js";
 import { SKILL_IDS } from "../contracts.js";
+import { UNREACHABLE_DESTINATION_MESSAGE } from "../api/gameApi.js";
 import { content } from "../content/index.js";
 import { SKILLS } from "../content/skills.js";
 import { RECOVERY_CACHE_ID } from "../systems/death.js";
@@ -63,7 +64,12 @@ export function eventChangesWeaponCharge(event: GameEvent): boolean {
 export function describeNavigationFailure(data: GameEvent["data"]): { text: string; tone: NoticeTone } | null {
   const reason = typeof data["reason"] === "string" ? data["reason"] : "";
   if (reason === "cancelled" || reason === "movement-disabled") return null;
-  return { text: "There is no route to that place.", tone: "error" };
+  return { text: UNREACHABLE_DESTINATION_MESSAGE, tone: "error" };
+}
+
+/** Repeating the same failed route adds no information and should not wake the message log again. */
+export function ignoresRepeatedNotice(message: string): boolean {
+  return message === UNREACHABLE_DESTINATION_MESSAGE;
 }
 
 export type AutoOpen = "bank" | "shop" | null;
@@ -227,6 +233,7 @@ export class Hud {
   pushNotice(message: string, tone: NoticeTone = "info"): void {
     const last = this.toastStrip.lastElementChild as HTMLElement | null;
     if (last && last.dataset["message"] === message) {
+      if (ignoresRepeatedNotice(message)) return;
       const seen = Number(last.dataset["count"] ?? "1") + 1;
       last.dataset["count"] = String(seen);
       last.textContent = `${message} (x${seen})`;

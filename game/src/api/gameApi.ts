@@ -40,6 +40,15 @@ import {
  */
 const RANGED_APPROACH_SLACK = 1.5;
 
+/**
+ * One player-facing answer for a destination that neither the navmesh nor route graph can reach.
+ *
+ * `moveTo` returns this error to its immediate caller and emits `navigation.failed` for listeners.
+ * The HUD receives both paths after a human click, so the wording must stay identical or one bad
+ * click fills the message log with two versions of the same failure.
+ */
+export const UNREACHABLE_DESTINATION_MESSAGE = "There is no route to that place.";
+
 /** The terminal result of an interaction that first had to walk into range. */
 export interface PendingInteractionOutcome {
   entityId: EntityId;
@@ -340,7 +349,7 @@ export class CorealmGameApi implements GameApiContract {
       entityId ?? undefined,
       this.clock.elapsedMs,
     );
-    return err("NOT_REACHABLE", "No walkable path to that destination");
+    return err("NOT_REACHABLE", UNREACHABLE_DESTINATION_MESSAGE);
   }
 
   /**

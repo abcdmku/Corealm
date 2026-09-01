@@ -20,6 +20,7 @@ import {
   type ItemId,
 } from "../game/src/contracts.js";
 import { SPELLS } from "../game/src/content/spells.js";
+import { UNREACHABLE_DESTINATION_MESSAGE } from "../game/src/api/gameApi.js";
 import { RELEASED_MAGIC_ELEMENTS } from "../game/src/systems/essence.js";
 import { installTestDeadline } from "./lib/deadline.js";
 import { repoRoot } from "./lib/paths.js";
@@ -134,6 +135,10 @@ interface CombatEvidence {
   catalogChecks: Record<string, boolean>;
   levelChecks: Record<string, boolean>;
   equipment: EquipmentProof[];
+  routeFailureNotices: {
+    results: Array<{ error?: string; message?: string }>;
+    lines: Array<{ text: string; message: string | null; count: string | null }>;
+  };
   targetPointer: {
     entityId: string | undefined;
     click: Point;
@@ -326,6 +331,7 @@ try {
       melee: combat.melee,
       cast: combat.cast,
       equipment: combat.equipment,
+      routeFailureNotices: combat.routeFailureNotices,
     } } : {}),
     ...(building ? { building: {
       structures: building.structures,
@@ -435,6 +441,15 @@ function combatChecks(combat: CombatEvidence): Record<string, boolean> {
     combatEveryLevelCanBeSet: Object.values(combat.levelChecks).every(Boolean),
     combatRepresentativeEquipmentEquips: combat.equipment.length === 1
       && combat.equipment[0]?.slot === "mainHand",
+    combatRouteFailureSpeaksOnce: combat.routeFailureNotices.results.length === 3
+      && combat.routeFailureNotices.results.every((result) => (
+        result.error === "NOT_REACHABLE"
+        && result.message === UNREACHABLE_DESTINATION_MESSAGE
+      ))
+      && combat.routeFailureNotices.lines.length === 1
+      && combat.routeFailureNotices.lines[0]?.text === UNREACHABLE_DESTINATION_MESSAGE
+      && combat.routeFailureNotices.lines[0]?.message === UNREACHABLE_DESTINATION_MESSAGE
+      && combat.routeFailureNotices.lines[0]?.count === null,
     combatTargetPointerSelects: combat.targetPointer.selectedEntityId === combat.targetPointer.entityId,
     combatMeleeDamagesWithLiveMotion: combat.melee.combatStarted[1] > combat.melee.combatStarted[0]
       && numericFell(combat.melee.health)
@@ -526,6 +541,36 @@ async function testCombat(
   if (equipped.equipment.mainHand === setupWeapon) {
     equipment.push({ slot: "mainHand", itemId: setupWeapon });
   }
+
+  // A failed human walk has two reporting paths: the immediate Result and navigation.failed.
+  // The wording contract is covered in a focused test; here three real failures exercise the
+  // event side and prove the persistent HUD keeps one unchanged line instead of counting spam.
+  await clearMessageLog(targetPage);
+  const routeFailureNotices = await targetPage.evaluate(async ({ expectedMessage }) => {
+    const debug = Reflect.get(window, "__gameDebug") as {
+      callTool?: (name: string, args: unknown) => Promise<unknown>;
+    } | undefined;
+    if (!debug?.callTool) throw new Error("Production window.__gameDebug.callTool is unavailable");
+    const results: Array<{ error?: string; message?: string }> = [];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const result = await debug.callTool("corealm_move_to", { position: [1_000_000, 0, 1_000_000] });
+      if (typeof result !== "object" || result === null) throw new Error("Move failure was not structured");
+      const row = result as Record<string, unknown>;
+      results.push({
+        ...(typeof row["error"] === "string" ? { error: row["error"] } : {}),
+        ...(typeof row["message"] === "string" ? { message: row["message"] } : {}),
+      });
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
+    const lines = [...document.querySelectorAll<HTMLElement>(".msglog__line")]
+      .filter((line) => line.dataset["message"] === expectedMessage)
+      .map((line) => ({
+        text: line.textContent ?? "",
+        message: line.dataset["message"] ?? null,
+        count: line.dataset["count"] ?? null,
+      }));
+    return { results, lines };
+  }, { expectedMessage: UNREACHABLE_DESTINATION_MESSAGE });
 
   // Reuse the already prepared boot-target asset for the action proofs. Loading another full rig
   // here adds no production-path coverage and can push the two-boot gate beyond its hard deadline.
@@ -635,6 +680,7 @@ async function testCombat(
     catalogChecks,
     levelChecks,
     equipment,
+    routeFailureNotices,
     targetPointer: {
       entityId: targetBase.target?.entityId,
       click: targetPoint,
