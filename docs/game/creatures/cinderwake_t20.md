@@ -1,0 +1,50 @@
+---
+title: "Cinderwake"
+description: "Cinderwake spawn locations, combat stats, and drops."
+---
+
+<div class="corealm-creature-spawn-evidence">
+<div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/cinderwake.webp" alt="Cinderwake at its authored spawn in Kilnhalt" loading="lazy" /><figcaption><strong>Cinderwake</strong><span>Cinderwake Arena, Kilnhalt</span></figcaption></figure></div>
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Cinderwake">
+<div class="corealm-map-stage" data-map-stage>
+<img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
+<a class="corealm-map-marker" href="../../regions/#cinderwake-arena" style="--map-x:73.8333%;--map-y:15.0000%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Cinderwake, Cinderwake Arena, Kilnhalt" title="Cinderwake, Cinderwake Arena, Kilnhalt"><span>Cinderwake<small>Cinderwake Arena, Kilnhalt</small></span></a>
+</div>
+<span class="corealm-map-north" aria-hidden="true">N</span>
+<div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
+<button type="button" data-map-action="out" aria-label="Zoom out" title="Zoom out">&minus;</button>
+<button type="button" data-map-action="reset" aria-label="Reset map" title="Reset map">&#x25CE;</button>
+<button type="button" data-map-action="in" aria-label="Zoom in" title="Zoom in">+</button>
+</div>
+<button class="corealm-map-expand" type="button" data-map-action="expand" aria-label="Expand map" aria-pressed="false" title="Expand map">&#x26F6;</button>
+</div>
+<figcaption>Markers use each authored spawn group's exact centre.</figcaption>
+</figure>
+</div>
+
+## Spawn locations
+
+| Region | Nearest place | Spawn group | Count |
+| --- | --- | --- | --- |
+| [Kilnhalt](../../regions/#cinderwake-arena) | [Cinderwake Arena](../../regions/#cinderwake-arena) | Cinderwake | 1 |
+
+## Stats
+
+| Tier | Health | Attack | Defence | Accuracy | Max hit | Attack speed | Armour | Magic armour | Behaviour | Aggro |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 20 | 260 | 32 | 24 | 22 | 15 | 3.0 s | 78 | 45 | territorial | 22 m |
+
+## Drops
+
+Elemental orbs are singleton altar keys. The boss drops its orb when no physical copy exists. Repeat kills do not create a duplicate while that orb is carried, banked, or waiting in loot or recovery. If the copy is lost before awakening its altar, the boss can drop it again. Once consumed to awaken that altar, it never drops again.
+
+| Drop | Quantity | Chance or rule |
+| --- | --- | --- |
+| Marks | 1800-2800 | Always |
+| [Fire Orb](../../items/#fire-orb) | 1 | First eligible acquisition |
+| [Cinderwake Sword](../../items/#cinderwake-sword) | 1 | 10% |
+| [Cinderwake Staff](../../items/#cinderwake-staff) | 1 | 10% |
+| [Emberite Bar](../../items/#emberite-bar) | 1-3 | 100% |
+| [Fire Opal](../../items/#fire-opal) | 1-3 | 75% |
+| [Charhide](../../items/#charhide) | 1-2 | 60% |

@@ -1,23 +1,23 @@
 {
   "width": 4800,
-  "height": 3600,
+  "height": 4800,
   "playableBounds": {
     "minX": -350,
     "maxX": 350,
     "minZ": -200,
-    "maxZ": 200
+    "maxZ": 460
   },
   "imageBounds": {
     "minX": -600,
     "maxX": 600,
     "minZ": -450,
-    "maxZ": 450
+    "maxZ": 750
   },
   "imagePaddingMetres": 250,
   "seed": 1337,
   "tiles": {
     "columns": 24,
-    "rows": 18,
+    "rows": 24,
     "metres": 50,
     "pixels": 200,
     "bleedPixels": 128
@@ -30,12 +30,12 @@
     "path": "generated/world-map.png",
     "format": "png",
     "width": 4800,
-    "height": 3600,
-    "bytes": 10840206,
-    "sha256": "4902c1ff3be7905790fe60db1129a5046240d5305efae4902841303a33ada827"
+    "height": 4800,
+    "bytes": 15039339,
+    "sha256": "b99855f5eba6b842d35c723af73bc0400eb2f3e82a71bfd86178fc8cd85564bb"
   },
-  "sha256": "4902c1ff3be7905790fe60db1129a5046240d5305efae4902841303a33ada827",
-  "renderFingerprint": "c2b894a879d9599099f2b78784b22d36c571180dfd02e825879fb10a74eb4439",
+  "sha256": "b99855f5eba6b842d35c723af73bc0400eb2f3e82a71bfd86178fc8cd85564bb",
+  "renderFingerprint": "b2c51eafec40273d493c31c8a5798c734ceb478b6c93172ea549444f428b9f4e",
   "renditions": {
     "minimap": {
       "id": "minimap",
@@ -43,10 +43,10 @@
       "path": "generated/world-map-minimap.webp",
       "format": "webp",
       "width": 800,
-      "height": 600,
+      "height": 800,
       "metresPerPixel": 1.5,
-      "bytes": 100692,
-      "sha256": "cee037df90cfcd9a2ae1047390afd14fb42ebd8ae30dd0a96511d931588e3456",
+      "bytes": 139072,
+      "sha256": "12bb2d174765a1982cc9c1111b486cb7261b8b2268322ce805a5f0d5b7a72e83",
       "quality": 92
     },
     "detail": [
@@ -56,10 +56,10 @@
         "path": "generated/world-map-detail-4800.webp",
         "format": "webp",
         "width": 4800,
-        "height": 3600,
+        "height": 4800,
         "metresPerPixel": 0.25,
-        "bytes": 727110,
-        "sha256": "98404b0b8f91c46809589c7eae3330fedbbef7e16da1740ea5f93375d7b35e3a",
+        "bytes": 1062756,
+        "sha256": "227c34065a718dee771e6da94c301a7e32984fadba7b8450c0584befc3845f6f",
         "quality": 60
       },
       {
@@ -68,10 +68,10 @@
         "path": "generated/world-map-detail-2400.webp",
         "format": "webp",
         "width": 2400,
-        "height": 1800,
+        "height": 2400,
         "metresPerPixel": 0.5,
-        "bytes": 380816,
-        "sha256": "32d24f9e2ea66ddbb6a8966f2d1ba39f5ff19261d6903ef4f1d03fa71fdaf536",
+        "bytes": 502262,
+        "sha256": "139877981d5c8ef1af209c25b94bc58db6fcdbc98d9fd88ca5c13d80217e71bf",
         "quality": 82
       },
       {
@@ -80,10 +80,10 @@
         "path": "generated/world-map-detail-1200.webp",
         "format": "webp",
         "width": 1200,
-        "height": 900,
+        "height": 1200,
         "metresPerPixel": 1,
-        "bytes": 139844,
-        "sha256": "73652fbe64aa25a3e9c6ad8fd90427a90230337749d23667efcba7d1cc7771b9",
+        "bytes": 190390,
+        "sha256": "2871874f3c9da4b62c770f50943993ef4be1c26174b021cacedd124b947e0870",
         "quality": 86
       }
     ]

@@ -37,6 +37,16 @@ description: "Production recipes generated from the live game tables."
 | Kaldite Gloves | 10 | anvil | 1× Kaldite Bar | 1× Kaldite Gauntlets | 3.0 s | 88 |
 | Kaldite Pickaxe | 10 | anvil | 2× Kaldite Bar + 1× Cairnpine Handle | 1× Kaldite Pickaxe | 3.0 s | 77 |
 | Kaldite Hatchet | 10 | anvil | 2× Kaldite Bar + 1× Cairnpine Handle | 1× Kaldite Hatchet | 3.0 s | 77 |
+| Emberite Bar | 20 | furnace | 3× Emberite Ore + 2× Kilnstone | 1× Emberite Bar | 2.4 s | 42 |
+| Emberite Dagger | 20 | anvil | 1× Emberite Bar + 1× Cinderpine Handle | 1× Emberite Dagger | 3.0 s | 104 |
+| Emberite Sword | 20 | anvil | 2× Emberite Bar + 1× Cinderpine Handle | 1× Emberite Sword | 3.0 s | 182 |
+| Emberite Helm | 20 | anvil | 2× Emberite Bar | 1× Emberite Helm | 3.0 s | 130 |
+| Emberite Body | 20 | anvil | 3× Emberite Bar | 1× Emberite Plate | 3.0 s | 260 |
+| Emberite Legs | 20 | anvil | 3× Emberite Bar | 1× Emberite Greaves | 3.0 s | 260 |
+| Emberite Boots | 20 | anvil | 1× Emberite Bar | 1× Emberite Boots | 3.0 s | 130 |
+| Emberite Gloves | 20 | anvil | 1× Emberite Bar | 1× Emberite Gauntlets | 3.0 s | 130 |
+| Emberite Pickaxe | 20 | anvil | 2× Emberite Bar + 1× Cinderpine Handle | 1× Emberite Pickaxe | 3.0 s | 114 |
+| Emberite Hatchet | 20 | anvil | 2× Emberite Bar + 1× Cinderpine Handle | 1× Emberite Hatchet | 3.0 s | 114 |
 
 ## Cooking
 
@@ -48,6 +58,8 @@ description: "Production recipes generated from the live game tables."
 | Roast Venison | 5 | range / campfire | 1× Raw Venison | 1× Roast Venison | 2.4 s | 36 |
 | Seared Cragfin | 10 | range / campfire | 1× Cragfin | 1× Seared Cragfin | 2.4 s | 53 |
 | Roast Haunch | 10 | range / campfire | 1× Raw Haunch | 1× Roast Haunch | 2.4 s | 53 |
+| Seared Ashfin | 20 | range / campfire | 1× Ashfin | 1× Seared Ashfin | 2.4 s | 78 |
+| Roast Ember Haunch | 20 | range / campfire | 1× Raw Ember Haunch | 1× Roast Ember Haunch | 2.4 s | 78 |
 
 ## Crafting
 
@@ -86,6 +98,17 @@ description: "Production recipes generated from the live game tables."
 | Cairnpelt Hood | 10 | crafting_table | 1× Cairn Pelt | 1× Cairnpelt Hood | 3.0 s | 88 |
 | Cairnpelt Boots | 10 | crafting_table | 1× Cairn Pelt | 1× Cairnpelt Boots | 3.0 s | 88 |
 | Cairnpelt Wraps | 10 | crafting_table | 1× Cairn Pelt | 1× Cairnpelt Wraps | 3.0 s | 88 |
+| Fire Wand | 20 | essence_altar | 1× Cinderpine Wand | 1× Fire Wand | 1.8 s | 125 |
+| Fire Staff | 20 | essence_altar | 1× Cinderpine Staff | 1× Fire Staff | 1.8 s | 166 |
+| Emberite Ring | 20 | crafting_table | 1× Emberite Bar + 1× Fire Opal | 1× Emberite Ring | 2.4 s | 156 |
+| Emberite Pendant | 20 | crafting_table | 1× Emberite Bar + 1× Fire Opal | 1× Emberite Pendant | 2.4 s | 156 |
+| Cinder Ring | 20 | crafting_table | 1× Emberite Bar + 2× Fire Opal | 1× Cinder Ring | 2.4 s | 156 |
+| Cinder Charm | 20 | crafting_table | 2× Fire Opal | 1× Cinder Charm | 2.4 s | 156 |
+| Charhide Robe | 20 | crafting_table | 3× Charhide | 1× Charhide Robe | 2.4 s | 208 |
+| Charhide Leggings | 20 | crafting_table | 2× Charhide | 1× Charhide Leggings | 2.4 s | 208 |
+| Charhide Hood | 20 | crafting_table | 1× Charhide | 1× Charhide Hood | 3.0 s | 130 |
+| Charhide Boots | 20 | crafting_table | 1× Charhide | 1× Charhide Boots | 3.0 s | 130 |
+| Charhide Wraps | 20 | crafting_table | 1× Charhide | 1× Charhide Wraps | 3.0 s | 130 |
 
 ## Fletching
 
@@ -111,3 +134,9 @@ description: "Production recipes generated from the live game tables."
 | Cairnpine Wand | 10 | fletching_bench | 2× Cairnpine Shaft | 1× Cairnpine Wand | 1.8 s | 84 |
 | Cairnpine Shield | 10 | fletching_bench | 2× Cairnpine Log + 1× Kaldite Bar | 1× Cairnpine Shield | 1.8 s | 98 |
 | Cairnpine Rod | 10 | fletching_bench | 2× Cairnpine Shaft + 1× Cairn Pelt | 1× Cairnpine Rod | 1.8 s | 63 |
+| Cinderpine Shafts | 20 | fletching_bench | 1× Cinderpine Log | 4× Cinderpine Shaft | 1.8 s | 52 |
+| Cinderpine Handles | 20 | fletching_bench | 1× Cinderpine Log | 2× Cinderpine Handle | 1.8 s | 52 |
+| Cinderpine Staff | 20 | fletching_bench | 3× Cinderpine Shaft | 1× Cinderpine Staff | 1.8 s | 166 |
+| Cinderpine Wand | 20 | fletching_bench | 2× Cinderpine Shaft | 1× Cinderpine Wand | 1.8 s | 125 |
+| Cinderpine Shield | 20 | fletching_bench | 2× Cinderpine Log + 1× Emberite Bar | 1× Cinderpine Shield | 1.8 s | 146 |
+| Cinderpine Rod | 20 | fletching_bench | 2× Cinderpine Shaft + 1× Charhide | 1× Cinderpine Rod | 1.8 s | 94 |

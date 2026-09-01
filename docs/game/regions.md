@@ -14,6 +14,7 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#coldbrace-east-gate" style="--map-x:38.8333%;--map-y:56.6667%" data-map-side="right" data-map-kind="gate" data-map-marker aria-label="Coldbrace East Gate, Fallowmarch" title="Coldbrace East Gate, Fallowmarch"><span>Coldbrace East Gate<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#the-broken-milestone" style="--map-x:41.0000%;--map-y:50.6667%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="The Broken Milestone, Fallowmarch" title="The Broken Milestone, Fallowmarch"><span>The Broken Milestone<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#bracken-pit" style="--map-x:36.6667%;--map-y:43.3333%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Bracken Pit, Fallowmarch" title="Bracken Pit, Fallowmarch"><span>Bracken Pit<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="#kiln-road-south" style="--map-x:36.6667%;--map-y:34.0000%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Kiln Road South, Fallowmarch" title="Kiln Road South, Fallowmarch"><span>Kiln Road South<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#palewood-copse" style="--map-x:22.1667%;--map-y:55.3333%" data-map-side="right" data-map-kind="grove" data-map-marker aria-label="Palewood Copse, Fallowmarch" title="Palewood Copse, Fallowmarch"><span>Palewood Copse<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#redsill-shallows" style="--map-x:46.6667%;--map-y:55.0000%" data-map-side="right" data-map-kind="water" data-map-marker aria-label="Redsill Shallows, Fallowmarch" title="Redsill Shallows, Fallowmarch"><span>Redsill Shallows<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#corven-ford" style="--map-x:44.0000%;--map-y:62.1667%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Corven Ford, Fallowmarch" title="Corven Ford, Fallowmarch"><span>Corven Ford<small>Fallowmarch</small></span></a>
@@ -34,6 +35,8 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#the-thornline" style="--map-x:66.3333%;--map-y:37.3333%" data-map-side="left" data-map-kind="camp" data-map-marker aria-label="The Thornline, Vellenwood" title="The Thornline, Vellenwood"><span>The Thornline<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="#earth-essence-cache" style="--map-x:71.8333%;--map-y:35.3333%" data-map-side="left" data-map-kind="landmark" data-map-marker aria-label="Earth Essence Cache, Vellenwood" title="Earth Essence Cache, Vellenwood"><span>Earth Essence Cache<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="#cairn-gate" style="--map-x:70.8333%;--map-y:48.0000%" data-map-side="left" data-map-kind="gate" data-map-marker aria-label="Cairn Gate, Vellenwood" title="Cairn Gate, Vellenwood"><span>Cairn Gate<small>Vellenwood</small></span></a>
+<a class="corealm-map-marker" href="#kiln-path" style="--map-x:62.5000%;--map-y:33.8333%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Kiln Path, Vellenwood" title="Kiln Path, Vellenwood"><span>Kiln Path<small>Vellenwood</small></span></a>
+<a class="corealm-map-marker" href="#ember-edge" style="--map-x:73.8333%;--map-y:33.8333%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Ember Edge, Vellenwood" title="Ember Edge, Vellenwood"><span>Ember Edge<small>Vellenwood</small></span></a>
 <a class="corealm-map-marker" href="#moorgate" style="--map-x:71.3333%;--map-y:49.6667%" data-map-side="left" data-map-kind="gate" data-map-marker aria-label="Moorgate, Karrowmoor" title="Moorgate, Karrowmoor"><span>Moorgate<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#moor-road-bend" style="--map-x:64.1667%;--map-y:50.5000%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Moor Road Bend, Karrowmoor" title="Moor Road Bend, Karrowmoor"><span>Moor Road Bend<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#lower-quarry" style="--map-x:55.0000%;--map-y:51.3333%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Lower Quarry, Karrowmoor" title="Lower Quarry, Karrowmoor"><span>Lower Quarry<small>Karrowmoor</small></span></a>
@@ -50,6 +53,21 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#far-tarn" style="--map-x:73.6667%;--map-y:59.1667%" data-map-side="left" data-map-kind="water" data-map-marker aria-label="Far Tarn, Karrowmoor" title="Far Tarn, Karrowmoor"><span>Far Tarn<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#tarn-track" style="--map-x:75.0000%;--map-y:56.6667%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Tarn Track, Karrowmoor" title="Tarn Track, Karrowmoor"><span>Tarn Track<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#water-essence-cache" style="--map-x:77.3333%;--map-y:64.6667%" data-map-side="left" data-map-kind="landmark" data-map-marker aria-label="Water Essence Cache, Karrowmoor" title="Water Essence Cache, Karrowmoor"><span>Water Essence Cache<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="#kiln-road-south" style="--map-x:36.6667%;--map-y:32.1667%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Kiln Road South, Kilnhalt" title="Kiln Road South, Kilnhalt"><span>Kiln Road South<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#ridge-track" style="--map-x:62.5000%;--map-y:32.1667%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Ridge Track, Kilnhalt" title="Ridge Track, Kilnhalt"><span>Ridge Track<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#ember-edge-track" style="--map-x:74.1667%;--map-y:32.1667%" data-map-side="left" data-map-kind="junction" data-map-marker aria-label="Ember Edge Track, Kilnhalt" title="Ember Edge Track, Kilnhalt"><span>Ember Edge Track<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#kilnroad-fork" style="--map-x:50.0000%;--map-y:28.8333%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Kilnroad Fork, Kilnhalt" title="Kilnroad Fork, Kilnhalt"><span>Kilnroad Fork<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#south-bend" style="--map-x:53.3333%;--map-y:25.0000%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="South Bend, Kilnhalt" title="South Bend, Kilnhalt"><span>South Bend<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#emberfast" style="--map-x:50.1667%;--map-y:22.9167%" data-map-side="right" data-map-kind="settlement" data-map-marker aria-label="Emberfast, Kilnhalt" title="Emberfast, Kilnhalt"><span>Emberfast<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#emberfast-bank" style="--map-x:50.6667%;--map-y:23.2500%" data-map-side="right" data-map-kind="bank" data-map-marker aria-label="Emberfast Bank, Kilnhalt" title="Emberfast Bank, Kilnhalt"><span>Emberfast Bank<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#emberfast-gate" style="--map-x:52.0000%;--map-y:22.2500%" data-map-side="right" data-map-kind="gate" data-map-marker aria-label="Emberfast Gate, Kilnhalt" title="Emberfast Gate, Kilnhalt"><span>Emberfast Gate<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#quarry-postern" style="--map-x:48.0000%;--map-y:22.2500%" data-map-side="right" data-map-kind="gate" data-map-marker aria-label="Quarry Postern, Kilnhalt" title="Quarry Postern, Kilnhalt"><span>Quarry Postern<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#coalroot-plots" style="--map-x:47.3333%;--map-y:22.8333%" data-map-side="right" data-map-kind="farm" data-map-marker aria-label="Coalroot Plots, Kilnhalt" title="Coalroot Plots, Kilnhalt"><span>Coalroot Plots<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#clinker-quarry" style="--map-x:29.1667%;--map-y:22.5000%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Clinker Quarry, Kilnhalt" title="Clinker Quarry, Kilnhalt"><span>Clinker Quarry<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#ashfin-springs" style="--map-x:67.5000%;--map-y:29.1667%" data-map-side="left" data-map-kind="water" data-map-marker aria-label="Ashfin Springs, Kilnhalt" title="Ashfin Springs, Kilnhalt"><span>Ashfin Springs<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#cinderpine-stand" style="--map-x:70.0000%;--map-y:21.6667%" data-map-side="left" data-map-kind="grove" data-map-marker aria-label="Cinderpine Stand, Kilnhalt" title="Cinderpine Stand, Kilnhalt"><span>Cinderpine Stand<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#fire-essence-cache" style="--map-x:74.1667%;--map-y:16.6667%" data-map-side="left" data-map-kind="landmark" data-map-marker aria-label="Fire Essence Cache, Kilnhalt" title="Fire Essence Cache, Kilnhalt"><span>Fire Essence Cache<small>Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="#cinderwake-arena" style="--map-x:73.8333%;--map-y:15.0000%" data-map-side="left" data-map-kind="landmark" data-map-marker aria-label="Cinderwake Arena, Kilnhalt" title="Cinderwake Arena, Kilnhalt"><span>Cinderwake Arena<small>Kilnhalt</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -123,6 +141,14 @@ A snapped March Company marker where the pit road bends around the rise.
 A shallow Grithe pit 160 m north of Coldbrace. Six seams and two stone faces.
 
 **Tier:** 1 · **Type:** seam
+
+### Kiln Road South
+
+![Kiln Road South](./assets/captures/locations/fallowmarch_kiln_road.webp)
+
+Where the pit track runs on toward the ember foothills. No gate; the border is open ground.
+
+**Tier:** 1 · **Type:** junction
 
 ### Palewood Copse
 
@@ -290,6 +316,22 @@ An old stone heart under the eastern canopy, split through with earth essence.
 The east gate. On a clear day you can see the Karrowmoor ridge from it.
 
 **Tier:** 5 · **Type:** gate
+
+### Kiln Path
+
+![Kiln Path](./assets/captures/locations/vellenwood_kiln_path.webp)
+
+A foot track over the northern ridge toward the ember foothills. No gate; it never needed one.
+
+**Tier:** 5 · **Type:** junction
+
+### Ember Edge
+
+![Ember Edge](./assets/captures/locations/vellenwood_ember_edge.webp)
+
+The canopy's last shade line. North of here the trees stand scorched and far apart.
+
+**Tier:** 5 · **Type:** junction
 
 
 ## Karrowmoor
@@ -460,3 +502,129 @@ Chamber three. Cairns, indoors, arranged since the crew left.
 A twenty-four metre circle of swept stone.
 
 **Tier:** 10 · **Type:** dungeon
+
+## Kilnhalt
+
+The foothills north of the old survey line, where the ground runs warm and the pines grow back scorched. Somebody fired kilns here long before the March Company drew its maps, and the ground never entirely went out. Emberfast is the camp that grew up on the warm flat in the middle: smiths, mostly, because Emberite is the first metal since Kaldite worth the walk, and the walk is why they stay. Nobody watches the southern border. There is no border. You just notice, somewhere past the last milestone, that the wind has gone warm.
+
+Tier 20. Settlement: **Emberfast**.
+
+### Kiln Road South
+
+![Kiln Road South](./assets/captures/locations/kilnhalt_south_track.webp)
+
+The pit track out of Fallowmarch, on warm ground now. The border is somewhere behind you.
+
+**Tier:** 20 · **Type:** junction
+
+### Ridge Track
+
+![Ridge Track](./assets/captures/locations/kilnhalt_vellen_track.webp)
+
+The foot track down off the Vellenwood ridge. The first scorched pines start here.
+
+**Tier:** 20 · **Type:** junction
+
+### Ember Edge Track
+
+![Ember Edge Track](./assets/captures/locations/kilnhalt_east_track.webp)
+
+Where the canopy shade gives out for good. The springs lie north-west of here.
+
+**Tier:** 20 · **Type:** junction
+
+### Kilnroad Fork
+
+![Kilnroad Fork](./assets/captures/locations/kilnroad_fork.webp)
+
+Both southern tracks meet here. Emberfast's rampart torches are visible up the road.
+
+**Tier:** 20 · **Type:** junction
+
+### South Bend
+
+![South Bend](./assets/captures/locations/emberfast_south_bend.webp)
+
+The road swings east around Emberfast's rampart to reach the gate.
+
+**Tier:** 20 · **Type:** junction
+
+### Emberfast
+
+![Emberfast](./assets/captures/locations/emberfast_town.webp)
+
+A walled kiln camp with every counter and bench a tier-20 trade needs inside one wall.
+
+**Tier:** 20 · **Type:** settlement
+
+### Emberfast Bank
+
+![Emberfast Bank](./assets/captures/locations/emberfast_bank.webp)
+
+One chest under a porch. The vault ledger smells faintly of smoke.
+
+**Tier:** 20 · **Type:** bank
+
+### Emberfast Gate
+
+![Emberfast Gate](./assets/captures/locations/emberfast_east_gate.webp)
+
+The east gatehouse. Carts to the stand and the springs leave this way.
+
+**Tier:** 20 · **Type:** gate
+
+### Quarry Postern
+
+![Quarry Postern](./assets/captures/locations/emberfast_west_postern.webp)
+
+The west gatehouse, opening onto the plots and the quarry road.
+
+**Tier:** 20 · **Type:** gate
+
+### Coalroot Plots
+
+![Coalroot Plots](./assets/captures/locations/emberfast_plots.webp)
+
+Four beds in the warm soil against the west wall. Coalroot takes twenty minutes.
+
+**Tier:** 20 · **Type:** farm
+
+### Clinker Quarry
+
+![Clinker Quarry](./assets/captures/locations/clinker_quarry.webp)
+
+Six Emberite seams and two Kilnstone faces, still warm at the break.
+
+**Tier:** 20 · **Type:** seam
+
+### Ashfin Springs
+
+![Ashfin Springs](./assets/captures/locations/ashfin_springs.webp)
+
+Four warm pools where the ashfin run heavy. The water steams at dawn.
+
+**Tier:** 20 · **Type:** water
+
+### Cinderpine Stand
+
+![Cinderpine Stand](./assets/captures/locations/cinderpine_stand.webp)
+
+Eight cinderpine, scorched black outside and sound within. The fire chose not to eat them.
+
+**Tier:** 20 · **Type:** grove
+
+### Fire Essence Cache
+
+![Fire Essence Cache](./assets/captures/locations/kilnhalt_fire_cache.webp)
+
+A ruined stone court where fire essence beads out of the warm rock. The altar is dark.
+
+**Tier:** 20 · **Type:** landmark
+
+### Cinderwake Arena
+
+![Cinderwake Arena](./assets/captures/locations/cinderwake_arena.webp)
+
+A swept circle of scorched stone past the altar court. Something keeps it swept.
+
+**Tier:** 20 · **Type:** landmark

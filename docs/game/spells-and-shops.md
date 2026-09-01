@@ -33,6 +33,7 @@ Boss orbs are singleton altar keys, not equipment. Use one on the dormant altar 
 | [Air Orb](./items/#air-orb) | 1 | Air | Awakens the regional altar for both weapon types | Air Essence | Released |
 | [Earth Orb](./items/#earth-orb) | 5 | Earth | Awakens the regional altar for both weapon types | Earth Essence | Released |
 | [Water Orb](./items/#water-orb) | 10 | Water | Awakens the regional altar for both weapon types | Water Essence | Released |
+| [Fire Orb](./items/#fire-orb) | 20 | Fire | Awakens the regional altar for both weapon types | Fire Essence | Released |
 
 ## Charged elemental weapons
 
@@ -46,6 +47,8 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Earth Staff](./items/#earth-staff) | Earth | 1000 | 100× Earth Essence | Released |
 | [Water Wand](./items/#water-wand) | Water | 1000 | 100× Water Essence | Released |
 | [Water Staff](./items/#water-staff) | Water | 1000 | 100× Water Essence | Released |
+| [Fire Wand](./items/#fire-wand) | Fire | 1000 | 100× Fire Essence | Released |
+| [Fire Staff](./items/#fire-staff) | Fire | 1000 | 100× Fire Essence | Released |
 
 ## Shops
 
@@ -117,3 +120,31 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Kaldite Boots](./items/#kaldite-boots) | 2 | 600 |
 | [Kaldite Gauntlets](./items/#kaldite-gauntlets) | 2 | 600 |
 | [Cairnpine Shield](./items/#cairnpine-shield) | 2 | 560 |
+
+### Emberfast Provisioners
+
+| Item | Stock | Price |
+| --- | --- | --- |
+| [Emberite Pickaxe](./items/#emberite-pickaxe) | 3 | 1400 |
+| [Emberite Hatchet](./items/#emberite-hatchet) | 3 | 1350 |
+| [Cinderpine Rod](./items/#cinderpine-rod) | 3 | 1100 |
+| [Seared Ashfin](./items/#seared-ashfin) | 40 | 150 |
+| [Seared Cragfin](./items/#seared-cragfin) | 20 | 70 |
+| [Coalroot Seed](./items/#coalroot-seed) | 30 | 115 |
+| [Fire Essence](./items/#fire-essence) | 300 | 120 |
+| [Cinderpine Shaft](./items/#cinderpine-shaft) | 60 | 70 |
+| [Charhide](./items/#charhide) | 8 | 290 |
+
+### Kiln Row Smith
+
+| Item | Stock | Price |
+| --- | --- | --- |
+| [Kaldite Bar](./items/#kaldite-bar) | 25 | 250 |
+| [Emberite Bar](./items/#emberite-bar) | 20 | 760 |
+| [Kilnstone](./items/#kilnstone) | 80 | 12 |
+| [Kaldite Sword](./items/#kaldite-sword) | 2 | 1450 |
+| [Kaldite Helm](./items/#kaldite-helm) | 2 | 880 |
+| [Emberite Dagger](./items/#emberite-dagger) | 2 | 1700 |
+| [Emberite Boots](./items/#emberite-boots) | 2 | 1350 |
+| [Emberite Gauntlets](./items/#emberite-gauntlets) | 2 | 1350 |
+| [Cinderpine Shield](./items/#cinderpine-shield) | 2 | 1250 |

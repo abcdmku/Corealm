@@ -20,3 +20,9 @@ description: "Gathering nodes, requirements, yields, respawns, and authored pres
 | Kaldite Face | Mining | 10 | 10 | [Kaldite Ore](./items/#kaldite-ore) | [Cairn Garnet](./items/#cairn-garnet) 7% | 35 | 8-14 | 43 s respawn | rock_medium_3, rock_medium_1 | Renderer fallback | 1.75 m |
 | Water Essence Cache | Mining | 10 | 10 | [Water Essence](./items/#water-essence) | - | 35 | 40-90 | 30 s respawn | rocks_free_essence_node | Renderer fallback | 1.58 m |
 | Cairnpine | Woodcutting | 10 | 10 | [Cairnpine Log](./items/#cairnpine-log) | - | 35 | 8-14 | 43 s respawn | tree_pine_2, tree_pine_1 | nature_tree_stump_snow | 9 m |
+| Emberfast Plot | Farming | 20 | 20 | [Coalroot](./items/#coalroot) | [Coalroot Seed](./items/#coalroot-seed) 25% | 52 | 2-5 per harvest | 1200 s wall-clock growth | crop_carrot | Renderer fallback | 1 m |
+| Ashfin Spring | Fishing | 20 | 20 | [Ashfin](./items/#ashfin) | - | 52 | 7-14 | 65 s respawn | fish_cragfin | Renderer fallback | 0.92 m, water -0.22 m |
+| Emberite Seam | Mining | 20 | 20 | [Emberite Ore](./items/#emberite-ore) | [Fire Opal](./items/#fire-opal) 7% | 52 | 7-14 | 65 s respawn | rock_medium_1, rock_medium_3 | Renderer fallback | 1.8 m |
+| Kilnstone Face | Mining | 20 | 20 | [Kilnstone](./items/#kilnstone) | [Fire Opal](./items/#fire-opal) 3% | 52 | 7-14 | 65 s respawn | rock_medium_2 | Renderer fallback | 1.5 m |
+| Fire Essence Cache | Mining | 20 | 20 | [Fire Essence](./items/#fire-essence) | - | 52 | 40-90 | 30 s respawn | rocks_free_essence_node | Renderer fallback | 1.58 m |
+| Cinderpine | Woodcutting | 20 | 20 | [Cinderpine Log](./items/#cinderpine-log) | - | 52 | 7-14 | 65 s respawn | tree_twisted_2, tree_twisted_1 | nature_tree_stump | 9 m |
