@@ -19,8 +19,8 @@
  * resolved inside a function body instead.
  */
 import type {
-  EntityId, FeatureLabApi, GameApi, ItemDef, ItemId, ItemStack, QuestId, RegionId, Result,
-  SemanticEntity, SkillId, StationKind, Vec3,
+  EntityId, FeatureLabApi, GameApi, ItemDef, ItemId, ItemStack, LootContainerView, QuestId,
+  RegionId, Result, SemanticEntity, SkillId, StationKind, Vec3,
 } from "../contracts.js";
 import { burnChance, content } from "../content/index.js";
 import type { RecipeDef } from "../content/index.js";
@@ -39,6 +39,7 @@ import { SettingsStore } from "./settings.js";
 import { PanelDock } from "./dock.js";
 import { QuestTracker } from "./questTracker.js";
 import { Minimap } from "./minimap.js";
+import { LootReveal } from "./lootReveal.js";
 import {
   LazyPanel,
   loadBankPanel,
@@ -592,6 +593,8 @@ export interface UiContext {
   readonly registry: KeyBindingRegistry;
   /** Lightweight source for the real terrain-backed map; absent only in isolated UI tests. */
   readonly mapTerrain?: MapTerrainSource;
+  /** Projects a world point into viewport pixels for UI anchored to an entity. */
+  readonly projectWorldToScreen?: (position: Vec3) => { x: number; y: number; visible: boolean };
   /** True while a bank window is open, so the inventory can offer Deposit. */
   isBankOpen(): boolean;
   /** True while a shop window is open, so the inventory can offer Sell. */
@@ -949,6 +952,8 @@ export interface UiOptions {
   /** Existing client-preference store, when boot must apply audio before the UI is constructed. */
   settings?: SettingsStore;
   mapTerrain?: MapTerrainSource;
+  /** Projects a world point into viewport pixels for compact world-anchored UI. */
+  projectWorldToScreen?: (position: Vec3) => { x: number; y: number; visible: boolean };
   /** True when boot found a save. The title screen offers "Continue" rather than "Begin". */
   hasSave?(): boolean;
   /**
@@ -988,6 +993,8 @@ export interface Ui {
   closeDialogue(): void;
   /** Shows the death report. The root calls this on `player.died` with the event payload. */
   showDeath(detail: DeathDetail): void;
+  /** Opens the read-only contents grid beside a world loot container. */
+  openLoot(container: LootContainerView): void;
   /** Raises the title and pause screen. */
   openTitle(): void;
   /** Live client preferences. The root subscribes to apply them. */
@@ -1024,6 +1031,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     menu,
     registry,
     mapTerrain: options.mapTerrain,
+    projectWorldToScreen: options.projectWorldToScreen,
     isBankOpen: () => bank?.frame.isOpen() ?? false,
     isShopOpen: () => shop?.frame.isOpen() ?? false,
     deposit: (itemId, quantity) => { bank?.withPanel((panel) => panel.deposit(itemId, quantity)); },
@@ -1038,6 +1046,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
     notify(`Could not open ${title}. Try again.`, "error");
   };
   const hud = new Hud(context, options);
+  const loot = new LootReveal(context);
   const inventory = new LazyPanel({
     id: "inventory", title: "Inventory", key: "i", keyLabel: "Inventory", registry,
     load: () => loadInventoryPanel(context), onError: loadError("Inventory"),
@@ -1187,6 +1196,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       }
       tracker.mount(root);
       dock.mount(root);
+      loot.mount(root);
       for (const panel of panels) panel.frame.mount(root);
       featureLab?.frame.open();
       // Both of these cover the screen, so they mount last and sit above the panels.
@@ -1199,6 +1209,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
 
     update(): void {
       if (!mounted) return;
+      loot.update();
       const now = performance.now();
       if (now - lastHudMs >= HUD_INTERVAL_MS) {
         lastHudMs = now;
@@ -1223,6 +1234,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       minimap?.dispose();
       tracker.dispose();
       dock.dispose();
+      loot.dispose();
       death.dispose();
       title.dispose();
       for (const panel of panels) panel.dispose();
@@ -1254,6 +1266,10 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
 
     showDeath(detail: DeathDetail): void {
       death.show(detail);
+    },
+
+    openLoot(container: LootContainerView): void {
+      loot.show(container);
     },
 
     openTitle(): void {

@@ -12,7 +12,7 @@
 import type {
   ActivitySummary, BankView, DialogueView, DocHit, EntityId, EquipSlot, EquipmentBonuses,
   GameApi as GameApiContract, GameEvent, GameEventType, InteractionId, InventorySlot, ItemId,
-  ItemStack, MoveTarget, ObserveFilter, ObservedEntity, PlayerView, QuestSummary, RecipeId, TimeView,
+  ItemStack, LootTakeResult, MoveTarget, ObserveFilter, ObservedEntity, PlayerView, QuestSummary, RecipeId, TimeView,
   Result, SemanticEntity, SkillId, SkillView, SpellbookView, SpellElement, SpellId, SpellRow, Vec3,
   OverlaySpec,
 } from "../contracts.js";
@@ -124,6 +124,9 @@ export interface SystemHooks {
      * play. Optional, so a partially-registered hook still behaves exactly as before.
      */
     rangeFor?(interaction: InteractionId): number;
+  };
+  loot?: {
+    take(entityId: EntityId, stackIndex?: number): Result<LootTakeResult>;
   };
 }
 
@@ -448,6 +451,24 @@ export class CorealmGameApi implements GameApiContract {
     const runner = this.hooks.interactions;
     if (!runner) return err("UNAVAILABLE", "Interaction system is not available yet");
     return runner.run(entityId, interaction);
+  }
+
+  takeLoot(entityId: EntityId, stackIndex?: number): Result<LootTakeResult> {
+    const state = this.store.get();
+    if (state.player.health <= 0) return err("DEAD", "The player is dead");
+
+    const entity = this.hooks.entities?.get(entityId);
+    if (!entity) return err("NOT_FOUND", `No entity with id ${entityId}`, entityId);
+    if (entity.archetype !== "loot" && entity.archetype !== "recovery_cache") {
+      return err("INVALID_ARGUMENT", `${entity.name} is not a loot container.`, entityId);
+    }
+    if (distanceXZ(state.player.position, entity.position) > INTERACT_RANGE) {
+      return err("OUT_OF_RANGE", `Move closer to ${entity.name} first.`, entityId);
+    }
+
+    const hook = this.hooks.loot;
+    if (!hook) return err("UNAVAILABLE", "Loot system is not available yet", entityId);
+    return hook.take(entityId, stackIndex);
   }
 
   useItem(itemId: ItemId, target?: { itemId: ItemId } | { entityId: EntityId }): Result<{ effect: string }> {

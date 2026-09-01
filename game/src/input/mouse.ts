@@ -17,7 +17,7 @@ import { CAMERA } from "../app/config.js";
 import { Picker, type Pick, type PickSource, type PickerSources } from "./picking.js";
 import { KeyboardController, type KeyBindingRegistry } from "./keyboard.js";
 import {
-  ContextMenu, INTERACTION_LABELS, notify, primaryInteraction, reportResult,
+  ContextMenu, interactionLabel, notify, primaryInteraction, reportResult,
 } from "../ui/contextMenu.js";
 
 /** Pointer travel beyond this distance switches hover handling into drag mode. */
@@ -484,7 +484,7 @@ export class InputController {
     if (!label) return;
 
     label.textContent = interaction
-      ? `${INTERACTION_LABELS[interaction]} ${entity.name}`
+      ? `${interactionLabel(entity, interaction)} ${entity.name}`
       : entity.name;
 
     const tier = document.createElement("span");

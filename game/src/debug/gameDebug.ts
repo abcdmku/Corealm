@@ -468,6 +468,11 @@ export function installGameDebug(deps: DebugDeps): void {
       return path ? path.map((point) => xyz(roundVec3(point))) : null;
     },
 
+    getNavPoint(point: Vec3): { x: number; y: number; z: number } | null {
+      const found = nav.closestPoint(point);
+      return found ? xyz(roundVec3(found)) : null;
+    },
+
     planRoute(fromId: string, toId: string, agilityLevel = 1): unknown {
       return nav.planRoute(fromId, toId, agilityLevel);
     },

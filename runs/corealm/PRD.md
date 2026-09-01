@@ -496,6 +496,8 @@ On death, every inventory item drops into a **Recovery Cache** semantic entity a
 
 The cache is visible only to its owner, survives reload, and expires 15 real minutes after creation. Expiry destroys the contents. Only one cache exists at a time, and dying with a live cache destroys the old one, so the HUD shows a persistent warning banner with a countdown while a cache is live.
 
+Opening an enemy loot pile or Recovery Cache is read-only. It opens a compact inventory grid beside the world container with exactly one cell per remaining stack and no filler cells. Nothing moves into the player's inventory until that stack is clicked. The container remains in the world until every stack has been taken or it expires.
+
 Movement speed is 4.2 m/s running and 1.9 m/s walking. Walking is used only by NPCs.
 
 ---
@@ -1551,11 +1553,11 @@ Every test ends by asserting `__gameDebug.getErrors()` has length 0.
 | E1 | `loadScenario("tier1_ready")`, `setSeed(99)`, attack a Rill Skitterling. `combat.started` fires, `getState().combat.targetId` is set, and the enemy's health drops on the next combat tick. |
 | E2 | With `setPaused(true)` then `step(2400)` repeated, damage values are identical across two runs at the same seed. |
 | E3 | Kill the Skitterling. `combat.ended` fires with `outcome: "killed"`, Melee XP increases by exactly `4 * damageDealt + 12`, and a loot pile entity exists at the corpse position. |
-| E4 | `corealm_interact` with `loot` on the pile transfers marks and items into inventory, and the pile entity disappears. |
+| E4 | `corealm_interact` with `loot` on the pile leaves inventory and the pile unchanged while opening its exact stack grid beside the container. Clicking a stack, or using the matching semantic take command, transfers only that stack. The pile disappears after its final stack is taken. |
 | E5 | Magic parity: equip a Kaldite staff, `corealm_attack({ entityId: cairnwight, spellId: "voltrend" })`. Magic XP increases by `4 * damage + 22` per cast. |
 | E6 | `setHealth(6)` while in combat. `health.low` fires exactly once. Eating a cooked fish raises health by exactly `healAmount(tier)` and blocks attacks for 1800 ms. |
 | E7 | `setHealth(0)`. `player.died` fires. `getState().world.recoveryCache` is non-null with every pre-death inventory item, `getState().inventory` is empty, `getState().equipment` is unchanged, and skill XP is unchanged. Player position equals the Coldbrace respawn point and health equals `maxHealth`. |
-| E8 | Walk to the cache and loot it. Every item returns and the cache becomes null. |
+| E8 | Walk to the cache and open it. Opening changes nothing. Taking every displayed stack returns every item and makes the cache null. |
 | E9 | `advanceGameTime(901)` on a live cache. The cache becomes null and the items are gone. |
 | E10 | `loadScenario("boss_ready")`, fight Ordrun. At health fraction 0.55, `getState().world.enemies.ordrun.bossPhase` changes from 1 to 2. A telegraph overlay exists for 1600 ms before the slam, and standing in it costs exactly 22 health. |
 

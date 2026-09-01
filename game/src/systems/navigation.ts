@@ -1166,7 +1166,7 @@ function bytesToBase64(bytes: Uint8Array): string {
  * polygon is not "harmless because nothing connects to it", which is what the old comment claimed.
  * A ring has no top face and generates no roof polygon.
  *
- * The sides are what actually block: a vertical quad exceeds `walkableSlopeAngle` 48 degrees, so
+ * The sides are what actually block: a vertical quad exceeds `walkableSlopeAngle` 78 degrees, so
  * it rasterises with the NULL area flag, and because the ring skirts 1.5 m below the volume base
  * its span merges with the terrain span underneath and takes the ring's flag rather than the
  * ground's. That is the whole carve.

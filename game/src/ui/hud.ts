@@ -165,7 +165,7 @@ export class Hud {
     cache.append(cacheLabel, cacheDetail);
     cache.addEventListener("pointerdown", (event) => event.stopPropagation());
     cache.addEventListener("click", () => {
-      // `interact` walks into range and then loots on arrival, so one click recovers the pack.
+      // `interact` walks into range and opens the cache on arrival. Contents move only by choice.
       reportResult(this.ctx.api.interact(RECOVERY_CACHE_ID, "loot"));
     });
 

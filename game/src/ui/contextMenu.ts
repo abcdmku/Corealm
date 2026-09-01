@@ -127,6 +127,15 @@ export const INTERACTION_LABELS: Record<InteractionId, string> = {
   unequip: "Unequip",
 };
 
+/** World containers read as boxes the player opens, while the gameplay verb remains `loot`. */
+export function interactionLabel(entity: SemanticEntity, interaction: InteractionId): string {
+  if (
+    interaction === "loot"
+    && (entity.archetype === "loot" || entity.archetype === "recovery_cache")
+  ) return "Open";
+  return INTERACTION_LABELS[interaction];
+}
+
 /** Sorts an entity's interactions into menu order. Unknown ids sink to the bottom, never vanish. */
 export function orderInteractions(interactions: readonly InteractionId[]): InteractionId[] {
   const rank = (id: InteractionId): number => {
@@ -276,7 +285,7 @@ export class ContextMenu {
       const movementAllowed = options.movementEnabled !== false || interaction === "inspect";
       const item: ContextMenuItem = {
         id: interaction,
-        label: `${INTERACTION_LABELS[interaction]} ${entity.name}`,
+        label: `${interactionLabel(entity, interaction)} ${entity.name}`,
         enabled: availability.enabled && movementAllowed,
         danger: COMBAT_VERBS.includes(interaction),
         onSelect: () => this.runInteraction(entity, interaction),

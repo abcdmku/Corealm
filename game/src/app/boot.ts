@@ -13,6 +13,7 @@ import type {
   FeatureLabApi,
   FeatureLabStructureSelection,
   FeatureLabStructureView,
+  LootContainerView,
   RegionId,
   SemanticEntity,
   SkillId,
@@ -927,11 +928,13 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     groundHeightAt: (x, z) => scene.meshHeightAt(x, z),
   });
   const healthSystem = new HealthSystem({ store, events, equipment: equipmentSystem });
+  let openLootContainer: ((container: LootContainerView) => void) | undefined;
   const deathSystem = new DeathSystem({
     store, events,
     entities: entityStore,
     inventory: inventorySystem,
     dispatcher: interactions,
+    onLootOpened: (container) => openLootContainer?.(container),
     // Respawn points are authored per region; fall back to the region's own spawn.
     respawn: {
       resolve: (respawnPointId: string, regionId: RegionId) => {
@@ -1133,6 +1136,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     },
   });
   api.register("activity", activitySystem.hook());
+  api.register("loot", {
+    take: (entityId, stackIndex) => deathSystem.take(entityId, stackIndex),
+  });
 
   api.register("entities", {
     get: (id) => entityStore.get(id),
@@ -1654,6 +1660,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // model-context container the browser provides. One implementation, three ways in.
   // The human UI. Everything it does goes through GameApi, the same object the agent tools call.
   const uiConstructionSpan = bootTelemetry.startSpan(BOOT_SPANS.UI_CONSTRUCTION);
+  const lootProjection = new THREE.Vector3();
   const ui = createUi(api, {
     settings: clientSettings,
     mapTerrain: {
@@ -1665,6 +1672,22 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       }),
       roadPolylines: () => scene.getRoadPolylines(),
     },
+    projectWorldToScreen: (position) => {
+      lootProjection.set(position[0], position[1], position[2]).project(renderer.camera);
+      const bounds = canvas.getBoundingClientRect();
+      return {
+        x: bounds.left + (lootProjection.x + 1) * bounds.width / 2,
+        y: bounds.top + (1 - lootProjection.y) * bounds.height / 2,
+        visible: Number.isFinite(lootProjection.x)
+          && Number.isFinite(lootProjection.y)
+          && lootProjection.x >= -1
+          && lootProjection.x <= 1
+          && lootProjection.y >= -1
+          && lootProjection.y <= 1
+          && lootProjection.z >= -1
+          && lootProjection.z <= 1,
+      };
+    },
     // OrbitCamera yaw is measured from +z clockwise; the compass wants a heading in the same frame.
     getHeadingRad: () => camera.yaw,
     // The minimap's destination marker. GameApi does not expose the live path; the store does.
@@ -1675,6 +1698,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     onNewGame: () => resetWorld(undefined, false),
     ...(featureLab ? { featureLab } : {}),
   });
+  openLootContainer = (container) => ui.openLoot(container);
   ui.mount(labelRoot);
   api.subscribePendingResult(({ result }) => {
     if (!result.ok) ui.notify(result.error.message, "error");

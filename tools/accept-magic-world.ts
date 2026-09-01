@@ -390,8 +390,10 @@ try {
         await driver.screenshot(screenshotDir, "magic-08-air-orb-boss-drop");
       }
       await call("teleport", [{ entityId: firstBoss.pileId }]);
-      const lootResult = await tool("corealm_interact", { entityId: firstBoss.pileId, interaction: "loot" });
-      if (toolError(lootResult)) failures.push(`${boss.bossName} loot rejected: ${JSON.stringify(lootResult)}`);
+      const openResult = await tool("corealm_interact", { entityId: firstBoss.pileId, interaction: "loot" });
+      if (toolError(openResult)) failures.push(`${boss.bossName} loot open rejected: ${JSON.stringify(openResult)}`);
+      const lootResult = await tool("corealm_take_loot", { entityId: firstBoss.pileId });
+      if (toolError(lootResult)) failures.push(`${boss.bossName} loot take rejected: ${JSON.stringify(lootResult)}`);
       const afterLoot = await tool("corealm_inventory", {}) as InventoryView;
       if (itemCount(afterLoot, boss.orbId) !== 1) {
         failures.push(`first ${boss.bossName} loot did not put exactly one ${boss.orbName} in inventory`);

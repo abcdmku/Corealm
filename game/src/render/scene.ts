@@ -1169,7 +1169,7 @@ export class WorldScene {
    * from under its collar, which is the other half of how the 32.75 m cliff was cut.
    */
   private normaliseFlats(): void {
-    const maxGradient = 0.6; // about 31 degrees, comfortably inside the 48-degree walkable limit
+    const maxGradient = 0.6; // about 31 degrees, comfortably inside the 64-degree uphill limit
     // Two passes: the first pass changes the flattened field the second pass measures against.
     for (let pass = 0; pass < 2; pass += 1) {
       for (const flat of this.flats) {
@@ -3581,8 +3581,9 @@ const PAD_CORE_EPSILON = 1e-5;
 
 /**
  * Haul roads: the graded corridors `buildHaulRoads` cuts between flat pads. Every number here is
- * measured against `NAV_CONFIG` in app/config.ts, which is cs 0.45 (large world), walkableRadius 2
- * voxels = 0.90 m, walkableClimb 0.40 m, walkableSlopeAngle 48 degrees = a gradient of 1.111.
+ * measured against `NAV_CONFIG` in app/config.ts, which is cs 0.45 (large world), walkableRadius 1
+ * voxel = 0.45 m, walkableClimb 0.40 m, and the directional uphill limit is 64 degrees. Haul roads
+ * stay far gentler than that so their local collars remain reliable after rasterisation.
  *
  * HAUL_TRIGGER_GRADE 0.50 (26.6 degrees) is where a link stops being walkable in practice rather
  * than in theory: recast rasterises at 0.45 m and the 2 m terrain lattice quantises the slope it
@@ -3596,8 +3597,8 @@ const PAD_CORE_EPSILON = 1e-5;
  * surface than on its own profile. Measured over all 15 authored Karrowmoor road links, 0.30 puts
  * the worst surface metre on each between 13.6 and 32.1 degrees, mean 21.1.
  *
- * HAUL_ROAD_HALF 2.6 m of full regrade is 5.2 m of flat lane. Recast erodes walkableRadius 0.90 m
- * from each side, so 3.4 m of walkable width survives - nearly four times the agent - and the
+ * HAUL_ROAD_HALF 2.6 m of full regrade is 5.2 m of flat lane. Recast erodes walkableRadius 0.45 m
+ * from each side, so 4.3 m of walkable width survives - nearly five times the agent - and the
  * collar outside it is graded too, so the usable corridor is wider still.
  *
  * HAUL_MIN_LINK 10 m was 18, which silently dropped the shortest authored ramp in the world: the

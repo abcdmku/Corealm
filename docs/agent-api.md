@@ -93,7 +93,7 @@ off the body is **not** a loss or a gain: it emits `item.equipped` or `item.uneq
 neither of the two item events fires for it. A swap emits one `item.equipped` carrying `replaced`
 with the id of the piece that went back into the pack.
 
-## The 21 tools
+## The 22 tools
 
 ### Reading state
 - `corealm_player` — position, region, health, dead, moving, activityKind, and two separate
@@ -168,7 +168,10 @@ with the id of the piece that went back into the pack.
 - `corealm_move_to` — walk to an entity, a location id, or a position
 - `corealm_stop` — cancel navigation, activity, and combat
 - `corealm_interact` — mine, chop, fish, rake, plant, harvest, talk, open, climb, vault, loot, take,
-  produce, recharge, bank, trade, inspect
+  produce, recharge, bank, trade, inspect. The `loot` interaction opens a container without moving
+  anything.
+- `corealm_take_loot` — explicitly take one displayed stack by `stackIndex`, or omit the index to
+  take every stack that fits
 - `corealm_use_item` — eat food, equip gear, or apply a matching seed to a farm plot
 - `corealm_equip` — equip an item or clear a slot
 - `corealm_produce` — smelt, smith, cook, craft, fletch

@@ -6,7 +6,7 @@
  * code path, which is what makes agent parity a property of the architecture rather than a claim:
  * every tool below calls `GameApi`, the same object the human UI calls.
  *
- * Twenty-one tools, consolidated from the brief's ~30 capability bullets. The consolidations that
+ * Twenty-two tools, consolidated from the brief's ~30 capability bullets. The consolidations that
  * did the work: `observe` absorbs known-location recall through a `scope` parameter, `interact`
  * absorbs gather/agility/loot/talk/door through the `InteractionId` it is given, and `events`
  * absorbs both draining and long-poll waiting through an optional timeout.
@@ -183,14 +183,30 @@ export function createTools(api: GameApi): ToolDef[] {
         + "consumed once and the altar remains active. For recharge, target that awakened altar while a "
         + "matching charged Air, Earth, or Water wand or staff is "
         + "equipped. The altar atomically spends exactly 100 matching essence and fills that weapon "
-        + "to 1000 charges. A full weapon or insufficient essence rejects without taking anything. If this "
-        + "call starts a walk, wait for navigation.completed and then for essence.recharged; routed "
+        + "to 1000 charges. A full weapon or insufficient essence rejects without taking anything. A loot "
+        + "interaction only opens the container; use corealm_take_loot to move stacks. If this call starts "
+        + "a walk, wait for navigation.completed and then for essence.recharged; routed "
         + "failures are shown through the same game notice channel as in-range failures.",
       inputSchema: obj({
         entityId: STR("Entity id"),
         interaction: STR("One of the entity's listed interactions"),
       }, ["entityId", "interaction"]),
       execute: (args) => unwrap(api.interact(asString(args.entityId), asString(args.interaction) as InteractionId)),
+    },
+    {
+      name: "corealm_take_loot",
+      description:
+        "Explicitly take loot after opening a loot pile or Recovery Cache. Give stackIndex to take "
+        + "one displayed stack, or omit it to take everything that fits. Opening with "
+        + "corealm_interact and the loot interaction never transfers items.",
+      inputSchema: obj({
+        entityId: STR("Opened loot container id"),
+        stackIndex: NUM("Optional zero-based index in the displayed contents grid"),
+      }, ["entityId"]),
+      execute: (args) => unwrap(api.takeLoot(
+        asString(args.entityId),
+        typeof args.stackIndex === "number" ? Math.floor(args.stackIndex) : undefined,
+      )),
     },
     {
       name: "corealm_use_item",

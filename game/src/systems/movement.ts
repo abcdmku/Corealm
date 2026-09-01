@@ -43,7 +43,7 @@ import type { EntityId, RegionId, SemanticEntity, Vec3 } from "../contracts.js";
 import type { GameState } from "../state/store.js";
 import type { Navigation, RouteLeg } from "./navigation.js";
 import type { EventBus } from "../core/events.js";
-import { INTERACT_RANGE, MOVEMENT, PLAYER_RADIUS, PLAYER_SPEED } from "../app/config.js";
+import { INTERACT_RANGE, MOVEMENT, PLAYER_RADIUS, PLAYER_SLOPES, PLAYER_SPEED } from "../app/config.js";
 import { distanceXZ, pathLength, turnToward } from "../core/math.js";
 
 /** How close counts as arrived, in metres. */
@@ -78,17 +78,6 @@ const IDLE_SPEED = 0.05;
  * wall. 0.05 m is a sixth of `PLAYER_RADIUS` and an eighth of the largest possible step.
  */
 const STEP_SLACK = 0.05;
-
-/**
- * Largest vertical change one direct step may make, in metres.
- *
- * The walkable slope angle is 48 degrees and the largest possible step at `runSpeed` on a 100 ms
- * tick is 0.42 m, so the steepest legal ground gains 0.42 * tan(48) = 0.47 m in a tick. 0.75 m
- * clears that with margin while refusing the 8 m jump onto the March Company Hall roof, which the
- * old test could not see at all because it measured against the desired target rather than
- * against the player.
- */
-const MAX_STEP_UP = 0.75;
 
 /**
  * A step that achieves less than this fraction of what was asked for is retried axis by axis.
@@ -627,19 +616,44 @@ export class Movement {
    * refused only by the accident that the ground boundary happened to be nearer in 3D.
    */
   private clampToWorld(state: GameState, from: Vec3, stepX: number, stepZ: number): Vec3 | null {
-    const desired: Vec3 = [from[0] + stepX, from[1], from[2] + stepZ];
+    const desired = this.desiredNavPoint(state, from, stepX, stepZ);
     const snapped = this.nav.closestPoint(desired);
     if (!snapped) return null;
 
     const stepLength = Math.hypot(stepX, stepZ);
     if (distanceXZ(snapped, from) > stepLength + STEP_SLACK) return null;
-    if (Math.abs(snapped[1] - from[1]) > MAX_STEP_UP) return null;
 
     let point = snapped;
     const solids = this.ports.solids;
     if (solids) point = solids.resolve(point, from, PLAYER_RADIUS);
     point = this.pushOutOfMovers(state, point);
-    return this.ground(state, point);
+    const previousRegionId = state.player.regionId;
+    point = this.ground(state, point);
+    if (slopeStepAllowed(from, point)) return point;
+    state.player.regionId = previousRegionId;
+    return null;
+  }
+
+  /**
+   * Gives the nav query the terrain height at its XZ target when the player is standing on terrain.
+   *
+   * Asking for a point at the old Y works on ordinary ground, but on a steep descent that old-height
+   * point is closer to the ledge behind the player than to the ground ahead. Detour then snaps back
+   * uphill and direct input stalls. Dungeon floors stay on their own nav geometry because their Y
+   * differs from the overworld terrain by much more than `GROUND_SNAP_MAX`.
+   */
+  private desiredNavPoint(state: GameState, from: Vec3, stepX: number, stepZ: number): Vec3 {
+    const x = from[0] + stepX;
+    const z = from[2] + stepZ;
+    const heightAt = this.ports.heightAt;
+    if (!heightAt) return [x, from[1], z];
+
+    const currentGround = heightAt(state.player.regionId, from[0], from[2]);
+    if (!Number.isFinite(currentGround) || Math.abs(currentGround - from[1]) > GROUND_SNAP_MAX) {
+      return [x, from[1], z];
+    }
+    const targetGround = heightAt(state.player.regionId, x, z);
+    return Number.isFinite(targetGround) ? [x, targetGround, z] : [x, from[1], z];
   }
 
   /**
@@ -758,9 +772,15 @@ export class Movement {
     // nothing, and `applyDirect` has always done it.
     const snapped = this.nav.closestPoint(position);
     if (snapped && distanceXZ(snapped, position) < CORNER_RADIUS) position = snapped;
+    const previousRegionId = player.regionId;
     const solids = this.ports.solids;
     if (solids) position = solids.resolve(position, start, PLAYER_RADIUS);
     position = this.ground(state, position);
+    if (!slopeStepAllowed(start, position)) {
+      position = start;
+      index = movement.pathIndex;
+      player.regionId = previousRegionId;
+    }
 
     player.position = position;
     movement.pathIndex = index;
@@ -1026,6 +1046,23 @@ export class Movement {
     }
     return total;
   }
+}
+
+/**
+ * Accepts a player-sized vertical step or a continuous slope within the directional limit.
+ * Downhill gets its own larger angle so the same nav polygon may be legal in only one direction.
+ */
+function slopeStepAllowed(from: Vec3, to: Vec3): boolean {
+  const vertical = to[1] - from[1];
+  const height = Math.abs(vertical);
+  if (height <= 1e-6) return true;
+
+  const horizontal = distanceXZ(from, to);
+  if (horizontal <= 1e-6) return false;
+  const limitDegrees = vertical > 0
+    ? PLAYER_SLOPES.maxAscentAngle
+    : PLAYER_SLOPES.maxDescentAngle;
+  return height / horizontal <= Math.tan(limitDegrees * Math.PI / 180);
 }
 
 // ------------------------------------------------------------- geometry

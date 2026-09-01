@@ -149,8 +149,22 @@ export const NAV_CONFIG = {
   walkableRadius: 1,     // voxels
   walkableClimb: 2,      // voxels
   walkableHeight: 9,     // voxels
-  walkableSlopeAngle: 48,
+  // Recast only has one slope limit, but player movement is directional. Keep steep terrain in
+  // the mesh so it can be descended, then let Movement apply the lower uphill limit below.
+  walkableSlopeAngle: 78,
   minRegionArea: 4,
+} as const;
+
+/**
+ * Directional terrain limits for player movement.
+ *
+ * Sixty-four degrees is already a scramble, so steeper uphill faces stay blocked. Downhill travel
+ * remains available until the ground is nearly a wall. The navmesh uses the downhill value because
+ * excluding a polygon at bake time would also remove the legal direction across it.
+ */
+export const PLAYER_SLOPES = {
+  maxAscentAngle: 64,
+  maxDescentAngle: NAV_CONFIG.walkableSlopeAngle,
 } as const;
 
 /**

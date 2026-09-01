@@ -327,7 +327,7 @@ async function scenarioSurface({ page, mcp }: ScenarioContext): Promise<JsonObje
     return context.getTools();
   }) as JsonObject[];
   const names = descriptors.map((row) => String(row["name"]));
-  if (names.length !== 21) throw new Error(`Expected 21 tools, got ${names.length}`);
+  if (names.length !== 22) throw new Error(`Expected 22 tools, got ${names.length}`);
   if (new Set(names).size !== names.length) throw new Error("WebMCP advertised duplicate tool names");
   for (const row of descriptors) {
     if (!row["description"] || asObject(row["inputSchema"])["type"] !== "object") {
@@ -502,7 +502,11 @@ async function scenarioBossCamp({ page, mcp, fixture }: ScenarioContext): Promis
     const loot = asArray(expectOk(await mcp.call("corealm_observe", {
       scope: "visible", archetypes: ["loot"], radius: 140, limit: 20,
     }), "observe boss loot")).map(asObject);
-    for (const pile of loot) await mcp.interact(String(pile["id"]), "loot");
+    for (const pile of loot) {
+      const entityId = String(pile["id"]);
+      await mcp.interact(entityId, "loot");
+      expectOk(await mcp.call("corealm_take_loot", { entityId }), `take loot ${entityId}`);
+    }
     const inventory = expectOk(await mcp.call("corealm_inventory"), "read boss drops");
     if (inventoryCount(inventory, "pale_quartz") > 0) {
       return { boss: "tempest_roc", wantedItem: "pale_quartz", kills, quantity: inventoryCount(inventory, "pale_quartz") };

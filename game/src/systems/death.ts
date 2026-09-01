@@ -13,7 +13,9 @@
  * This file also sweeps enemy loot piles, because it is the only system that expires timed world
  * containers and two sweepers would be one too many.
  */
-import type { EntityId, ItemStack, RegionId, Result, SemanticEntity, Vec3 } from "../contracts.js";
+import type {
+  EntityId, ItemStack, LootContainerView, LootTakeResult, RegionId, Result, SemanticEntity, Vec3,
+} from "../contracts.js";
 import { err, ok } from "../contracts.js";
 import type { GameState, Store } from "../state/store.js";
 import { DEFAULT_SPAWN } from "../state/store.js";
@@ -81,6 +83,8 @@ export interface DeathDeps {
   snapToGround?: (point: Vec3) => Vec3 | null;
   /** View block for the cache entity. Omitted means the cache is state-only, not rendered. */
   cacheView?: SemanticEntity["view"];
+  /** Presentation output fired only after the dispatcher has validated an Open interaction. */
+  onLootOpened?: (container: LootContainerView) => void;
 }
 
 export class DeathSystem implements TickSystem {
@@ -259,76 +263,115 @@ export class DeathSystem implements TickSystem {
 
   // ------------------------------------------------------------------- loot
 
-  /**
-   * The `loot` interaction, for both container kinds. Partial pickups are a success with a message
-   * rather than a failure: taking four of six stacks and being told so is more useful than being
-   * refused because the last two would not fit.
-   */
+  /** Opening is deliberately read-only. Taking a displayed stack is a separate GameApi command. */
   loot(entity: SemanticEntity): Result<{ started: string }> {
     const state = this.deps.store.get();
-    const atMs = this.lastAtMs;
+    let items: ItemStack[];
 
     if (entity.archetype === "recovery_cache") {
       const cache = state.world.recoveryCache;
       if (!cache || cache.id !== entity.id) {
         return err("NOT_FOUND", "That cache is gone.", entity.id);
       }
-      const moved = this.transfer(cache.items, entity.id, atMs);
-      if (cache.items.length === 0) {
-        state.world.recoveryCache = null;
-        this.deps.entities.remove?.(entity.id);
-        this.deps.store.markDirty();
-        return ok({ started: `recovered ${moved} stack${moved === 1 ? "" : "s"}` });
-      }
-      this.deps.store.markDirty();
-      if (moved === 0) return err("INVENTORY_FULL", "You have no room for anything in there.", entity.id);
-      return ok({ started: `recovered ${moved} stacks, ${cache.items.length} left in the cache` });
+      items = cache.items;
+    } else {
+      const pile = state.world.lootPiles[entity.id];
+      if (!pile) return err("NOT_FOUND", "There is nothing there.", entity.id);
+      items = pile.items;
     }
 
-    const pile = state.world.lootPiles[entity.id];
-    if (!pile) return err("NOT_FOUND", "There is nothing there.", entity.id);
-
-    const moved = this.transfer(pile.items, entity.id, atMs);
-    if (pile.items.length === 0) {
-      delete state.world.lootPiles[entity.id];
-      this.deps.entities.remove?.(entity.id);
-      this.deps.store.markDirty();
-      return ok({ started: `took ${moved} stack${moved === 1 ? "" : "s"}` });
-    }
-    this.deps.store.markDirty();
-    if (moved === 0) return err("INVENTORY_FULL", "Your inventory is full.", entity.id);
-    return ok({ started: `took ${moved} stacks, ${pile.items.length} left on the ground` });
+    this.deps.onLootOpened?.({
+      entityId: entity.id,
+      name: entity.name,
+      position: cloneVec3(entity.position),
+      items: items.map((stack) => ({ ...stack })),
+    });
+    return ok({ started: `opened ${entity.name}` });
   }
 
-  /**
-   * Moves what fits into the inventory and leaves the rest in place. Mutates `items` so a partial
-   * pickup leaves the container holding exactly what is still in it.
-   */
-  private transfer(items: ItemStack[], sourceId: EntityId, atMs: number): number {
-    let moved = 0;
+  /** Takes one selected stack, or every stack when `stackIndex` is omitted by an agent command. */
+  take(entityId: EntityId, stackIndex?: number): Result<LootTakeResult> {
+    const state = this.deps.store.get();
+    const entity = this.deps.entities.get(entityId);
+    if (!entity) return err("NOT_FOUND", "That loot container is gone.", entityId);
+
+    let items: ItemStack[];
+    const recovery = entity.archetype === "recovery_cache";
+    if (recovery) {
+      const cache = state.world.recoveryCache;
+      if (!cache || cache.id !== entityId) return err("NOT_FOUND", "That cache is gone.", entityId);
+      items = cache.items;
+    } else {
+      const pile = state.world.lootPiles[entityId];
+      if (!pile) return err("NOT_FOUND", "There is nothing there.", entityId);
+      items = pile.items;
+    }
+
+    if (
+      stackIndex !== undefined
+      && (!Number.isInteger(stackIndex) || stackIndex < 0 || stackIndex >= items.length)
+    ) {
+      return err("NOT_FOUND", "That stack is no longer in the container.", entityId);
+    }
+
+    const taken = this.transfer(items, entity.id, entity.name, this.lastAtMs, stackIndex);
+    if (taken.length === 0) {
+      const message = recovery ? "You have no room for that item." : "Your inventory is full.";
+      return err("INVENTORY_FULL", message, entityId);
+    }
+
+    const containerEmpty = items.length === 0;
+    if (containerEmpty) {
+      if (recovery) state.world.recoveryCache = null;
+      else delete state.world.lootPiles[entityId];
+      this.deps.entities.remove?.(entityId);
+    }
+    this.deps.store.markDirty();
+    return ok({
+      taken,
+      remaining: items.map((stack) => ({ ...stack })),
+      containerEmpty,
+    });
+  }
+
+  /** Moves matching stacks and returns the exact quantities accepted by the inventory. */
+  private transfer(
+    items: ItemStack[],
+    sourceId: EntityId,
+    sourceName: string,
+    atMs: number,
+    onlyStackIndex?: number,
+  ): ItemStack[] {
+    const taken: ItemStack[] = [];
     for (let index = items.length - 1; index >= 0; index -= 1) {
       const stack = items[index];
       if (!stack) {
         items.splice(index, 1);
         continue;
       }
-      const added = this.deps.inventory.addItem(stack.itemId, stack.quantity);
-      if (!added.ok || added.value <= 0) continue;
+      if (onlyStackIndex !== undefined && index !== onlyStackIndex) continue;
 
-      if (added.value >= stack.quantity) {
-        items.splice(index, 1);
-      } else {
-        stack.quantity -= added.value;
-      }
-      moved += 1;
+      const itemId = stack.itemId;
+      const requested = stack.quantity;
+      const added = this.deps.inventory.addItem(itemId, requested);
+      if (!added.ok || added.value <= 0) continue;
+      const quantity = Math.min(requested, added.value);
+
+      if (quantity >= requested) items.splice(index, 1);
+      else stack.quantity -= quantity;
+
+      const existing = taken.find((entry) => entry.itemId === itemId);
+      if (existing) existing.quantity += quantity;
+      else taken.push({ itemId, quantity });
+
       this.deps.events.emit(
         "item.received",
-        { itemId: stack.itemId, quantity: added.value, from: sourceId },
+        { itemId, quantity, source: "loot", from: sourceId, sourceName },
         sourceId,
         atMs,
       );
     }
-    return moved;
+    return taken;
   }
 
   // -------------------------------------------------------------- read-only

@@ -200,6 +200,21 @@ export interface StructureVariantDescriptor<TPrefab extends string = string> {
 export interface ItemStack { itemId: ItemId; quantity: number }
 export interface InventorySlot extends ItemStack { slotIndex: number }
 
+/** Read-only contents revealed by opening a world loot container. */
+export interface LootContainerView {
+  entityId: EntityId;
+  name: string;
+  position: Vec3;
+  items: ItemStack[];
+}
+
+/** Exact result of explicitly taking one displayed stack from a world loot container. */
+export interface LootTakeResult {
+  taken: ItemStack[];
+  remaining: ItemStack[];
+  containerEmpty: boolean;
+}
+
 export interface EquipmentBonuses {
   accuracy: number;
   power: number;
@@ -989,6 +1004,8 @@ export interface GameApi {
 
   // interaction
   interact(entityId: EntityId, interaction: InteractionId): Result<{ started: string }>;
+  /** Takes one displayed stack from a world loot container. Omit `stackIndex` to take all. */
+  takeLoot(entityId: EntityId, stackIndex?: number): Result<LootTakeResult>;
   useItem(itemId: ItemId, target?: { itemId: ItemId } | { entityId: EntityId }): Result<{ effect: string }>;
   equipItem(itemId: ItemId): Result<{ slot: EquipSlot; replaced: ItemId | null }>;
   unequipItem(slot: EquipSlot): Result<{ itemId: ItemId }>;

@@ -215,7 +215,7 @@ export function buildDungeon(
  * Inverse-distance weighting over the authored chamber floors, cubed. The exponent is the whole
  * design: at p = 3 the surface is within 0.21 m of the authored floor height across a chamber's own
  * disc, and the steepest gradient between two chambers is `drop * p / separation` = 4 * 3 / 20.6 =
- * 30 degrees, which clears `NAV_CONFIG.walkableSlopeAngle` (48) with margin. p = 2 would flatten the
+ * 30 degrees, which clears the player's 64-degree uphill limit with margin. p = 2 would flatten the
  * ramp to 21 degrees but bow each chamber floor 0.88 m below its authored height at the rim; p = 4
  * holds the floors flat but ramps at 38 degrees.
  */
