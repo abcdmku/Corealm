@@ -53,7 +53,7 @@ const LAB_TEST_SETTINGS = {
   ambient: 0,
   sfx: 0,
 } as const;
-type FeatureLabShard = "all" | "building" | "combat";
+type FeatureLabShard = "all" | "building" | "navigation" | "combat";
 const TEST_SHARD = readTestShard(process.argv.slice(2));
 
 const PREFAB_SELECTION = {
@@ -124,6 +124,7 @@ interface ModeNavigationEvidence {
   before: DocumentProbe;
   after: DocumentProbe;
   fresh: FeatureLabState;
+  probe: RuntimeProbe;
   queryPreserved: boolean;
   hashPreserved: boolean;
 }
@@ -246,26 +247,27 @@ try {
   });
   page.on("pageerror", (error) => diagnostics.page.push(`[${activeMode}] ${error.stack ?? error.message}`));
 
-  // Every shard starts on the compatibility route. Combat coverage then traverses through the real
-  // mode control, proving the redirect and a fresh production runtime after selection.
-  activeMode = "legacy-redirect/building";
   const stageMs: Record<string, number> = {};
   let stageStarted = performance.now();
   const stage = (name: string): void => {
     stageMs[name] = Math.round(performance.now() - stageStarted);
     stageStarted = performance.now();
   };
-  const legacy = await testLegacyRedirect(page, server.url, (state) => {
-    lastState = state;
-  });
-  logProgress("legacy redirect ready");
-  lastState = legacy.state;
+  let legacy: LegacyRedirectEvidence | null = null;
+  if (TEST_SHARD !== "combat") {
+    activeMode = "legacy-redirect/building";
+    legacy = await testLegacyRedirect(page, server.url, (state) => {
+      lastState = state;
+    });
+    logProgress("legacy redirect ready");
+    lastState = legacy.state;
+  }
   stage("legacyRedirect");
-  const building = TEST_SHARD === "combat"
-    ? null
-    : await testBuilding(page, server.url, screenshotDir, screenshots, (state) => {
+  const building = TEST_SHARD === "all" || TEST_SHARD === "building"
+    ? await testBuilding(page, server.url, screenshotDir, screenshots, (state) => {
         lastState = state;
-      }, false);
+      }, false)
+    : null;
   if (building) {
     logProgress("building proof complete");
     lastState = building.final;
@@ -274,27 +276,36 @@ try {
 
   let combat: CombatEvidence | null = null;
   let modeNavigation: ModeNavigationEvidence | null = null;
-  if (TEST_SHARD !== "building") {
+  if (TEST_SHARD === "all" || TEST_SHARD === "navigation") {
     activeMode = "building-to-combat-navigation";
-    const navigationSource = building?.final ?? legacy.state;
+    const navigationSource = building?.final ?? legacy?.state;
+    if (!navigationSource) throw new Error("Mode navigation has no building source state");
     modeNavigation = await selectModeWithReload(page, "combat", navigationSource, (state) => {
       lastState = state;
     });
     logProgress("combat navigation ready");
-
+    lastState = modeNavigation.fresh;
     stage("modeNavigation");
+  }
+
+  if (TEST_SHARD === "all" || TEST_SHARD === "combat") {
     activeMode = "combat";
     combat = await testCombat(page, server.url, screenshotDir, screenshots, (state) => {
       lastState = state;
-    }, false);
+    }, TEST_SHARD === "combat");
     logProgress("combat proof complete");
     lastState = combat.final;
     stage("combat");
   }
 
-  const comparisonProbe = building?.probe ?? combat!.probe;
+  const comparisonProbe = building?.probe ?? combat?.probe ?? modeNavigation?.probe;
+  if (!comparisonProbe) throw new Error("Feature-lab shard produced no runtime probe");
+  const expectedScreenshots = TEST_SHARD === "all" ? 3
+    : TEST_SHARD === "building" ? 1
+      : TEST_SHARD === "combat" ? 2
+        : 0;
   const checks: Record<string, boolean> = {
-    ...legacyChecks(legacy, comparisonProbe),
+    ...(legacy ? legacyChecks(legacy, comparisonProbe) : {}),
     ...(building ? buildingChecks(building) : {}),
     ...(combat ? combatChecks(combat) : {}),
     ...(modeNavigation ? navigationChecks(modeNavigation, building?.final.structure.revision) : {}),
@@ -307,10 +318,10 @@ try {
         && combat.ready.engine === building.ready.engine
         && combat.ready.world === building.ready.world,
     } : {}),
-    screenshotsCaptured: screenshots.length >= (TEST_SHARD === "all" ? 3 : TEST_SHARD === "building" ? 1 : 2),
+    screenshotsCaptured: screenshots.length >= expectedScreenshots,
     noRuntimeErrors: (building?.final.errors.length ?? 0) === 0
       && (combat?.final.errors.length ?? 0) === 0
-      && legacy.state.errors.length === 0
+      && (legacy?.state.errors.length ?? 0) === 0
       && diagnostics.console.length === 0
       && diagnostics.page.length === 0,
     under60Seconds: performance.now() - started < TOTAL_BUDGET_MS,
@@ -341,12 +352,12 @@ try {
       freeCamera: building.freeCamera,
     } } : {}),
     ...(modeNavigation ? { modeNavigation } : {}),
-    legacy,
+    ...(legacy ? { legacy } : {}),
     screenshots,
     errors: {
       combat: combat?.final.errors ?? [],
       building: building?.final.errors ?? [],
-      legacy: legacy.state.errors,
+      legacy: legacy?.state.errors ?? [],
       console: diagnostics.console,
       page: diagnostics.page,
     },
@@ -374,8 +385,10 @@ function readTestShard(args: string[]): FeatureLabShard {
   const inline = args.find((arg) => arg.startsWith("--shard="))?.slice("--shard=".length);
   const flagIndex = args.indexOf("--shard");
   const value = inline ?? (flagIndex >= 0 ? args[flagIndex + 1] : undefined) ?? "all";
-  if (value === "all" || value === "building" || value === "combat") return value;
-  throw new Error(`Unknown feature-lab shard ${JSON.stringify(value)}; expected all, building, or combat`);
+  if (value === "all" || value === "building" || value === "navigation" || value === "combat") return value;
+  throw new Error(
+    `Unknown feature-lab shard ${JSON.stringify(value)}; expected all, building, navigation, or combat`,
+  );
 }
 
 function legacyChecks(legacy: LegacyRedirectEvidence, comparisonProbe: RuntimeProbe): Record<string, boolean> {
@@ -906,6 +919,7 @@ async function selectModeWithReload(
     before,
     after,
     fresh,
+    probe: await readRuntimeProbe(targetPage),
     queryPreserved: expectedSearch.toString() === afterUrl.searchParams.toString(),
     hashPreserved: beforeUrl.hash === afterUrl.hash,
   };

@@ -76,7 +76,9 @@ jobs:
         run: npx --no-install playwright install --with-deps chromium
       - name: Accept building features before final-world smoke
         run: npm run lab:test -- --shard building
-      - name: Accept combat features and mode navigation before final-world smoke
+      - name: Accept compatibility routing and mode navigation before final-world smoke
+        run: npm run lab:test -- --shard navigation
+      - name: Accept combat features before final-world smoke
         run: npm run lab:test -- --shard combat
       - name: Browser smoke test
         run: npm run smoke -- --run runs/corealm
@@ -121,7 +123,9 @@ jobs:
         run: npx --no-install playwright install --with-deps chromium
       - name: Accept building features before final-world smoke
         run: npm run lab:test -- --shard building
-      - name: Accept combat features and mode navigation before final-world smoke
+      - name: Accept compatibility routing and mode navigation before final-world smoke
+        run: npm run lab:test -- --shard navigation
+      - name: Accept combat features before final-world smoke
         run: npm run lab:test -- --shard combat
       - name: Browser smoke test
         run: npm run smoke -- --run runs/corealm
