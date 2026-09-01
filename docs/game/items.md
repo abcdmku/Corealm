@@ -12,7 +12,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="worn-pickaxe"></span>![Worn Pickaxe](./assets/items/worn_pickaxe.png) **Worn Pickaxe** | 0 | tool | No | 8 | 5 | Mining +1 |
 | <span id="worn-rod"></span>![Worn Rod](./assets/items/worn_rod.png) **Worn Rod** | 0 | tool | No | 6 | 4 | Fishing +1 |
 | <span id="grithe-bar"></span>![Grithe Bar](./assets/items/grithe_bar.png) **Grithe Bar** | 1 | bar | No | 30 | 18 | - |
-| <span id="air-orb"></span>![Air Orb](./assets/items/air_orb.png) **Air Orb** | 1 | component | No | 0 | 0 | boss crafting component; makes a 1000-charge elemental weapon; released |
+| <span id="air-orb"></span>![Air Orb](./assets/items/air_orb.png) **Air Orb** | 1 | component | No | 0 | 0 | boss altar key; awakens its regional altar for 1000-charge weapons; released |
 | <span id="coarse-hide"></span>![Coarse Hide](./assets/items/coarse_hide.png) **Coarse Hide** | 1 | component | No | 16 | 10 | - |
 | <span id="coney-foot"></span>![Coney Foot](./assets/items/coney_foot.png) **Coney Foot** | 1 | component | Yes | 18 | 11 | - |
 | <span id="curled-horn"></span>![Curled Horn](./assets/items/curl_horn.png) **Curled Horn** | 1 | component | No | 22 | 13 | - |
@@ -67,7 +67,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="curved-tusk"></span>![Curved Tusk](./assets/items/curved_tusk.png) **Curved Tusk** | 5 | component | No | 72 | 43 | - |
 | <span id="duskoak-handle"></span>![Duskoak Handle](./assets/items/duskoak_handle.png) **Duskoak Handle** | 5 | component | Yes | 23 | 14 | - |
 | <span id="duskoak-shaft"></span>![Duskoak Shaft](./assets/items/duskoak_shaft.png) **Duskoak Shaft** | 5 | component | Yes | 14 | 8 | - |
-| <span id="earth-orb"></span>![Earth Orb](./assets/items/earth_orb.png) **Earth Orb** | 5 | component | No | 0 | 0 | boss crafting component; makes a 1000-charge elemental weapon; released |
+| <span id="earth-orb"></span>![Earth Orb](./assets/items/earth_orb.png) **Earth Orb** | 5 | component | No | 0 | 0 | boss altar key; awakens its regional altar for 1000-charge weapons; released |
 | <span id="stag-antler"></span>![Stag Antler](./assets/items/stag_antler.png) **Stag Antler** | 5 | component | No | 78 | 47 | - |
 | <span id="vell-amber"></span>![Vell Amber](./assets/items/vell_amber.png) **Vell Amber** | 5 | component | Yes | 70 | 42 | - |
 | <span id="venom-gland"></span>![Venom Gland](./assets/items/venom_gland.png) **Venom Gland** | 5 | component | Yes | 64 | 38 | - |
@@ -118,7 +118,7 @@ description: "Every item, price, requirement, and effect in Corealm."
 | <span id="ibex-horn"></span>![Ibex Horn](./assets/items/ibex_horn.png) **Ibex Horn** | 10 | component | No | 165 | 99 | - |
 | <span id="rat-tail"></span>![Rat Tail](./assets/items/rat_tail.png) **Rat Tail** | 10 | component | Yes | 84 | 50 | - |
 | <span id="scorpion-stinger"></span>![Scorpion Stinger](./assets/items/scorpion_stinger.png) **Scorpion Stinger** | 10 | component | Yes | 140 | 84 | - |
-| <span id="water-orb"></span>![Water Orb](./assets/items/water_orb.png) **Water Orb** | 10 | component | No | 0 | 0 | boss crafting component; makes a 1000-charge elemental weapon; released |
+| <span id="water-orb"></span>![Water Orb](./assets/items/water_orb.png) **Water Orb** | 10 | component | No | 0 | 0 | boss altar key; awakens its regional altar for 1000-charge weapons; released |
 | <span id="cairnpelt-boots"></span>![Cairnpelt Boots](./assets/items/cairnpelt_boots.png) **Cairnpelt Boots** | 10 | equipment | No | 500 | 300 | feet; Magic 10 |
 | <span id="cairnpelt-hood"></span>![Cairnpelt Hood](./assets/items/cairnpelt_hood.png) **Cairnpelt Hood** | 10 | equipment | No | 700 | 420 | head; Magic 10 |
 | <span id="cairnpelt-leggings"></span>![Cairnpelt Leggings](./assets/items/cairnpelt_leggings.png) **Cairnpelt Leggings** | 10 | equipment | No | 1260 | 756 | legs; Magic 10 |
