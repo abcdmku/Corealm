@@ -240,16 +240,32 @@ describe("gear appearance", () => {
     expect(VISIBLE_EQUIP_SLOTS).not.toContain("accessory2");
   });
 
-  it("grows the silhouette with tier and swaps the body variant", () => {
+  it("uses the requested Quaternius armour families and swaps the body variant", () => {
     const t1 = gearAppearance("grithe_sword");
     const t10 = gearAppearance("kaldite_sword");
     expect(t1?.scale).toBeLessThan(t10?.scale ?? 0);
     expect(t1?.tint).not.toBe(t10?.tint);
-    // Tier 5 and 10 body pieces carry a pauldron; tier 1 does not. That is the growth.
-    expect(gearAppearanceParts("grithe_cuirass")).toHaveLength(1);
-    expect(gearAppearanceParts("kaldite_plate")).toHaveLength(2);
-    expect(gearAppearance("kaldite_plate", "female")?.assetId).toBe("outfit_female_ranger_chest");
-    expect(gearAppearance("cairnpelt_robe", "male")?.assetId).toBe("outfit_male_peasant_chest");
+    expect(gearAppearanceParts("grithe_cuirass").map((part) => part.assetId)).toEqual([
+      "outfit_male_knight_chest",
+      "outfit_male_knight_pauldron",
+      "outfit_male_knight_scarf",
+    ]);
+    expect(gearAppearance("kaldite_plate", "female")?.assetId).toBe("outfit_female_knight_chest");
+    expect(gearAppearanceParts("cairnpelt_robe", "male").map((part) => part.assetId)).toEqual([
+      "outfit_male_ranger_chest",
+      "outfit_male_ranger_pauldron",
+    ]);
+    expect(gearAppearance("marchhide_hood", "female")?.assetId).toBe("outfit_female_ranger_hood");
+    expect(gearAppearance("grithe_helm", "male")?.assetId).toBe("outfit_male_knight_helmet");
+  });
+
+  it("uses bronze, dark iron, and steel for melee, and blue, dark green, and black for magic", () => {
+    expect(gearAppearance("grithe_cuirass")?.tint).toBe(0xb77a3f);
+    expect(gearAppearance("corven_plate")?.tint).toBe(0x7f8589);
+    expect(gearAppearance("kaldite_plate")?.tint).toBe(0xffffff);
+    expect(gearAppearance("marchhide_robe")?.tint).toBe(0x416f9d);
+    expect(gearAppearance("bramblehide_robe")?.tint).toBe(0x2f4f3b);
+    expect(gearAppearance("cairnpelt_robe")?.tint).toBe(0x4a4d52);
   });
 
   it("attaches weapons to bones and armour to skin, and never scales a skinned part", () => {
@@ -304,6 +320,30 @@ describe("tinting", () => {
     expect(painted.color.getHex()).toBe(appearance?.tint);
     // The NPCs in Coldbrace wear the same peasant and ranger parts out of the same asset cache.
     expect(shared.color.getHex()).toBe(0xffffff);
+  });
+
+  it("recolours Ranger from source luminance without an emissive flattening pass", () => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    const robe = gearAppearance("marchhide_robe");
+    expect(robe).not.toBeNull();
+    if (robe) applyGearAppearance(mesh, robe);
+    const painted = mesh.material as THREE.MeshStandardMaterial;
+    expect(painted.color.getHex()).toBe(0xffffff);
+    expect(painted.emissive.getHex()).toBe(0x000000);
+    expect(painted.emissiveIntensity).toBe(0);
+    expect(painted.customProgramCacheKey()).toContain("ranger-tier-colour:416f9d");
+
+    const shader = {
+      fragmentShader: "#include <color_fragment>", vertexShader: "", uniforms: {},
+    } as Parameters<THREE.Material["onBeforeCompile"]>[0];
+    painted.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+    expect(shader.fragmentShader).toContain("gearTierSourceLuma");
+    expect(shader.fragmentShader).toContain("gearTierValue");
+
+    const knight = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    const plate = gearAppearance("grithe_cuirass");
+    if (plate) applyGearAppearance(knight, plate);
+    expect((knight.material as THREE.MeshStandardMaterial).emissive.getHex()).toBe(0x000000);
   });
 
   it("puts Kaldite's garnet in the emissive channel, since the weapon GLBs carry one material", () => {

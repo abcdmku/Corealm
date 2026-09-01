@@ -65,6 +65,22 @@ const PREFAB_SELECTION = {
   seed: 3,
 } as const satisfies FeatureLabStructureSelection;
 
+const MELEE_ARMOUR_SET = [
+  ["head", "grithe_helm"],
+  ["body", "grithe_cuirass"],
+  ["legs", "grithe_greaves"],
+  ["feet", "grithe_boots"],
+  ["hands", "grithe_gloves"],
+] as const satisfies readonly (readonly [EquipSlot, ItemId])[];
+
+const MAGIC_ARMOUR_SET = [
+  ["head", "marchhide_hood"],
+  ["body", "marchhide_robe"],
+  ["legs", "marchhide_leggings"],
+  ["feet", "marchhide_boots"],
+  ["hands", "marchhide_wraps"],
+] as const satisfies readonly (readonly [EquipSlot, ItemId])[];
+
 interface Point {
   x: number;
   y: number;
@@ -452,8 +468,11 @@ function combatChecks(combat: CombatEvidence): Record<string, boolean> {
     combatProductionStructurePresent: structureIsValid(combat.ready.structure),
     combatCatalogsComplete: Object.values(combat.catalogChecks).every(Boolean),
     combatEveryLevelCanBeSet: Object.values(combat.levelChecks).every(Boolean),
-    combatRepresentativeEquipmentEquips: combat.equipment.length === 1
-      && combat.equipment[0]?.slot === "mainHand",
+    combatRepresentativeEquipmentEquips: [
+      ...MELEE_ARMOUR_SET,
+      ...MAGIC_ARMOUR_SET,
+    ].every(([slot, itemId]) => combat.equipment.some((row) => row.slot === slot && row.itemId === itemId))
+      && combat.equipment.some((row) => row.slot === "mainHand"),
     combatRouteFailureSpeaksOnce: combat.routeFailureNotices.results.length === 3
       && combat.routeFailureNotices.results.every((result) => (
         result.error === "NOT_REACHABLE"
@@ -539,8 +558,9 @@ async function testCombat(
     SKILL_IDS.map((skillId) => [skillId, levels.levels[skillId] === 99]),
   );
 
-  // Detailed slot/catalog coverage belongs to the focused catalog and equipment tests. Keep the
-  // real-browser gate representative so its two production boots stay within the 60-second loop.
+  // Focused tests cover every item. The browser gate dresses one complete melee set and one
+  // complete magic set so both production silhouettes reach the live rig and the two combat
+  // screenshots carry useful armour evidence.
   const equipment: EquipmentProof[] = [];
   const setupWeapon = findItem(catalog, "mainHand", /sword|blade|axe|mace/i)
     ?? catalog.equipment.find((group) => group.slot === "mainHand")?.items[0]?.id;
@@ -554,6 +574,10 @@ async function testCombat(
   if (equipped.equipment.mainHand === setupWeapon) {
     equipment.push({ slot: "mainHand", itemId: setupWeapon });
   }
+  const meleeArmour = await equipArmourSet(targetPage, MELEE_ARMOUR_SET);
+  remember(meleeArmour);
+  equipment.push(...MELEE_ARMOUR_SET.map(([slot, itemId]) => ({ slot, itemId })));
+  await waitForPlayerPart(targetPage, "outfit_male_knight_chest");
 
   // An unresolved assistance target must fail before the renderer can park a marker at Three.js's
   // default world origin. A valid fixed-position marker still uses the same production overlay
@@ -668,6 +692,7 @@ async function testCombat(
   });
   remember(meleeAfter);
 
+  await focusPlayerForArmourProof(targetPage);
   const meleeShot = path.join(captures, "combat-melee.png");
   await capture(targetPage, meleeShot, captured);
 
@@ -679,6 +704,10 @@ async function testCombat(
       await api.equipPlayer("mainHand", itemId);
     }, magicWeapon);
   }
+  const magicArmour = await equipArmourSet(targetPage, MAGIC_ARMOUR_SET);
+  remember(magicArmour);
+  equipment.push(...MAGIC_ARMOUR_SET.map(([slot, itemId]) => ({ slot, itemId })));
+  await waitForPlayerPart(targetPage, "outfit_male_ranger_chest");
   const spell = [...catalog.spells].reverse().find((preset) => {
     const definition = SPELLS.find((candidate) => candidate.id === preset.id);
     return definition !== undefined && RELEASED_MAGIC_ELEMENTS.includes(definition.cost.element);
@@ -708,6 +737,7 @@ async function testCombat(
       && castMotionAdvanced;
   });
   remember(castParticles);
+  await focusPlayerForArmourProof(targetPage);
   const spellShot = path.join(captures, "combat-spell.png");
   await capture(targetPage, spellShot, captured);
   const castAfter = await waitForState(targetPage, "production spell damage", (state) => (
@@ -1045,6 +1075,53 @@ async function readCatalog(targetPage: Page): Promise<FeatureLabCatalog> {
     if (!api) throw new Error("window.__featureLab is unavailable");
     return api.getCatalog();
   });
+}
+
+async function equipArmourSet(
+  targetPage: Page,
+  set: readonly (readonly [EquipSlot, ItemId])[],
+): Promise<FeatureLabState> {
+  return targetPage.evaluate(async (entries) => {
+    const api = window.__featureLab;
+    if (!api) throw new Error("window.__featureLab is unavailable");
+    for (const [slot, itemId] of entries) await api.equipPlayer(slot, itemId);
+    return api.getState();
+  }, set);
+}
+
+async function waitForPlayerPart(targetPage: Page, assetId: string): Promise<void> {
+  await targetPage.waitForFunction((needle) => {
+    const debug = Reflect.get(window, "__gameDebug") as {
+      getSceneStats?: () => { counts?: Record<string, number> };
+    } | undefined;
+    const counts = debug?.getSceneStats?.().counts;
+    return counts !== undefined && Object.keys(counts).some((name) => name.includes(needle));
+  }, assetId, { polling: POLL_MS, timeout: ACTION_BUDGET_MS });
+}
+
+async function focusPlayerForArmourProof(targetPage: Page): Promise<void> {
+  await targetPage.evaluate(() => {
+    const debug = Reflect.get(window, "__gameDebug") as { focusPlayer?: () => boolean } | undefined;
+    if (debug?.focusPlayer?.() !== true) {
+      throw new Error("Production window.__gameDebug.focusPlayer is unavailable");
+    }
+  });
+  const canvas = targetPage.locator("#viewport");
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("Production #viewport has no bounds for armour proof");
+  // Stay left of the feature-lab panel. Pointer events landing on that overlay never reach the
+  // production canvas, even though the canvas fills the same screen-space rectangle beneath it.
+  const startX = box.x + box.width * 0.45;
+  const y = box.y + box.height * 0.5;
+  // focusPlayer deliberately frames the avatar from behind. Two real right-drag gestures orbit
+  // roughly PI radians so the material proof sees the lit front and retains normal input coverage.
+  for (let gesture = 0; gesture < 2; gesture += 1) {
+    await targetPage.mouse.move(startX, y);
+    await targetPage.mouse.down({ button: "right" });
+    await targetPage.mouse.move(startX - 262, y, { steps: 8 });
+    await targetPage.mouse.up({ button: "right" });
+  }
+  await targetPage.waitForTimeout(200);
 }
 
 async function readRuntimeProbe(targetPage: Page): Promise<RuntimeProbe> {

@@ -243,6 +243,16 @@ const PACKS: PackDef[] = [
     root: "Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/",
   },
   {
+    id: "modular-character-outfits-fantasy-source",
+    name: "Modular Character Outfits - Fantasy (Source edition)",
+    author: "Quaternius",
+    source: "https://quaternius.itch.io/modular-character-outfits-fantasy",
+    license: "CC0-1.0",
+    archiveSha256: "c1bdaa7c79bb43e8f082f8484a841ac8ec8afa0295a9cfa7e9b101cd0cd32cab",
+    zip: "Modular_Character_Outfits_-_Fantasy[Source].zip",
+    root: "Modular Character Outfits - Fantasy[Source]/Exports/glTF (Godot-Unreal)/",
+  },
+  {
     id: "ultimate-platformer-pack",
     name: "Ultimate Platformer Pack",
     author: "Quaternius",
@@ -746,6 +756,35 @@ for (const [file, id, tags] of OUTFIT_PARTS) {
   CATALOG.push({
     id,
     pack: "modular-character-outfits-fantasy",
+    file: `Modular Parts/${file}`,
+    category: "outfit",
+    tags: ["outfit", "modular", "equip", ...tags],
+  });
+}
+
+// The free edition does not contain the Knight. The user's Source-edition archive is still CC0,
+// and its pinned hash and separate pack id keep the paid input distinct from the free archive.
+const SOURCE_OUTFIT_PARTS: Array<[string, string, string[]]> = [
+  ["Male_Knight_Head_Armet", "outfit_male_knight_helmet", ["head", "helmet", "knight", "armour", "male"]],
+  ["Male_Knight_Body_Armor", "outfit_male_knight_chest", ["torso", "knight", "armour", "male"]],
+  ["Male_Knight_Arms", "outfit_male_knight_gloves", ["arms", "gloves", "knight", "armour", "male"]],
+  ["Male_Knight_Legs_Armor", "outfit_male_knight_legs", ["legs", "knight", "armour", "male"]],
+  ["Male_Knight_Feet_Armor", "outfit_male_knight_boots", ["feet", "boots", "knight", "armour", "male"]],
+  ["Male_Knight_Acc_Pauldron_Round", "outfit_male_knight_pauldron", ["shoulder", "pauldron", "knight", "armour", "male"]],
+  ["Male_Knight_Acc_Scarf", "outfit_male_knight_scarf", ["neck", "scarf", "knight", "male"]],
+  ["Female_Knight_Head_Armet", "outfit_female_knight_helmet", ["head", "helmet", "knight", "armour", "female"]],
+  ["Female_Knight_Body_Armor", "outfit_female_knight_chest", ["torso", "knight", "armour", "female"]],
+  ["Female_Knight_Arms", "outfit_female_knight_gloves", ["arms", "gloves", "knight", "armour", "female"]],
+  ["Female_Knight_Legs", "outfit_female_knight_legs", ["legs", "knight", "armour", "female"]],
+  ["Female_Knight_Feet", "outfit_female_knight_boots", ["feet", "boots", "knight", "armour", "female"]],
+  ["Female_Knight_Acc_Pauldrons_Round", "outfit_female_knight_pauldron", ["shoulder", "pauldron", "knight", "armour", "female"]],
+  ["Female_Knight_Acc_Scarf", "outfit_female_knight_scarf", ["neck", "scarf", "knight", "female"]],
+];
+
+for (const [file, id, tags] of SOURCE_OUTFIT_PARTS) {
+  CATALOG.push({
+    id,
+    pack: "modular-character-outfits-fantasy-source",
     file: `Modular Parts/${file}`,
     category: "outfit",
     tags: ["outfit", "modular", "equip", ...tags],

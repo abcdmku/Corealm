@@ -1,8 +1,9 @@
 /**
  * Item-to-model mappings, hand sockets, and per-item material treatment for worn gear.
  *
- * Magic weapons use the staff and wand meshes from Blink's FREE - RPG Weapons pack. Every wood
- * tier keeps the same silhouette and changes only its unlit base colour. Altar-crafted elemental
+ * Melee armour uses Quaternius' Knight set and magic armour uses the hooded Ranger set. Magic
+ * weapons use the staff and wand meshes from Blink's FREE - RPG Weapons pack. Every wood tier
+ * keeps the same silhouette and changes only its unlit base colour. Altar-crafted elemental
  * weapons add one small faceted mesh at the crown.
  */
 import * as THREE from "three";
@@ -27,10 +28,7 @@ export interface GearAppearance {
    * body's bones, so scaling it detaches the silhouette from the skeleton driving it.
    */
   scale?: number;
-  /**
-   * Emissive accent, additive to the frozen interface. Kaldite is "black with a garnet accent" and
-   * the weapon GLBs carry ONE material, so the accent has nowhere to live except emissive.
-   */
+  /** Emissive accent used by the remaining gem-treated weapon materials. */
   accent?: number;
   /** The crafted elemental socket drawn at the weapon head. The weapon material itself remains non-emissive. */
   orb?: GearOrbAppearance;
@@ -69,37 +67,36 @@ export const VISIBLE_EQUIP_SLOTS: readonly EquipSlot[] = [
  * Every asset in this ladder is textured AND vertex-coloured: parsing the GLBs, sword, axe and
  * pickaxe are one `MI_Trim_Props_Vertex` primitive with a `baseColorTexture` and a `COLOR_0`
  * attribute; shield has three trim materials, all textured and vertex-coloured; the ranger and
- * peasant parts are `MI_Ranger` / `MI_Peasant`, both textured. `MeshStandardMaterial.color`
+ * knight parts are `MI_Ranger` / `MI_Knight`, both textured. `MeshStandardMaterial.color`
  * MULTIPLIES both of those, so a tint can darken and it can shift hue, and it can never lighten.
  *
  * That was tested rather than assumed: dropping `map` on the bone-attached weapons and re-shooting
  * the tier-1 kit turned the sword GOLD, not grey, because `COLOR_0` carries the bronze too
  * (runs/corealm/screenshots/rig2-tier-t1-crop.png at that revision). Killing both would leave a
- * flat, unlit-looking silhouette. So the ladder is a DARKENING ladder with a hue push, and the
- * PRD's colour words are approximated in the only direction the assets allow.
+ * flat, unlit-looking silhouette. Knight keeps that textured multiply. Ranger's almost-black
+ * albedo also gets the small uniform colour lift in `tintedMaterial`, so its full outfit can read
+ * blue and green without throwing away the painted seams and buckles.
  *
- * The numbers below were then re-picked from what the screenshots actually showed. The first pass
- * had Corven 0x434a52 (29% luminance) against Kaldite 0x24222a (14%), and at gameplay light both
- * kits read as one flat black — see the near-identical rig2-tier-t5-crop.png and
- * rig2-tier-t10-crop.png at that revision. Tier 5 is now 43% and pushed to blue steel, which is
- * three times Kaldite's luminance and a different hue family, so the two separate.
+ * The armour colours below are the authored gameplay ladder. Melee moves from bronze to dark iron
+ * to bright steel. Magic moves from blue to dark green to black. The Knight and Ranger silhouettes
+ * keep the two combat styles distinct when their palettes happen to have similar luminance.
  */
 
 /** Tier 0. Old iron with rust in it: warmer and darker than Grithe, so the upgrade reads. */
 const WORN = 0x6f6257;
-/** Grithe: "dull grey". A near-neutral cool multiply — this is the undyed end of the ladder. */
-const GRITHE = 0x8d9298;
-/** Corven: "dark and slightly oily to the touch". Blue steel, deliberately NOT black. */
-const CORVEN = 0x5a6b7c;
-/** Kaldite: "black Kaldite", garnet rivets. The accent is the garnet. */
-const KALDITE = 0x24222a;
+/** Melee tier 1: bronze over the Knight's authored plate texture. */
+const GRITHE = 0xb77a3f;
+/** Melee tier 5: medium neutral grey, separated clearly from both bronze and bright steel. */
+const CORVEN = 0x7f8589;
+/** Melee tier 10: full-white multiply, the brightest the textured source steel can render. */
+const KALDITE = 0xffffff;
 const KALDITE_GARNET = 0x5c1522;
-/** Marchhide: cured wolf hide. */
-const MARCHHIDE = 0x8a6a4a;
-/** Bramblehide: heavy hide, waxed. Lifted off Cairnpelt's black for the same separation reason. */
-const BRAMBLEHIDE = 0x6a5943;
-/** Cairnpelt: shroud cloth that "does not take dye" — so the tint is close to a no-op, correctly. */
-const WIGHTSHROUD = 0xa9a89c;
+/** Magic tier 1: blue. */
+const MARCHHIDE = 0x416f9d;
+/** Magic tier 5: dark green. */
+const BRAMBLEHIDE = 0x2f4f3b;
+/** Magic tier 10: charcoal black, light enough to keep seams visible under gameplay lighting. */
+const WIGHTSHROUD = 0x4a4d52;
 
 /** Magic tiers share geometry. Their unlit wood colour is the only tier-specific treatment. */
 const BASIC_WOOD = 0x8a5a32;
@@ -113,8 +110,8 @@ const MAGIC_WAND_SCALE = 0.80;
 
 // ------------------------------------------------------------------------ the ladder
 
-type OutfitKit = "ranger" | "peasant";
-type OutfitPart = "hood" | "chest" | "legs" | "boots" | "gloves" | "pauldron";
+type OutfitKit = "ranger" | "knight";
+type OutfitPart = "helmet" | "hood" | "chest" | "legs" | "boots" | "gloves" | "pauldron" | "scarf";
 type WeaponAsset = "sword" | "shield" | "axe" | "pickaxe" | "rpg_weapon_staff" | "rpg_weapon_wand";
 
 /**
@@ -157,13 +154,12 @@ interface LadderTier {
 }
 
 /**
- * Every id in `content/equipment.ts`, grouped the way the content file groups them. A pauldron is
- * added to the tier 5 and tier 10 body pieces so the silhouette grows with tier as well as
- * changing colour; tiers 1 has none, which is the whole point of the growth.
+ * Every id in `content/equipment.ts`, grouped the way the content file groups them. All tiers keep
+ * their class silhouette and change palette, stats, names, and weapon scale.
  */
 const LADDER: readonly LadderTier[] = [
   {
-    tier: 1, kit: "ranger", cloth: GRITHE, weapon: GRITHE, offHandTint: 0x8a6f4d,
+    tier: 1, kit: "knight", cloth: GRITHE, weapon: GRITHE, offHandTint: 0x8a6f4d,
     mainHand: [
       { id: "grithe_dagger", asset: "sword", scale: 0.62 },
       { id: "grithe_sword", asset: "sword", scale: 1 },
@@ -174,7 +170,7 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["grithe_ring", "grithe_pendant"],
   },
   {
-    tier: 5, kit: "ranger", cloth: CORVEN, weapon: CORVEN, offHandTint: 0x5c4a33,
+    tier: 5, kit: "knight", cloth: CORVEN, weapon: CORVEN, offHandTint: 0x5c4a33,
     mainHand: [
       { id: "corven_dagger", asset: "sword", scale: 0.62 },
       { id: "corven_sword", asset: "sword", scale: 1 },
@@ -185,7 +181,7 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["corven_ring", "corven_pendant"],
   },
   {
-    tier: 10, kit: "ranger", cloth: KALDITE, clothAccent: KALDITE_GARNET,
+    tier: 10, kit: "knight", cloth: KALDITE,
     weapon: KALDITE, weaponAccent: KALDITE_GARNET, offHandTint: KALDITE,
     mainHand: [
       { id: "kaldite_dagger", asset: "sword", scale: 0.62 },
@@ -197,7 +193,7 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["kaldite_ring", "kaldite_pendant"],
   },
   {
-    tier: 1, kit: "peasant", cloth: MARCHHIDE, weapon: PALEWOOD,
+    tier: 1, kit: "ranger", cloth: MARCHHIDE, weapon: PALEWOOD,
     mainHand: [
       { id: "palewood_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
       { id: "palewood_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
@@ -209,7 +205,7 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["ember_ring", "ember_charm"],
   },
   {
-    tier: 5, kit: "peasant", cloth: BRAMBLEHIDE, weapon: DUSKOAK,
+    tier: 5, kit: "ranger", cloth: BRAMBLEHIDE, weapon: DUSKOAK,
     mainHand: [
       { id: "duskoak_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
       { id: "duskoak_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
@@ -221,7 +217,7 @@ const LADDER: readonly LadderTier[] = [
     accessories: ["stone_ring", "stone_charm"],
   },
   {
-    tier: 10, kit: "peasant", cloth: WIGHTSHROUD, weapon: CAIRNPINE,
+    tier: 10, kit: "ranger", cloth: WIGHTSHROUD, weapon: CAIRNPINE,
     mainHand: [
       { id: "cairnpine_wand", asset: "rpg_weapon_wand", scale: MAGIC_WAND_SCALE, fixedScale: true },
       { id: "cairnpine_staff", asset: "rpg_weapon_staff", scale: MAGIC_STAFF_SCALE, fixedScale: true },
@@ -292,15 +288,15 @@ function buildTable(): Map<ItemId, GearVisual> {
       });
     }
 
-    // The peasant set has no head part in the library (measured: 4 parts, chest/legs/boots/gloves),
-    // so both lines borrow the ranger hood. It is the only skinned head mesh that exists.
+    const headPart: OutfitPart = row.kit === "knight" ? "helmet" : "hood";
     table.set(row.head, {
       slot: "head",
-      parts: [outfitPart("ranger", "hood", row.cloth, row.clothAccent)],
+      parts: [outfitPart(row.kit, headPart, row.cloth, row.clothAccent)],
     });
 
     const bodyParts: PartSpec[] = [outfitPart(row.kit, "chest", row.cloth, row.clothAccent)];
-    if (row.tier >= 5) bodyParts.push(outfitPart("ranger", "pauldron", row.cloth, row.clothAccent));
+    bodyParts.push(outfitPart(row.kit, "pauldron", row.cloth, row.clothAccent));
+    if (row.kit === "knight") bodyParts.push(outfitPart("knight", "scarf", row.cloth, row.clothAccent));
     table.set(row.body, { slot: "body", parts: bodyParts });
 
     table.set(row.legs, { slot: "legs", parts: [outfitPart(row.kit, "legs", row.cloth, row.clothAccent)] });
@@ -591,11 +587,14 @@ function tintedMaterial(material: THREE.Material, appearance: GearAppearance): T
   }
   if (appearance.accent !== undefined && shaded.emissive instanceof THREE.Color) {
     shaded.emissive.setHex(appearance.accent);
-    // None of these materials carries an emissiveMap, so the accent is a UNIFORM lift, not a glow
-    // on the rivets. That is why it is 0.15: enough to give Kaldite's near-black a garnet cast
-    // under the region's fog, low enough that the plate still reads as metal rather than as a
-    // light source. Raising this past ~0.3 makes the whole armour glow.
+    // The weapon GLB has one material and no emissive map, so this is a restrained uniform gem
+    // cast rather than a localized glow. The armour itself has no accent and remains plain steel.
     shaded.emissiveIntensity = 0.15;
+  }
+  if (isRangerOutfitAsset(appearance.assetId)
+    && appearance.tint !== undefined
+    && shaded.color instanceof THREE.Color) {
+    applyRangerTierColour(clone, appearance.tint);
   }
   if (isMagicWeaponAsset(appearance.assetId)) {
     // The source FBXs each use one material, so there is no safe sub-material to recolour. Removing
@@ -615,6 +614,50 @@ function tintedMaterial(material: THREE.Material, appearance: GearAppearance): T
 
 function isMagicWeaponAsset(assetId: string): boolean {
   return assetId === "rpg_weapon_staff" || assetId === "rpg_weapon_wand";
+}
+
+function isRangerOutfitAsset(assetId: string): boolean {
+  return assetId.startsWith("outfit_male_ranger_") || assetId.startsWith("outfit_female_ranger_");
+}
+
+/**
+ * Rehues Ranger's nearly black albedo without using emissive light.
+ *
+ * A uniform emissive lift made every normal face equally bright, which erased the hood folds,
+ * chest planes, straps, and boot shape. This fragment pass reads the authored texture and vertex
+ * colour luminance, maps that value into the tier hue, then leaves Three's normal PBR lighting to
+ * shade the result. The 0.26 floor makes the dark cloth accept blue or green. Expanding the
+ * source's first 0.22 luminance into the remaining range keeps its low-contrast detail readable.
+ */
+function applyRangerTierColour(material: THREE.Material, tint: number): void {
+  const shaded = material as Partial<THREE.MeshStandardMaterial>;
+  if (!(shaded.color instanceof THREE.Color)) return;
+
+  // The shader below owns the tier colour. White lets it measure the unmodified source albedo.
+  shaded.color.setHex(0xffffff);
+  if (shaded.emissive instanceof THREE.Color) {
+    shaded.emissive.setHex(0x000000);
+    shaded.emissiveIntensity = 0;
+  }
+
+  const colour = new THREE.Color(tint);
+  const colourLiteral = `vec3(${colour.r.toFixed(6)}, ${colour.g.toFixed(6)}, ${colour.b.toFixed(6)})`;
+  const inheritedCompile = material.onBeforeCompile;
+  const inheritedCacheKey = material.customProgramCacheKey.bind(material);
+  material.onBeforeCompile = (shader, renderer): void => {
+    inheritedCompile.call(material, shader, renderer);
+    const marker = "#include <color_fragment>";
+    if (!shader.fragmentShader.includes(marker)) return;
+    shader.fragmentShader = shader.fragmentShader.replace(marker, `${marker}
+      float gearTierSourceLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+      float gearTierValue = mix(0.26, 1.0, smoothstep(0.0, 0.22, gearTierSourceLuma));
+      diffuseColor.rgb = ${colourLiteral} * gearTierValue;
+    `);
+  };
+  material.customProgramCacheKey = (): string => (
+    `${inheritedCacheKey()}|ranger-tier-colour:${tint.toString(16)}`
+  );
+  material.needsUpdate = true;
 }
 
 /** One shared 20-triangle shape. Each attachment owns only its tiny material. */

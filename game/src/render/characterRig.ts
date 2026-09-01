@@ -237,16 +237,16 @@ const SKIN_SLOTS: ReadonlySet<EquipSlot> = new Set<EquipSlot>(["body", "legs", "
 /**
  * Which body region a layered part covers, keyed off the manifest's own tags.
  *
- * The outfit pack tags every modular part with exactly one region word — measured across all 20
- * parts: `torso` (chest), `legs`, `feet` (boots), `arms` (gloves), `head` (hood), `shoulder`
- * (pauldron). Hair is tagged both `hair` and `head`, so `hair` is tested first or a hood would
- * evict it.
+ * The outfit pack tags every modular part with a region word: `torso` (chest), `legs`, `feet`
+ * (boots), `arms` (gloves), `head` (hood or helmet), `shoulder` (pauldron), and `neck` (scarf).
+ * Hair is tagged both `hair` and `head`, so `hair` is tested first or a hood would evict it.
  *
  * This is what lets an equipped chest piece REPLACE the starting tunic instead of layering inside
  * it, and it is what the head-cap coverage test below counts.
  */
 const REGION_TAGS: readonly (readonly [string, string])[] = [
   ["hair", "hair"],
+  ["neck", "neck"],
   ["shoulder", "shoulder"],
   ["torso", "body"],
   ["legs", "legs"],
@@ -256,17 +256,16 @@ const REGION_TAGS: readonly (readonly [string, string])[] = [
 ];
 
 /** Draw order of the layered regions. Fixed, so the assembled part list is deterministic. */
-const REGION_ORDER: readonly string[] = ["body", "legs", "feet", "hands", "shoulder", "head", "hair"];
+const REGION_ORDER: readonly string[] = ["body", "legs", "feet", "hands", "shoulder", "neck", "head", "hair"];
 
 /** The regions that must all be dressed before the base body may be cut down to a head cap. */
 const HEAD_CAP_REQUIRES: readonly string[] = ["body", "legs", "feet", "hands"];
 
 /**
- * How a modular outfit id decomposes. Measured across all 20 modular parts in
- * game/public/assets/manifest.json: `outfit_<sex>_<kit>_<part>`, sex male|female, kit
- * peasant|ranger, part chest|legs|boots|gloves for both kits plus hood|pauldron for ranger only.
+ * How a modular outfit id decomposes. The coverage completion below uses the four body regions;
+ * head, shoulder, and neck pieces remain optional.
  */
-const OUTFIT_ID = /^outfit_(male|female)_(peasant|ranger)_(chest|legs|boots|gloves|hood|pauldron)$/;
+const OUTFIT_ID = /^outfit_(male|female)_(peasant|ranger|knight)_(chest|legs|boots|gloves|helmet|hood|pauldron|scarf)$/;
 
 /** The part that dresses each region `HEAD_CAP_REQUIRES` counts, in the order they are appended. */
 const COVERAGE_PARTS: readonly (readonly [part: string, region: string])[] = [
