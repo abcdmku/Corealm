@@ -103,8 +103,10 @@ export function createTools(api: GameApi): ToolDef[] {
       description:
         "List entities the player can currently see, or locations they have discovered. This is the "
         + "main way to find something to interact with. Results are sorted nearest first and "
-        + "`distance` is walking distance over the navmesh, not straight line. Filter hard: an "
-        + "unfiltered call in a town is mostly scenery you cannot use.",
+        + "`distance` is walking distance over the navmesh, not straight line. In `known` scope, "
+        + "a row backed by an entity has both its entity `id` and a `locationId`; a pure landmark "
+        + "has `state: \"known\"` and its `id` is the location id. Filter hard: an unfiltered call "
+        + "in a town is mostly scenery you cannot use.",
       inputSchema: obj({
         scope: { type: "string", enum: ["visible", "known"], description: "visible = what is in range now; known = discovered locations" },
         radius: NUM("Metres. Default 40, max 140."),
@@ -406,13 +408,16 @@ export function createTools(api: GameApi): ToolDef[] {
       name: "corealm_overlay",
       description:
         "Draw or clear an assistance overlay in the player's world view: highlight an entity, draw "
-        + "a path line, place a marker, or attach a world-space label. This is how an agent shows a "
-        + "human what it is talking about.",
+        + "a path line, place a marker, or attach a world-space label. Use `locationId` for a known "
+        + "place and `entityId` only for a real entity. If a pure location id is accidentally passed "
+        + "as `entityId`, the game resolves it as a location instead of drawing at world origin. "
+        + "Unknown targets return NOT_FOUND and draw nothing.",
       inputSchema: obj({
         op: { type: "string", enum: ["set", "clear"] },
         id: STR("Overlay id. Reusing an id replaces it."),
         kind: { type: "string", enum: ["highlight", "path", "marker", "label"] },
         entityId: STR("Entity to attach to"),
+        locationId: STR("Known place id to mark at its fixed world position"),
         position: { type: "array", items: { type: "number" }, minItems: 3, maxItems: 3 },
         path: { type: "array", items: { type: "array", items: { type: "number" } } },
         text: STR("Label text"),
@@ -427,6 +432,7 @@ export function createTools(api: GameApi): ToolDef[] {
           id: asString(args.id, `overlay_${Date.now()}`),
           kind: (args.kind as OverlaySpec["kind"]) ?? "highlight",
           ...(typeof args.entityId === "string" ? { entityId: args.entityId as EntityId } : {}),
+          ...(typeof args.locationId === "string" ? { locationId: args.locationId } : {}),
           ...(Array.isArray(args.position) ? { position: args.position as unknown as Vec3 } : {}),
           ...(Array.isArray(args.path) ? { path: args.path as unknown as Vec3[] } : {}),
           ...(typeof args.text === "string" ? { text: args.text } : {}),

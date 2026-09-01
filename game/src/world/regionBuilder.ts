@@ -1049,7 +1049,7 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
     tier,
     regionId,
     position: bankPosition,
-    state: "open",
+    state: "closed",
     interactions: ["inspect", "bank"],
     view: {
       assetId: settlement.bank.assetId,

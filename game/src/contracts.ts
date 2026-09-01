@@ -742,6 +742,8 @@ export interface OverlaySpec {
   id: string;
   kind: "highlight" | "path" | "marker" | "label";
   entityId?: EntityId;
+  /** Route/location id. The API resolves this to a fixed world position before rendering. */
+  locationId?: string;
   position?: Vec3;
   path?: Vec3[];
   text?: string;

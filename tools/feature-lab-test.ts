@@ -555,6 +555,39 @@ async function testCombat(
     equipment.push({ slot: "mainHand", itemId: setupWeapon });
   }
 
+  // An unresolved assistance target must fail before the renderer can park a marker at Three.js's
+  // default world origin. A valid fixed-position marker still uses the same production overlay
+  // path, then clears cleanly so the rest of the combat screenshots stay unchanged.
+  await targetPage.evaluate(async () => {
+    const debug = Reflect.get(window, "__gameDebug") as {
+      callTool?: (name: string, args: unknown) => Promise<unknown>;
+    } | undefined;
+    if (!debug?.callTool) throw new Error("Production window.__gameDebug.callTool is unavailable");
+    await debug.callTool("corealm_overlay", { op: "clear" });
+    const rejected = await debug.callTool("corealm_overlay", {
+      op: "set",
+      id: "lab-missing-target",
+      kind: "marker",
+      entityId: "lab_entity_that_does_not_exist",
+    }) as Record<string, unknown>;
+    if (rejected["error"] !== "NOT_FOUND") {
+      throw new Error(`Unknown overlay target did not return NOT_FOUND: ${JSON.stringify(rejected)}`);
+    }
+    const placed = await debug.callTool("corealm_overlay", {
+      op: "set",
+      id: "lab-position-target",
+      kind: "marker",
+      position: [6, 0, 6],
+    }) as Record<string, unknown>;
+    if (placed["activeCount"] !== 1) {
+      throw new Error(`Valid overlay target was not drawn: ${JSON.stringify(placed)}`);
+    }
+    const cleared = await debug.callTool("corealm_overlay", { op: "clear" }) as Record<string, unknown>;
+    if (cleared["activeCount"] !== 0) {
+      throw new Error(`Overlay cleanup failed: ${JSON.stringify(cleared)}`);
+    }
+  });
+
   // A failed human walk has two reporting paths: the immediate Result and navigation.failed.
   // The wording contract is covered in a focused test; here three real failures exercise the
   // event side and prove the persistent HUD keeps one unchanged line instead of counting spam.

@@ -405,7 +405,9 @@ export type CharacterMotion = "idle" | "walk" | "run" | "attack" | "hit" | "deat
  * stops moving reads as dead.
  */
 const OWN_CLIP_PATTERNS: Record<CharacterMotion, readonly RegExp[]> = {
-  idle: [/^idle/i, /^flying/i],
+  // A container's "Closed" clip is a held pose, while "Close" is the transition into it. Without
+  // this preference the chest manifest order picks Chest_Close and loops the transition forever.
+  idle: [/^idle/i, /^flying/i, /(?:^|_)closed$/i],
   walk: [/^walk/i, /^flying/i, /^jump/i],
   // Falls back to the walk clip, because not every rig ships a run: the hog, the rat and the fish
   // have one locomotion cycle each and pursuing on it is correct for them.
@@ -414,6 +416,20 @@ const OWN_CLIP_PATTERNS: Record<CharacterMotion, readonly RegExp[]> = {
   hit: [/^hitrecieve/i, /^hit/i],
   death: [/^death/i],
 };
+
+/** Orders an asset's own clips without using a transition as its resting animation. */
+export function ownClipCandidates(
+  own: readonly string[],
+  motion: CharacterMotion,
+): string[] {
+  const picked: string[] = [];
+  for (const pattern of OWN_CLIP_PATTERNS[motion]) {
+    for (const name of own) if (pattern.test(name) && !picked.includes(name)) picked.push(name);
+  }
+  if (motion !== "idle") return picked;
+  for (const name of own) if (!picked.includes(name)) picked.push(name);
+  return picked;
+}
 
 /**
  * The same table against the shared 65-joint library, for anything built on a humanoid body.
@@ -4149,13 +4165,7 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
   ): string[] {
     const own = this.assets.entry(assetId)?.animations ?? [];
     if (own.length > 0) {
-      const picked: string[] = [];
-      for (const pattern of OWN_CLIP_PATTERNS[motion]) {
-        for (const name of own) if (pattern.test(name) && !picked.includes(name)) picked.push(name);
-      }
-      if (motion !== "idle") return picked;
-      for (const name of own) if (!picked.includes(name)) picked.push(name);
-      return picked;
+      return ownClipCandidates(own, motion);
     }
     if (motion !== "idle") {
       const candidates = [...HUMANOID_CLIPS[motion]];

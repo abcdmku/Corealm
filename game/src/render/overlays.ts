@@ -107,6 +107,12 @@ export class Overlays {
     nowMs: number,
     style: "default" | "walkDestination",
   ): number {
+    const position = this.resolvePosition(spec);
+    // GameApi rejects unresolved anchors. Keep the renderer defensive too, since click feedback
+    // and future presentation code can call this class directly. A missing target must never fall
+    // through to Three.js's default [0, 0, 0] position.
+    if (spec.kind !== "path" && !position) return this.live.size;
+
     this.clear(spec.id);
 
     // A hard cap, because an agent in a loop can otherwise fill the scene with rings.
@@ -116,7 +122,6 @@ export class Overlays {
     }
 
     const colour = new THREE.Color(spec.colour ?? DEFAULT_COLOUR);
-    const position = this.resolvePosition(spec);
 
     let object: THREE.Object3D | null = null;
     let element: HTMLElement | undefined;

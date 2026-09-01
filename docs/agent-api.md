@@ -183,7 +183,9 @@ with the id of the piece that went back into the pack.
 - `corealm_shop` — list, buy, sell
 
 ### Helping the human
-- `corealm_overlay` — highlight, path, marker, label
+- `corealm_overlay` — highlight, path, marker, label. Pass `locationId` for a known place. If a
+  pure location id is passed as `entityId`, the API safely resolves it as a location; unknown
+  targets return `NOT_FOUND` and draw nothing.
 - `corealm_events` — the cursor and long-poll described above
 
 ## Magic loadout and recharging

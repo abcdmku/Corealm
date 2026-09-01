@@ -647,7 +647,45 @@ export class CorealmGameApi implements GameApiContract {
     if (!hook) return err("UNAVAILABLE", "Overlay system is not available yet");
     if (op === "set") {
       if (!spec) return err("INVALID_ARGUMENT", "overlay('set') needs a spec");
-      return ok({ activeCount: hook.set(spec) });
+      if (spec.kind === "path") {
+        if (!spec.path || spec.path.length < 2) {
+          return err("INVALID_ARGUMENT", "A path overlay needs at least two points");
+        }
+        return ok({ activeCount: hook.set(spec) });
+      }
+
+      let resolved = spec;
+      if (spec.entityId) {
+        const entity = this.hooks.entities?.get(spec.entityId);
+        if (!entity) {
+          // Known-place rows deliberately share ObservedEntity's shape. For a place with no
+          // backing entity, its `id` is a location id. Treating that id as an entity is an easy
+          // agent mistake, so resolve it as a location before rejecting it.
+          const location = this.nav.routeNode(spec.entityId);
+          if (location) {
+            const { entityId: _entityId, locationId: _locationId, ...rest } = spec;
+            resolved = { ...rest, position: location.position };
+          } else if (!spec.position) {
+            return err(
+              "NOT_FOUND",
+              `No entity or location with id ${spec.entityId}`,
+              spec.entityId,
+            );
+          }
+        }
+      } else if (spec.locationId) {
+        const location = this.nav.routeNode(spec.locationId);
+        if (!location) return err("NOT_FOUND", `No location with id ${spec.locationId}`);
+        const { locationId: _locationId, ...rest } = spec;
+        resolved = { ...rest, position: location.position };
+      } else if (!spec.position) {
+        return err(
+          "INVALID_ARGUMENT",
+          `${spec.kind} overlay needs an entityId, locationId, or position`,
+        );
+      }
+
+      return ok({ activeCount: hook.set(resolved) });
     }
     return ok({ activeCount: hook.clear(spec?.id) });
   }
