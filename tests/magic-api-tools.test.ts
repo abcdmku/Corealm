@@ -5,6 +5,7 @@ import type {
 import { SKILL_IDS, err, ok } from "../game/src/contracts.js";
 import { CorealmGameApi } from "../game/src/api/gameApi.js";
 import { createTools, type ToolDef } from "../game/src/agent/tools.js";
+import { EVENT_CATALOGUE } from "../game/src/agent/manual.js";
 import { ALL_ITEMS } from "../game/src/content/items.js";
 import { content, type ContentTables } from "../game/src/content/index.js";
 import { SPELLS } from "../game/src/content/spells.js";
@@ -192,15 +193,16 @@ describe("magic tool schemas", () => {
     const tools = createTools({} as GameApi);
     const equip = findTool(tools, "corealm_equip");
     const interact = findTool(tools, "corealm_interact");
-    const events = findTool(tools, "corealm_events");
 
     const properties = equip.inputSchema["properties"] as Record<string, Record<string, unknown>>;
     expect(properties["unequipSlot"]?.["enum"]).not.toContain("focus");
     expect(equip.description).not.toMatch(/focus slot/i);
     expect(interact.description).toMatch(/exactly 100 matching essence/i);
     expect(interact.description).toMatch(/1000 charges/i);
-    expect(events.description).toContain("remainingCharges");
-    expect(events.description).toContain("essenceSpent");
+    // The payload documentation moved out of the tool description and into the manual's event
+    // catalogue, which is what corealm_manual {topic:"events"} renders.
+    expect(EVENT_CATALOGUE["spell.launched"].fields).toContain("remainingCharges");
+    expect(EVENT_CATALOGUE["essence.recharged"].fields).toContain("essenceSpent");
   });
 
   it("requires spellId for select while accepting an explicit null to restore automatic selection", async () => {

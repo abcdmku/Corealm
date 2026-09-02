@@ -10,10 +10,10 @@
  * FROZEN. Only the root edits this file.
  */
 import type {
-  ActivitySummary, BankView, DialogueView, DocHit, EntityId, EquipSlot, EquipmentBonuses,
-  GameApi as GameApiContract, GameEvent, GameEventType, InteractionId, InventorySlot, ItemId,
-  ItemStack, LootTakeResult, MoveTarget, ObserveFilter, ObservedEntity, PlayerView, QuestSummary, RecipeId, TimeView,
-  Result, SemanticEntity, SkillId, SkillView, SpellbookView, SpellElement, SpellId, SpellRow, Vec3,
+  ActivitySummary, BankView, DialogueView, DocHit, EntityId, EquipSlot, EquipmentBonuses, EventBatch,
+  GameApi as GameApiContract, GameEventType, InteractionId, InventorySlot, ItemId,
+  ItemStack, LootTakeResult, MoveTarget, ObserveFilter, ObservedEntity, PathPlan, PlayerView, QuestSummary, RecipeId, TimeView,
+  Result, SemanticEntity, SkillId, SkillView, SpellbookView, SpellElement, SpellId, SpellRow, StateRevision, Vec3,
   OverlaySpec,
 } from "../contracts.js";
 import { EQUIP_SLOTS, SKILL_IDS, err, ok } from "../contracts.js";
@@ -54,6 +54,17 @@ export interface PendingInteractionOutcome {
   entityId: EntityId;
   interaction: InteractionId;
   result: Result<{ started: string }>;
+}
+
+/** Metres along a polyline, in XZ and Y alike — the same measure `Movement` walks. */
+function pathLengthOf(points: readonly Vec3[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1]!;
+    const b = points[i]!;
+    total += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  }
+  return total;
 }
 
 /** Total quantity of one item across inventory slots, ignoring the empty ones. */
@@ -214,6 +225,15 @@ export class CorealmGameApi implements GameApiContract {
       tick: this.clock.tick,
       timeScale: this.clock.timeScale,
       paused: this.clock.paused,
+    };
+  }
+
+  getRevision(): StateRevision {
+    return {
+      revision: this.store.revision(),
+      eventSeq: this.eventBus.currentSeq(),
+      simMs: this.clock.elapsedMs,
+      tick: this.clock.tick,
     };
   }
 
@@ -386,6 +406,75 @@ export class CorealmGameApi implements GameApiContract {
       pathLength: Math.round(walked * 100) / 100,
       etaMs: Math.round(plan.cost * 1000),
     };
+  }
+
+  /**
+   * The read-only twin of `walkTo`: the same destination resolution and the same two answers
+   * (navmesh first, route graph second), returned instead of started. Nothing here touches the
+   * store or the bus, so an assistant can draw a route as often as it likes.
+   */
+  planPath(target: MoveTarget): Result<PathPlan> {
+    if (!this.nav.isReady()) return err("UNAVAILABLE", "Navigation is not ready");
+    const state = this.store.get();
+
+    let destination: Vec3;
+    let entityId: EntityId | null = null;
+    let locationId: string | null = null;
+    if ("position" in target) {
+      destination = target.position;
+    } else if ("entityId" in target) {
+      const entity = this.hooks.entities?.get(target.entityId);
+      if (!entity) return err("NOT_FOUND", `No entity with id ${target.entityId}`, target.entityId);
+      destination = entity.position;
+      entityId = entity.id;
+    } else {
+      const node = this.nav.routeNode(target.locationId);
+      if (!node) return err("NOT_FOUND", `No known location ${target.locationId}`);
+      destination = node.position;
+      locationId = target.locationId;
+    }
+
+    const from = state.player.position;
+    const direct = this.nav.findPathDetailed(from, destination);
+    if (direct && !direct.partial) {
+      const length = pathLengthOf(direct.path);
+      return ok({
+        points: direct.path.map((point) => [...point] as unknown as Vec3),
+        pathLength: Math.round(length * 100) / 100,
+        etaMs: Math.round((length / PLAYER_SPEED) * 1000),
+        legs: [],
+      });
+    }
+
+    const agility = state.skills.agility.level;
+    const plan = locationId !== null
+      ? this.nav.planRouteVia(from, { locationId }, agility)
+      : this.nav.planRouteVia(from, entityId !== null ? { position: destination, id: entityId } : { position: destination }, agility);
+    if (!plan || plan.legs.length === 0) return err("NOT_REACHABLE", UNREACHABLE_DESTINATION_MESSAGE);
+
+    const points: Vec3[] = [[...from] as unknown as Vec3];
+    let walked = 0;
+    for (const leg of plan.legs) {
+      if (leg.kind === "walk") {
+        const detailed = this.nav.findPathDetailed(leg.from, leg.to);
+        const segment = detailed && !detailed.partial ? detailed.path : [leg.from, leg.to];
+        for (const point of segment) points.push([...point] as unknown as Vec3);
+        walked += leg.cost * PLAYER_SPEED;
+      } else {
+        points.push([...leg.to] as unknown as Vec3);
+      }
+    }
+    return ok({
+      points,
+      pathLength: Math.round(walked * 100) / 100,
+      etaMs: Math.round(plan.cost * 1000),
+      legs: plan.legs.map((leg) => ({
+        kind: leg.kind,
+        fromId: leg.fromId,
+        toId: leg.toId,
+        ...(leg.reqLevel !== undefined ? { reqLevel: leg.reqLevel } : {}),
+      })),
+    });
   }
 
   stop(): Result<{ stopped: string[] }> {
@@ -713,7 +802,7 @@ export class CorealmGameApi implements GameApiContract {
 
   // ----------------------------------------------------------------- events
 
-  events(sinceSeq: number, filter?: GameEventType[], timeoutMs?: number): Promise<{ events: GameEvent[]; nextSeq: number }> {
+  events(sinceSeq: number, filter?: GameEventType[], timeoutMs?: number): Promise<EventBatch> {
     if (timeoutMs === undefined || timeoutMs <= 0) {
       return Promise.resolve(this.eventBus.since(sinceSeq, filter));
     }

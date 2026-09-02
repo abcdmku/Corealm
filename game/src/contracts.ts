@@ -160,6 +160,19 @@ export type InteractionId =
   | "attack" | "cast" | "talk" | "open" | "enter" | "climb" | "vault"
   | "loot" | "take" | "awaken" | "produce" | "recharge" | "bank" | "trade" | "equip" | "unequip";
 
+/** The unions above as values, so a tool schema can enumerate them instead of accepting any string. */
+export const ARCHETYPES: readonly Archetype[] = [
+  "ore", "tree", "fishing_spot", "farm_plot",
+  "enemy", "boss", "npc", "station", "bank", "shop",
+  "obstacle", "door", "portal", "loot", "recovery_cache", "landmark",
+];
+
+export const INTERACTION_IDS: readonly InteractionId[] = [
+  "inspect", "mine", "chop", "fish", "rake", "plant", "harvest",
+  "attack", "cast", "talk", "open", "enter", "climb", "vault",
+  "loot", "take", "awaken", "produce", "recharge", "bank", "trade", "equip", "unequip",
+];
+
 /** A production station category. Recipes may accept more than one category. */
 export type StationKind =
   | "furnace" | "anvil" | "range" | "campfire" | "crafting_table" | "fletching_bench"
@@ -519,7 +532,23 @@ export type GameErrorCode =
   | "NOT_FOUND" | "OUT_OF_RANGE" | "NOT_REACHABLE" | "REQUIREMENTS_NOT_MET"
   | "INVENTORY_FULL" | "BUSY" | "INVALID_ARGUMENT" | "DEAD" | "DEPLETED"
   | "NOT_ENOUGH_CURRENCY" | "NOT_ENOUGH_ITEMS" | "NO_DIALOGUE"
-  | "TIMEOUT" | "UNAVAILABLE";
+  | "TIMEOUT" | "UNAVAILABLE"
+  /**
+   * Agent-session refusals. These never come from the world: they are the collaboration contract
+   * saying no before the world is asked. `NOT_PERMITTED` is a tool the current mode or control
+   * owner does not allow, `PAUSED` is the player's pause button, `CANCELLED` is a bounded
+   * operation cut short by Stop or Take control, `APPROVAL_REQUIRED` is a request the player has
+   * not yet answered.
+   */
+  | "NOT_PERMITTED" | "PAUSED" | "CANCELLED" | "APPROVAL_REQUIRED";
+
+export const GAME_ERROR_CODES: readonly GameErrorCode[] = [
+  "NOT_FOUND", "OUT_OF_RANGE", "NOT_REACHABLE", "REQUIREMENTS_NOT_MET",
+  "INVENTORY_FULL", "BUSY", "INVALID_ARGUMENT", "DEAD", "DEPLETED",
+  "NOT_ENOUGH_CURRENCY", "NOT_ENOUGH_ITEMS", "NO_DIALOGUE",
+  "TIMEOUT", "UNAVAILABLE",
+  "NOT_PERMITTED", "PAUSED", "CANCELLED", "APPROVAL_REQUIRED",
+];
 
 export interface GameError { code: GameErrorCode; message: string; entityId?: EntityId }
 
@@ -577,7 +606,104 @@ export type GameEventType =
   | "level.gained" | "production.completed"
   | "campfire.built" | "campfire.replaced" | "campfire.expired"
   | "quest.updated" | "dialogue.opened" | "dialogue.closed"
-  | "entity.discovered";
+  | "entity.discovered"
+  /**
+   * The collaboration session, published on the same bus as the world so an agent waits on a
+   * mode change or a player's Stop with the one `corealm_events` call it already uses.
+   * `agent.session` is mode, control owner, pause and objective changes; `agent.task` is a bounded
+   * operation starting, finishing or being cut short; `agent.approval` is a request being raised
+   * or answered.
+   */
+  | "agent.session" | "agent.task" | "agent.approval";
+
+export const GAME_EVENT_TYPES: readonly GameEventType[] = [
+  "navigation.started", "navigation.completed", "navigation.failed",
+  "activity.started", "activity.stopped",
+  "resource.depleted", "inventory.full",
+  "item.received", "item.lost", "item.equipped", "item.unequipped",
+  "combat.started", "combat.ended", "spell.launched",
+  "essence.altarAwakened", "essence.recharged",
+  "health.low", "player.died", "level.gained", "production.completed",
+  "campfire.built", "campfire.replaced", "campfire.expired",
+  "quest.updated", "dialogue.opened", "dialogue.closed", "entity.discovered",
+  "agent.session", "agent.task", "agent.approval",
+];
+
+/**
+ * What `GameEvent.data` carries, per type.
+ *
+ * Emitters have always written plain records, and a handful of types are emitted from more than
+ * one place with more than one shape (`item.received` is a gather, a loot pile, a purchase and a
+ * currency drop). This map states every field any emitter writes, with optionals where the shapes
+ * differ, so a consumer narrows on `type` instead of casting `data` to `Record<string, unknown>`
+ * and hoping. It is also the source the agent manual renders its event catalogue from, so the
+ * documentation cannot drift from the type.
+ */
+export interface GameEventPayloads {
+  "navigation.started": { pathLength?: number; etaMs: number; points?: number; legs?: number; route?: boolean };
+  "navigation.completed": { position: Vec3 };
+  "navigation.failed": { reason: string; to?: Vec3 };
+  "activity.started": { kind: string; skill?: SkillId; entityId?: EntityId; interaction?: string; recipeId?: RecipeId };
+  "activity.stopped": { kind: string; reason: string; skill?: SkillId; entityId?: EntityId; completed?: number; remaining?: number };
+  "resource.depleted": { entityId?: EntityId; itemId?: ItemId; tier?: number; respawnInSeconds?: number; plotId?: EntityId; respawnSeconds?: number };
+  "inventory.full": { itemId?: ItemId; name?: string; attempted?: number; added?: number; recipeId?: RecipeId };
+  "item.received": {
+    itemId?: ItemId; name?: string; quantity?: number; source?: string; skill?: SkillId; from?: EntityId;
+    sourceName?: string; currency?: number; pileId?: EntityId; items?: ItemStack[];
+  };
+  "item.lost": { itemId?: ItemId; name?: string; quantity?: number; reason?: string; cacheId?: EntityId; items?: ItemStack[] };
+  "item.equipped": { itemId: ItemId; name: string; slot: EquipSlot; replaced: ItemId | null };
+  "item.unequipped": { itemId: ItemId; name: string; slot: EquipSlot; quantity: number };
+  "combat.started": {
+    initiator?: "player" | "enemy"; targetId?: EntityId; by?: EntityId; name?: string; spellId?: SpellId | null;
+    /** Boss choreography rides on this type: `boss.phase`, `boss.telegraph`, `boss.slam`. */
+    event?: string; enemyId?: EntityId; phase?: number; kind?: string; centre?: Vec3; radius?: number;
+    firesAtMs?: number; damage?: number; hit?: boolean;
+  };
+  "combat.ended": { reason: string; enemyId?: EntityId; name?: string; xp?: number };
+  "spell.launched": {
+    spellId: SpellId; targetId: EntityId; element: SpellElement; rung: SpellRung; flightMs: number; hit: boolean;
+    fuelSource: string; weaponItemId: ItemId | null; remainingCharges: number | null;
+    essenceItemId: ItemId | null; remainingEssence: number | null;
+  };
+  "essence.altarAwakened": { altarId: EntityId; element: SpellElement; orbItemId: ItemId };
+  "essence.recharged": {
+    altarId: EntityId; weaponItemId: ItemId; element: SpellElement; before: number; after: number;
+    essenceItemId: ItemId; essenceSpent: number;
+  };
+  "health.low": { health: number; maxHealth: number; fraction: number; threshold: number };
+  "player.died": { position: Vec3; regionId: RegionId; respawnPointId: string; respawnPosition: Vec3; [key: string]: unknown };
+  "level.gained": { skill: SkillId; level: number; levelsGained: number };
+  "production.completed": { recipeId?: RecipeId; recipeName?: string; skill?: SkillId; kind?: string; cropId?: ItemId; plotId?: EntityId; tier?: number; [key: string]: unknown };
+  "campfire.built": { logItemId: ItemId; tier: number; lifetimeMs: number; expiresAtPlaySeconds: number; [key: string]: unknown };
+  "campfire.replaced": { previousLogItemId: ItemId; previousTier: number; logItemId: ItemId; tier: number; [key: string]: unknown };
+  "campfire.expired": { logItemId: ItemId; tier: number; position: Vec3 };
+  "quest.updated": {
+    questId: QuestId; status: "unstarted" | "active" | "complete"; stage: number; stageCount: number;
+    objective: string | null; objectiveRefs: QuestObjectiveRef[];
+  };
+  "dialogue.opened": { npcId: EntityId; speaker: string; nodeId: string; optionCount: number };
+  "dialogue.closed": { npcId: EntityId };
+  "entity.discovered": { locationId: string; regionId: RegionId; via: string };
+  "agent.session": {
+    change: "mode" | "control" | "paused" | "objective" | "connected";
+    mode: AgentMode; controlOwner: AgentControlOwner; paused: boolean; objective: string | null;
+    agentName: string | null; by: "agent" | "player" | "system";
+  };
+  "agent.task": {
+    taskId: string; tool: string; status: "started" | "completed" | "cancelled" | "failed";
+    summary: string; reason?: string;
+  };
+  "agent.approval": {
+    requestId: string; kind: AgentApprovalKind; description: string;
+    status: "pending" | "approved" | "denied" | "expired";
+  };
+}
+
+/** A `GameEvent` narrowed to one type. `data` is that type's payload, nothing looser. */
+export type TypedGameEvent<T extends GameEventType = GameEventType> = T extends GameEventType
+  ? { seq: number; type: T; atMs: number; entityId?: EntityId; data: GameEventPayloads[T] }
+  : never;
 
 export interface GameEvent {
   /** Monotonic, never reused. */
@@ -588,6 +714,60 @@ export interface GameEvent {
   entityId?: EntityId;
   data: Record<string, unknown>;
 }
+
+/** Narrows a loose event to its typed payload. Safe because every emitter writes the shape above. */
+export function asTypedEvent<T extends GameEventType>(event: GameEvent, type: T): TypedGameEvent<T> | null {
+  return event.type === type ? (event as unknown as TypedGameEvent<T>) : null;
+}
+
+/**
+ * One cursor read from the event ring.
+ *
+ * The ring keeps a bounded window, so a caller that sleeps through more events than it holds
+ * comes back to a gap. `dropped` says so, `droppedCount` says how many, and `oldestSeq` is the
+ * first sequence still readable — the caller can resync by re-reading state through
+ * `corealm_context` instead of trusting an inventory reconstructed from a stream with a hole.
+ */
+export interface EventBatch {
+  events: GameEvent[];
+  /** Pass back as `sinceSeq`. */
+  nextSeq: number;
+  /** Lowest sequence number still in the ring, or `nextSeq` when the ring is empty. */
+  oldestSeq: number;
+  /** True when `sinceSeq` was older than the ring: events between it and `oldestSeq` are gone. */
+  dropped: boolean;
+  droppedCount: number;
+}
+
+/**
+ * A change token for the whole game state.
+ *
+ * `revision` advances on every mutation the store is told about, `eventSeq` on every published
+ * event. Two reads with equal pairs saw the same world; anything else means re-read. `simMs`
+ * rides along because a deadline compared against wall time is always wrong.
+ */
+export interface StateRevision {
+  revision: number;
+  eventSeq: number;
+  simMs: number;
+  tick: number;
+}
+
+// ------------------------------------------------------------ agent session
+
+/**
+ * The three collaboration modes.
+ *
+ *  - `guide`: read-only. Answers, recommendations, explanations. The agent never touches the world.
+ *  - `assist`: the player drives. The agent may draw overlays and propose steps.
+ *  - `play`: the agent may perform game actions while it owns control, until stopped.
+ */
+export type AgentMode = "guide" | "assist" | "play";
+
+/** Who is allowed to move the character right now. */
+export type AgentControlOwner = "player" | "agent";
+
+export type AgentApprovalKind = "control" | "trade";
 
 // ------------------------------------------------------------- state views
 
@@ -769,6 +949,16 @@ export interface OverlaySpec {
 }
 
 export type MoveTarget = { entityId: EntityId } | { position: Vec3 } | { locationId: string };
+
+/** A previewed route. `points` is drawable as a `path` overlay as-is. */
+export interface PathPlan {
+  points: Vec3[];
+  /** Metres walked, excluding portal and shortcut legs. */
+  pathLength: number;
+  etaMs: number;
+  /** Route-graph hops the walk needs beyond the navmesh, in order. Empty for a plain walk. */
+  legs: { kind: "walk" | "shortcut" | "portal"; fromId: string; toId: string; reqLevel?: number }[];
+}
 
 // ------------------------------------------------------ the real-engine feature lab
 
@@ -1002,6 +1192,8 @@ export interface GameApi {
   getCurrency(): number;
   /** The sim clock. Compare any `*AtMs` deadline against `simMs`, never against wall time. */
   getTime(): TimeView;
+  /** The change token. Equal pairs mean nothing happened between two reads. */
+  getRevision(): StateRevision;
 
   // observation
   observe(filter: ObserveFilter): ObservedEntity[];
@@ -1010,6 +1202,12 @@ export interface GameApi {
 
   // movement
   moveTo(target: MoveTarget): Result<{ pathLength: number; etaMs: number }>;
+  /**
+   * The path `moveTo` would walk, without walking it. Read-only: exists so an assistant can draw
+   * a route for the player to follow. `legs` names the route-graph hops when the navmesh alone
+   * cannot reach the target (a portal, an Agility shortcut).
+   */
+  planPath(target: MoveTarget): Result<PathPlan>;
   stop(): Result<{ stopped: string[] }>;
 
   // interaction
@@ -1067,5 +1265,5 @@ export interface GameApi {
     sinceSeq: number,
     filter?: GameEventType[],
     timeoutMs?: number,
-  ): Promise<{ events: GameEvent[]; nextSeq: number }>;
+  ): Promise<EventBatch>;
 }

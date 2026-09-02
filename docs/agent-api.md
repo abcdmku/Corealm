@@ -1,31 +1,41 @@
 # Writing an agent for Corealm
 
-Corealm is a browser RPG that an AI agent plays through the same actions a human uses. There is no
-privileged automation path: every tool below calls the identical function the human UI calls. If a
-human can do it, you can; if they cannot, neither can you.
+Corealm is a browser RPG that an AI agent plays alongside a human, through the same actions the
+human uses. There is no privileged automation path: every tool below calls the identical function
+the human UI calls. If a human can do it, you can; if they cannot, neither can you.
 
-This document is enough to write a working autonomous player from scratch.
+The game is self-describing. An agent that has never seen it learns everything it needs from two
+tools: `corealm_context` (the whole situation, right now) and `corealm_manual` (the rules). This
+document is the same material for a human reader, plus a worked example.
 
 ## Getting a handle
 
 Two entry points, one implementation behind both.
 
 ```js
-// Always present, in every browser.
-const agent = window.corealm.agent;
-
-// The WebMCP surface, when the browser supports it. Same handlers.
+// WebMCP, in a capable browser. This is how an agent in the browser reaches the game.
 const tools = await document.modelContext.getTools();
+
+// Always present, in every browser. Same handlers, same validation, same session rules.
+const agent = window.corealm.agent;
 ```
+
+Tools are registered with `document.modelContext.registerTool` (falling back to the older
+`navigator.modelContext` spelling) with a `title`, a `description`, a strict `inputSchema`, and
+`annotations.readOnlyHint`. Each `execute(input, { signal })` returns
+`{ content: [{ type: "text", text: <JSON> }], isError? }`; the JSON is the tool's result. A browser
+without WebMCP gets no stand-in: `window.corealm.agent.webmcp()` reports `binding: "none"` and the
+in-game agent panel says so.
 
 `window.corealm.agent` exposes:
 
 | Method | Returns |
 | --- | --- |
-| `listTools()` | every tool with its name, description, and JSON Schema |
-| `call(name, args)` | the tool's result. **Never throws.** |
-| `webmcp()` | which container the adapter bound to, and whether it was native |
+| `listTools()` | every tool with name, title, description, JSON Schema, access level, annotations |
+| `call(name, args, { signal })` | the tool's result. **Never throws.** |
+| `webmcp()` | which container the adapter bound to, whether it was native, and how |
 | `version()` | build, contracts, and content versions — cache knowledge against these |
+| `session()` | the collaboration session: mode, control owner, objective, pending approval |
 
 ## The single most important thing
 
@@ -36,314 +46,210 @@ const result = await agent.call("corealm_interact", { entityId: "x", interaction
 // { error: "REQUIREMENTS_NOT_MET", message: "Requires Mining 10", entityId: "x" }
 ```
 
-Always check for `.error` before using a result. The codes are:
+Always check for `.error` before using a result. The codes:
 
 `NOT_FOUND`, `OUT_OF_RANGE`, `NOT_REACHABLE`, `REQUIREMENTS_NOT_MET`, `INVENTORY_FULL`, `BUSY`,
 `INVALID_ARGUMENT`, `DEAD`, `DEPLETED`, `NOT_ENOUGH_CURRENCY`, `NOT_ENOUGH_ITEMS`, `NO_DIALOGUE`,
-`TIMEOUT`, `UNAVAILABLE`.
+`TIMEOUT`, `UNAVAILABLE`, and the four session codes `NOT_PERMITTED`, `PAUSED`, `CANCELLED`,
+`APPROVAL_REQUIRED`.
 
-`message` is always human-readable and states what is missing. You can usually act on it directly.
+`message` is always human-readable and states what is missing. Arguments are validated against
+each tool's schema before anything runs: a wrong type, an unknown field, a value outside its range
+or enum is an `INVALID_ARGUMENT` naming the field, never a silently-applied default.
+
+## The three modes
+
+The player chooses how much the agent may do, and the agent panel in the game shows it.
+
+| Mode | The agent may | Tools |
+| --- | --- | --- |
+| `guide` | read, answer, explain, recommend | everything marked `read` |
+| `assist` | also draw routes and highlights, and propose plans | plus `assist` tools: `corealm_overlay`, `corealm_route`, `corealm_propose` |
+| `play` | also act, while it holds control and is not paused | plus `act` tools |
+
+`corealm_session {op:"set_mode", mode}` moves to `guide` or `assist`. `play` is granted by the
+player: `corealm_session {op:"request_control", objective}` asks, the panel shows the request with
+Allow and Deny, and the call returns `granted`, `denied`, or `pending` (with a `requestId` for
+`wait_approval`). When the task is done, `{op:"release_control"}` hands the character back.
+
+The player can always Pause, Stop, or Take control from the panel. Each arrives as an
+`agent.session` event, so `corealm_events` or `corealm_wait {events:["agent.session"]}` is how the
+agent notices. Shop buys and sells in play mode ask for approval per call unless the player has
+pre-approved trades. Everything else in play mode is free.
+
+## Start with corealm_context
+
+One call, one atomic snapshot of the same tick:
+
+```js
+const ctx = await agent.call("corealm_context");
+ctx.session.mode            // "guide" | "assist" | "play"
+ctx.session.controlOwner    // "player" | "agent"
+ctx.player                  // position, health, inCombat, activityKind, ...
+ctx.quests.active[0].refs   // the current objective as ids
+ctx.nearby.entities         // what is within 40 m, with interactions
+ctx.events.nextSeq          // the cursor to continue from
+ctx.revision                // { revision, eventSeq, simMs, tick } — equal means nothing changed
+ctx.suggestedActions        // ranked exact tool calls, with `requires` when a mode is needed
+```
+
+Pass `sections` to read a subset. Read `corealm_manual` once (`overview` and `modes`), and look
+the other topics up as needed: `control`, `tools`, `rules`, `terminology`, `events`, `errors`,
+`efficiency`.
 
 ## The second most important thing
 
 **Do not poll.** `corealm_events` blocks until something happens:
 
 ```js
-// Wrong: burns tool calls and tokens learning nothing.
-while (true) {
-  const player = await agent.call("corealm_player");
-  if (!player.activityKind) break;
-}
-
-// Right: one call, returns the moment the activity actually ends.
-const { events, nextSeq } = await agent.call("corealm_events", {
+const { events, nextSeq, dropped } = await agent.call("corealm_events", {
   sinceSeq: cursor,
   types: ["activity.stopped", "inventory.full", "resource.depleted"],
   timeoutMs: 30000,
 });
 cursor = nextSeq;
+if (dropped) { /* the ring moved on without you: re-read corealm_context */ }
 ```
 
-Events are a monotonic sequence. Keep the `nextSeq` you were given and pass it back as `sinceSeq`.
-You will never miss an event and never see one twice.
+Events are a monotonic sequence. Keep the `nextSeq` you were given and pass it back as
+`sinceSeq`. The ring keeps the last 512 events; if your cursor is older than that, `dropped` is
+true and `droppedCount` says how many you missed.
 
-The event types are:
+The event types, with payloads documented in `corealm_manual {topic:"events"}`:
 
 ```
 navigation.started  navigation.completed  navigation.failed
 activity.started    activity.stopped      resource.depleted   inventory.full
 item.received       item.lost             item.equipped       item.unequipped
-combat.started      combat.ended          spell.launched      essence.recharged
-health.low          player.died           level.gained        production.completed
+combat.started      combat.ended          spell.launched      essence.altarAwakened
+essence.recharged   health.low            player.died         level.gained
+production.completed campfire.built       campfire.replaced   campfire.expired
 quest.updated       dialogue.opened       dialogue.closed     entity.discovered
+agent.session       agent.task            agent.approval
 ```
 
-`spell.launched` fires when a cast is rolled and its bolt leaves, carrying
-`{ spellId, targetId, element, rung, flightMs, hit, orbItemId, remainingCharges }`. It matters to an agent because a spell does
-NOT damage anything until it arrives: `flightMs` later, the target's health moves and the kill (if
-any) resolves. So a cast that has been accepted is not yet a hit, and an agent that reads health
-immediately after `corealm_attack` will read the old value.
+`spell.launched` fires when a cast is rolled and its bolt leaves. A spell does NOT damage anything
+until it arrives, `flightMs` later, so an agent that reads health immediately after
+`corealm_attack` reads the old value. Gear moving onto or off the body is `item.equipped` /
+`item.unequipped`, never `item.received` / `item.lost`.
 
-`essence.recharged` carries
-`{ altarId, orbItemId, element, before, after, essenceItemId, essenceSpent }`. Use `after` as the new
-charge count and advance the event cursor before issuing another command.
+## The 34 tools
 
-You can reconstruct your inventory from `item.received` and `item.lost` alone. Gear moving onto or
-off the body is **not** a loss or a gain: it emits `item.equipped` or `item.unequipped` instead, and
-neither of the two item events fires for it. A swap emits one `item.equipped` carrying `replaced`
-with the id of the piece that went back into the pack.
+Access: `read` works in any mode; `assist` needs assist or play; `act` needs play mode with agent
+control, not paused.
 
-## The 22 tools
+### Orientation
+- `corealm_context` (read) — the whole situation, atomically. Call this first.
+- `corealm_manual` (read) — the rules, by topic.
+- `corealm_session` (read) — connect, set the objective, ask for or release control, stop, cancel.
 
-### Reading state
-- `corealm_player` — position, region, health, dead, moving, activityKind, and two separate
-  combat facts:
-  - `inCombat` — a fight is happening: you have a target, or something has engaged you. It clears
-    on the frame the last enemy dies, so `waitFor(() => !inCombat)` is safe after a kill.
-  - `regenBlocked` — the eight-second no-regen window after any blow in either direction. It
-    outlives the fight on purpose. Wait on this only if you are waiting to heal.
-  - `targetId` and `engagedBy` name who, so you never have to infer it.
-  - `facingRad` — which way the player is pointing, radians, 0 = +Z (north).
-  - `time` — the sim clock: `{ simMs, tick, timeScale, paused }`. **Every deadline the game gives
-    you is stamped in `simMs`, never in wall time** — a recovery cache's `expiresAtMs`, a crop's
-    growth. Comparing one against `Date.now()` is wrong, and quietly wrong whenever the clock is
-    paused or rescaled.
-- `corealm_skills` — all 11 skills with level, xp, xpToNext
-- `corealm_inventory` — 28 slots, equipment with summed bonuses, mark balance
-- `corealm_spellbook` — call with `{ op: "read" }` to read all sixteen spells and the live magic
-  loadout. The response contains:
+### Helping the player
+- `corealm_propose` — a summary and up to eight steps, shown in the panel and, outside guide
+  mode, marked in the world.
+- `corealm_route` — the path the character would walk, drawn in assist or play. Read-only on the
+  world.
+- `corealm_overlay` (assist) — highlight, path, marker, label. Pure presentation.
 
-  ```js
-  {
-    spells: [{
-      id, name, element, rung, reqLevel, maxHit, baseXp, castMs,
-      requiredElement, fuelCost, unlocked, castable, blockedBy, description,
-    }],
-    preferredSpellId, activeSpellId, magicLevel,
-    equippedWeapon: {
-      itemId, name, element, charges, capacity, rechargeItemId, rechargeCost,
-    } ?? null,
-    essence: { wind, earth, water, fire },
-    releasedElements,
-  }
-  ```
+### Bounded operations (act)
+One call each, interruptible by Pause, Stop, Take control, or the caller's own AbortSignal.
+- `corealm_navigate` — walk and wait for arrival.
+- `corealm_follow_route` — several waypoints in order.
+- `corealm_gather` — mine, chop, fish or harvest until `quantity` items arrive; picks the nearest
+  qualifying node and moves on when one depletes.
+- `corealm_fight` — attack, wait for the outcome, optionally retreat below a health fraction, loot.
+- `corealm_loot_nearby` — open and empty every pile within reach.
+- `corealm_craft` — a production batch, waited to completion.
+- `corealm_wait` (read) — block on events, idle, health, or respawn.
 
-  Call `{ op: "select", spellId }` to set the standing choice. Pass `spellId: null` to return to
-  automatic selection. `activeSpellId` is what an attack will cast now. `blockedBy` states why a
-  row cannot be cast.
-- `corealm_quests` — every known quest with status, stage, and objective. `currentObjective` is
-  prose written for a player and contains no ids; `currentObjectiveRefs` is the same objective as
-  data — `{ kind: "item" | "entity" | "location" | "enemyFamily" | "recipe" | "spell", id }` — in
-  the order the sentence names them. Read the refs, not the sentence:
+### Reading state (read)
+- `corealm_player`, `corealm_skills`, `corealm_inventory`, `corealm_quests`, `corealm_spellbook`.
+  `corealm_quests` lists quests from regions the player has entered whose prerequisites are done;
+  objectives stay hidden until a quest is accepted. `currentObjectiveRefs` is the objective as ids.
 
-  ```js
-  const quest = (await agent.call("corealm_quests")).find((q) => q.status === "active");
-  for (const ref of quest.currentObjectiveRefs) {
-    if (ref.kind === "location") await agent.call("corealm_move_to", { locationId: ref.id });
-    if (ref.kind === "entity") await agent.call("corealm_move_to", { entityId: ref.id });
-  }
-  ```
+### Finding things (read)
+- `corealm_observe` — what is visible now (`scope: "visible"`, 140 m ceiling) or the places the
+  player has discovered (`scope: "known"`). Discovery is real: a fresh character knows four
+  places. `corealm_search_docs` lists every place's `locationId`, and `corealm_navigate` accepts
+  one whether or not it is discovered — look it up, walk there, discover it on arrival.
+- `corealm_inspect` — full detail on one entity.
+- `corealm_search_docs` — the public documentation. Never quest solutions.
 
-### Finding things
-- `corealm_observe` — entities you can see now (`scope: "visible"`, 140 m ceiling), or the places
-  you have discovered (`scope: "known"`)
+### Primitives (act)
+- `corealm_move_to`, `corealm_stop`, `corealm_interact`, `corealm_take_loot`, `corealm_use_item`,
+  `corealm_equip`, `corealm_produce`, `corealm_build_campfire`, `corealm_attack`.
+- `corealm_dialogue`, `corealm_bank`, `corealm_shop` — `state` / `list` read in any mode; the
+  other ops act.
 
-  **Discovery is real, and it starts almost empty.** A fresh character knows four places out of
-  forty-four. Walking within 40 m of somewhere discovers it permanently and fires
-  `entity.discovered`. So `scope: "known"` is what you have earned, not a map you were handed —
-  which means an agent that only ever looks at what it knows will walk in circles.
-
-  The way out is `corealm_search_docs`. The generated pages name every place with its id —
-  `**Bracken Pit** (\`bracken_pit\`)` — and `corealm_move_to({ locationId })` accepts an id whether
-  or not you have been there. Look up where the ore is, walk there, discover it on arrival. That is
-  the intended loop and it is how the mining proof in this document bootstraps.
-
-  Rows for a place backed by an entity carry BOTH ids: `id` is the entity (`coldbrace_bank`) and
-  `locationId` is the place it stands at (`bank_interior`). Only the second one is accepted by
-  `move_to({ locationId })`.
-- `corealm_inspect` — full detail on one entity
-- `corealm_search_docs` — the public game documentation
-
-### Acting
-- `corealm_move_to` — walk to an entity, a location id, or a position
-- `corealm_stop` — cancel navigation, activity, and combat
-- `corealm_interact` — mine, chop, fish, rake, plant, harvest, talk, open, climb, vault, loot, take,
-  produce, recharge, bank, trade, inspect. The `loot` interaction opens a container without moving
-  anything.
-- `corealm_take_loot` — explicitly take one displayed stack by `stackIndex`, or omit the index to
-  take every stack that fits
-- `corealm_use_item` — eat food, equip gear, or apply a matching seed to a farm plot
-- `corealm_equip` — equip an item or clear a slot
-- `corealm_produce` — smelt, smith, cook, craft, fletch
-- `corealm_build_campfire` — turn a carried log into a temporary cooking station
-- `corealm_attack` — attack with whatever is in the main hand. A one-handed wand casts every 2.2
-  seconds. A stronger two-handed staff casts every 3.0 seconds. Both reach 15 m, so the character
-  opens fire without closing. A blade or bare hands swing at 1.6 m and walk in first.
-  Pass `spellId` to force a specific spell. Damage lands when the bolt arrives, not when the call
-  returns — see `spell.launched`
-- `corealm_dialogue` — read, choose an option, end
-- `corealm_bank` — list, deposit, withdraw, depositAll
-- `corealm_shop` — list, buy, sell
-
-### Helping the human
-- `corealm_overlay` — highlight, path, marker, label. Pass `locationId` for a known place. If a
-  pure location id is passed as `entityId`, the API safely resolves it as a location; unknown
-  targets return `NOT_FOUND` and draw nothing.
-- `corealm_events` — the cursor and long-poll described above
+### Events (read)
+- `corealm_events` — the cursor and long-poll described above.
 
 ## Magic loadout and recharging
 
 A cast needs a wand or staff in `mainHand` and one unit of matching fuel. A matching elemental
 weapon spends one stored charge first, including on a miss. A plain or empty weapon spends one
-carried Essence instead. Boss-dropped Air, Earth, and Water Orbs are singleton altar keys, not
-equipment. Carry the matching Orb to the dormant altar at that region's Essence Cache and use its
-`awaken` interaction. This consumes the Orb once, permanently lights the altar, and enables both
-matching wand and staff recipes. Fire remains visible in the spellbook but is not released.
-
-An awakened Essence Altar refills the equipped elemental weapon to 1,000 for exactly 100 matching Essence.
-The altar does not accept a plain weapon, a full weapon, the wrong Essence, or less than 100 Essence.
-
-```js
-const before = await agent.call("corealm_spellbook", { op: "read" });
-await agent.call("corealm_interact", {
-  entityId: "fallowmarch_air_altar",
-  interaction: "awaken",
-});
-const result = await agent.call("corealm_interact", {
-  entityId: "fallowmarch_air_altar",
-  interaction: "recharge",
-});
-if (result.error) throw new Error(result.message);
-
-const { events, nextSeq } = await agent.call("corealm_events", {
-  sinceSeq: cursor,
-  types: ["essence.recharged"],
-  timeoutMs: 5000,
-});
-cursor = nextSeq;
-const after = await agent.call("corealm_spellbook", { op: "read" });
-```
+carried Essence instead. Boss-dropped Orbs are altar keys: carry the matching Orb to the dormant
+altar at that region's Essence Cache and use its `awaken` interaction. An awakened altar refills
+the equipped elemental weapon to 1,000 for exactly 100 matching Essence.
 
 ## Three things that will surprise you
 
-**Movement takes real time.** `corealm_move_to` returns immediately with an ETA. The character then
-walks at 4.2 m/s over a real navmesh. Wait for `navigation.completed`.
+**Movement takes real time.** The character walks at 4.2 m/s over a real navmesh. `corealm_move_to`
+returns immediately with an ETA; `corealm_navigate` waits for you.
 
-**Interaction walks you into range automatically.** You do not need to move first. `corealm_interact`
-on something far away starts walking and returns `{ started: "walking to ..." }`. Wait for
-`navigation.completed`, then interact again.
+**Interaction walks you into range automatically.** `corealm_interact` on something far away starts
+walking and returns `{ started: "walking to ..." }`; the interaction runs on arrival.
 
 **Gathering is a continuing activity.** One `corealm_interact` with `mine` keeps yielding ore until
-the node depletes, your pack fills, you move, or you stop. This is the same thing one human click
-does. Do not call it once per ore.
+the node depletes, your pack fills, you move, or you stop. `corealm_gather` counts for you.
 
 ## Distances are walking distances
 
-`ObservedEntity.distance` is path length over the navmesh, not straight line. Across the Karrowmoor
-terraces those differ by enough to change which node is actually closer. Trust the number.
+`ObservedEntity.distance` is path length over the navmesh, not straight line. Trust the number.
 
 ## A complete worked example: train Mining from 1 to 10
 
 ```js
 const agent = window.corealm.agent;
-let cursor = 0;
 
-async function waitFor(types, timeoutMs = 60000) {
-  const result = await agent.call("corealm_events", { sinceSeq: cursor, types, timeoutMs });
-  cursor = result.nextSeq;
-  return result.events;
+// Orient, then ask for the keys. The player clicks Allow in the panel.
+const ctx = await agent.call("corealm_context", { sections: ["session", "skills"] });
+if (ctx.session.mode !== "play") {
+  const asked = await agent.call("corealm_session", {
+    op: "request_control", objective: "Train Mining to 10 at the Bracken Pit", timeoutMs: 25000,
+  });
+  if (asked.status !== "granted") return;
 }
 
-async function mineUntilLevel(target) {
-  while (true) {
-    const skills = await agent.call("corealm_skills");
-    if (skills.mining.level >= target) return;
-
-    // Find the best ore we currently qualify for. Sorted nearest first already.
-    const ores = await agent.call("corealm_observe", {
-      archetypes: ["ore"],
-      interaction: "mine",
-      requirementsMet: true,
-      radius: 140,
-      limit: 10,
-    });
-
-    const available = ores.filter((ore) => ore.state === "available");
-    if (available.length === 0) {
-      // Everything nearby is depleted. Wait for a respawn rather than walking away.
-      await waitFor(["resource.depleted"], 15000);
-      continue;
-    }
-
-    // Highest tier we qualify for, nearest first as the tiebreak.
-    const target_ore = available.sort((a, b) => b.tier - a.tier || a.distance - b.distance)[0];
-
-    const started = await agent.call("corealm_interact", {
-      entityId: target_ore.id,
-      interaction: "mine",
-    });
-    if (started.error) continue;
-
-    // If it had to walk, wait for arrival then start again.
-    if (String(started.started).startsWith("walking")) {
-      await waitFor(["navigation.completed", "navigation.failed"]);
-      continue;
-    }
-
-    // Mine until something interesting happens. ONE call covers the whole session.
-    const events = await waitFor(
-      ["inventory.full", "resource.depleted", "activity.stopped", "level.gained"],
-      120000,
-    );
-
-    if (events.some((event) => event.type === "inventory.full")) {
-      await bankEverything();
-    }
-  }
+while ((await agent.call("corealm_skills")).mining.level < 10) {
+  await agent.call("corealm_navigate", { locationId: "bracken_pit" });
+  const free = (await agent.call("corealm_inventory")).freeSlots;
+  const mined = await agent.call("corealm_gather", { interaction: "mine", quantity: free });
+  if (mined.error === "CANCELLED") return;              // the player stopped us
+  await agent.call("corealm_navigate", { entityId: "coldbrace_bank" });
+  await agent.call("corealm_bank", { op: "depositAll" });
 }
 
-async function bankEverything() {
-  const banks = await agent.call("corealm_observe", { scope: "known", archetypes: ["bank"], limit: 5 });
-  if (banks.length === 0) return;
-
-  await agent.call("corealm_move_to", { entityId: banks[0].id });
-  await waitFor(["navigation.completed", "navigation.failed"]);
-
-  const result = await agent.call("corealm_bank", { op: "depositAll" });
-  if (result.error) console.warn("bank failed:", result.message);
-}
-
-await mineUntilLevel(10);
+await agent.call("corealm_session", { op: "release_control" });
 ```
 
-That is roughly **20 to 40 tool calls** for the whole 1→10 climb. A naive polling agent spends more
-than that on the first node.
+That is about **a dozen tool calls** for the whole 1→10 climb.
 
 ## Being efficient
 
-Efficiency is a design goal, not an afterthought. A better agent reaches the same goal with fewer
-calls and fewer tokens.
+**Use the bounded operations.** They replace a dozen primitive calls each and return when done.
 
-**Cache what does not change.** The XP table, recipes, item stats and region layouts are fixed for a
-build. Read them once through `corealm_search_docs`, key the cache on `agent.version().content`, and
-never ask again.
+**Cache what does not change.** The XP table, recipes, item stats and region layouts are fixed for
+a build. Read them once through `corealm_search_docs`, key the cache on
+`agent.version().content`, and never ask again.
 
-**Remember where things are.** `corealm_observe` with `scope: "known"` returns discovered locations.
-Once you know the Bracken Pit is at a given place you can `corealm_move_to` it by `locationId`
-without searching.
+**Filter hard.** An unfiltered `corealm_observe` in a town returns mostly scenery. Pass
+`archetypes`, `interaction`, and `requirementsMet: true`.
 
-**Filter hard.** An unfiltered `corealm_observe` in a town returns mostly scenery. Pass `archetypes`,
-`interaction`, and `requirementsMet: true` and you get a short list you can act on.
-
-**Predict inventory.** You have 28 slots. Ore does not stack. If you have 6 free slots, a node with
-9 gathers left will fill you — bank first and save the interruption.
-
-**Use one blocking wait instead of many polls.** This is the single largest saving available.
+**Predict inventory.** 28 slots; ore does not stack. Bank before a session that will overflow.
 
 ## The optimisation that makes this a game
 
-The highest-tier resource is not always the best one. Corealm is built so that this is genuinely
-true, not a slogan:
+The highest-tier resource is not always the best one:
 
 | Choice | XP/hour at Mining 12 |
 | --- | --- |
@@ -351,46 +257,23 @@ true, not a slogan:
 | Tier 10 Kaldite ore, 188 m from the Highcairn bank | 14,266 |
 | Tier 10 Kaldite ore, via the Sunder Ledge shortcut (needs Agility 10) | **18,409** |
 
-Before Agility 10 the *lower*-tier ore wins by 15.8%. After the shortcut opens, the higher tier wins
-by 11.4%. An agent that always picks the highest tier it qualifies for leaves about 15% on the table.
-
-Work it out from data you can already read: `corealm_observe` gives tier and walking distance,
-`corealm_search_docs` gives XP per gather, and the gathering formula is documented — success chance
-is `0.30 + 0.016 * (effectiveLevel - requiredLevel)` per 1.8 s attempt, capped at 0.95.
+Work it out from data you can read: `corealm_observe` gives tier and walking distance,
+`corealm_search_docs` gives XP per gather, and success chance per 1.8 s attempt is
+`0.30 + 0.016 * (effectiveLevel - requiredLevel)`, capped at 0.95.
 
 ## Information parity
 
 You discover the world the way a player does.
 
 - `corealm_inspect` on an entity you have never seen returns `NOT_FOUND`.
-- `corealm_search_docs` returns documented public knowledge only. It never leaks unstarted quest
-  stages or undiscovered secrets.
+- `corealm_quests` lists what a player's journal would: nothing from a region they have not set
+  foot in, nothing behind an unfinished prerequisite, no objective text before acceptance.
+- `corealm_search_docs` returns documented public knowledge only.
 - `corealm_observe` with `scope: "visible"` returns what is genuinely observable right now.
-
-This is deliberate. An agent that had to explore to learn something knows it honestly.
-
-## Helping a human
-
-If a person is watching, narrate with overlays instead of text:
-
-```js
-await agent.call("corealm_overlay", {
-  op: "set", id: "target", kind: "highlight",
-  entityId: ore.id, colour: "#ffd98a",
-});
-await agent.call("corealm_overlay", {
-  op: "set", id: "note", kind: "label",
-  entityId: ore.id, text: "Best XP per hour from here",
-});
-```
-
-Overlays are pure presentation. Drawing one can never change game state, so they are always safe.
 
 ## Testing your agent
 
 In a development build, `window.__gameDebug` offers deterministic setup: `setSkillLevel`,
-`giveItem`, `teleport`, `advanceGameTime`, `setSeed`, `setTimeScale`, `loadScenario`.
-
-Use these to **set up** a test, never to accomplish the task. An agent that teleports to the ore has
-not proven anything. `setTimeScale` is the one exception — running the same actions faster is still
-running the same actions.
+`giveItem`, `teleport`, `advanceGameTime`, `setTimeScale`, `reset`. Use these to **set up** a
+test, never to accomplish the task. `__gameDebug.callTool` runs a tool without the session gate,
+for click-parity probes only; nothing reachable from WebMCP or `window.corealm.agent` can.

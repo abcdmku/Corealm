@@ -97,7 +97,6 @@ import { QUESTS, type QuestPredicate } from "../content/quests.js";
 import { worldExclusions, type ScatterResult } from "../world/scatter.js";
 import { createScatterStreaming } from "../world/scatterStreaming.js";
 import { findShot, shotIds, SHOTS } from "../debug/shots.js";
-import { installAgentSurface } from "../agent/index.js";
 import { createUi } from "../ui/panels.js";
 import { preloadFeatureLabPanel } from "../ui/lazyPanelRegistry.js";
 import { SettingsStore, type UiSettings } from "../ui/settings.js";
@@ -1667,8 +1666,29 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // Movement still worked (held keys are a set, so adding twice is adding once), which is why the
   // panels looked unbound rather than double-bound and no screenshot in Phase 1 ever showed one.
 
-  // The agent surface. Always installed at window.corealm.agent, and mirrored onto whichever
-  // model-context container the browser provides. One implementation, three ways in.
+  // The agent surface. Always installed at window.corealm.agent, and registered with whichever
+  // model-context container the browser provides — none, if the browser has none, and the panel
+  // says so. One implementation, three ways in. Installed before the UI because the UI's agent
+  // panel is a view onto the session, and before the ready boundary because a browser agent reads
+  // the tool list as soon as the page is up. Loaded like the feature lab and the debug surface —
+  // a dynamic import off the critical path — because the descriptors alone are a few tens of
+  // kilobytes the first frame does not need; the handlers behind them load on the first call.
+  //
+  // Control handoff locks HUMAN input only. `api.setMovementCommandsEnabled(false)` would also
+  // refuse the agent's own `corealm_move_to`, which is the opposite of handing it the keys.
+  const version = { build: "phase1-round2", contracts: "4", content: "1" };
+  const { installAgentSurface } = await import("../agent/index.js");
+  const agent = installAgentSurface(api, {
+    version,
+    now: () => clock.elapsedMs,
+    emit: (type, data) => events.emit(type, data as Record<string, unknown>, undefined, clock.elapsedMs),
+    onControlOwnerChanged: (owner) => {
+      input.setMovementEnabled(owner === "player");
+      if (owner === "agent") ui.notify("The agent has control. Take control or Stop from the agent panel.", "info");
+      else ui.notify("You have control.", "info");
+    },
+  });
+
   // The human UI. Everything it does goes through GameApi, the same object the agent tools call.
   const uiConstructionSpan = bootTelemetry.startSpan(BOOT_SPANS.UI_CONSTRUCTION);
   const lootProjection = new THREE.Vector3();
@@ -1708,6 +1728,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     // nothing can press "New game" before boot has finished running.
     onNewGame: () => resetWorld(undefined, false),
     ...(featureLab ? { featureLab } : {}),
+    agentSession: agent.session,
   });
   openLootContainer = (container) => ui.openLoot(container);
   ui.mount(labelRoot);
@@ -1831,9 +1852,6 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       return true;
     },
   });
-
-  const version = { build: "phase1-round2", contracts: "3", content: "1" };
-  const agent = installAgentSurface(api, { version });
 
   const loop = new GameLoop({
     store, events, clock, rng, renderer, camera, scene, physics, nav, movement, api, saves, input,
@@ -2331,7 +2349,10 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     },
     captureDocumentationFrame: () => renderer.captureFrame(),
     listShots: () => shotIds(),
-    callTool: (name: string, args: unknown) => agent.call(name, (args ?? {}) as Record<string, unknown>),
+    // The harness's parity probe. It runs the same handler with the same validation, but skips
+    // the collaboration gate: a smoke test proving that a tool call and a click reach the same
+    // function is not an agent asking for the keys, and must not flip the panel into play mode.
+    callTool: (name: string, args: unknown) => agent.call(name, (args ?? {}) as Record<string, unknown>, { bypassSession: true }),
   });
 
   // Compile spawn-visible variants now. Transparent and hidden-dungeon variants remain necessary,

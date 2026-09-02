@@ -35,7 +35,7 @@ describe("event publication cursors", () => {
     events.emit("essence.recharged", { orbItemId: "air_orb" }, undefined, 900);
 
     const beforeFlush = events.since(0);
-    expect(beforeFlush).toEqual({ events: [], nextSeq: 0 });
+    expect(beforeFlush).toEqual({ events: [], nextSeq: 0, oldestSeq: 1, dropped: false, droppedCount: 0 });
     expect(events.currentSeq()).toBe(0);
 
     events.flush();

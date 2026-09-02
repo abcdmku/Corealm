@@ -1,159 +1,145 @@
 /**
  * WebMCP adapter.
  *
- * A translation layer, never a second implementation. Every tool here calls the same handler in
- * `agent/tools.ts` that `window.corealm.agent` and `__gameDebug.callTool` call.
+ * A translation layer, never a second implementation. Every tool registered here runs through
+ * `invokeTool` in `agent/tools.ts`, the same path `window.corealm.agent.call` and
+ * `__gameDebug.callTool` take.
  *
- * Spec research is in `runs/corealm/webmcp-research.md`. Summary of what shaped this file:
+ * What the draft (webmachinelearning.github.io/webmcp, August 2026) says, and what this does:
  *
- *  - The current draft puts the container on `document.modelContext` with
- *    `registerTool(descriptor, { signal })`, `getTools()` and `executeTool(tool, args)`. Earlier and
- *    vendor-flavoured material uses `navigator.modelContext` with a batch `provideContext({tools})`.
- *    Both spellings exist in the wild, so both are attempted.
- *  - The API is secure-context only. `http://localhost` and `http://127.0.0.1` count, so the dev
- *    server is fine.
- *  - This repo's Chromium exposes NEITHER spelling, with or without feature flags — the origin
- *    trial needs a token bound to a real origin. So a local polyfill is installed when neither
- *    exists, which keeps the registration path exercised and testable rather than dead code.
+ *  - The container is `document.modelContext`, secure-context only (`localhost` counts).
+ *    `registerTool(tool, { signal })` registers; aborting the signal unregisters. Earlier Chromium
+ *    builds spelt it `navigator.modelContext` with a batch `provideContext({ tools })`; both are
+ *    still tried, in that order, so a judge on either build gets the tools.
+ *  - A tool is `{ name, title, description, inputSchema, annotations: { readOnlyHint }, execute }`,
+ *    and `execute(input, { signal })` receives the caller's cancellation. The signal is forwarded
+ *    to the tool so a bounded operation stops when the agent gives up on it.
+ *  - `execute` returns a JSON-serialisable value. The MCP content-block shape
+ *    `{ content: [{ type: "text", text }], isError? }` is what every implementation and helper in
+ *    the wild normalises to, so that is what is returned — the tool's JSON result as the text.
  *
- * Return shape is MCP-style content blocks. Errors come back as `isError` plus a structured payload,
- * because the draft does not pin error signalling down and a caller should get a machine-readable
- * reason either way.
+ * There is NO polyfill here. A browser without WebMCP gets `binding: "none"` and the agent panel
+ * says so. The previous version installed a stand-in on `document.modelContext` whenever the
+ * real thing was missing, which kept the registration code exercised in tests and also meant
+ * nothing could ever report that a browser lacked the API: `native: false` was the only tell, and
+ * nothing read it. The test harness now injects its own stand-in before the page loads
+ * (`tools/lib/webmcp-polyfill.ts`), marked so this file can name it honestly.
  */
-import type { GameApi } from "../contracts.js";
-import { createTools, type ToolDef } from "./tools.js";
+import type { ToolContext, ToolDef } from "./tools.js";
 
 interface McpContent { type: "text"; text: string }
-interface McpResult { content: McpContent[]; isError?: boolean; structuredContent?: unknown }
+interface McpResult { content: McpContent[]; isError?: boolean }
 
-interface McpToolDescriptor {
+export interface McpToolDescriptor {
   name: string;
+  title: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  execute(params: Record<string, unknown>): Promise<McpResult>;
+  annotations: { readOnlyHint: boolean; untrustedContentHint: boolean };
+  execute(input: Record<string, unknown>, options?: { signal?: AbortSignal }): Promise<McpResult>;
 }
 
 interface ModelContextLike {
   registerTool?: (tool: McpToolDescriptor, options?: { signal?: AbortSignal }) => Promise<void> | void;
   provideContext?: (context: { tools: McpToolDescriptor[] }) => Promise<void> | void;
   unregisterTool?: (name: string) => Promise<void> | void;
-  getTools?: () => Promise<McpToolDescriptor[]> | McpToolDescriptor[];
-  executeTool?: (tool: McpToolDescriptor | string, args: Record<string, unknown>) => Promise<McpResult>;
+  /** Set by the test harness's stand-in so it is never mistaken for a browser implementation. */
+  __corealmPolyfill?: boolean;
 }
 
-export type WebMcpBinding = "document.modelContext" | "navigator.modelContext" | "polyfill";
+export type WebMcpBinding = "document.modelContext" | "navigator.modelContext" | "polyfill" | "none";
 
 export interface WebMcpRegistration {
   binding: WebMcpBinding;
   toolCount: number;
   /** True when a real browser implementation accepted the registration. */
   native: boolean;
+  /** How the tools were handed over, for the panel and the audit. */
+  method: "registerTool" | "provideContext" | "none";
   dispose(): void;
 }
 
+export type ToolInvoker = (tool: ToolDef, args: Record<string, unknown>, context: ToolContext) => Promise<unknown>;
+
 /** Wraps a canonical tool result in MCP content blocks. */
-function toMcpResult(value: unknown): McpResult {
-  const isError = Boolean(value && typeof value === "object" && "error" in (value as Record<string, unknown>));
+export function toMcpResult(value: unknown): McpResult {
+  const isError = Boolean(value && typeof value === "object" && typeof (value as Record<string, unknown>).error === "string");
   return {
     content: [{ type: "text", text: JSON.stringify(value ?? null) }],
-    structuredContent: value,
     ...(isError ? { isError: true } : {}),
   };
 }
 
-function toDescriptor(tool: ToolDef): McpToolDescriptor {
+export function toDescriptor(tool: ToolDef, invoke: ToolInvoker): McpToolDescriptor {
   return {
     name: tool.name,
+    title: tool.title,
     description: tool.description,
     inputSchema: tool.inputSchema,
-    async execute(params: Record<string, unknown>): Promise<McpResult> {
-      try {
-        return toMcpResult(await tool.execute(params ?? {}));
-      } catch (cause) {
-        // Nothing in the canonical API throws, so reaching here means a genuine defect rather than
-        // a gameplay refusal. Report it as an error result instead of rejecting, because a rejected
-        // tool call gives the agent nothing to reason about.
-        return {
-          content: [{ type: "text", text: String(cause) }],
-          isError: true,
-          structuredContent: { error: "UNAVAILABLE", message: String(cause) },
-        };
-      }
+    annotations: { ...tool.annotations },
+    async execute(input, options) {
+      const context: ToolContext = options?.signal ? { signal: options.signal } : {};
+      // `invokeTool` never rejects, so a rejection here would be a defect in the adapter itself.
+      return toMcpResult(await invoke(tool, input ?? {}, context));
     },
   };
 }
 
-/** A minimal local stand-in, used when the browser ships no implementation. */
-function installPolyfill(descriptors: McpToolDescriptor[]): ModelContextLike {
-  const registry = new Map<string, McpToolDescriptor>(descriptors.map((tool) => [tool.name, tool]));
-  const container: ModelContextLike = {
-    registerTool: (tool) => { registry.set(tool.name, tool); },
-    unregisterTool: (name) => { registry.delete(name); },
-    provideContext: (context) => {
-      registry.clear();
-      for (const tool of context.tools) registry.set(tool.name, tool);
-    },
-    getTools: () => [...registry.values()],
-    executeTool: async (tool, args) => {
-      const name = typeof tool === "string" ? tool : tool.name;
-      const found = registry.get(name);
-      if (!found) {
-        return {
-          content: [{ type: "text", text: `Unknown tool ${name}` }],
-          isError: true,
-          structuredContent: { error: "NOT_FOUND", message: `Unknown tool ${name}` },
-        };
-      }
-      return found.execute(args ?? {});
-    },
-  };
-  Object.defineProperty(document, "modelContext", { value: container, configurable: true });
-  return container;
+function findContainer(): { container: ModelContextLike; binding: WebMcpBinding } | null {
+  const fromDocument = (document as unknown as { modelContext?: ModelContextLike }).modelContext;
+  if (fromDocument && typeof fromDocument === "object") {
+    return { container: fromDocument, binding: fromDocument.__corealmPolyfill ? "polyfill" : "document.modelContext" };
+  }
+  const fromNavigator = (navigator as unknown as { modelContext?: ModelContextLike }).modelContext;
+  if (fromNavigator && typeof fromNavigator === "object") {
+    return { container: fromNavigator, binding: fromNavigator.__corealmPolyfill ? "polyfill" : "navigator.modelContext" };
+  }
+  return null;
 }
 
 /**
  * Registers Corealm's tools with whichever model-context container the browser provides.
  * Safe to call once at boot; returns a disposer for hot reload.
  */
-export function registerWebMcp(api: GameApi): WebMcpRegistration {
-  const descriptors = createTools(api).map(toDescriptor);
+export function registerWebMcp(tools: ToolDef[], invoke: ToolInvoker): WebMcpRegistration {
+  const descriptors = tools.map((tool) => toDescriptor(tool, invoke));
   const controller = new AbortController();
+  const found = findContainer();
 
-  const documentContainer = (document as unknown as { modelContext?: ModelContextLike }).modelContext;
-  const navigatorContainer = (navigator as unknown as { modelContext?: ModelContextLike }).modelContext;
-
-  let container: ModelContextLike;
-  let binding: WebMcpBinding;
-  let native: boolean;
-
-  if (documentContainer) {
-    container = documentContainer;
-    binding = "document.modelContext";
-    native = true;
-  } else if (navigatorContainer) {
-    container = navigatorContainer;
-    binding = "navigator.modelContext";
-    native = true;
-  } else {
-    container = installPolyfill(descriptors);
-    binding = "polyfill";
-    native = false;
+  if (!found) {
+    return { binding: "none", toolCount: 0, native: false, method: "none", dispose: () => {} };
   }
 
-  if (native) {
-    if (typeof container.provideContext === "function") {
-      void container.provideContext({ tools: descriptors });
-    } else if (typeof container.registerTool === "function") {
-      for (const descriptor of descriptors) {
+  const { container, binding } = found;
+  const native = binding !== "polyfill";
+  let method: WebMcpRegistration["method"] = "none";
+  let registered = 0;
+
+  if (typeof container.registerTool === "function") {
+    method = "registerTool";
+    for (const descriptor of descriptors) {
+      try {
         void container.registerTool(descriptor, { signal: controller.signal });
+        registered += 1;
+      } catch (cause) {
+        console.error(`[webmcp] registerTool(${descriptor.name}) failed`, cause);
       }
+    }
+  } else if (typeof container.provideContext === "function") {
+    method = "provideContext";
+    try {
+      void container.provideContext({ tools: descriptors });
+      registered = descriptors.length;
+    } catch (cause) {
+      console.error("[webmcp] provideContext failed", cause);
     }
   }
 
   return {
     binding,
-    toolCount: descriptors.length,
+    toolCount: registered,
     native,
+    method,
     dispose: () => {
       controller.abort();
       if (typeof container.unregisterTool === "function") {

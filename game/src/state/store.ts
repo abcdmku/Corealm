@@ -237,6 +237,13 @@ export class Store {
   private state: GameState;
   private listeners = new Set<() => void>();
   private dirty = false;
+  /**
+   * Monotonic mutation counter. `dirty` is a one-shot flag the loop consumes for persistence, so
+   * it cannot tell an agent whether anything changed between two reads; this can. It survives
+   * `consumeDirty()` and is never reset within a session, including across `reset()`, so a reset
+   * reads as a change rather than as nothing.
+   */
+  private revisionCount = 0;
 
   constructor(seed = 1337, nowMs = 0) {
     this.state = createInitialState(seed, nowMs);
@@ -266,6 +273,12 @@ export class Store {
 
   markDirty(): void {
     this.dirty = true;
+    this.revisionCount += 1;
+  }
+
+  /** The change token. Advances on every `markDirty()`, and only then. */
+  revision(): number {
+    return this.revisionCount;
   }
 
   consumeDirty(): boolean {

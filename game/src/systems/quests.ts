@@ -162,10 +162,32 @@ export class QuestSystem implements TickSystem {
 
   // ------------------------------------------------------------- public API
 
-  /** `SystemHooks.quests`. Every quest, including the ones never started. */
+  /**
+   * `SystemHooks.quests`. Every quest the player could know about.
+   *
+   * This used to be every quest in the content table, so a fresh character's journal — and any
+   * agent reading it — listed all ten names, their regions and their skill requirements, including
+   * the Kilnhalt chain three regions away. The redaction of objective text below was honest, but
+   * the list itself was the leak: it is a map of the game's structure handed out before a step is
+   * taken. An unstarted quest is now visible only once the player has set foot in its region and
+   * finished whatever it chains from — the same moment a human could have met the giver.
+   * Started and finished quests are always listed.
+   */
   summaries(): QuestSummary[] {
     const state = this.deps.store.get();
-    return QUESTS.map((def) => this.summaryOf(state, def));
+    return QUESTS
+      .filter((def) => this.isKnown(state, def))
+      .map((def) => this.summaryOf(state, def));
+  }
+
+  private isKnown(state: GameState, def: QuestDef): boolean {
+    const status = state.quests[def.id]?.status ?? "unstarted";
+    if (status !== "unstarted") return true;
+    if (!state.discovery.regions.includes(def.regionId)) return false;
+    for (const prerequisite of def.prerequisiteQuestIds) {
+      if ((state.quests[prerequisite]?.status ?? "unstarted") !== "complete") return false;
+    }
+    return true;
   }
 
   summary(questId: QuestId): QuestSummary | undefined {

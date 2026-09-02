@@ -38,6 +38,8 @@ import { SettingsPanel } from "./settingsPanel.js";
 import { SettingsStore } from "./settings.js";
 import { PanelDock } from "./dock.js";
 import { QuestTracker } from "./questTracker.js";
+import { AgentPanel } from "./agentPanel.js";
+import type { AgentSession } from "../agent/session.js";
 import { Minimap } from "./minimap.js";
 import { LootReveal } from "./lootReveal.js";
 import {
@@ -975,6 +977,8 @@ export interface UiOptions {
   getDestination?(): Vec3 | null;
   /** Present only in the transient real-engine lab; enables setup controls in production panels. */
   featureLab?: FeatureLabApi;
+  /** The collaboration session, when the agent surface is installed. Drives the agent panel. */
+  agentSession?: AgentSession;
 }
 
 export interface Ui {
@@ -1025,6 +1029,9 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
   let shop: LazyPanel<ShopPanelHandle> | null = null;
 
   const tracker = new QuestTracker(api);
+  const agentPanel = options.agentSession
+    ? new AgentPanel({ session: options.agentSession, now: () => api.getTime().simMs })
+    : null;
 
   const context: UiContext = {
     api,
@@ -1196,6 +1203,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
         root.querySelector(".hud")?.classList.add("has-minimap");
       }
       tracker.mount(root);
+      agentPanel?.mount(root);
       dock.mount(root);
       loot.mount(root);
       for (const panel of panels) panel.frame.mount(root);
@@ -1223,6 +1231,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
         lastPanelMs = now;
         refreshAll(false);
         tracker.update();
+        agentPanel?.update();
       }
     },
 
@@ -1230,6 +1239,7 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
       setNoticeSink(null);
       minimap?.dispose();
       tracker.dispose();
+      agentPanel?.dispose();
       dock.dispose();
       loot.dispose();
       death.dispose();
