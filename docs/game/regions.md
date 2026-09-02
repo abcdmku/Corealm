@@ -144,7 +144,7 @@ A shallow Grithe pit 160 m north of Coldbrace. Six seams and two stone faces.
 
 ### Kiln Road South
 
-![Kiln Road South](./assets/captures/locations/fallowmarch_kiln_road.webp)
+
 
 Where the pit track runs on toward the ember foothills. No gate; the border is open ground.
 
@@ -319,7 +319,7 @@ The east gate. On a clear day you can see the Karrowmoor ridge from it.
 
 ### Kiln Path
 
-![Kiln Path](./assets/captures/locations/vellenwood_kiln_path.webp)
+
 
 A foot track over the northern ridge toward the ember foothills. No gate; it never needed one.
 
@@ -327,7 +327,7 @@ A foot track over the northern ridge toward the ember foothills. No gate; it nev
 
 ### Ember Edge
 
-![Ember Edge](./assets/captures/locations/vellenwood_ember_edge.webp)
+
 
 The canopy's last shade line. North of here the trees stand scorched and far apart.
 
@@ -511,7 +511,7 @@ Tier 20. Settlement: **Emberfast**.
 
 ### Kiln Road South
 
-![Kiln Road South](./assets/captures/locations/kilnhalt_south_track.webp)
+
 
 The pit track out of Fallowmarch, on warm ground now. The border is somewhere behind you.
 
@@ -519,7 +519,7 @@ The pit track out of Fallowmarch, on warm ground now. The border is somewhere be
 
 ### Ridge Track
 
-![Ridge Track](./assets/captures/locations/kilnhalt_vellen_track.webp)
+
 
 The foot track down off the Vellenwood ridge. The first scorched pines start here.
 
@@ -527,7 +527,7 @@ The foot track down off the Vellenwood ridge. The first scorched pines start her
 
 ### Ember Edge Track
 
-![Ember Edge Track](./assets/captures/locations/kilnhalt_east_track.webp)
+
 
 Where the canopy shade gives out for good. The springs lie north-west of here.
 
@@ -535,7 +535,7 @@ Where the canopy shade gives out for good. The springs lie north-west of here.
 
 ### Kilnroad Fork
 
-![Kilnroad Fork](./assets/captures/locations/kilnroad_fork.webp)
+
 
 Both southern tracks meet here. Emberfast's rampart torches are visible up the road.
 
@@ -543,7 +543,7 @@ Both southern tracks meet here. Emberfast's rampart torches are visible up the r
 
 ### South Bend
 
-![South Bend](./assets/captures/locations/emberfast_south_bend.webp)
+
 
 The road swings east around Emberfast's rampart to reach the gate.
 
@@ -551,7 +551,7 @@ The road swings east around Emberfast's rampart to reach the gate.
 
 ### Emberfast
 
-![Emberfast](./assets/captures/locations/emberfast_town.webp)
+
 
 A walled kiln camp with every counter and bench a tier-20 trade needs inside one wall.
 
@@ -559,7 +559,7 @@ A walled kiln camp with every counter and bench a tier-20 trade needs inside one
 
 ### Emberfast Bank
 
-![Emberfast Bank](./assets/captures/locations/emberfast_bank.webp)
+
 
 One chest under a porch. The vault ledger smells faintly of smoke.
 
@@ -567,7 +567,7 @@ One chest under a porch. The vault ledger smells faintly of smoke.
 
 ### Emberfast Gate
 
-![Emberfast Gate](./assets/captures/locations/emberfast_east_gate.webp)
+
 
 The east gatehouse. Carts to the stand and the springs leave this way.
 
@@ -575,7 +575,7 @@ The east gatehouse. Carts to the stand and the springs leave this way.
 
 ### Quarry Postern
 
-![Quarry Postern](./assets/captures/locations/emberfast_west_postern.webp)
+
 
 The west gatehouse, opening onto the plots and the quarry road.
 
@@ -583,7 +583,7 @@ The west gatehouse, opening onto the plots and the quarry road.
 
 ### Coalroot Plots
 
-![Coalroot Plots](./assets/captures/locations/emberfast_plots.webp)
+
 
 Four beds in the warm soil against the west wall. Coalroot takes twenty minutes.
 
@@ -591,7 +591,7 @@ Four beds in the warm soil against the west wall. Coalroot takes twenty minutes.
 
 ### Clinker Quarry
 
-![Clinker Quarry](./assets/captures/locations/clinker_quarry.webp)
+
 
 Six Emberite seams and two Kilnstone faces, still warm at the break.
 
@@ -599,7 +599,7 @@ Six Emberite seams and two Kilnstone faces, still warm at the break.
 
 ### Ashfin Springs
 
-![Ashfin Springs](./assets/captures/locations/ashfin_springs.webp)
+
 
 Four warm pools where the ashfin run heavy. The water steams at dawn.
 
@@ -607,7 +607,7 @@ Four warm pools where the ashfin run heavy. The water steams at dawn.
 
 ### Cinderpine Stand
 
-![Cinderpine Stand](./assets/captures/locations/cinderpine_stand.webp)
+
 
 Eight cinderpine, scorched black outside and sound within. The fire chose not to eat them.
 
@@ -615,7 +615,7 @@ Eight cinderpine, scorched black outside and sound within. The fire chose not to
 
 ### Fire Essence Cache
 
-![Fire Essence Cache](./assets/captures/locations/kilnhalt_fire_cache.webp)
+
 
 A ruined stone court where fire essence beads out of the warm rock. The altar is dark.
 
@@ -623,7 +623,7 @@ A ruined stone court where fire essence beads out of the warm rock. The altar is
 
 ### Cinderwake Arena
 
-![Cinderwake Arena](./assets/captures/locations/cinderwake_arena.webp)
+
 
 A swept circle of scorched stone past the altar court. Something keeps it swept.
 

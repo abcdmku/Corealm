@@ -7,6 +7,7 @@
  * Usage: npx tsx tools/gen-docs.ts [--out docs/game] [--provenance-out docs/asset-provenance-gathering.md]
  */
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
@@ -458,6 +459,9 @@ function publicCaptureAsset(kind: CaptureKind, id: string, base: string): string
 }
 
 function capture(kind: CaptureKind, id: string, label: string, base = "./"): string {
+  // Astro's content pipeline fails the whole site build on a relative image that is missing, so
+  // content that has not been captured yet (see tools/capture-docs.ts) simply gets no picture.
+  if (!existsSync(path.resolve(repoRoot, "docs/game", captureAsset(kind, id, "")))) return "";
   return `![${label}](${captureAsset(kind, id, base)})`;
 }
 
