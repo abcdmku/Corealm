@@ -12,6 +12,13 @@ export interface SmokeReport {
   initial: RuntimeSnapshot | null;
   afterInput: RuntimeSnapshot | null;
   afterReset: RuntimeSnapshot | null;
+  bank: {
+    entity: unknown;
+    interaction: unknown;
+    beforeQuantity: number;
+    afterQuantity: number;
+    panelOpen: boolean;
+  } | null;
   errors: { console: string[]; page: string[]; requests: string[] };
   durationMs: number;
 }
@@ -43,6 +50,7 @@ export async function runSmokeTest(runCandidate: string): Promise<SmokeReport> {
     initial: null,
     afterInput: null,
     afterReset: null,
+    bank: null,
     errors: { console: driver.consoleErrors, page: driver.pageErrors, requests: driver.requestErrors },
     durationMs: 0,
   };
@@ -76,6 +84,40 @@ export async function runSmokeTest(runCandidate: string): Promise<SmokeReport> {
     await driver.wait(120);
     report.afterInput = await driver.snapshot();
     report.checks.inputChangesState = moved(report.initial.playerPosition, report.afterInput.playerPosition);
+
+    // Final-world integration proof for banking. Debug calls only place the player and grant the
+    // test item; opening and moving it both go through the same public agent tools used in play.
+    const bankEntity = await driver.callDebug("getEntity", ["coldbrace_bank"]);
+    const teleported = await driver.callDebug("teleport", [{ entityId: "coldbrace_bank" }]);
+    const before = await driver.callDebug("callTool", ["corealm_bank", { op: "list", filter: "grithe" }]);
+    await driver.callDebug("giveItem", ["grithe_ore", 5, "inventory"]);
+    const interaction = await driver.callDebug("callTool", [
+      "corealm_interact",
+      { entityId: "coldbrace_bank", interaction: "bank" },
+    ]);
+    await driver.page!.locator("#panel-bank:not([hidden])").waitFor({
+      state: "visible",
+      // The full authored world can still be compiling deferred assets on software rendering.
+      timeout: 20_000,
+    }).catch(() => undefined);
+    const panelOpen = await driver.page!.locator("#panel-bank").isVisible();
+    await driver.callDebug("callTool", [
+      "corealm_bank",
+      { op: "deposit", itemId: "grithe_ore", quantity: -1 },
+    ]);
+    const after = await driver.callDebug("callTool", ["corealm_bank", { op: "list", filter: "grithe" }]);
+    const beforeQuantity = bankQuantity(before, "grithe_ore");
+    const afterQuantity = bankQuantity(after, "grithe_ore");
+    report.bank = { entity: bankEntity, interaction, beforeQuantity, afterQuantity, panelOpen };
+    report.checks.finalWorldBankEntityLoads = teleported === true
+      && isRecord(bankEntity)
+      && bankEntity.archetype === "bank"
+      && Array.isArray(bankEntity.interactions)
+      && bankEntity.interactions.includes("bank");
+    report.checks.finalWorldBankInteractionOpensPanel = panelOpen
+      && isRecord(interaction)
+      && typeof interaction.started === "string";
+    report.checks.finalWorldBankMovesAgentQuantity = afterQuantity - beforeQuantity === 5;
 
     await driver.reset();
     report.afterReset = await driver.snapshot();
@@ -129,6 +171,16 @@ function samePosition(before: unknown, after: unknown): boolean {
 function navigationReady(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   return (value as Record<string, unknown>).status === "ready";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function bankQuantity(value: unknown, itemId: string): number {
+  if (!isRecord(value) || !Array.isArray(value.slots)) return 0;
+  const stack = value.slots.find((entry) => isRecord(entry) && entry.itemId === itemId);
+  return isRecord(stack) && typeof stack.quantity === "number" ? stack.quantity : 0;
 }
 
 async function main(): Promise<void> {

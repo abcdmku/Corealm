@@ -6,12 +6,12 @@ description: "Karrow Reaver spawn locations, combat stats, and drops."
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/karrow_reavers.webp" alt="Karrow Reaver at its authored spawn in Karrowmoor" loading="lazy" /><figcaption><strong>Karrow Reaver</strong><span>Third Ramp, Karrowmoor</span></figcaption></figure>
 <figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch1_reavers.webp" alt="Karrow Reaver at its authored spawn in The Gravelmaw" loading="lazy" /><figcaption><strong>Karrow Reaver</strong><span>The Lit Gallery, The Gravelmaw</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Karrow Reaver">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#third-ramp" style="--map-x:62.3333%;--map-y:60.6667%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Karrow Reaver, Third Ramp, Karrowmoor" title="Karrow Reaver, Third Ramp, Karrowmoor"><span>Karrow Reaver<small>Third Ramp, Karrowmoor</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#the-lit-gallery" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="Karrow Reaver, The Gravelmaw, The Lit Gallery" title="Karrow Reaver, The Gravelmaw, The Lit Gallery"><span>Karrow Reaver<small>The Gravelmaw, The Lit Gallery</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#third-ramp" style="--map-x:62.3333%;--map-y:67.3750%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Karrow Reaver, Third Ramp, Karrowmoor" title="Karrow Reaver, Third Ramp, Karrowmoor"><span>Karrow Reaver<small>Third Ramp, Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-lit-gallery" style="--map-x:53.8333%;--map-y:60.8750%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="Karrow Reaver, The Gravelmaw, The Lit Gallery" title="Karrow Reaver, The Gravelmaw, The Lit Gallery"><span>Karrow Reaver<small>The Gravelmaw, The Lit Gallery</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

@@ -1365,6 +1365,11 @@ html, body {
 
 /* -------------------------------------------------------------------- bank */
 
+#panel-bank {
+  /* Keep the transfer grids legible when the bank opens over another workbench or HUD panel. */
+  background: linear-gradient(180deg, rgba(28, 23, 17, 0.985), rgba(13, 11, 8, 0.98));
+}
+
 .bank-columns { display: flex; gap: var(--space-3); align-items: flex-start; }
 .bank-column { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .bank-column--bank { flex: 1 1 auto; }

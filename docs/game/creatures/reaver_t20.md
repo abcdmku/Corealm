@@ -5,11 +5,11 @@ description: "Kilnroad Reaver spawn locations, combat stats, and drops."
 
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/kilnroad_reavers.webp" alt="Kilnroad Reaver at its authored spawn in Kilnhalt" loading="lazy" /><figcaption><strong>Kilnroad Reaver</strong><span>Kilnroad Fork, Kilnhalt</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Kilnroad Reaver">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#kilnroad-fork" style="--map-x:46.6667%;--map-y:28.1667%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Kilnroad Reaver, Kilnroad Fork, Kilnhalt" title="Kilnroad Reaver, Kilnroad Fork, Kilnhalt"><span>Kilnroad Reaver<small>Kilnroad Fork, Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#kilnroad-fork" style="--map-x:46.6667%;--map-y:43.0000%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Kilnroad Reaver, Kilnroad Fork, Kilnhalt" title="Kilnroad Reaver, Kilnroad Fork, Kilnhalt"><span>Kilnroad Reaver<small>Kilnroad Fork, Kilnhalt</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

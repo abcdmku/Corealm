@@ -819,7 +819,7 @@ function pushAssetSolid(
   if (solid) ctx.solids.push(solid);
 }
 
-function assetSolidFromMeasurements(
+export function assetSolidFromMeasurements(
   id: string,
   position: Vec3,
   assetId: string,
@@ -854,6 +854,37 @@ function assetSolidFromMeasurements(
     position: solidPosition,
     size: [round2(sizeX), round2(Math.max(0.3, size.y * scale)), round2(sizeZ)],
     rotationY: round4(rotationY),
+  };
+}
+
+export interface BankEntitySpec {
+  id: EntityId;
+  name: string;
+  tier: number;
+  regionId: RegionId;
+  position: Vec3;
+  assetId: string;
+  rotationY: number;
+  settlementId?: string;
+}
+
+/** The production semantic shape shared by authored banks and the deterministic feature-lab bank. */
+export function createBankEntity(spec: BankEntitySpec): SemanticEntity {
+  return {
+    id: spec.id,
+    archetype: "bank",
+    name: spec.name,
+    tier: spec.tier,
+    regionId: spec.regionId,
+    position: [...spec.position] as Vec3,
+    state: "closed",
+    interactions: ["inspect", "bank"],
+    view: {
+      assetId: spec.assetId,
+      rotationY: spec.rotationY,
+      labelHeight: 1.4,
+    },
+    ...(spec.settlementId ? { meta: { settlementId: spec.settlementId } } : {}),
   };
 }
 
@@ -1042,22 +1073,16 @@ function buildRegionEntities(region: RegionDef, rng: Rng, ctx: BuildContext): vo
 
   const bankScale = drawnScale("bank", undefined, tier);
   const bankPosition = place(settlement.bank.position, settlement.bank.assetId, bankScale);
-  ctx.out.push({
+  ctx.out.push(createBankEntity({
     id: settlement.bank.id,
-    archetype: "bank",
     name: settlement.bank.name,
     tier,
     regionId,
     position: bankPosition,
-    state: "closed",
-    interactions: ["inspect", "bank"],
-    view: {
-      assetId: settlement.bank.assetId,
-      rotationY: settlement.bank.rotationY,
-      labelHeight: 1.4,
-    },
-    meta: { settlementId: settlement.id },
-  });
+    assetId: settlement.bank.assetId,
+    rotationY: settlement.bank.rotationY,
+    settlementId: settlement.id,
+  }));
   pushAssetSolid(ctx, settlement.bank.id, bankPosition, settlement.bank.assetId, bankScale,
     settlement.bank.rotationY, true);
   ctx.locationEntity.set(bankLocationId(region), settlement.bank.id);

@@ -2,13 +2,12 @@
  * The bank window: bank on the left, inventory on the right, because every real bank interaction is
  * a transfer between the two and a player should never have to remember what is in the other one.
  *
- * Quantity is a mode, not a prompt — 1 / 10 / All / X — so depositing forty things is four clicks
+ * Quantity is a mode, not a prompt — 1 / 5 / 10 / All / X — so depositing forty things is four clicks
  * instead of forty. The filter is a plain substring match applied to what `bank("list")` returned,
  * which keeps the behaviour identical whether or not the banking system implements its own filter.
  *
- * Opened by the world: `Ui.openBank()` is called when a bank interaction succeeds. It also opens
- * itself when the HUD sees a banking activity start, so the window appears even if the interaction
- * path never learns about the UI.
+ * Opened by the world: the activity event bridge calls `Ui.openBank()` when a bank interaction
+ * succeeds, so mouse, context-menu, and agent interactions all reach this same panel.
  */
 import type { BankView, EntityId, InventorySlot, ItemId, ItemStack } from "../contracts.js";
 import { notify } from "./contextMenu.js";
@@ -289,12 +288,17 @@ export class BankPanel implements ManagedPanel {
 
     cell.addEventListener("click", () => {
       const stack = this.inventory[index];
-      if (stack) this.deposit(stack.itemId, this.quantity.resolve(stack.quantity));
+      if (stack) this.deposit(stack.itemId, this.quantity.resolve(this.carriedQuantity(stack.itemId)));
     });
     cell.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       const stack = this.inventory[index];
-      if (stack) this.openTransferMenu(stack, "deposit", event.clientX, event.clientY);
+      if (stack) this.openTransferMenu(
+        { itemId: stack.itemId, quantity: this.carriedQuantity(stack.itemId) },
+        "deposit",
+        event.clientX,
+        event.clientY,
+      );
     });
     this.ctx.tooltip.attach(cell, () => {
       const stack = this.inventory[index];
@@ -310,6 +314,13 @@ export class BankPanel implements ManagedPanel {
 
     this.invCells.push(cell);
     return cell;
+  }
+
+  private carriedQuantity(itemId: ItemId): number {
+    return this.inventory.reduce(
+      (total, slot) => total + (slot?.itemId === itemId ? slot.quantity : 0),
+      0,
+    );
   }
 
   // ------------------------------------------------------------ operations

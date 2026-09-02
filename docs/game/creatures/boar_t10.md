@@ -5,11 +5,11 @@ description: "Scree Boar spawn locations, combat stats, and drops."
 
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/scree_boars.webp" alt="Scree Boar at its authored spawn in Karrowmoor" loading="lazy" /><figcaption><strong>Scree Boar</strong><span>The Great Cairn, Karrowmoor</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Scree Boar">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#the-great-cairn" style="--map-x:64.1667%;--map-y:63.3333%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Scree Boar, The Great Cairn, Karrowmoor" title="Scree Boar, The Great Cairn, Karrowmoor"><span>Scree Boar<small>The Great Cairn, Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-great-cairn" style="--map-x:64.1667%;--map-y:69.3750%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Scree Boar, The Great Cairn, Karrowmoor" title="Scree Boar, The Great Cairn, Karrowmoor"><span>Scree Boar<small>The Great Cairn, Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

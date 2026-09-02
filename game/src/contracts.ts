@@ -861,6 +861,14 @@ export interface FeatureLabState {
   };
   selectedEntityId: EntityId | null;
   structure: FeatureLabStructureView;
+  bank: {
+    entityId: EntityId;
+    state: string;
+    position: Vec3;
+    screen: readonly [number, number] | null;
+    contents: BankView;
+    inventory: ItemStack[];
+  } | null;
   altar: {
     entityId: EntityId;
     state: "dormant" | "awakened";
@@ -962,7 +970,9 @@ export interface FeatureLabApi {
    * is the only way to test disengaging: the player moves at 4.2 m/s and pursuit at about 3.1, and
    * enemies leash 28 m from their own spawn. A teleport would prove none of that.
    */
-  perform(action: "attack" | "cast" | "flee" | "reset-player" | "awaken-altar"): Promise<FeatureLabState>;
+  perform(
+    action: "attack" | "cast" | "flee" | "reset-player" | "awaken-altar" | "open-bank" | "reset-bank",
+  ): Promise<FeatureLabState>;
 }
 
 declare global {

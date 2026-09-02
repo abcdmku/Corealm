@@ -46,7 +46,7 @@ Both preview commands use port 4174, so run one at a time. You can switch workbe
 
 ### Combat mode
 
-`npm run lab:preview` opens `/index.html?mode=combat`. Use the lab controls to spawn production NPCs and creatures, choose equipment by slot, set presentation-only skill levels, select a spell, and exercise melee and spell effects. Walking, ground clicks, target selection, animation, damage, and effects still flow through the production game systems.
+`npm run lab:preview` opens `/index.html?mode=combat`. Use the lab controls to spawn production NPCs and creatures, choose equipment by slot, set presentation-only skill levels, select a spell, and exercise melee and spell effects. A deterministic production bank fixture near the yard spawn can be opened or reset from the Bank workbench. Its contents and carried inventory are published in lab state so transfer behavior can be checked without relying on a save. Walking, ground clicks, target selection, animation, damage, effects, and bank interaction still flow through the production game systems.
 
 Editable skill values and direct equipment choices are test setup. They do not simulate progression, item eligibility, inventory acquisition, or persistence.
 
@@ -133,7 +133,7 @@ npm run lab:test -- --shard navigation
 npm run lab:test -- --shard combat
 ```
 
-Each invocation starts one Vite server and one Chromium session. Together the shards cover the combat route, building route, mode navigation, and legacy redirect, and prove that both labs report `engine: "corealm-production"` and the same `fallowmarch-yard` identity. Combat coverage checks the production canvas and debug state, actor rigs and animation progress, a direct equipment change, pointer selection, repeated route-failure reporting, melee damage and motion, and spell particles and damage. Building coverage boots a production prefab through the compatibility route, changes it to a wall run through the real authoring panel, checks collision output and revision changes, walks through real keyboard input, suppresses keyboard movement when walking is off, and orbits and fits the free camera without moving the player. Focused structure tests cover the full prefab, composition, kit, and wall-run catalogue.
+Each invocation starts one Vite server and one Chromium session. Together the shards cover the combat route, building route, mode navigation, and legacy redirect, and prove that both labs report `engine: "corealm-production"` and the same `fallowmarch-yard` identity. Combat coverage checks the production canvas and debug state, actor rigs and animation progress, a direct equipment change, pointer selection, repeated route-failure reporting, melee damage and motion, spell particles and damage, and the production bank panel. The bank proof opens the fixture through the real interaction dispatcher, checks the 1 / 5 / 10 / All / X quantity modes, transfers five items in both directions, filters by item name, and deposits all carried fixture items. Building coverage boots a production prefab through the compatibility route, changes it to a wall run through the real authoring panel, checks collision output and revision changes, walks through real keyboard input, suppresses keyboard movement when walking is off, and orbits and fits the free camera without moving the player. Focused structure tests cover the full prefab, composition, kit, and wall-run catalogue.
 
 The navigation shard treats the mode selector as navigation, not an in-place state mutation. It records the current query and hash, switches from building to combat, waits for the document and `window.__featureLab` to load again, then checks the canonical destination `mode`, preserved URL fields, shared-yard identity, and fresh combat defaults. Both options use the same navigation path, while the building-route readiness check locks its defaults to player visible, walking off, and free camera off.
 
@@ -184,13 +184,14 @@ If a loop exceeds its budget, split detailed coverage into focused tests or the 
 
 ## Evidence and generated files
 
-The combined gate overwrites three ignored screenshots under `test-results/feature-labs/`:
+The combined gate overwrites four ignored screenshots under `test-results/feature-labs/`:
 
+- `bank-transfer.png`
 - `combat-melee.png`
 - `combat-spell.png`
 - `building-authoring.png`
 
-All three capture calls must succeed, but the gate does not decide whether the scene is readable. State and camera probes can show that framing changed, but they do not prove that the player, structure, or camera composition looks correct. The gate does not clean the directory, so these fixed names are overwritten while unrelated stale files remain. The gate prints its JSON result to stdout and does not write a durable report, trace, or pixel baseline. The legacy redirect step does not capture a separate screenshot.
+All four capture calls must succeed, but the gate does not decide whether the scene is readable. State and camera probes can show that framing changed, but they do not prove that the player, structure, or camera composition looks correct. The gate does not clean the directory, so these fixed names are overwritten while unrelated stale files remain. The gate prints its JSON result to stdout and does not write a durable report, trace, or pixel baseline. The legacy redirect step does not capture a separate screenshot.
 
 Lab screenshots, browser reports, traces, and other generated evidence are disposable by default. Keep routine output under ignored test-result locations and overwrite it between runs. Inspect visual output during development, but do not update Markdown, commit screenshots, or create report diffs on every pass.
 

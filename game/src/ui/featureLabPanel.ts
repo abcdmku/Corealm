@@ -55,6 +55,7 @@ export class FeatureLabPanel implements ManagedPanel {
   private readonly mode = field(document.createElement("select"), "lab-mode");
   private readonly status = document.createElement("p");
   private readonly combatWorkbench = workbench("lab-combat-workbench", "Combat workbench");
+  private readonly bankWorkbench = workbench("lab-bank-workbench", "Bank workbench");
   private readonly buildingWorkbench = workbench("lab-building-workbench", "Building workbench");
 
   private readonly kind = field(document.createElement("select"), "lab-target-kind");
@@ -158,6 +159,17 @@ export class FeatureLabPanel implements ManagedPanel {
       gear,
     );
 
+    const bankActions = document.createElement("div");
+    bankActions.className = "lab-actions";
+    bankActions.append(
+      this.button("lab-open-bank", "Open bank", () => this.lab.perform("open-bank")),
+      this.button("lab-reset-bank", "Reset bank fixture", () => this.lab.perform("reset-bank")),
+    );
+    const bankNote = document.createElement("p");
+    bankNote.className = "empty-state";
+    bankNote.textContent = "The chest, carried items, storage, and transfer window all use production code.";
+    this.bankWorkbench.append(bankActions, bankNote);
+
     this.sourceKind.append(
       option("prefab", "Prefab"),
       option("composition", "Composition"),
@@ -257,6 +269,7 @@ export class FeatureLabPanel implements ManagedPanel {
       labelled("Workbench", this.mode),
       this.status,
       this.combatWorkbench,
+      this.bankWorkbench,
       this.buildingWorkbench,
     );
     this.populateTargets("creature");
@@ -274,6 +287,7 @@ export class FeatureLabPanel implements ManagedPanel {
 
     this.mode.value = state.mode;
     this.showWorkbench(this.combatWorkbench, state.mode === "combat");
+    this.showWorkbench(this.bankWorkbench, state.mode === "combat");
     this.showWorkbench(this.buildingWorkbench, state.mode === "building");
 
     const targetEntityId = state.target?.entityId ?? null;
@@ -441,6 +455,9 @@ export class FeatureLabPanel implements ManagedPanel {
       ? `${state.altar.state}; ${state.altar.element}; interactions ${state.altar.interactions.join(", ")}; `
         + `Orb ${state.altar.orbConsumed ? "consumed" : "ready"}`
       : "not selected";
+    const bank = state.bank
+      ? `${state.bank.contents.usedSlots}/${state.bank.contents.capacity} slots; ${state.bank.state}`
+      : "missing";
     const errors = state.errors.length === 0
       ? "none"
       : `${state.errors.length}: ${state.errors.slice(-3).join(" | ")}`;
@@ -450,6 +467,7 @@ export class FeatureLabPanel implements ManagedPanel {
       `Counts ${structureCounts}`,
       `Player ${player}`,
       `Target ${target}`,
+      `Bank ${bank}`,
       `Altar ${altar}`,
       `Activity ${activity}`,
       `Errors ${errors}`,
@@ -476,6 +494,9 @@ export class FeatureLabPanel implements ManagedPanel {
       state.target?.entityId ?? "-",
       state.levels[skillId],
       state.spellId ?? "-",
+      state.bank?.state ?? "-",
+      ...(state.bank?.contents.slots.map((stack) => `${stack.itemId}:${stack.quantity}`) ?? []),
+      ...(state.bank?.inventory.map((stack) => `held:${stack.itemId}:${stack.quantity}`) ?? []),
       selection.kind,
       selection.id,
       selection.kit,

@@ -388,7 +388,7 @@ export function createTools(api: GameApi): ToolDef[] {
       inputSchema: obj({
         op: { type: "string", enum: ["list", "deposit", "withdraw", "depositAll"] },
         itemId: STR("Item to move"),
-        quantity: NUM("How many. Omit for all of that item."),
+        quantity: NUM("How many. Omit or use -1 for all of that item."),
         filter: STR("Substring filter for list"),
       }, ["op"]),
       execute: (args) => unwrap(api.bank(

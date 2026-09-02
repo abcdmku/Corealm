@@ -5,11 +5,11 @@ description: "March Road Reaver spawn locations, combat stats, and drops."
 
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/march_road_reavers.webp" alt="March Road Reaver at its authored spawn in Fallowmarch" loading="lazy" /><figcaption><strong>March Road Reaver</strong><span>West Track, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for March Road Reaver">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#west-track" style="--map-x:30.5000%;--map-y:52.0000%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="March Road Reaver, West Track, Fallowmarch" title="March Road Reaver, West Track, Fallowmarch"><span>March Road Reaver<small>West Track, Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#west-track" style="--map-x:30.5000%;--map-y:60.8750%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="March Road Reaver, West Track, Fallowmarch" title="March Road Reaver, West Track, Fallowmarch"><span>March Road Reaver<small>West Track, Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

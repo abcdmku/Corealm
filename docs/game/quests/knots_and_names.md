@@ -28,12 +28,12 @@ Shafts come from Palewood logs, cut at the Palewood Copse in Fallowmarch (locati
 <nav class="corealm-quest-items" aria-label="Items for step 1"><span>Items</span><a href="../../items/#palewood-shaft">Palewood Shaft</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_fletching.webp" alt="Coldbrace Fletching Bench in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Fletching Bench</strong><span>Coldbrace Bank, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 1">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#coldbrace-bank" style="--map-x:35.4667%;--map-y:57.5500%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Fletching Bench, Fallowmarch" title="Coldbrace Fletching Bench, Fallowmarch"><span>Coldbrace Fletching Bench<small>Fallowmarch</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#palewood-copse" style="--map-x:22.1667%;--map-y:55.3333%" data-map-side="right" data-map-kind="grove" data-map-marker aria-label="Palewood Copse, Fallowmarch" title="Palewood Copse, Fallowmarch"><span>Palewood Copse<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#coldbrace-bank" style="--map-x:35.4667%;--map-y:65.0375%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Fletching Bench, Fallowmarch" title="Coldbrace Fletching Bench, Fallowmarch"><span>Coldbrace Fletching Bench<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#palewood-copse" style="--map-x:22.1667%;--map-y:63.3750%" data-map-side="right" data-map-kind="grove" data-map-marker aria-label="Palewood Copse, Fallowmarch" title="Palewood Copse, Fallowmarch"><span>Palewood Copse<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -61,11 +61,11 @@ The Air Essence Cache lies deep in southern Fallowmarch. Mine any of its five gl
 <nav class="corealm-quest-items" aria-label="Items for step 2"><span>Items</span><a href="../../items/#air-essence">Air Essence</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/fallowmarch_air_cache.webp" alt="Air Essence Cache in the running Corealm world" loading="lazy" /><figcaption><strong>Air Essence Cache</strong><span>Air Essence Cache, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 2">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:62.5000%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:68.7500%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -93,11 +93,11 @@ She works the trade post side of the Rootfall stump. The handover takes both.
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#palewood-shaft">Palewood Shaft</a><a href="../../items/#air-essence">Air Essence</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_seamer_juno.webp" alt="Seamer Juno in the running Corealm world" loading="lazy" /><figcaption><strong>Seamer Juno</strong><span>Rootfall Bank Chest, Vellenwood</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Knots and Names, step 3">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#seamer-juno" style="--map-x:54.8667%;--map-y:39.2333%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Seamer Juno, Vellenwood" title="Seamer Juno, Vellenwood"><span>Seamer Juno<small>Vellenwood</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#seamer-juno" style="--map-x:54.8667%;--map-y:51.3000%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Seamer Juno, Vellenwood" title="Seamer Juno, Vellenwood"><span>Seamer Juno<small>Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

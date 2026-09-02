@@ -17,6 +17,7 @@ import type { GameState, Store } from "../state/store.js";
 import { BANK_CAPACITY } from "../state/store.js";
 import { content } from "../content/index.js";
 import type { EventBus } from "../core/events.js";
+import type { InteractionContext, InteractionDispatcher } from "../world/interactions.js";
 import type { InventorySystem } from "./inventory.js";
 import { MAX_STACK } from "./inventory.js";
 
@@ -24,7 +25,7 @@ export type BankOp = "list" | "deposit" | "withdraw" | "depositAll";
 
 export interface BankArgs {
   itemId?: ItemId;
-  /** Omitted means "all of it", which is what the 1 / 5 / 10 / all / custom picker sends for "all". */
+  /** Omitted or -1 means "all of it". The UI omits it; the agent API also accepts the PRD's -1. */
   quantity?: number;
   /** Plain case-insensitive substring match for this list response. Empty string returns all rows. */
   filter?: string;
@@ -34,7 +35,10 @@ export interface BankDeps {
   store: Store;
   events: EventBus;
   inventory: InventorySystem;
+  dispatcher: InteractionDispatcher;
   now: () => number;
+  /** Production persistence hook. Bank writes are saved before the call returns. */
+  persist?: () => void;
   /**
    * True when the player is within interaction range of a bank entity. The world layer owns the
    * distance test; this system only asks.
@@ -43,10 +47,26 @@ export interface BankDeps {
 }
 
 export class BankSystem {
-  constructor(private readonly deps: BankDeps) {}
+  constructor(private readonly deps: BankDeps) {
+    deps.dispatcher.registerHandler("bank", (context) => this.open(context));
+  }
 
   private get state(): GameState {
     return this.deps.store.get();
+  }
+
+  /** Opens the bank through the same interaction path used by pointer and agent play. */
+  private open(context: InteractionContext): Result<{ started: string }> {
+    if (context.entity.archetype !== "bank") {
+      return err("INVALID_ARGUMENT", `${context.entity.name} is not a bank`, context.entity.id);
+    }
+    this.deps.events.emit(
+      "activity.started",
+      { kind: "bank", interaction: "bank" },
+      context.entity.id,
+      this.deps.now(),
+    );
+    return ok({ started: `banking at ${context.entity.name}` });
   }
 
   /** Matches `SystemHooks.bank`. */
@@ -58,14 +78,20 @@ export class BankSystem {
       case "list":
         return ok(this.view(args?.filter));
       case "deposit":
-        return this.deposit(args);
+        return this.write(() => this.deposit(args));
       case "withdraw":
-        return this.withdraw(args);
+        return this.write(() => this.withdraw(args));
       case "depositAll":
-        return this.depositAll();
+        return this.write(() => this.depositAll());
       default:
         return err("INVALID_ARGUMENT", `Unknown bank op "${String(op)}"`);
     }
+  }
+
+  private write(operation: () => Result<BankView>): Result<BankView> {
+    const result = operation();
+    if (result.ok) this.deps.persist?.();
+    return result;
   }
 
   // ------------------------------------------------------------------- views
@@ -108,10 +134,12 @@ export class BankSystem {
     if (held < 1) return err("NOT_ENOUGH_ITEMS", `You are not carrying any ${def.name}`);
 
     const requested = args?.quantity;
-    if (requested !== undefined && (!Number.isFinite(requested) || requested < 1)) {
-      return err("INVALID_ARGUMENT", "Quantity must be at least 1");
+    if (requested !== undefined && requested !== -1 && (!Number.isFinite(requested) || requested < 1)) {
+      return err("INVALID_ARGUMENT", "Quantity must be -1 for all or at least 1");
     }
-    const wanted = requested === undefined ? held : Math.min(Math.floor(requested), held);
+    const wanted = requested === undefined || requested === -1
+      ? held
+      : Math.min(Math.floor(requested), held);
 
     const moved = this.moveIn(itemId, wanted);
     if (!moved.ok) return { ok: false, error: moved.error };
@@ -174,10 +202,12 @@ export class BankSystem {
     }
 
     const requested = args?.quantity;
-    if (requested !== undefined && (!Number.isFinite(requested) || requested < 1)) {
-      return err("INVALID_ARGUMENT", "Quantity must be at least 1");
+    if (requested !== undefined && requested !== -1 && (!Number.isFinite(requested) || requested < 1)) {
+      return err("INVALID_ARGUMENT", "Quantity must be -1 for all or at least 1");
     }
-    const wanted = requested === undefined ? stack.quantity : Math.min(Math.floor(requested), stack.quantity);
+    const wanted = requested === undefined || requested === -1
+      ? stack.quantity
+      : Math.min(Math.floor(requested), stack.quantity);
 
     // addItem does the slot arithmetic and reports what actually fit; the bank gives up exactly that
     // much, so a half-fitting withdrawal never loses the remainder.

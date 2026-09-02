@@ -5,11 +5,11 @@ description: "Mossbound spawn locations, combat stats, and drops."
 
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/mossbound.webp" alt="Mossbound at its authored spawn in Vellenwood" loading="lazy" /><figcaption><strong>Mossbound</strong><span>Cairn Gate, Vellenwood</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Mossbound">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#cairn-gate" style="--map-x:76.5000%;--map-y:44.0000%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Mossbound, Cairn Gate, Vellenwood" title="Mossbound, Cairn Gate, Vellenwood"><span>Mossbound<small>Cairn Gate, Vellenwood</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#cairn-gate" style="--map-x:76.5000%;--map-y:54.8750%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Mossbound, Cairn Gate, Vellenwood" title="Mossbound, Cairn Gate, Vellenwood"><span>Mossbound<small>Cairn Gate, Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

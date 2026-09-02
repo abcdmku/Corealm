@@ -22,11 +22,11 @@ The planks cross Corven Brook at (-78, -30) and need Agility 1. Every successful
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#marchfield">Marchfield</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/brookvault_planks.webp" alt="Brookvault Planks in the running Corealm world" loading="lazy" /><figcaption><strong>Brookvault Planks</strong><span>Marchfield, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Carter's Wager, step 1">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#marchfield" style="--map-x:43.5000%;--map-y:52.5000%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Brookvault Planks, Fallowmarch" title="Brookvault Planks, Fallowmarch"><span>Brookvault Planks<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#marchfield" style="--map-x:43.5000%;--map-y:61.2500%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Brookvault Planks, Fallowmarch" title="Brookvault Planks, Fallowmarch"><span>Brookvault Planks<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -53,12 +53,12 @@ It sits on the town's north wall at (-160, -56) and needs Agility 3, which stage
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/wall_vault.webp" alt="Wall Vault in the running Corealm world" loading="lazy" /><figcaption><strong>Wall Vault</strong><span>Coldbrace Square, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Carter's Wager, step 2">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:36.6667%;--map-y:54.6667%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Wall Vault, Fallowmarch" title="Wall Vault, Fallowmarch"><span>Wall Vault<small>Fallowmarch</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:36.6667%;--map-y:56.6667%" data-map-side="right" data-map-kind="settlement" data-map-marker aria-label="Coldbrace Square, Fallowmarch" title="Coldbrace Square, Fallowmarch"><span>Coldbrace Square<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:36.6667%;--map-y:62.8750%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Wall Vault, Fallowmarch" title="Wall Vault, Fallowmarch"><span>Wall Vault<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#coldbrace-square" style="--map-x:36.6667%;--map-y:64.3750%" data-map-side="right" data-map-kind="settlement" data-map-marker aria-label="Coldbrace Square, Fallowmarch" title="Coldbrace Square, Fallowmarch"><span>Coldbrace Square<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -85,11 +85,11 @@ Every answer finishes the quest. Only one of them survives contact with the Ward
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#coldbrace-south-gate">Coldbrace South Gate</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_carter_bel.webp" alt="Carter Bel in the running Corealm world" loading="lazy" /><figcaption><strong>Carter Bel</strong><span>Coldbrace South Gate, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Carter's Wager, step 3">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#carter-bel" style="--map-x:36.7917%;--map-y:58.4583%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Carter Bel, Fallowmarch" title="Carter Bel, Fallowmarch"><span>Carter Bel<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#carter-bel" style="--map-x:36.7917%;--map-y:65.7188%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Carter Bel, Fallowmarch" title="Carter Bel, Fallowmarch"><span>Carter Bel<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

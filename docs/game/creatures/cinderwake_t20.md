@@ -5,11 +5,11 @@ description: "Cinderwake spawn locations, combat stats, and drops."
 
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/cinderwake.webp" alt="Cinderwake at its authored spawn in Kilnhalt" loading="lazy" /><figcaption><strong>Cinderwake</strong><span>Cinderwake Arena, Kilnhalt</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Cinderwake">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#cinderwake-arena" style="--map-x:73.8333%;--map-y:15.0000%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Cinderwake, Cinderwake Arena, Kilnhalt" title="Cinderwake, Cinderwake Arena, Kilnhalt"><span>Cinderwake<small>Cinderwake Arena, Kilnhalt</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#cinderwake-arena" style="--map-x:73.8333%;--map-y:33.1250%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Cinderwake, Cinderwake Arena, Kilnhalt" title="Cinderwake, Cinderwake Arena, Kilnhalt"><span>Cinderwake<small>Cinderwake Arena, Kilnhalt</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

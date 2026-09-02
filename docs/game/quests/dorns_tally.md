@@ -23,11 +23,11 @@ Pick one seam and stay on it. `inspect` the node while you work: its `resource.r
 <nav class="corealm-quest-items" aria-label="Items for step 1"><span>Items</span><a href="../../items/#grithe-ore">Grithe Ore</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/locations/bracken_pit.webp" alt="Bracken Pit in the running Corealm world" loading="lazy" /><figcaption><strong>Bracken Pit</strong><span>Bracken Pit, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Dorn's Tally, step 1">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#bracken-pit" style="--map-x:36.6667%;--map-y:43.3333%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Bracken Pit, Fallowmarch" title="Bracken Pit, Fallowmarch"><span>Bracken Pit<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#bracken-pit" style="--map-x:36.6667%;--map-y:54.3750%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Bracken Pit, Fallowmarch" title="Bracken Pit, Fallowmarch"><span>Bracken Pit<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -54,11 +54,11 @@ The exact figure was in the `resource.depleted` event, and the quest kept it: it
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_pitmaster_dorn.webp" alt="Pitmaster Dorn in the running Corealm world" loading="lazy" /><figcaption><strong>Pitmaster Dorn</strong><span>Coldbrace Bank, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Dorn's Tally, step 2">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#pitmaster-dorn" style="--map-x:36.4833%;--map-y:57.3750%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Pitmaster Dorn, Fallowmarch" title="Pitmaster Dorn, Fallowmarch"><span>Pitmaster Dorn<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#pitmaster-dorn" style="--map-x:36.4833%;--map-y:64.9063%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Pitmaster Dorn, Fallowmarch" title="Pitmaster Dorn, Fallowmarch"><span>Pitmaster Dorn<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -86,11 +86,11 @@ Walk to the bank counter and `bank("deposit", { itemId: "grithe_ore", quantity: 
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#grithe-ore">Grithe Ore</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/coldbrace_bank.webp" alt="Coldbrace Bank in the running Corealm world" loading="lazy" /><figcaption><strong>Coldbrace Bank</strong><span>Coldbrace Bank, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Dorn's Tally, step 3">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#coldbrace-bank" style="--map-x:36.3542%;--map-y:57.5333%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Bank, Fallowmarch" title="Coldbrace Bank, Fallowmarch"><span>Coldbrace Bank<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#coldbrace-bank" style="--map-x:36.3542%;--map-y:65.0250%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="Coldbrace Bank, Fallowmarch" title="Coldbrace Bank, Fallowmarch"><span>Coldbrace Bank<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -112,11 +112,11 @@ Back to the square. He will have a pen ready; he always has a pen ready.
 <nav class="corealm-quest-where" aria-label="Locations for step 4"><span>Where</span><a href="../../regions/#coldbrace-square">Coldbrace Square</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_pitmaster_dorn.webp" alt="Pitmaster Dorn in the running Corealm world" loading="lazy" /><figcaption><strong>Pitmaster Dorn</strong><span>Coldbrace Bank, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for Dorn's Tally, step 4">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#pitmaster-dorn" style="--map-x:36.4833%;--map-y:57.3750%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Pitmaster Dorn, Fallowmarch" title="Pitmaster Dorn, Fallowmarch"><span>Pitmaster Dorn<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#pitmaster-dorn" style="--map-x:36.4833%;--map-y:64.9063%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Pitmaster Dorn, Fallowmarch" title="Pitmaster Dorn, Fallowmarch"><span>Pitmaster Dorn<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

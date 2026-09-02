@@ -152,6 +152,14 @@ interface CombatEvidence {
   catalogChecks: Record<string, boolean>;
   levelChecks: Record<string, boolean>;
   equipment: EquipmentProof[];
+  bank: {
+    panelOpened: boolean;
+    quantityModes: string[];
+    filteredItems: string[];
+    gritheOre: readonly [number, number, number];
+    carriedGritheOre: readonly [number, number, number];
+    depositAllClearedFixtureItems: boolean;
+  };
   routeFailureNotices: {
     results: Array<{ error?: string; message?: string }>;
     lines: Array<{ text: string; message: string | null; count: string | null }>;
@@ -316,9 +324,9 @@ try {
 
   const comparisonProbe = building?.probe ?? combat?.probe ?? modeNavigation?.probe;
   if (!comparisonProbe) throw new Error("Feature-lab shard produced no runtime probe");
-  const expectedScreenshots = TEST_SHARD === "all" ? 3
+  const expectedScreenshots = TEST_SHARD === "all" ? 4
     : TEST_SHARD === "building" ? 1
-      : TEST_SHARD === "combat" ? 2
+      : TEST_SHARD === "combat" ? 3
         : 0;
   const checks: Record<string, boolean> = {
     ...(legacy ? legacyChecks(legacy, comparisonProbe) : {}),
@@ -355,6 +363,7 @@ try {
       catalogChecks: combat.catalogChecks,
       levelChecks: combat.levelChecks,
       targetPointer: combat.targetPointer,
+      bank: combat.bank,
       melee: combat.melee,
       cast: combat.cast,
       equipment: combat.equipment,
@@ -468,6 +477,15 @@ function combatChecks(combat: CombatEvidence): Record<string, boolean> {
     combatProductionStructurePresent: structureIsValid(combat.ready.structure),
     combatCatalogsComplete: Object.values(combat.catalogChecks).every(Boolean),
     combatEveryLevelCanBeSet: Object.values(combat.levelChecks).every(Boolean),
+    combatBankTransfersThroughProductionPanel: combat.bank.panelOpened
+      && ["1", "5", "10", "All", "X"].every((label) => combat.bank.quantityModes.includes(label))
+      && combat.bank.gritheOre[1] === combat.bank.gritheOre[0] + 5
+      && combat.bank.gritheOre[2] === combat.bank.gritheOre[0]
+      && combat.bank.carriedGritheOre[1] === combat.bank.carriedGritheOre[0] - 5
+      && combat.bank.carriedGritheOre[2] === combat.bank.carriedGritheOre[0]
+      && combat.bank.filteredItems.length === 1
+      && combat.bank.filteredItems[0] === "grithe_ore"
+      && combat.bank.depositAllClearedFixtureItems,
     combatRepresentativeEquipmentEquips: [
       ...MELEE_ARMOUR_SET,
       ...MAGIC_ARMOUR_SET,
@@ -537,6 +555,7 @@ async function testCombat(
     && state.mode === "combat"
     && state.walkingEnabled
     && state.structure.ready
+    && state.bank !== null
     && state.target !== null
     && state.target.screen !== null
     && state.playerMotion?.liveRig === true
@@ -546,6 +565,53 @@ async function testCombat(
   const probe = await readRuntimeProbe(targetPage);
   const catalog = await readCatalog(targetPage);
   const catalogChecks = validateCatalog(catalog);
+
+  const bankBefore = ready.bank;
+  if (!bankBefore) throw new Error("Feature lab has no bank fixture");
+  const openBank = targetPage.getByRole("button", { name: "Open bank" });
+  await openBank.waitFor({ state: "visible", timeout: READY_BUDGET_MS });
+  await openBank.click();
+  const bankPanel = targetPage.locator("#panel-bank");
+  await bankPanel.waitFor({ state: "visible", timeout: ACTION_BUDGET_MS });
+  const panelOpened = await bankPanel.isVisible();
+  const quantityModes = (await bankPanel.locator(".qty__btn").allTextContents()).map((label) => label.trim());
+  await bankPanel.getByRole("radio", { name: "5", exact: true }).click();
+  await bankPanel.locator('.bank-column--inventory .slot[data-item="grithe_ore"]').first().click();
+  const bankDeposited = await waitForState(targetPage, "bank five-item deposit", (state) => (
+    stackQuantity(state.bank?.contents.slots, "grithe_ore") === 30
+    && stackQuantity(state.bank?.inventory, "grithe_ore") === 3
+  ));
+  remember(bankDeposited);
+  await bankPanel.locator('.bank-column--bank .slot[data-item="grithe_ore"]').click();
+  const bankWithdrawn = await waitForState(targetPage, "bank five-item withdrawal", (state) => (
+    stackQuantity(state.bank?.contents.slots, "grithe_ore") === 25
+    && stackQuantity(state.bank?.inventory, "grithe_ore") === 8
+  ));
+  remember(bankWithdrawn);
+  await bankPanel.getByRole("searchbox", { name: "Filter bank by name" }).fill("grithe");
+  const filteredItems = await bankPanel.locator(".bank-grid .slot:not(.is-empty)").evaluateAll((cells) => (
+    cells.map((cell) => (cell as HTMLElement).dataset["item"] ?? "")
+  ));
+  const bankShot = path.join(captures, "bank-transfer.png");
+  await capture(targetPage, bankShot, captured);
+  await bankPanel.getByRole("button", { name: "Deposit all", exact: true }).click();
+  const bankDepositedAll = await waitForState(targetPage, "bank deposit-all", (state) => (
+    stackQuantity(state.bank?.inventory, "grithe_ore") === 0
+    && stackQuantity(state.bank?.inventory, "palewood_log") === 0
+    && stackQuantity(state.bank?.contents.slots, "palewood_log") === 6
+  ));
+  remember(bankDepositedAll);
+  await targetPage.evaluate(async () => {
+    const api = window.__featureLab;
+    if (!api) throw new Error("window.__featureLab is unavailable");
+    await api.perform("reset-bank");
+  });
+  await bankPanel.getByRole("button", { name: "Close Bank" }).click();
+  const bankReset = await waitForState(targetPage, "bank fixture reset", (state) => (
+    stackQuantity(state.bank?.contents.slots, "grithe_ore") === 25
+    && stackQuantity(state.bank?.inventory, "grithe_ore") === 8
+  ));
+  remember(bankReset);
 
   const levels = await targetPage.evaluate((skillIds) => {
     const api = window.__featureLab;
@@ -756,6 +822,23 @@ async function testCombat(
     catalogChecks,
     levelChecks,
     equipment,
+    bank: {
+      panelOpened,
+      quantityModes,
+      filteredItems,
+      gritheOre: [
+        stackQuantity(bankBefore.contents.slots, "grithe_ore"),
+        stackQuantity(bankDeposited.bank?.contents.slots, "grithe_ore"),
+        stackQuantity(bankWithdrawn.bank?.contents.slots, "grithe_ore"),
+      ],
+      carriedGritheOre: [
+        stackQuantity(bankBefore.inventory, "grithe_ore"),
+        stackQuantity(bankDeposited.bank?.inventory, "grithe_ore"),
+        stackQuantity(bankWithdrawn.bank?.inventory, "grithe_ore"),
+      ],
+      depositAllClearedFixtureItems: stackQuantity(bankDepositedAll.bank?.inventory, "grithe_ore") === 0
+        && stackQuantity(bankDepositedAll.bank?.inventory, "palewood_log") === 0,
+    },
     routeFailureNotices,
     targetPointer: {
       entityId: targetBase.target?.entityId,
@@ -1393,6 +1476,13 @@ function findItem(
 ): ItemId | null {
   const group = catalog.equipment.find((candidate) => candidate.slot === slot);
   return group?.items.find((item) => pattern.test(item.label))?.id ?? null;
+}
+
+function stackQuantity(
+  stacks: readonly { itemId: ItemId; quantity: number }[] | undefined,
+  itemId: ItemId,
+): number {
+  return stacks?.find((stack) => stack.itemId === itemId)?.quantity ?? 0;
 }
 
 function healthFell(before: FeatureLabState, after: FeatureLabState): boolean {

@@ -1,8 +1,10 @@
-import type { FeatureLabMode, RegionId } from "../contracts.js";
+import type { FeatureLabMode, RegionId, Vec3 } from "../contracts.js";
 import { getRegion } from "../content/regions.js";
 import type { WorldTerrainSpec } from "../render/scene.js";
 import {
   buildWorld,
+  assetSolidFromMeasurements,
+  createBankEntity,
   type BuiltWorld,
   type HeightAt,
   type WorldPorts,
@@ -103,14 +105,50 @@ function buildFeatureLabTerrain(): WorldTerrainSpec {
   };
 }
 
-const buildEmptySemanticWorld: BootProfile["buildSemanticWorld"] = () => ({
-  entities: [],
-  routeNodes: [],
-  routeEdges: [],
-  knownLocations: [],
-  buildings: [],
-  solids: [],
-});
+export const FEATURE_LAB_BANK_ID = "feature-lab:bank";
+const FEATURE_LAB_BANK_ASSET_ID = "chest_wood";
+const FEATURE_LAB_BANK_X = 2;
+const FEATURE_LAB_BANK_Z = 1;
+
+/** A real bank entity in the compact yard, kept close enough for an immediate pointer interaction. */
+const buildFeatureLabSemanticWorld: BootProfile["buildSemanticWorld"] = (_seed, heightAt, ports) => {
+  const ground = heightAt("fallowmarch", FEATURE_LAB_BANK_X, FEATURE_LAB_BANK_Z);
+  const position: Vec3 = [
+    FEATURE_LAB_BANK_X,
+    ground - (ports?.baseY?.(FEATURE_LAB_BANK_ASSET_ID) ?? 0),
+    FEATURE_LAB_BANK_Z,
+  ];
+  const bank = createBankEntity({
+    id: FEATURE_LAB_BANK_ID,
+    name: "Feature Lab Bank",
+    tier: 1,
+    regionId: "fallowmarch",
+    position,
+    assetId: FEATURE_LAB_BANK_ASSET_ID,
+    rotationY: Math.PI,
+    settlementId: "feature-lab-yard",
+  });
+  const solid = assetSolidFromMeasurements(
+    FEATURE_LAB_BANK_ID,
+    position,
+    FEATURE_LAB_BANK_ASSET_ID,
+    1,
+    Math.PI,
+    true,
+    {
+      assetSize: ports?.assetSize ?? (() => null),
+      assetCenterXZ: ports?.assetCenterXZ ?? (() => null),
+    },
+  );
+  return {
+    entities: [bank],
+    routeNodes: [],
+    routeEdges: [],
+    knownLocations: [],
+    buildings: [],
+    solids: solid ? [solid] : [],
+  };
+};
 
 const FEATURE_LAB_SPAWN: BootSpawn = Object.freeze({
   regionId: "fallowmarch",
@@ -125,7 +163,7 @@ function createFeatureLabProfile(labMode: FeatureLabMode): BootProfile {
     labMode,
     terrain: buildFeatureLabTerrain,
     spawn: FEATURE_LAB_SPAWN,
-    buildSemanticWorld: buildEmptySemanticWorld,
+    buildSemanticWorld: buildFeatureLabSemanticWorld,
     persistent: false,
     worldSurface: false,
     dungeon: false,

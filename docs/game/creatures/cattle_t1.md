@@ -5,11 +5,11 @@ description: "Redsill Cow spawn locations, combat stats, and drops."
 
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/redsill_cattle.webp" alt="Redsill Cow at its authored spawn in Fallowmarch" loading="lazy" /><figcaption><strong>Redsill Cow</strong><span>Redsill Shallows, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Redsill Cow">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#redsill-shallows" style="--map-x:44.1667%;--map-y:57.6667%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Redsill Cow, Redsill Shallows, Fallowmarch" title="Redsill Cow, Redsill Shallows, Fallowmarch"><span>Redsill Cow<small>Redsill Shallows, Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#redsill-shallows" style="--map-x:44.1667%;--map-y:65.1250%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Redsill Cow, Redsill Shallows, Fallowmarch" title="Redsill Cow, Redsill Shallows, Fallowmarch"><span>Redsill Cow<small>Redsill Shallows, Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

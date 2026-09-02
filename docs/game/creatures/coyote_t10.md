@@ -5,11 +5,11 @@ description: "Tarn Coyote spawn locations, combat stats, and drops."
 
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/tarn_coyotes.webp" alt="Tarn Coyote at its authored spawn in Karrowmoor" loading="lazy" /><figcaption><strong>Tarn Coyote</strong><span>Cairn Tarns, Karrowmoor</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Tarn Coyote">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#cairn-tarns" style="--map-x:69.0000%;--map-y:55.8333%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Tarn Coyote, Cairn Tarns, Karrowmoor" title="Tarn Coyote, Cairn Tarns, Karrowmoor"><span>Tarn Coyote<small>Cairn Tarns, Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#cairn-tarns" style="--map-x:69.0000%;--map-y:63.7500%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Tarn Coyote, Cairn Tarns, Karrowmoor" title="Tarn Coyote, Cairn Tarns, Karrowmoor"><span>Tarn Coyote<small>Cairn Tarns, Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

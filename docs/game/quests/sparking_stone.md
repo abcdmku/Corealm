@@ -28,12 +28,12 @@ Go south through Vellenwood to Coldbrace, then follow the western track to locat
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#air-essence-cache">Air Essence Cache</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/tempest_roc.webp" alt="Tempest Roc in the running Corealm world" loading="lazy" /><figcaption><strong>Tempest Roc</strong><span>Air Essence Cache, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 1">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../creatures/tempest_roc_t1/" style="--map-x:25.6667%;--map-y:63.0000%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Tempest Roc, Fallowmarch" title="Tempest Roc, Fallowmarch"><span>Tempest Roc<small>Fallowmarch</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:62.5000%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../creatures/tempest_roc_t1/" style="--map-x:25.6667%;--map-y:69.1250%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Tempest Roc, Fallowmarch" title="Tempest Roc, Fallowmarch"><span>Tempest Roc<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:68.7500%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -56,12 +56,12 @@ The guaranteed Air Orb remains in the Tempest Roc's loot pile after the kill. Us
 <nav class="corealm-quest-items" aria-label="Items for step 2"><span>Items</span><a href="../../items/#air-orb">Air Orb</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/tempest_roc.webp" alt="Tempest Roc in the running Corealm world" loading="lazy" /><figcaption><strong>Tempest Roc</strong><span>Air Essence Cache, Fallowmarch</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 2">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../creatures/tempest_roc_t1/" style="--map-x:25.6667%;--map-y:63.0000%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Tempest Roc, Fallowmarch" title="Tempest Roc, Fallowmarch"><span>Tempest Roc<small>Fallowmarch</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:62.5000%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../creatures/tempest_roc_t1/" style="--map-x:25.6667%;--map-y:69.1250%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Tempest Roc, Fallowmarch" title="Tempest Roc, Fallowmarch"><span>Tempest Roc<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:68.7500%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -84,11 +84,11 @@ Use interaction awaken on entity fallowmarch_air_altar while carrying the Air Or
 <nav class="corealm-quest-items" aria-label="Items for step 3"><span>Items</span><a href="../../items/#palewood-log">Palewood Log</a><a href="../../items/#palewood-shaft">Palewood Shaft</a><a href="../../items/#palewood-staff">Palewood Staff</a><a href="../../items/#air-orb">Air Orb</a><a href="../../items/#air-staff">Air Staff</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/fallowmarch_air_altar.webp" alt="Fallowmarch Air Altar in the running Corealm world" loading="lazy" /><figcaption><strong>Fallowmarch Air Altar</strong><span>Air Essence Cache</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 3">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:62.5000%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#air-essence-cache" style="--map-x:29.1667%;--map-y:68.7500%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -111,11 +111,11 @@ The Air Staff spends its charge before carried Air Essence. Redsill Frogs near l
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/redsill_frogs.webp" alt="Redsill Frog in the running Corealm world" loading="lazy" /><figcaption><strong>Redsill Frog</strong><span>Redsill Shallows, Fallowmarch</span></figcaption></figure>
 <figure class="corealm-quest-scene"><img src="../../assets/captures/entities/fallowmarch_air_altar.webp" alt="Fallowmarch Air Altar in the running Corealm world" loading="lazy" /><figcaption><strong>Fallowmarch Air Altar</strong><span>Redsill Shallows</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 4">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../creatures/frog_t1/" style="--map-x:45.3333%;--map-y:56.0000%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Redsill Frog, Fallowmarch" title="Redsill Frog, Fallowmarch"><span>Redsill Frog<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../creatures/frog_t1/" style="--map-x:45.3333%;--map-y:63.8750%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Redsill Frog, Fallowmarch" title="Redsill Frog, Fallowmarch"><span>Redsill Frog<small>Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -143,11 +143,11 @@ She is at the middle of Highcairn. The handover takes the ore.
 <nav class="corealm-quest-items" aria-label="Items for step 5"><span>Items</span><a href="../../items/#kaldite-ore">Kaldite Ore</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_quarrier_vess.webp" alt="Quarrier Vess in the running Corealm world" loading="lazy" /><figcaption><strong>Quarrier Vess</strong><span>Highcairn, Karrowmoor</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Sparking Stone, step 5">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#quarrier-vess" style="--map-x:62.1500%;--map-y:55.7000%" data-map-side="left" data-map-kind="npc" data-map-marker aria-label="Quarrier Vess, Karrowmoor" title="Quarrier Vess, Karrowmoor"><span>Quarrier Vess<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#quarrier-vess" style="--map-x:62.1500%;--map-y:63.6500%" data-map-side="left" data-map-kind="npc" data-map-marker aria-label="Quarrier Vess, Karrowmoor" title="Quarrier Vess, Karrowmoor"><span>Quarrier Vess<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

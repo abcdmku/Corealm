@@ -31,7 +31,7 @@ import { enemyBlockFor } from "../content/enemies.js";
 import { enemyCombatLevel } from "../content/index.js";
 import { distanceXZ } from "../core/math.js";
 import type { GameState, Store } from "../state/store.js";
-import { setSkillLevel } from "../state/store.js";
+import { BANK_CAPACITY, setSkillLevel } from "../state/store.js";
 import type { CombatSystem } from "../systems/combat.js";
 import type { EquipmentSystem } from "../systems/equipment.js";
 import type { InventorySystem } from "../systems/inventory.js";
@@ -52,6 +52,15 @@ const MAX_TARGET_DISTANCE = 40;
 const FLEE_DISTANCE = 45;
 const TARGET_LATERAL_OFFSET = 3;
 const LAB_ITEM_QUANTITY = 100_000;
+const LAB_BANK_CONTENTS = Object.freeze([
+  { itemId: "grithe_ore", quantity: 25 },
+  { itemId: "duskoak_log", quantity: 12 },
+  { itemId: "seared_trout", quantity: 5 },
+] satisfies readonly { itemId: ItemId; quantity: number }[]);
+const LAB_BANK_INVENTORY = Object.freeze([
+  { itemId: "grithe_ore", quantity: 8 },
+  { itemId: "palewood_log", quantity: 6 },
+] satisfies readonly { itemId: ItemId; quantity: number }[]);
 
 export interface FeatureLabRuntimeDeps {
   readonly api: CorealmGameApi;
@@ -132,11 +141,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
   deps.store.get().inventory.slots.fill(null);
   for (const skill of SKILL_IDS) setSkillLevel(deps.store.get(), skill, 99);
   deps.store.markDirty();
-  for (const itemId of Object.values(ESSENCE_BY_ELEMENT)) {
-    if (!itemId) continue;
-    requireOk(deps.inventory.addItem(itemId, LAB_ITEM_QUANTITY), `stock ${itemId}`);
-  }
-  requireOk(deps.inventory.addItem("air_orb", 1), "stock the Air Orb");
+  resetBankFixture();
   const initialSpellId = FEATURE_LAB_CATALOG.spells[0]?.id ?? null;
   if (initialSpellId) requireOk(deps.api.setPreferredSpell(initialSpellId), `select ${initialSpellId}`);
 
@@ -334,7 +339,8 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
 
     async perform(action) {
       return guardAsync(async () => {
-        if (action !== "attack" && action !== "cast" && action !== "flee" && action !== "reset-player" && action !== "awaken-altar") {
+        if (action !== "attack" && action !== "cast" && action !== "flee" && action !== "reset-player"
+          && action !== "awaken-altar" && action !== "open-bank" && action !== "reset-bank") {
           throw new Error(`Unknown feature-lab action: ${String(action)}`);
         }
         if (action === "reset-player") {
@@ -349,6 +355,17 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
           if (altar.state !== "awakened") {
             requireOk(deps.essence.awaken(altar.id), `awaken ${altar.name}`);
           }
+          return getState();
+        }
+        if (action === "reset-bank") {
+          resetBankFixture();
+          deps.resetPlayer();
+          return getState();
+        }
+        if (action === "open-bank") {
+          const bank = deps.entityStore.all().find((entity) => entity.archetype === "bank");
+          if (!bank) throw new Error("The feature-lab bank fixture is missing");
+          requireOk(deps.api.interact(bank.id, "bank"), `open ${bank.name}`);
           return getState();
         }
         const live = requireCreatureTarget();
@@ -395,6 +412,22 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
     for (const slot of EQUIP_SLOTS) worn[slot] = equipment.slots[slot]?.itemId ?? null;
 
     const state = deps.store.get();
+    const bankEntity = deps.entityStore.all().find((candidate) => candidate.archetype === "bank");
+    const bank: FeatureLabState["bank"] = bankEntity ? {
+      entityId: bankEntity.id,
+      state: bankEntity.state,
+      position: [...bankEntity.position] as Vec3,
+      screen: projectEntity(bankEntity.position, bankEntity.view?.labelHeight ?? 1.4),
+      contents: {
+        slots: state.bank.slots.map((stack) => ({ ...stack })),
+        usedSlots: state.bank.slots.length,
+        capacity: BANK_CAPACITY,
+      },
+      inventory: deps.inventory.distinctItemIds().map((itemId) => ({
+        itemId,
+        quantity: deps.inventory.countOf(itemId),
+      })),
+    } : null;
     const altarEntity = deps.entityStore.all().find((candidate) => candidate.meta?.essenceAltar === true);
     const altarElement = altarEntity?.meta?.essenceElement;
     const altar: FeatureLabState["altar"] = altarEntity
@@ -435,6 +468,7 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
       },
       selectedEntityId: deps.selectedEntityId(),
       structure: cloneStructureView(structure),
+      bank,
       altar,
       target: entity && target ? {
         kind: target.preset.kind,
@@ -525,6 +559,26 @@ export function createFeatureLabRuntime(deps: FeatureLabRuntimeDeps): FeatureLab
   function discardFromSetupInventory(itemId: ItemId): void {
     const quantity = deps.inventory.countOf(itemId);
     if (quantity > 0) requireOk(deps.inventory.removeItem(itemId, quantity, { silent: true }), `discard ${itemId}`);
+  }
+
+  function resetBankFixture(): void {
+    const fixtureItemIds = new Set<ItemId>([
+      ...LAB_BANK_CONTENTS.map((stack) => stack.itemId),
+      ...LAB_BANK_INVENTORY.map((stack) => stack.itemId),
+      ...Object.values(ESSENCE_BY_ELEMENT).filter((itemId): itemId is ItemId => itemId !== null),
+      "air_orb",
+    ]);
+    for (const itemId of fixtureItemIds) discardFromSetupInventory(itemId);
+    deps.store.get().bank.slots = LAB_BANK_CONTENTS.map((stack) => ({ ...stack }));
+    for (const itemId of Object.values(ESSENCE_BY_ELEMENT)) {
+      if (!itemId) continue;
+      requireOk(deps.inventory.addItem(itemId, LAB_ITEM_QUANTITY), `stock ${itemId}`);
+    }
+    requireOk(deps.inventory.addItem("air_orb", 1), "stock the Air Orb");
+    for (const stack of LAB_BANK_INVENTORY) {
+      requireOk(deps.inventory.addItem(stack.itemId, stack.quantity), `stock ${stack.itemId}`);
+    }
+    deps.store.markDirty();
   }
 
   function clearTarget(): void {

@@ -72,8 +72,6 @@ export function ignoresRepeatedNotice(message: string): boolean {
   return message === UNREACHABLE_DESTINATION_MESSAGE;
 }
 
-export type AutoOpen = "bank" | "shop" | null;
-
 export class Hud {
   readonly element: HTMLElement;
   private readonly toastStrip: HTMLElement;
@@ -101,8 +99,6 @@ export class Hud {
   private lastEventMs = 0;
   private eventCursor = 0;
   private eventPollInFlight = false;
-  private pendingOpen: AutoOpen = null;
-  private lastActivityKind: string | null = null;
   private readonly timers = new Set<number>();
 
   constructor(private readonly ctx: UiContext, private readonly options: UiOptions) {
@@ -265,13 +261,6 @@ export class Hud {
     }, MESSAGE_IDLE_MS);
   }
 
-  /** Consumed by `createUi`: a bank or shop interaction landed and the window should come up. */
-  takeAutoOpen(): AutoOpen {
-    const pending = this.pendingOpen;
-    this.pendingOpen = null;
-    return pending;
-  }
-
   update(nowMs: number): void {
     const api = this.ctx.api;
     const player = api.getPlayer();
@@ -369,7 +358,6 @@ export class Hud {
 
     if (!activity) {
       this.activityRow.hidden = true;
-      this.detectAutoOpen(null);
       return;
     }
 
@@ -383,7 +371,6 @@ export class Hud {
     this.activityCount.textContent = activity.remaining > 0
       ? `${activity.completed} done · ${activity.remaining} left`
       : `${activity.completed} done`;
-    this.detectAutoOpen(activity.kind);
   }
 
   private updateCurrency(currency: number): void {
@@ -461,21 +448,6 @@ export class Hud {
     const described = this.describeEvent(event);
     if (described) this.pushNotice(described.text, described.tone);
 
-    if (event.type === "activity.started") {
-      const kind = typeof event.data["kind"] === "string" ? event.data["kind"] : null;
-      const interaction = typeof event.data["interaction"] === "string" ? event.data["interaction"] : null;
-      this.detectAutoOpen(kind ?? interaction);
-    }
-  }
-
-  /** Bank and shop windows are opened by the world, which has no reference to the UI. */
-  private detectAutoOpen(kind: string | null): void {
-    if (kind === this.lastActivityKind) return;
-    this.lastActivityKind = kind;
-    if (!kind) return;
-    const lowered = kind.toLowerCase();
-    if (lowered.includes("bank")) this.pendingOpen = "bank";
-    else if (lowered.includes("shop") || lowered.includes("trade")) this.pendingOpen = "shop";
   }
 
   private describeEvent(event: GameEvent): { text: string; tone: NoticeTone } | null {

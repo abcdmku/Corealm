@@ -46,7 +46,8 @@ import {
   rehydrateEnemyRuntimes,
   rehydrateWorldContainers,
 } from "../persistence/worldContainers.js";
-import { installBootPlaceholder, installGameDebug, type RecordedError } from "../debug/gameDebug.js";
+import type { RecordedError } from "../debug/gameDebug.js";
+import { installBootPlaceholder } from "../debug/bootPlaceholder.js";
 import { GameLoop } from "./loop.js";
 import { formatBootAssetProgress } from "./bootStatus.js";
 import { InputController } from "../input/mouse.js";
@@ -115,12 +116,7 @@ import {
   footstepSurfaceAt, type AudioDiagnostic,
 } from "../audio/index.js";
 import { GAME_BOOT_PROFILE, type BootProfile } from "./bootProfile.js";
-import { createFeatureLabRuntime } from "../featureLab/runtime.js";
-import {
-  DEFAULT_FEATURE_LAB_STRUCTURE_SELECTION,
-  assembleFeatureLabStructure,
-  type FeatureLabStructureAssembly,
-} from "../featureLab/structures.js";
+import type { FeatureLabStructureAssembly } from "../featureLab/structures.js";
 import { BOOT_MILESTONES, BOOT_SPANS, bootTelemetry } from "../perf/bootTelemetry.js";
 
 export interface BootResult {
@@ -791,8 +787,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     ...(profile.kind === "feature-lab" ? { skillLevel: () => 99 } : {}),
   });
   const bankSystem = new BankSystem({
-    store, events, inventory: inventorySystem, now,
+    store, events, inventory: inventorySystem, dispatcher: interactions, now,
     inRangeOfBank: () => nearArchetype("bank"),
+    persist: () => { saves.save(store.get(), Date.now()); },
   });
   const economySystem = new EconomySystem({
     store, events, inventory: inventorySystem, now,
@@ -1353,6 +1350,15 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
 
   let featureLab: FeatureLabApi | undefined;
   if (profile.kind === "feature-lab") {
+    // The workbench runtime is never used by the authored game. Keep it out of the critical game
+    // bundle and load it only after a lab profile has been selected.
+    const [{ createFeatureLabRuntime }, {
+      DEFAULT_FEATURE_LAB_STRUCTURE_SELECTION,
+      assembleFeatureLabStructure,
+    }] = await Promise.all([
+      import("../featureLab/runtime.js"),
+      import("../featureLab/structures.js"),
+    ]);
     const structureOrigin: Vec3 = [-8, scene.meshHeightAt(-8, 12), 12];
     let activeStructure: FeatureLabStructureAssembly | null = null;
     let activeStructureNavigation: THREE.Mesh[] = [];
@@ -1651,10 +1657,10 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       if (!initialTarget) throw new Error("The production content has no creature for the feature lab");
       await featureLab.spawnTarget("creature", initialTarget.id);
     }
-    window.__featureLab = featureLab;
-  } else {
-    delete window.__featureLab;
   }
+  // Published at the final ready boundary below. Test and authoring clients treat the presence of
+  // this API as proof that the shared renderer and debug surface are ready too.
+  delete window.__featureLab;
   // There is exactly ONE KeyboardController, and `InputController` owns it. A second one used to
   // stand here: both listened on `window`, both dispatched the same keydown through the same
   // shared registry, and every panel key therefore fired twice — open, then closed, in one press.
@@ -1777,8 +1783,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     entityViews.clearHighlight(enemyId);
   });
 
-  // A bank or shop interaction has no event of its own, so the panel opens off the successful
-  // interaction rather than off a signal that does not exist.
+  // Bank and shop interactions publish an instantaneous activity signal rather than storing a
+  // timed activity. Open their panels from that shared signal so every input path behaves alike.
   events.subscribe((event) => {
     if (event.type !== "activity.started" || !event.entityId) return;
     const entity = entityStore.get(event.entityId);
@@ -1986,6 +1992,9 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     return ((hash >>> 0) % 6283) / 1000;
   };
 
+  // The debug and acceptance surface is required before `ready` flips, but none of it participates
+  // in world construction or the first render. Load it after those critical paths have completed.
+  const { installGameDebug } = await import("../debug/gameDebug.js");
   installGameDebug({
     store, events, clock, nav, movement, api, renderer, camera, assets, errors,
     isReady: () => debugReady,
@@ -2350,6 +2359,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     bootTelemetry.recordPerformanceResources();
     bootTelemetry.milestone(BOOT_MILESTONES.FIRST_PLAYABLE);
     debugReady = true;
+    if (featureLab) window.__featureLab = featureLab;
   } else {
     const firstFrameSpan = bootTelemetry.startSpan(BOOT_SPANS.FIRST_RENDERED_FRAME);
     loop.start();
@@ -2368,6 +2378,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       // playable mark and the final critical span/resource bookkeeping above.
       bootTelemetry.milestone(BOOT_MILESTONES.FIRST_PLAYABLE);
       debugReady = true;
+      if (featureLab) window.__featureLab = featureLab;
       window.setTimeout(() => {
         audioDirector.setRegion(store.get().player.regionId);
         const expandEntityResidency = (): void => {

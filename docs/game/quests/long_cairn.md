@@ -22,11 +22,11 @@ Somebody has been re-stacking the cairns on Karrowmoor. Cairnkeeper Ode knows ev
 <nav class="corealm-quest-where" aria-label="Locations for step 1"><span>Where</span><a href="../../regions/#the-great-cairn">The Great Cairn</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/great_cairn_stone.webp" alt="The Great Cairn in the running Corealm world" loading="lazy" /><figcaption><strong>The Great Cairn</strong><span>The Great Cairn, Karrowmoor</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 1">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#the-great-cairn" style="--map-x:61.6667%;--map-y:64.6667%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="The Great Cairn, Karrowmoor" title="The Great Cairn, Karrowmoor"><span>The Great Cairn<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-great-cairn" style="--map-x:61.6667%;--map-y:70.3750%" data-map-side="right" data-map-kind="entity" data-map-marker aria-label="The Great Cairn, Karrowmoor" title="The Great Cairn, Karrowmoor"><span>The Great Cairn<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -53,11 +53,11 @@ She stands on the west side of the camp, at (138, -68).
 <nav class="corealm-quest-where" aria-label="Locations for step 2"><span>Where</span><a href="../../regions/#highcairn">Highcairn</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_cairnkeeper_ode.webp" alt="Cairnkeeper Ode in the running Corealm world" loading="lazy" /><figcaption><strong>Cairnkeeper Ode</strong><span>Highcairn Plots, Karrowmoor</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 2">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#cairnkeeper-ode" style="--map-x:61.2167%;--map-y:55.0417%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Cairnkeeper Ode, Karrowmoor" title="Cairnkeeper Ode, Karrowmoor"><span>Cairnkeeper Ode<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#cairnkeeper-ode" style="--map-x:61.2167%;--map-y:63.1563%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Cairnkeeper Ode, Karrowmoor" title="Cairnkeeper Ode, Karrowmoor"><span>Cairnkeeper Ode<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -85,11 +85,11 @@ Hale is at (152, -74), the east side of Highcairn. He watches the mouth for a li
 <nav class="corealm-quest-where" aria-label="Locations for step 3"><span>Where</span><a href="../../regions/#highcairn">Highcairn</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_watcher_hale.webp" alt="Watcher Hale in the running Corealm world" loading="lazy" /><figcaption><strong>Watcher Hale</strong><span>Highcairn Bank, Karrowmoor</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 3">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#watcher-hale" style="--map-x:62.9583%;--map-y:54.6167%" data-map-side="left" data-map-kind="npc" data-map-marker aria-label="Watcher Hale, Karrowmoor" title="Watcher Hale, Karrowmoor"><span>Watcher Hale<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#watcher-hale" style="--map-x:62.9583%;--map-y:62.8375%" data-map-side="left" data-map-kind="npc" data-map-marker aria-label="Watcher Hale, Karrowmoor" title="Watcher Hale, Karrowmoor"><span>Watcher Hale<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -117,12 +117,12 @@ The mouth is at (46, -24) on terrace one, next to the Lower Quarry. Inside, `mov
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/entities/gravelmaw_mouth_portal.webp" alt="Gravelmaw Mouth Portal in the running Corealm world" loading="lazy" /><figcaption><strong>Gravelmaw Mouth Portal</strong><span>The Gravelmaw, The Lit Gallery, The Collapse</span></figcaption></figure>
 <figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch1_rats.webp" alt="Gravelmaw Rat in the running Corealm world" loading="lazy" /><figcaption><strong>Gravelmaw Rat</strong><span>The Lit Gallery, Gravelmaw</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 4">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#the-gravelmaw" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Karrowmoor" title="The Gravelmaw, Karrowmoor"><span>The Gravelmaw<small>Karrowmoor</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#the-collapse" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Entrance to The Lit Gallery, The Collapse" title="The Gravelmaw, Entrance to The Lit Gallery, The Collapse"><span>The Gravelmaw<small>Entrance to The Lit Gallery, The Collapse</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-gravelmaw" style="--map-x:53.8333%;--map-y:60.8750%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Karrowmoor" title="The Gravelmaw, Karrowmoor"><span>The Gravelmaw<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-collapse" style="--map-x:53.8333%;--map-y:60.8750%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Entrance to The Lit Gallery, The Collapse" title="The Gravelmaw, Entrance to The Lit Gallery, The Collapse"><span>The Gravelmaw<small>Entrance to The Lit Gallery, The Collapse</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -150,13 +150,13 @@ Ode describes all three mason's marks and the crew's rule for ordering them on h
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_cairnkeeper_ode.webp" alt="Cairnkeeper Ode in the running Corealm world" loading="lazy" /><figcaption><strong>Cairnkeeper Ode</strong><span>Highcairn Plots, Karrowmoor</span></figcaption></figure>
 <figure class="corealm-quest-scene"><img src="../../assets/captures/entities/gravelmaw_stone_door.webp" alt="The Three-Lever Door in the running Corealm world" loading="lazy" /><figcaption><strong>The Three-Lever Door</strong><span>The Cairn Hall, Gravelmaw</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 5">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#cairnkeeper-ode" style="--map-x:61.2167%;--map-y:55.0417%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Cairnkeeper Ode, Karrowmoor" title="Cairnkeeper Ode, Karrowmoor"><span>Cairnkeeper Ode<small>Karrowmoor</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#the-gravelmaw" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Karrowmoor" title="The Gravelmaw, Karrowmoor"><span>The Gravelmaw<small>Karrowmoor</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#the-collapse" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Entrance to The Collapse" title="The Gravelmaw, Entrance to The Collapse"><span>The Gravelmaw<small>Entrance to The Collapse</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#cairnkeeper-ode" style="--map-x:61.2167%;--map-y:63.1563%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Cairnkeeper Ode, Karrowmoor" title="Cairnkeeper Ode, Karrowmoor"><span>Cairnkeeper Ode<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-gravelmaw" style="--map-x:53.8333%;--map-y:60.8750%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Karrowmoor" title="The Gravelmaw, Karrowmoor"><span>The Gravelmaw<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-collapse" style="--map-x:53.8333%;--map-y:60.8750%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Entrance to The Collapse" title="The Gravelmaw, Entrance to The Collapse"><span>The Gravelmaw<small>Entrance to The Collapse</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -185,11 +185,11 @@ She will hand you a Cairn Garnet (item `cairn_garnet`). Do not sell it; stage 7 
 <nav class="corealm-quest-where" aria-label="Locations for step 6"><span>Where</span><a href="../../regions/#highcairn">Highcairn</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/npcs/npc_cairnkeeper_ode.webp" alt="Cairnkeeper Ode in the running Corealm world" loading="lazy" /><figcaption><strong>Cairnkeeper Ode</strong><span>Highcairn Plots, Karrowmoor</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 6">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../npcs/#cairnkeeper-ode" style="--map-x:61.2167%;--map-y:55.0417%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Cairnkeeper Ode, Karrowmoor" title="Cairnkeeper Ode, Karrowmoor"><span>Cairnkeeper Ode<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../npcs/#cairnkeeper-ode" style="--map-x:61.2167%;--map-y:63.1563%" data-map-side="right" data-map-kind="npc" data-map-marker aria-label="Cairnkeeper Ode, Karrowmoor" title="Cairnkeeper Ode, Karrowmoor"><span>Cairnkeeper Ode<small>Karrowmoor</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
@@ -218,12 +218,12 @@ With the door open, chamber 2 walks straight through to chamber 3. The stage com
 <nav class="corealm-quest-items" aria-label="Items for step 7"><span>Items</span><a href="../../items/#cairn-garnet">Cairn Garnet</a></nav>
 <div class="corealm-quest-step-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/gravelmaw_ch3_bears.webp" alt="Gravelmaw Cave Bear in the running Corealm world" loading="lazy" /><figcaption><strong>Gravelmaw Cave Bear</strong><span>The Cairn Hall, Gravelmaw</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-quest-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Map for The Long Cairn, step 7">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#the-gravelmaw" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Karrowmoor" title="The Gravelmaw, Karrowmoor"><span>The Gravelmaw<small>Karrowmoor</small></span></a>
-<a class="corealm-map-marker" href="../../regions/#the-cairn-hall" style="--map-x:53.8333%;--map-y:52.0000%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Entrance to The Cairn Hall" title="The Gravelmaw, Entrance to The Cairn Hall"><span>The Gravelmaw<small>Entrance to The Cairn Hall</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-gravelmaw" style="--map-x:53.8333%;--map-y:60.8750%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Karrowmoor" title="The Gravelmaw, Karrowmoor"><span>The Gravelmaw<small>Karrowmoor</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#the-cairn-hall" style="--map-x:53.8333%;--map-y:60.8750%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Entrance to The Cairn Hall" title="The Gravelmaw, Entrance to The Cairn Hall"><span>The Gravelmaw<small>Entrance to The Cairn Hall</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">

@@ -479,9 +479,9 @@ export function installRovingGrid(container: HTMLElement, columns: number): void
   });
 }
 
-export type QuantityMode = "1" | "10" | "all" | "custom";
+export type QuantityMode = "1" | "5" | "10" | "all" | "custom";
 
-/** A labelled row of quantity choices: 1 / 10 / All / custom. Shared by the bank and the shop. */
+/** A labelled row of quantity choices: 1 / 5 / 10 / All / custom. Shared by the bank and the shop. */
 export class QuantitySelector {
   readonly root: HTMLElement;
   private mode: QuantityMode = "1";
@@ -502,7 +502,7 @@ export class QuantitySelector {
     group.setAttribute("role", "radiogroup");
     group.setAttribute("aria-label", label);
 
-    const modes: QuantityMode[] = ["1", "10", "all", "custom"];
+    const modes: QuantityMode[] = ["1", "5", "10", "all", "custom"];
     for (const mode of modes) {
       const button = document.createElement("button");
       button.type = "button";
@@ -542,6 +542,7 @@ export class QuantitySelector {
   resolve(available: number): number {
     switch (this.mode) {
       case "1": return 1;
+      case "5": return Math.max(1, Math.min(5, available));
       case "10": return Math.max(1, Math.min(10, available));
       case "all": return Math.max(1, available);
       case "custom": {
@@ -553,7 +554,7 @@ export class QuantitySelector {
   }
 
   private syncButtons(): void {
-    const modes: QuantityMode[] = ["1", "10", "all", "custom"];
+    const modes: QuantityMode[] = ["1", "5", "10", "all", "custom"];
     this.buttons.forEach((button, index) => {
       const on = modes[index] === this.mode;
       button.classList.toggle("is-active", on);
@@ -1217,10 +1218,6 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
         dock.update();
         death.update();
         minimap?.update(now);
-        // The world may open a bank or a shop through an interaction rather than through us.
-        const wants = hud.takeAutoOpen();
-        if (wants === "bank") bank?.withPanel((panel) => panel.openFor(undefined));
-        else if (wants === "shop") shop?.withPanel((panel) => panel.openFor(undefined));
       }
       if (now - lastPanelMs >= PANEL_INTERVAL_MS) {
         lastPanelMs = now;

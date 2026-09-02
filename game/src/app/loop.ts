@@ -237,8 +237,8 @@ export class GameLoop {
   private pendingRigPoseTimeScale: number | null = null;
 
   constructor(private readonly deps: LoopDeps) {
-    // A bank interaction has no event of its own; it arrives as `activity.started` on an entity
-    // whose archetype is "bank" (boot opens the bank window off exactly this signal). Without an
+    // A bank interaction is instantaneous rather than a stored activity, so `BankSystem` publishes
+    // `activity.started` on the bank entity. Boot opens the window off the same signal. Without an
     // archetype lookup wired in, the chest-opening pose stays dormant and nothing else changes.
     deps.events.subscribe((event) => {
       if (event.type !== "activity.started" || !event.entityId) return;
@@ -282,11 +282,8 @@ export class GameLoop {
   /**
    * Plays a one-shot on the player rig at the next rendered frame.
    *
-   * The seam for anything that is not movement, an activity or a swing. It exists because the bank
-   * has no interaction of its own: `coldbrace_bank` advertises `interactions: ["inspect", "bank"]`
-   * but no system registers a `"bank"` dispatcher handler, so `interact(bank, "bank")` returns
-   * UNAVAILABLE and the `activity.started` this loop listens for never fires. Whoever wires the
-   * bank window can call this from the same line.
+   * The seam for anything that is not movement, a stored activity or a swing. Bank interaction is
+   * instantaneous, so its event schedules this pose without adding a fake timer to game state.
    */
   playPose(pose: CharacterPose): void {
     this.pendingRigPose = pose;

@@ -5,11 +5,11 @@ description: "Bramble Hog spawn locations, combat stats, and drops."
 
 <div class="corealm-creature-spawn-evidence">
 <div class="corealm-quest-scenes"><figure class="corealm-quest-scene"><img src="../../assets/captures/enemy-groups/bramble_hogs.webp" alt="Bramble Hog at its authored spawn in Vellenwood" loading="lazy" /><figcaption><strong>Bramble Hog</strong><span>Blackwater Pools, Vellenwood</span></figcaption></figure></div>
-<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1.3333333333333333">
+<figure class="corealm-location-map corealm-creature-map" data-location-map style="--map-image-ratio:1">
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Bramble Hog">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#blackwater-pools" style="--map-x:62.5000%;--map-y:39.3333%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Bramble Hog, Blackwater Pools, Vellenwood" title="Bramble Hog, Blackwater Pools, Vellenwood"><span>Bramble Hog<small>Blackwater Pools, Vellenwood</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#blackwater-pools" style="--map-x:62.5000%;--map-y:51.3750%" data-map-side="left" data-map-kind="enemy" data-map-marker aria-label="Bramble Hog, Blackwater Pools, Vellenwood" title="Bramble Hog, Blackwater Pools, Vellenwood"><span>Bramble Hog<small>Blackwater Pools, Vellenwood</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
 <div class="corealm-map-controls corealm-map-controls-zoom" aria-label="Map zoom controls">
