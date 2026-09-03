@@ -773,8 +773,10 @@ export class CorealmGameApi implements GameApiContract {
           // agent mistake, so resolve it as a location before rejecting it.
           const location = this.nav.routeNode(spec.entityId);
           if (location) {
-            const { entityId: _entityId, locationId: _locationId, ...rest } = spec;
-            resolved = { ...rest, position: location.position };
+            // The location id is kept beside the position: a marker plans its ground route by
+            // location, which is how it gets the portal and shortcut legs a raw position cannot.
+            const { entityId: _entityId, ...rest } = spec;
+            resolved = { ...rest, locationId: spec.entityId, position: location.position };
           } else if (!spec.position) {
             return err(
               "NOT_FOUND",
@@ -786,8 +788,7 @@ export class CorealmGameApi implements GameApiContract {
       } else if (spec.locationId) {
         const location = this.nav.routeNode(spec.locationId);
         if (!location) return err("NOT_FOUND", `No location with id ${spec.locationId}`);
-        const { locationId: _locationId, ...rest } = spec;
-        resolved = { ...rest, position: location.position };
+        resolved = { ...spec, position: location.position };
       } else if (!spec.position) {
         return err(
           "INVALID_ARGUMENT",

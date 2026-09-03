@@ -1002,6 +1002,8 @@ export interface Ui {
   openLoot(container: LootContainerView): void;
   /** Raises the title and pause screen. */
   openTitle(): void;
+  /** The quest the tracker is pinned to. The guidance layer marks its objective in the world. */
+  pinnedQuestId(): QuestId | null;
   /** Live client preferences. The root subscribes to apply them. */
   readonly settings: SettingsStore;
   /** The notice channel, for anything outside the UI that needs to tell the player something. */
@@ -1281,6 +1283,10 @@ export function createUi(api: GameApi, options: UiOptions = {}): Ui {
 
     openTitle(): void {
       title.open();
+    },
+
+    pinnedQuestId(): QuestId | null {
+      return tracker.pinnedId();
     },
 
     settings,

@@ -188,6 +188,9 @@ function createWorldTools({ api, session }: ToolDeps): ToolDef[] {
         ...(typeof args.text === "string" ? { text: args.text } : {}),
         ...(typeof args.colour === "string" ? { colour: args.colour } : {}),
         ...(typeof args.ttlMs === "number" ? { ttlMs: args.ttlMs } : {}),
+        ...(typeof args.persist === "boolean" ? { persist: args.persist } : {}),
+        ...(typeof args.arriveRadius === "number" ? { arriveRadius: args.arriveRadius } : {}),
+        ...(typeof args.route === "boolean" ? { route: args.route } : {}),
       };
       return unwrap(api.overlay("set", spec));
     }),

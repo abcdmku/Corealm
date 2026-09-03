@@ -330,11 +330,15 @@ export const TOOL_SPECS = {
     title: "Draw in the player's view",
     access: "assist",
     description:
-      "Draw or clear an assistance overlay in the player's world view: highlight an entity, draw "
-      + "a path line, place a marker, or attach a world-space label. Pure presentation: it can "
-      + "never change game state. Use `locationId` for a known place and `entityId` for a real "
-      + "entity; if a location id is passed as `entityId` it is resolved as a location. Unknown "
-      + "targets return NOT_FOUND and draw nothing. Reusing an id replaces that overlay.",
+      "Draw or clear an assistance overlay in the player's world view. Pure presentation: it can "
+      + "never change game state. Kinds: `highlight` rings a thing on the ground (\"this one\"); "
+      + "`marker` is a destination (\"go here\") — a pin with a ground route drawn from the player "
+      + "that follows them as they walk, plus `text` as a floating label, and it clears itself "
+      + "when they arrive and emits overlay.arrived (pass `persist: true` to keep it; "
+      + "`route: false` for a pin alone); `path` draws a polyline you supply; `label` is text "
+      + "alone. Use `locationId` for a known place and `entityId` for a real entity; if a "
+      + "location id is passed as `entityId` it is resolved as a location. Unknown targets return "
+      + "NOT_FOUND and draw nothing. Reusing an id replaces that overlay.",
     inputSchema: obj({
       op: ENUM(["set", "clear"], "set draws; clear removes one id, or everything when id is omitted"),
       id: STR("Overlay id. Reusing an id replaces it."),
@@ -343,9 +347,12 @@ export const TOOL_SPECS = {
       locationId: STR("Known place id to mark at its fixed world position"),
       position: VEC3,
       path: { type: "array", items: VEC3, minItems: 2, maxItems: 512, description: "Polyline for kind path" },
-      text: STR("Label text", { maxLength: 80 }),
+      text: STR("Label text. On a marker it floats above the pin.", { maxLength: 80 }),
       colour: STR("#rrggbb"),
       ttlMs: INT("Auto-clear after this long. 0 or omitted means until cleared.", { minimum: 0 }),
+      persist: BOOL("Marker only: keep it after the player arrives. Default false."),
+      arriveRadius: NUM("Marker only: metres from the target that count as arriving. Defaults: 4 for an entity, 8 for a location, 5 for a position.", { minimum: 1, maximum: 40 }),
+      route: BOOL("Marker only: draw the ground route from the player. Default true."),
     }, ["op"]),
   },
   corealm_events: {
@@ -529,11 +536,14 @@ export const TOOL_SPECS = {
     access: "read",
     mutates: true,
     description:
-      "Put a plan in front of the player: a one-line summary and up to eight steps. The agent "
-      + "panel shows it, and in assist or play mode each step with an entityId or locationId "
-      + "gets a numbered marker in the world. Nothing is executed. Use this to explain what you "
-      + "would do before asking for control, or to guide a player who is driving. Call with "
-      + "`clear: true` to remove the current proposal and its markers.",
+      "Put a plan in front of the player: a one-line summary and up to eight steps, with a cursor. "
+      + "The agent panel lists the steps and marks the current one. In assist or play mode the "
+      + "current step's place (entityId, locationId or position) is drawn in the world as a pin "
+      + "with a ground route from the player, and later steps as numbered labels. When the player "
+      + "reaches the current step's place it is completed, its marker clears, and the next step "
+      + "lights up — you get an agent.guide event each time. A step with `done: \"manual\"` (or "
+      + "no place) waits for you: call again with `advance: true` once you see it is done. "
+      + "Nothing is executed. Call with `clear: true` to take the plan down.",
     inputSchema: obj({
       summary: STR("What the plan achieves, in one line", { maxLength: 200 }),
       steps: {
@@ -541,11 +551,15 @@ export const TOOL_SPECS = {
         items: obj({
           text: STR("The step, for the player", { minLength: 1, maxLength: 160 }),
           tool: STR("The tool you would call for this step, if any"),
-          entityId: STR("Entity this step is about, for a marker"),
-          locationId: STR("Location this step is about, for a marker"),
+          entityId: STR("Entity this step happens at, for the marker"),
+          locationId: STR("Location this step happens at, for the marker"),
+          position: VEC3,
+          done: ENUM(["arrive", "manual"], "How the step completes. Default arrive when the step has a place, manual otherwise."),
+          arriveRadius: NUM("Metres from the place that count as arriving. Defaults: 4 for an entity, 8 for a location, 5 for a position.", { minimum: 1, maximum: 40 }),
         }, ["text"]),
         description: "Ordered steps",
       },
+      advance: BOOL("Complete the current step by hand and move the cursor to the next one"),
       clear: BOOL("Remove the current proposal instead of setting one"),
     }),
   },
@@ -557,15 +571,18 @@ export const TOOL_SPECS = {
     description:
       "Compute the path the character would walk to an entity, a location id, or a position, "
       + "without walking it: the polyline, its length in metres, the ETA, and any portal or "
-      + "Agility-shortcut hops it needs. In assist or play mode the route is also drawn in the "
-      + "player's view (pass draw: false to skip that); in guide mode it is computed only. "
-      + "Draw a route, then let the player walk it — that is assist mode's main move.",
+      + "Agility-shortcut hops it needs. In assist or play mode the destination is also marked in "
+      + "the player's view — a pin with a ground route that re-plans from the player as they walk "
+      + "and clears itself when they arrive (overlay.arrived) — pass draw: false to skip that; in "
+      + "guide mode it is computed only. Mark a route, then let the player walk it — that is "
+      + "assist mode's main move. `clear: true` removes the marked route early.",
     inputSchema: obj({
       entityId: STR("Route to this entity"),
       locationId: STR("Route to this location id"),
       position: VEC3,
       draw: BOOL("Draw the route in the world. Default true outside guide mode."),
       label: STR("Optional label at the destination", { maxLength: 60 }),
+      clear: BOOL("Remove the marked route instead of computing one"),
     }),
   },
   corealm_context: {

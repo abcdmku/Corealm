@@ -14,9 +14,16 @@
  * (runs/corealm/diagnosis/animation-and-movement-feel.md: paths carry 2-3 corners over 50 m with Y
  * linearly interpolated between them). An annotation inside the terrain annotates nothing, so every
  * ground-plane vertex here is sampled against the terrain field instead of trusted from the caller.
+ *
+ * This class draws; it does not decide. Which marker gets a route, when a route is re-planned and
+ * when a marker has been reached is `app/guidance.ts`, which calls `setRoute` and `setReached`
+ * here. Keeping that split is what lets this file stay a renderer with no idea where the player is.
  */
 import * as THREE from "three";
 import type { EntityId, OverlaySpec, Vec3 } from "../contracts.js";
+import {
+  RIBBON_HALF_WIDTH, buildRibbonGeometry, createRibbonMaterial, projectAlong, type RibbonUniforms,
+} from "./pathRibbon.js";
 import type { WorldScene } from "./scene.js";
 
 /**
@@ -32,20 +39,38 @@ interface MeshHeightSampler {
   meshHeightAt?(x: number, z: number): number;
 }
 
+type OverlayStyle = "default" | "walkDestination" | "reached";
+
 interface LiveOverlay {
   spec: OverlaySpec;
   object: THREE.Object3D;
-  style: "default" | "walkDestination";
+  style: OverlayStyle;
+  /** Sim time this was created, for the styles that animate over their lifetime. */
+  bornAtMs: number;
   /** Sim time at which this disappears, or null for "until cleared". */
   expiresAtMs: number | null;
   /** Kept so a followed entity's overlay tracks it as it moves. */
   entityId?: EntityId;
   element?: HTMLElement;
+  /** Metres above the anchor the label floats: clear of a pin, just off the ground otherwise. */
+  labelLift: number;
+  /** The marker's pin, which bobs. */
+  bob?: THREE.Object3D;
+  /** A ribbon attached by `setRoute`. World-space, so it lives beside the object, not under it. */
+  route?: Ribbon;
   /** Ground-plane rings that need re-seating when they move. Empty for kinds that have none. */
   conform: ConformRing[];
   /** Where the conform was last computed, so a stationary overlay never resamples. */
   conformedAt: THREE.Vector3;
   conformedAtMs: number;
+}
+
+interface Ribbon {
+  mesh: THREE.Mesh;
+  uniforms: RibbonUniforms;
+  /** The centreline, for sliding the head along it. */
+  centre: Float32Array;
+  length: number;
 }
 
 /** A ring whose vertices are pushed onto the terrain in the owning object's local frame. */
@@ -64,12 +89,21 @@ const MAX_OVERLAYS = 64;
 const CONFORM_MOVE_METRES = 0.2;
 /** ...and at worst this often, which bounds the cost of a ring that is chasing a running enemy. */
 const CONFORM_INTERVAL_MS = 400;
-/** Metres between ground samples along a route line. */
-const PATH_SAMPLE_METRES = 2;
-/** How high the route line rides. Clears 2 m quad relief; low enough to still read as ground paint. */
+/**
+ * Metres between ground samples along a route ribbon. Half the terrain lattice, so the strip's
+ * edges land on the mesh between lattice rows too; stretched for a route that would otherwise blow
+ * the sample cap, rather than truncating the route short of its destination.
+ */
+const PATH_SAMPLE_METRES = 1;
+/** How high the route ribbon rides. Clears 2 m quad relief; low enough to still read as ground paint. */
 const PATH_LIFT_METRES = 0.22;
 /** A cap, because an agent can hand in a path of any length and every sample is a terrain query. */
 const MAX_PATH_SAMPLES = 512;
+/** Where the marker's pin hangs, and how far it bobs. */
+const PIN_HEIGHT = 3.2;
+const PIN_BOB_METRES = 0.16;
+/** The "reached" flourish: a ring that swells and fades over this long. */
+const REACHED_TTL_MS = 650;
 
 export interface OverlayDeps {
   scene: WorldScene;
@@ -102,11 +136,51 @@ export class Overlays {
     return this.setStyled({ id, kind: "highlight", position, colour }, nowMs, "walkDestination");
   }
 
-  private setStyled(
-    spec: OverlaySpec,
-    nowMs: number,
-    style: "default" | "walkDestination",
-  ): number {
+  /**
+   * The moment of arrival: a ring at the spot that swells and fades out. Short-lived by
+   * construction, so a caller can fire it and forget it.
+   */
+  setReached(id: string, position: Vec3, nowMs: number, colour = DEFAULT_COLOUR): number {
+    return this.setStyled({ id, kind: "highlight", position, colour, ttlMs: REACHED_TTL_MS }, nowMs, "reached");
+  }
+
+  /**
+   * Attaches a ground route to an existing overlay, replacing any it had; null takes it away.
+   * The route is drawn in world space beside the anchor rather than under it, so a marker that
+   * follows a moving entity does not drag the whole ribbon along with it. Returns false when
+   * there is no such overlay.
+   */
+  setRoute(id: string, points: readonly Vec3[] | null): boolean {
+    const entry = this.live.get(id);
+    // A path's ribbon is the overlay itself, not an attachment; replace the overlay instead.
+    if (!entry || entry.spec.kind === "path") return false;
+    if (entry.route) {
+      this.disposeObject(entry.route.mesh);
+      delete entry.route;
+    }
+    if (!points || points.length < 2) return true;
+    const colour = new THREE.Color(entry.spec.colour ?? DEFAULT_COLOUR);
+    const route = this.makeRibbon(points, colour);
+    if (!route) return true;
+    entry.route = route;
+    this.group.add(route.mesh);
+    return true;
+  }
+
+  /**
+   * Slides an attached route's visible head to the player's position. Returns where that
+   * position sits against the route — how far along it and how far off it — or null when the
+   * overlay has no route. Cheap enough to call every frame, which is the point.
+   */
+  setRouteHead(id: string, position: Vec3): { along: number; lateral: number; remaining: number } | null {
+    const entry = this.live.get(id);
+    if (!entry?.route || entry.spec.kind === "path") return null;
+    const { along, lateral } = projectAlong(entry.route.centre, position[0], position[2]);
+    entry.route.uniforms.uHead.value = along;
+    return { along, lateral, remaining: entry.route.length - along };
+  }
+
+  private setStyled(spec: OverlaySpec, nowMs: number, style: OverlayStyle): number {
     const position = this.resolvePosition(spec);
     // GameApi rejects unresolved anchors. Keep the renderer defensive too, since click feedback
     // and future presentation code can call this class directly. A missing target must never fall
@@ -125,20 +199,36 @@ export class Overlays {
 
     let object: THREE.Object3D | null = null;
     let element: HTMLElement | undefined;
+    let bob: THREE.Object3D | undefined;
+    let route: LiveOverlay["route"];
+    let labelLift = 2.2;
     const conform: ConformRing[] = [];
 
     switch (spec.kind) {
       case "highlight":
         object = style === "walkDestination"
           ? this.makeWalkDestination(colour, conform)
-          : this.makeHighlight(colour, conform);
+          : style === "reached"
+            ? this.makeReached(colour, conform)
+            : this.makeHighlight(colour, conform);
         break;
-      case "marker":
-        object = this.makeMarker(colour, conform);
+      case "marker": {
+        const marker = this.makeMarker(colour, conform);
+        object = marker.group;
+        bob = marker.pin;
+        labelLift = PIN_HEIGHT + 1.1;
+        if (spec.text) element = this.makeLabel(spec.text, spec.colour ?? DEFAULT_COLOUR);
         break;
-      case "path":
-        object = this.makePath(spec.path ?? [], colour);
+      }
+      case "path": {
+        const ribbon = this.makeRibbon(spec.path ?? [], colour);
+        if (ribbon) {
+          object = ribbon.mesh;
+          // Held as the entry's route too, so its time uniform ticks with the attached ones.
+          route = ribbon;
+        }
         break;
+      }
       case "label":
         object = new THREE.Object3D();
         element = this.makeLabel(spec.text ?? "", spec.colour ?? DEFAULT_COLOUR);
@@ -154,9 +244,13 @@ export class Overlays {
       spec,
       object,
       style,
+      bornAtMs: nowMs,
       expiresAtMs: spec.ttlMs && spec.ttlMs > 0 ? nowMs + spec.ttlMs : null,
       ...(spec.entityId ? { entityId: spec.entityId } : {}),
       ...(element ? { element } : {}),
+      labelLift,
+      ...(bob ? { bob } : {}),
+      ...(route ? { route } : {}),
       conform,
       conformedAt: new THREE.Vector3(Number.NaN, Number.NaN, Number.NaN),
       conformedAtMs: Number.NEGATIVE_INFINITY,
@@ -181,8 +275,11 @@ export class Overlays {
     return this.live.size;
   }
 
-  /** Per-frame: expire, follow entities, re-seat rings on the terrain, project labels. */
+  /** Per-frame: expire, follow entities, animate, re-seat rings on the terrain, project labels. */
   update(nowMs: number): void {
+    // Animation runs on wall time so the chevrons keep drifting while the sim is paused; a frozen
+    // route reads as a stalled renderer, not a paused game.
+    const animSeconds = performance.now() / 1000;
     for (const [id, entry] of [...this.live]) {
       if (entry.expiresAtMs !== null && nowMs >= entry.expiresAtMs) {
         this.dispose(entry);
@@ -205,10 +302,22 @@ export class Overlays {
       // and being per-frame rather than per-second it also made every overlay recompute its world
       // matrix on every frame for that nothing.
       if (entry.spec.kind === "highlight") {
-        const strength = entry.style === "walkDestination" ? 0.018 : 0.06;
-        const pulse = 1 + Math.sin(nowMs / 320) * strength;
-        entry.object.scale.set(pulse, 1, pulse);
+        if (entry.style === "reached") {
+          // Swell and fade over the TTL. X/Z only, for the same reason as the pulse.
+          const progress = Math.min(1, (nowMs - entry.bornAtMs) / REACHED_TTL_MS);
+          const eased = 1 - (1 - progress) * (1 - progress);
+          const swell = 1 + eased * 1.9;
+          entry.object.scale.set(swell, 1, swell);
+          for (const ring of entry.conform) (ring.mesh.material as THREE.MeshBasicMaterial).opacity = (1 - eased) * 0.9;
+        } else {
+          const strength = entry.style === "walkDestination" ? 0.018 : 0.06;
+          const pulse = 1 + Math.sin(nowMs / 320) * strength;
+          entry.object.scale.set(pulse, 1, pulse);
+        }
       }
+
+      if (entry.bob) entry.bob.position.y = PIN_HEIGHT + Math.sin(animSeconds * 2.4) * PIN_BOB_METRES;
+      if (entry.route) entry.route.uniforms.uTime.value = animSeconds;
 
       this.conformRings(entry, nowMs, false);
       if (entry.element) this.positionLabel(entry);
@@ -217,6 +326,10 @@ export class Overlays {
 
   activeCount(): number {
     return this.live.size;
+  }
+
+  has(id: string): boolean {
+    return this.live.has(id);
   }
 
   list(): OverlaySpec[] {
@@ -261,22 +374,29 @@ export class Overlays {
   }
 
   /** A floating pin, for a destination the player cannot see yet. */
-  private makeMarker(colour: THREE.Color, conform: ConformRing[]): THREE.Object3D {
+  private makeMarker(colour: THREE.Color, conform: ConformRing[]): { group: THREE.Group; pin: THREE.Object3D } {
     const group = new THREE.Group();
-    const cone = new THREE.Mesh(
+    const pin = new THREE.Mesh(
       new THREE.ConeGeometry(0.5, 1.4, 10),
-      new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity: 0.9, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }),
     );
-    cone.rotation.x = Math.PI;
-    cone.position.y = 3.2;
-    cone.renderOrder = 10;
-    group.add(cone);
+    pin.rotation.x = Math.PI;
+    pin.position.y = PIN_HEIGHT;
+    pin.renderOrder = 10;
+    group.add(pin);
 
     const base = this.makeGroundRing(colour, 0.5, 0.72, 28, 0.9, 0.06);
     conform.push(base.conform);
     group.add(base.mesh);
 
-    return group;
+    return { group, pin };
+  }
+
+  /** The arrival ring. Starts at the marker's base size; `update` swells and fades it. */
+  private makeReached(colour: THREE.Color, conform: ConformRing[]): THREE.Object3D {
+    const ring = this.makeGroundRing(colour, 0.5, 0.72, 28, 0.9, 0.07);
+    conform.push(ring.conform);
+    return ring.mesh;
   }
 
   /**
@@ -295,12 +415,15 @@ export class Overlays {
   ): { mesh: THREE.Mesh; conform: ConformRing } {
     const geometry = new THREE.RingGeometry(inner, outer, segments);
     geometry.rotateX(-Math.PI / 2);
+    // Annotation paint on every overlay material: exempt from the scene's tone mapping so the
+    // colour an agent asked for is the colour on the ground (see `pathRibbon.ts`).
     const material = new THREE.MeshBasicMaterial({
       color: colour,
       transparent: true,
       opacity,
       side: THREE.DoubleSide,
       depthWrite: false,
+      toneMapped: false,
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.renderOrder = 10;
@@ -336,6 +459,7 @@ export class Overlays {
         opacity,
         side: THREE.DoubleSide,
         depthWrite: false,
+        toneMapped: false,
       }),
     );
     mesh.renderOrder = 9;
@@ -352,34 +476,39 @@ export class Overlays {
   }
 
   /**
-   * A route line drawn just above the ground.
+   * A route ribbon laid just above the ground.
    *
    * The caller's Y is discarded rather than trusted. Nav paths carry 2-3 corners over 50 m with Y
    * linearly interpolated between them, so a straight segment across a terrace cuts through the
    * hill — the measured worst case on one Karrowmoor path is 4.46 m below the surface. Long
    * segments are subdivided every PATH_SAMPLE_METRES and each sample is seated on the terrain.
    */
-  private makePath(points: readonly Vec3[], colour: THREE.Color): THREE.Object3D | null {
+  private makeRibbon(points: readonly Vec3[], colour: THREE.Color): Ribbon | null {
     if (points.length < 2) return null;
     const samples = this.resamplePath(points);
-    const vertices = new Float32Array(samples.length * 3);
-    for (const [index, point] of samples.entries()) {
-      vertices[index * 3] = point[0];
-      vertices[index * 3 + 1] = this.groundY(point[0], point[1]) + PATH_LIFT_METRES;
-      vertices[index * 3 + 2] = point[1];
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
-    const line = new THREE.Line(
-      geometry,
-      new THREE.LineBasicMaterial({ color: colour, transparent: true, opacity: 0.9, depthWrite: false }),
-    );
-    line.renderOrder = 10;
-    return line;
+    const built = buildRibbonGeometry(samples, (x, z) => this.groundY(x, z), RIBBON_HALF_WIDTH, PATH_LIFT_METRES);
+    if (!built) return null;
+    const uniforms: RibbonUniforms = {
+      uTime: { value: performance.now() / 1000 },
+      uLength: { value: built.length },
+      uHead: { value: 0 },
+    };
+    const mesh = new THREE.Mesh(built.geometry, createRibbonMaterial(colour, uniforms));
+    // Under the rings, so a destination ring sits on top of the ribbon's end.
+    mesh.renderOrder = 8;
+    return { mesh, uniforms, centre: built.centre, length: built.length };
   }
 
-  /** Corner list to an XZ polyline sampled densely enough to follow the ground. */
+  /**
+   * Corner list to an XZ polyline sampled densely enough to follow the ground. A route longer
+   * than the sample budget is sampled more coarsely rather than cut short of its destination.
+   */
   private resamplePath(points: readonly Vec3[]): [number, number][] {
+    let total = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      total += Math.hypot(points[index]![0] - points[index - 1]![0], points[index]![2] - points[index - 1]![2]);
+    }
+    const spacing = Math.max(PATH_SAMPLE_METRES, total / MAX_PATH_SAMPLES);
     const first = points[0]!;
     const out: [number, number][] = [[first[0], first[2]]];
     let budget = MAX_PATH_SAMPLES;
@@ -387,7 +516,8 @@ export class Overlays {
       const from = points[index - 1]!;
       const to = points[index]!;
       const span = Math.hypot(to[0] - from[0], to[2] - from[2]);
-      const steps = Math.max(1, Math.min(budget, Math.ceil(span / PATH_SAMPLE_METRES)));
+      if (span < 1e-3) continue;
+      const steps = Math.max(1, Math.min(budget, Math.ceil(span / spacing)));
       for (let step = 1; step <= steps; step += 1) {
         const t = step / steps;
         out.push([from[0] + (to[0] - from[0]) * t, from[2] + (to[2] - from[2]) * t]);
@@ -440,7 +570,7 @@ export class Overlays {
   private positionLabel(entry: LiveOverlay): void {
     if (!entry.element) return;
     this.projected.copy(entry.object.position);
-    this.projected.y += 2.2;
+    this.projected.y += entry.labelLift;
     this.projected.project(this.deps.camera);
 
     const behind = this.projected.z > 1;
@@ -454,9 +584,16 @@ export class Overlays {
   }
 
   private dispose(entry: LiveOverlay): void {
-    entry.object.removeFromParent();
+    this.disposeObject(entry.object);
+    // A path's ribbon IS its object, already disposed above; an attached route is a second object.
+    if (entry.route && entry.route.mesh !== entry.object) this.disposeObject(entry.route.mesh);
+    entry.element?.remove();
+  }
+
+  private disposeObject(object: THREE.Object3D): void {
+    object.removeFromParent();
     const seen = new Set<THREE.Material>();
-    entry.object.traverse((child) => {
+    object.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (mesh.geometry) mesh.geometry.dispose();
       const material = mesh.material;
@@ -467,6 +604,5 @@ export class Overlays {
         item.dispose();
       }
     });
-    entry.element?.remove();
   }
 }

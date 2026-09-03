@@ -44,6 +44,8 @@ export const EVENT_CATALOGUE: Record<GameEventType, { about: string; fields: str
   "agent.session": { about: "The collaboration session changed: mode, control owner, pause, objective, or connection. by says who did it.", fields: "change, mode, controlOwner, paused, objective, agentName, by" },
   "agent.task": { about: "A bounded operation started, completed, failed, or was cancelled.", fields: "taskId, tool, status, summary, reason?" },
   "agent.approval": { about: "An approval request was raised or answered.", fields: "requestId, kind, description, status" },
+  "overlay.arrived": { about: "The player reached a marker overlay's target (corealm_overlay marker, corealm_route, or the current step of a corealm_propose plan). cleared says whether the marker took itself down.", fields: "id, position, cleared" },
+  "agent.guide": { about: "A proposed plan's cursor moved: a step completed (via arrived, agent, or player) and the next is current; the last step completed (finished); or the plan was cleared. step and text are the now-current step, null when there is none.", fields: "change, completed, via, step, text, stepCount" },
 };
 
 export const ERROR_CATALOGUE: Record<GameErrorCode, string> = {
@@ -81,7 +83,7 @@ function overview(version: ToolDeps["version"]): string {
 const MODES = [
   "Three collaboration modes, chosen by the player and reported in corealm_context.session.mode:",
   "guide — read-only. You answer questions, explain, and recommend. Tools that read (corealm_context, corealm_observe, corealm_search_docs, corealm_wait, ...) work; anything that draws or acts returns NOT_PERMITTED.",
-  "assist — the player drives. You may draw routes and highlights (corealm_route, corealm_overlay) and put plans in front of them (corealm_propose). You may not move the character or change the world.",
+  "assist — the player drives. You may draw routes and highlights (corealm_route, corealm_overlay) and put plans in front of them (corealm_propose). A marker is a destination: it carries a ground route from the player and clears itself when they arrive (overlay.arrived); a plan's current step is drawn the same way and the cursor advances on arrival (agent.guide). You may not move the character or change the world.",
   "play — you act. corealm_navigate, corealm_gather, corealm_fight, corealm_interact and the rest work while you hold control (session.controlOwner = \"agent\") and are not paused.",
   "You can set guide or assist yourself: corealm_session {op:\"set_mode\", mode}. Play is granted by the player: corealm_session {op:\"request_control\", objective} asks, the panel shows the request, and the call returns granted, denied, or pending. Say what you intend to do in the objective; the player reads it.",
   "When your task is done, corealm_session {op:\"release_control\"} hands the character back and drops you to assist. Summarise what changed.",

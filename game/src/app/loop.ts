@@ -29,7 +29,6 @@ import type { CorealmGameApi } from "../api/gameApi.js";
 import type { SaveService } from "../persistence/storage.js";
 import type { InputController } from "../input/mouse.js";
 import type { EntityViews } from "../render/entityViews.js";
-import type { Overlays } from "../render/overlays.js";
 import type {
   CharacterMotionEvent,
   CharacterRig,
@@ -44,6 +43,14 @@ import type { Ui } from "../ui/panels.js";
 import type { EntityId, SemanticEntity, Vec3 } from "../contracts.js";
 import { GATHER_TICK_MS, SIM_TICK_MS } from "../core/time.js";
 import { AUTOSAVE_INTERVAL_MS, MOVEMENT } from "./config.js";
+
+/**
+ * The overlay layer's per-frame hook. Gets the player as DRAWN this frame, interpolated between
+ * sim ticks, because a route head that follows the store's position steps at the sim rate.
+ */
+export interface OverlayTicker {
+  update(nowMs: number, playerRenderPosition: Vec3): void;
+}
 
 /** A system that wants a slice of each sim tick. Registered by later build rounds. */
 export interface TickSystem {
@@ -173,7 +180,7 @@ export class GameLoop {
   private entityViews: EntityViews | null = null;
   private entitySource: (() => SemanticEntity[]) | null = null;
   private viewSyncAccumulatorMs = 0;
-  private overlays: Overlays | null = null;
+  private overlays: OverlayTicker | null = null;
   private playerRig: CharacterRig | null = null;
   private vfx: Vfx | null = null;
   private drainHits: (() => readonly CombatHit[]) | null = null;
@@ -259,8 +266,11 @@ export class GameLoop {
     this.entitySource = entities;
   }
 
-  /** Overlays tick every frame: they expire on a timer and follow entities that move. */
-  setOverlays(overlays: Overlays): void {
+  /**
+   * Overlays tick every frame: they expire on a timer and follow entities that move. Boot hands in
+   * the guidance layer, which runs the renderer's update after its own arrival and route checks.
+   */
+  setOverlays(overlays: OverlayTicker): void {
     this.overlays = overlays;
   }
 
@@ -513,7 +523,7 @@ export class GameLoop {
     // other time base would make a body dissolve at the wrong moment - or on a resumed save, at a
     // wildly wrong one.
     this.entityViews?.update(realDeltaMs / 1000, renderer.camera.position, this.deps.clock.elapsedMs);
-    this.overlays?.update(this.deps.clock.elapsedMs);
+    this.overlays?.update(this.deps.clock.elapsedMs, position);
     this.paintCombatHits(nowMs);
     this.vfx?.update(nowMs);
     // After `vfx`, so a spell burst draws over the floating numbers rather than under them.

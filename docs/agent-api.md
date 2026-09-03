@@ -64,7 +64,7 @@ The player chooses how much the agent may do, and the agent panel in the game sh
 | Mode | The agent may | Tools |
 | --- | --- | --- |
 | `guide` | read, answer, explain, recommend | everything marked `read` |
-| `assist` | also draw routes and highlights, and propose plans | plus `assist` tools: `corealm_overlay`, `corealm_route`, `corealm_propose` |
+| `assist` | also mark destinations and highlights, and propose plans that walk themselves forward | plus `assist` tools: `corealm_overlay`, `corealm_route`, `corealm_propose` |
 | `play` | also act, while it holds control and is not paused | plus `act` tools |
 
 `corealm_session {op:"set_mode", mode}` moves to `guide` or `assist`. `play` is granted by the
@@ -126,6 +126,7 @@ essence.recharged   health.low            player.died         level.gained
 production.completed campfire.built       campfire.replaced   campfire.expired
 quest.updated       dialogue.opened       dialogue.closed     entity.discovered
 agent.session       agent.task            agent.approval
+overlay.arrived     agent.guide
 ```
 
 `spell.launched` fires when a cast is rolled and its bolt leaves. A spell does NOT damage anything
@@ -144,11 +145,23 @@ control, not paused.
 - `corealm_session` (read) — connect, set the objective, ask for or release control, stop, cancel.
 
 ### Helping the player
-- `corealm_propose` — a summary and up to eight steps, shown in the panel and, outside guide
-  mode, marked in the world.
-- `corealm_route` — the path the character would walk, drawn in assist or play. Read-only on the
-  world.
+- `corealm_propose` — a summary and up to eight steps, with a cursor. The panel lists them and
+  marks the current one; outside guide mode the current step's place is a marker in the world
+  and the later steps are numbered labels. Reaching the current step completes it, clears its
+  marker and lights the next one (an `agent.guide` event each time). A step with `done:
+  "manual"` or no place waits for `{advance: true}`; `{clear: true}` takes the plan down.
+- `corealm_route` — the path the character would walk, and in assist or play a marker at the
+  destination. Read-only on the world.
 - `corealm_overlay` (assist) — highlight, path, marker, label. Pure presentation.
+
+A **marker is a destination**, wherever it comes from. It gets a pin, an optional `text` label,
+and a ground route drawn from the player that re-plans as they walk. When the player arrives —
+within `arriveRadius` (4 m for an entity, 8 m for a location, 5 m for a position), or by starting
+to use the target — it clears itself with a small flourish and emits `overlay.arrived`; pass
+`persist: true` to keep it, or `route: false` for a pin alone. The pinned quest's current
+objective is drawn the same way for the player, and follows the quest's stages. `highlight` is
+"this thing": a ring at the target with no route. So: mark the bank, then
+`corealm_wait {events:["overlay.arrived"]}`.
 
 ### Bounded operations (act)
 One call each, interruptible by Pause, Stop, Take control, or the caller's own AbortSignal.

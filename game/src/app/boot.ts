@@ -101,7 +101,6 @@ import { createUi } from "../ui/panels.js";
 import { preloadFeatureLabPanel } from "../ui/lazyPanelRegistry.js";
 import { SettingsStore, type UiSettings } from "../ui/settings.js";
 import { keybindings } from "../input/keyboard.js";
-import { Overlays } from "../render/overlays.js";
 import { CharacterRig } from "../render/characterRig.js";
 import {
   addChamberLights, buildDungeon, chamberFloorAt, dungeonFloorHeight, type DungeonSpec,
@@ -1157,19 +1156,31 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     rangeFor: (interaction) => interactions.rangeFor(interaction),
   });
 
-  // Assistance overlays. Presentation only: drawing one never changes canonical state, which is
-  // what makes it safe to let an agent write here.
+  // Assistance overlays, and the guidance layer over them that turns a marker into a destination:
+  // a ground route from the player, arrival, and the agent's plan and the pinned quest walking
+  // their markers forward. Presentation only: drawing one never changes canonical state, which is
+  // what makes it safe to let an agent write here. A dynamic import, like the agent surface and
+  // for the same reason: the renderer and the ribbon shader are not the first frame's business.
   const labelRoot = document.getElementById("ui-root") ?? document.body;
-  const overlays = new Overlays({
+  const { createGuidance } = await import("./guidance.js");
+  const { overlays, guidance } = createGuidance({
     scene,
     camera: renderer.camera,
     entityPosition: (entityId) => entityStore.get(entityId)?.position ?? null,
     labelRoot,
+  }, {
+    now: () => clock.elapsedMs,
+    playerPosition: () => store.get().player.position,
+    entityPosition: (entityId) => entityStore.get(entityId)?.position ?? null,
+    planPath: (target) => api.planPath(target),
+    overlay: (op, spec) => api.overlay(op, spec),
+    emit: (type, data) => events.emit(type, data as Record<string, unknown>, undefined, clock.elapsedMs),
   });
   api.register("overlays", {
-    set: (spec) => overlays.set(spec, clock.elapsedMs),
-    clear: (id) => overlays.clear(id),
+    set: (spec) => guidance.set(spec),
+    clear: (id) => guidance.clear(id),
   });
+  events.subscribe((event) => guidance.onEvent(event));
 
   // Combat and activity feedback, driven off the event stream rather than called by systems. That
   // keeps the dependency pointing one way, and it means an agent's action produces exactly the same
@@ -1676,7 +1687,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   //
   // Control handoff locks HUMAN input only. `api.setMovementCommandsEnabled(false)` would also
   // refuse the agent's own `corealm_move_to`, which is the opposite of handing it the keys.
-  const version = { build: "phase1-round2", contracts: "4", content: "1" };
+  const version = { build: "phase1-round2", contracts: "5", content: "1" };
   const { installAgentSurface } = await import("../agent/index.js");
   const agent = installAgentSurface(api, {
     version,
@@ -1688,6 +1699,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
       else ui.notify("You have control.", "info");
     },
   });
+  // The plan the agent proposes is drawn, and walked forward, by the guidance layer.
+  guidance.attachSession(agent.session);
 
   // The human UI. Everything it does goes through GameApi, the same object the agent tools call.
   const uiConstructionSpan = bootTelemetry.startSpan(BOOT_SPANS.UI_CONSTRUCTION);
@@ -1732,6 +1745,8 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   });
   openLootContainer = (container) => ui.openLoot(container);
   ui.mount(labelRoot);
+  // The pinned quest's current objective is a marker in the world; it follows the quest's stages.
+  guidance.attachQuests({ pinnedQuestId: () => ui.pinnedQuestId(), quests: () => api.getQuests() });
   api.subscribePendingResult(({ result }) => {
     if (!result.ok) ui.notify(result.error.message, "error");
   });
@@ -1880,7 +1895,7 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   // What the player is interacting with, so the rig can pick a pose for it: opening a chest is not
   // the same animation as swinging at a rock.
   loop.setArchetypeLookup((id) => entityStore.get(id)?.archetype ?? null);
-  loop.setOverlays(overlays);
+  loop.setOverlays(guidance);
   loop.setVfx(vfx);
   loop.setSpellVfx(spellVfx);
   loop.setCombatHits(() => combatSystem.consumeHits());

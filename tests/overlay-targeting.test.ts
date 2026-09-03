@@ -48,6 +48,7 @@ describe("overlay target resolution", () => {
     expect(set).toHaveBeenCalledWith({
       id: "town",
       kind: "marker",
+      locationId: "town_center",
       position: [...TOWN_POSITION],
     });
   });
@@ -64,6 +65,7 @@ describe("overlay target resolution", () => {
     expect(set).toHaveBeenLastCalledWith({
       id: "town",
       kind: "label",
+      locationId: "town_center",
       position: [...TOWN_POSITION],
       text: "Coldbrace Square",
     });

@@ -287,6 +287,96 @@ describe("the handoff", () => {
   });
 });
 
+describe("the guide", () => {
+  it("normalises a plan into targeted steps with a cursor and reports what it will draw", async () => {
+    const api = mockApi();
+    api.planPath = ((target: { locationId?: string }) => target.locationId === "nowhere"
+      ? err("NOT_FOUND", "No known location nowhere")
+      : ok({ points: [[0, 0, 0], [10, 0, 0]], pathLength: 10, etaMs: 2400, legs: [] })) as GameApi["planPath"];
+    const { session, emitted } = makeSession();
+    const tools = createTools(api, session, { build: "t", contracts: "5", content: "1" });
+    const propose = tool(tools, "corealm_propose");
+
+    const inGuide = await invokeTool(propose, session, {
+      summary: "Mine six ore",
+      steps: [
+        { text: "Walk to the pit", locationId: "bracken_pit" },
+        { text: "Mine six Grithe ore", entityId: "rock_1", done: "manual", arriveRadius: 6 },
+        { text: "Go nowhere", locationId: "nowhere" },
+        { text: "Bank it", tool: "corealm_bank" },
+      ],
+    }) as Record<string, unknown>;
+    expect(inGuide).toMatchObject({ proposed: true, steps: 4, currentStep: 0, drawn: 0, mode: "guide", unreachable: ["3: No known location nowhere"] });
+    expect(String(inGuide.note)).toMatch(/Guide mode/);
+
+    const plan = session.read().proposal!;
+    expect(plan.currentStep).toBe(0);
+    expect(plan.steps.map((step) => step.status)).toEqual(["current", "pending", "pending", "pending"]);
+    expect(plan.steps[0]).toMatchObject({ target: { locationId: "bracken_pit" }, done: "arrive" });
+    expect(plan.steps[1]).toMatchObject({ target: { entityId: "rock_1" }, done: "manual", arriveRadius: 6 });
+    // A place that does not exist cannot be arrived at, so the step falls to manual and has no target.
+    expect(plan.steps[2]).toMatchObject({ done: "manual" });
+    expect(plan.steps[2]!.target).toBeUndefined();
+    expect(plan.steps[3]).toMatchObject({ tool: "corealm_bank", done: "manual" });
+    // The tool never draws; the guidance layer does, from the session. No overlay call here.
+    expect(api.calls).toEqual([]);
+
+    session.setMode("assist", "agent");
+    const inAssist = await invokeTool(propose, session, { summary: "Same plan", steps: [{ text: "Walk", locationId: "bracken_pit" }, { text: "Bank" }] }) as Record<string, unknown>;
+    expect(inAssist).toMatchObject({ drawn: 1, mode: "assist" });
+    expect(inAssist.note).toBeUndefined();
+
+    const advanced = await invokeTool(propose, session, { advance: true });
+    expect(advanced).toMatchObject({ advanced: true, completed: 0, currentStep: 1, step: "Bank", finished: false });
+    expect(session.read().proposal!.steps.map((step) => step.status)).toEqual(["done", "current"]);
+    expect(await invokeTool(propose, session, { advance: true })).toMatchObject({ advanced: true, completed: 1, currentStep: null, finished: true });
+    expect(await invokeTool(propose, session, { advance: true })).toMatchObject({ advanced: false, finished: true });
+
+    const guideEvents = emitted.filter((event) => event.type === "agent.guide").map((event) => event.data);
+    expect(guideEvents).toEqual([
+      expect.objectContaining({ change: "advanced", completed: 0, via: "agent", step: 1, text: "Bank", stepCount: 2 }),
+      expect.objectContaining({ change: "finished", completed: 1, via: "agent", step: null, text: null }),
+    ]);
+
+    expect(await invokeTool(propose, session, { clear: true })).toEqual({ cleared: true });
+    expect(session.read().proposal).toBeNull();
+    expect(emitted.at(-1)).toMatchObject({ type: "agent.guide", data: { change: "cleared" } });
+    expect(await invokeTool(propose, session, { clear: true })).toEqual({ cleared: false });
+    expect(await invokeTool(propose, session, { advance: true })).toMatchObject({ error: "NOT_FOUND" });
+  });
+
+  it("marks a previewed route as a self-clearing destination and takes it down on request", async () => {
+    const api = mockApi();
+    const overlays: [string, Record<string, unknown> | undefined][] = [];
+    api.overlay = ((op: string, spec?: Record<string, unknown>) => { overlays.push([op, spec]); return ok({ activeCount: 1 }); }) as GameApi["overlay"];
+    const { session } = makeSession();
+    const tools = createTools(api, session, { build: "t", contracts: "5", content: "1" });
+    const route = tool(tools, "corealm_route");
+
+    expect(await invokeTool(route, session, { locationId: "bracken_pit" })).toMatchObject({ pathLength: 10, drawn: false });
+    expect(await invokeTool(route, session, { locationId: "bracken_pit", draw: true })).toMatchObject({ error: "NOT_PERMITTED" });
+    expect(overlays).toEqual([]);
+
+    session.setMode("assist", "agent");
+    expect(await invokeTool(route, session, { locationId: "bracken_pit", label: "Ore here" })).toMatchObject({ drawn: true, overlayId: "agent_route", pointCount: 2 });
+    expect(overlays).toEqual([["set", { id: "agent_route", kind: "marker", colour: "#6ea8ff", locationId: "bracken_pit", text: "Ore here" }]]);
+    expect(await invokeTool(route, session, { clear: true })).toEqual({ cleared: true });
+    expect(overlays.at(-1)).toEqual(["clear", { id: "agent_route", kind: "marker" }]);
+  });
+
+  it("forwards a marker's destination options to the API", async () => {
+    const api = mockApi();
+    const overlays: unknown[] = [];
+    api.overlay = ((op: string, spec?: Record<string, unknown>) => { overlays.push([op, spec]); return ok({ activeCount: 1 }); }) as GameApi["overlay"];
+    const { session } = makeSession();
+    session.setMode("assist", "agent");
+    const tools = createTools(api, session, { build: "t", contracts: "5", content: "1" });
+    await invokeTool(tool(tools, "corealm_overlay"), session, { op: "set", id: "bank", kind: "marker", entityId: "coldbrace_bank", text: "Bank", persist: true, route: false, arriveRadius: 12 });
+    expect(overlays).toEqual([["set", { id: "bank", kind: "marker", entityId: "coldbrace_bank", text: "Bank", persist: true, route: false, arriveRadius: 12 }]]);
+    expect(await invokeTool(tool(tools, "corealm_overlay"), session, { op: "set", kind: "marker", position: [0, 0, 0], arriveRadius: 0.5 })).toMatchObject({ error: "INVALID_ARGUMENT", path: "arriveRadius" });
+  });
+});
+
 describe("event truncation reporting", () => {
   it("reports how many events an old cursor missed", () => {
     const bus = new EventBus();

@@ -16,6 +16,7 @@
  */
 import type {
   AgentApprovalKind, AgentControlOwner, AgentMode, GameErrorCode, GameEventPayloads, GameEventType,
+  MoveTarget,
 } from "../contracts.js";
 
 export type ToolAccess = "read" | "assist" | "act";
@@ -37,17 +38,34 @@ export interface TaskView {
   startedAtMs: number;
 }
 
+export type ProposalStepStatus = "pending" | "current" | "done" | "skipped";
+
 export interface ProposalStep {
   text: string;
   tool?: string;
   args?: Record<string, unknown>;
+  /** Where the step happens, when it has a place. Drawn as the guide marker while current. */
+  target?: MoveTarget;
+  /** How the step completes: the player reaching `target`, or someone saying so. */
+  done: "arrive" | "manual";
+  /** Metres from `target` that count as arriving. Defaults by target kind. */
+  arriveRadius?: number;
+  status: ProposalStepStatus;
 }
 
+/**
+ * A plan with a cursor. `currentStep` is the index the guide is pointing at, or null once every
+ * step is done; the guidance layer draws that step and advances the cursor on arrival, and the
+ * agent or the player can advance it by hand.
+ */
 export interface Proposal {
   summary: string;
   steps: ProposalStep[];
   proposedAtMs: number;
+  currentStep: number | null;
 }
+
+export type ProposalAdvanceVia = "arrived" | "agent" | "player";
 
 export interface AgentSessionView {
   agentName: string | null;
@@ -128,7 +146,7 @@ export class AgentSession {
       objective: this.objective,
       activity: this.activity,
       task: this.task ? { id: this.task.id, tool: this.task.tool, summary: this.task.summary, startedAtMs: this.task.startedAtMs } : null,
-      proposal: this.proposal,
+      proposal: this.proposal ? { ...this.proposal, steps: this.proposal.steps.map((step) => ({ ...step })) } : null,
       pendingApproval: this.approval && this.approval.status === "pending" ? { ...this.approval } : null,
       autoApprove: { ...this.autoApprove },
       toolCalls: this.toolCalls,
@@ -202,7 +220,7 @@ export class AgentSession {
     this.connectedAtMs = null;
     this.objective = null;
     this.activity = null;
-    this.proposal = null;
+    this.clearProposal();
     if (this.controlOwner === "agent") this.setControlOwner("player", by);
     this.mode = "guide";
     this.paused = false;
@@ -220,8 +238,56 @@ export class AgentSession {
     this.notify();
   }
 
-  setProposal(proposal: Proposal | null): void {
-    this.proposal = proposal;
+  // -------------------------------------------------------------- the plan
+
+  /**
+   * Puts a plan up. The cursor lands on the first step; statuses are rewritten here so a caller
+   * never has to get them right. A null clears the plan (see `clearProposal`).
+   */
+  setProposal(proposal: Omit<Proposal, "currentStep"> | null): void {
+    if (!proposal) {
+      this.clearProposal();
+      return;
+    }
+    const steps = proposal.steps.map((step, index): ProposalStep => ({ ...step, status: index === 0 ? "current" : "pending" }));
+    this.proposal = { ...proposal, steps, currentStep: steps.length > 0 ? 0 : null };
+    this.notify();
+  }
+
+  /**
+   * Completes the current step and moves the cursor to the next pending one. `arrived` is the
+   * guidance layer seeing the player reach the step's target; `agent` and `player` are someone
+   * saying it is done (a player's advance reads as a skip). Returns the plan after the move, or
+   * null when there was nothing to advance.
+   */
+  advanceProposal(via: ProposalAdvanceVia): Proposal | null {
+    const proposal = this.proposal;
+    if (!proposal || proposal.currentStep === null) return null;
+    const completed = proposal.currentStep;
+    const current = proposal.steps[completed];
+    if (!current) return null;
+    current.status = via === "player" ? "skipped" : "done";
+    const next = proposal.steps.findIndex((step, index) => index > completed && step.status === "pending");
+    proposal.currentStep = next >= 0 ? next : null;
+    const nextStep = next >= 0 ? proposal.steps[next]! : null;
+    if (nextStep) nextStep.status = "current";
+    this.deps.emit("agent.guide", {
+      change: nextStep ? "advanced" : "finished",
+      completed, via,
+      step: proposal.currentStep, text: nextStep?.text ?? null, stepCount: proposal.steps.length,
+    });
+    this.notify();
+    return proposal;
+  }
+
+  /** Takes the plan down. Emits `agent.guide {change:"cleared"}` only when there was one. */
+  clearProposal(): void {
+    const proposal = this.proposal;
+    if (!proposal) return;
+    this.proposal = null;
+    this.deps.emit("agent.guide", {
+      change: "cleared", completed: null, via: null, step: null, text: null, stepCount: proposal.steps.length,
+    });
     this.notify();
   }
 

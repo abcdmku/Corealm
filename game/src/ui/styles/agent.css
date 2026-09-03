@@ -123,6 +123,31 @@
 .agent-panel__value.is-dim { color: var(--ink-dim); }
 .agent-panel__value.is-live { color: var(--highlight); }
 
+.agent-panel__plan { min-width: 0; }
+
+.agent-panel__plan-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.agent-panel__plan-head .agent-panel__value { flex: 1 1 auto; }
+
+.agent-panel__link {
+  flex: 0 0 auto;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  font-size: var(--size-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.agent-panel__link:hover { color: var(--highlight); }
+.agent-panel__link[hidden] { display: none; }
+
 .agent-panel__steps {
   margin: 0;
   padding-left: 16px;
@@ -130,6 +155,16 @@
   line-height: 1.35;
   color: var(--ink-dim);
 }
+
+/*
+ * The cursor. The current step carries the ink and a brass number; done steps fall back and strike
+ * through; a skipped step just falls back, so the player can still read the plan that was proposed.
+ */
+.agent-panel__steps li { padding-left: 2px; }
+.agent-panel__steps li.is-current { color: var(--ink); font-weight: 600; }
+.agent-panel__steps li.is-current::marker { color: var(--accent); font-weight: 700; }
+.agent-panel__steps li.is-done { color: var(--ink-faint); text-decoration: line-through; }
+.agent-panel__steps li.is-skipped { color: var(--ink-faint); }
 
 .agent-panel__actions {
   display: flex;

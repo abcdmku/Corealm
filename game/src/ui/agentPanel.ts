@@ -68,6 +68,7 @@ export class AgentPanel {
   private readonly controlEl: HTMLElement;
   private readonly proposalRow: HTMLElement;
   private readonly proposalSummary: HTMLElement;
+  private readonly proposalSkip: HTMLButtonElement;
   private readonly proposalSteps: HTMLOListElement;
   private readonly approvalBox: HTMLElement;
   private readonly approvalText: HTMLElement;
@@ -109,10 +110,18 @@ export class AgentPanel {
     controlRow.append(el("span", "agent-panel__key", "Control"), control);
 
     const proposalRow = el("div", "agent-panel__row");
-    const proposalCell = el("div", "");
+    const proposalCell = el("div", "agent-panel__plan");
+    const proposalHead = el("div", "agent-panel__plan-head");
     const proposalSummary = el("div", "agent-panel__value");
+    // The player's two hands on the plan: skip the step the guide is waiting on, or drop the plan.
+    const skip = button("Skip", "agent-panel__link", () => this.deps.session.advanceProposal("player"));
+    skip.title = "Mark the current step done and move on";
+    const dismiss = button("×", "agent-panel__btn", () => this.deps.session.clearProposal());
+    dismiss.title = "Dismiss the plan";
+    dismiss.setAttribute("aria-label", "Dismiss the plan");
+    proposalHead.append(proposalSummary, skip, dismiss);
     const proposalSteps = el("ol", "agent-panel__steps");
-    proposalCell.append(proposalSummary, proposalSteps);
+    proposalCell.append(proposalHead, proposalSteps);
     proposalRow.append(el("span", "agent-panel__key", "Plan"), proposalCell);
     proposalRow.hidden = true;
 
@@ -179,6 +188,7 @@ export class AgentPanel {
     this.controlEl = control;
     this.proposalRow = proposalRow;
     this.proposalSummary = proposalSummary;
+    this.proposalSkip = skip;
     this.proposalSteps = proposalSteps;
     this.approvalBox = approvalBox;
     this.approvalText = approvalText;
@@ -206,8 +216,9 @@ export class AgentPanel {
     const view = session.read();
     const signature = [
       view.agentName, view.mode, view.controlOwner, view.paused, view.objective, view.activity,
-      view.task?.id, view.proposal?.proposedAtMs, view.pendingApproval?.id, view.autoApprove.control,
-      view.autoApprove.trade, view.webmcp.binding, view.toolCalls,
+      view.task?.id, view.proposal?.proposedAtMs, view.proposal?.currentStep,
+      view.proposal?.steps.map((step) => step.status[0]).join(""), view.pendingApproval?.id,
+      view.autoApprove.control, view.autoApprove.trade, view.webmcp.binding, view.toolCalls,
     ].join("|");
     if (!force && signature === this.signature) return;
     this.signature = signature;
@@ -244,10 +255,20 @@ export class AgentPanel {
     const proposal = view.proposal;
     this.proposalRow.hidden = !proposal;
     if (proposal) {
-      this.proposalSummary.textContent = proposal.summary;
-      this.proposalSteps.replaceChildren(...proposal.steps.map((step) => {
+      const finished = proposal.currentStep === null;
+      this.proposalSummary.textContent = finished ? `${proposal.summary} — done` : proposal.summary;
+      this.proposalSkip.hidden = finished;
+      this.proposalSteps.replaceChildren(...proposal.steps.map((step, index) => {
         const item = document.createElement("li");
         item.textContent = step.text;
+        item.classList.toggle("is-current", index === proposal.currentStep);
+        item.classList.toggle("is-done", step.status === "done");
+        item.classList.toggle("is-skipped", step.status === "skipped");
+        if (index === proposal.currentStep) {
+          item.title = step.target
+            ? step.done === "arrive" ? "Clears when you get there" : "Marked in the world; the agent ticks it off"
+            : "The agent ticks this off";
+        }
         return item;
       }));
     }

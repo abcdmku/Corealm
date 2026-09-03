@@ -614,7 +614,14 @@ export type GameEventType =
    * operation starting, finishing or being cut short; `agent.approval` is a request being raised
    * or answered.
    */
-  | "agent.session" | "agent.task" | "agent.approval";
+  | "agent.session" | "agent.task" | "agent.approval"
+  /**
+   * The guidance layer. `overlay.arrived` is the player reaching a marker overlay's target — the
+   * marker clears itself unless it was set with `persist`. `agent.guide` is a proposed plan's
+   * cursor moving: a step completed (by arrival, the agent, or the player skipping it), the last
+   * step completing, or the plan being cleared.
+   */
+  | "overlay.arrived" | "agent.guide";
 
 export const GAME_EVENT_TYPES: readonly GameEventType[] = [
   "navigation.started", "navigation.completed", "navigation.failed",
@@ -627,6 +634,7 @@ export const GAME_EVENT_TYPES: readonly GameEventType[] = [
   "campfire.built", "campfire.replaced", "campfire.expired",
   "quest.updated", "dialogue.opened", "dialogue.closed", "entity.discovered",
   "agent.session", "agent.task", "agent.approval",
+  "overlay.arrived", "agent.guide",
 ];
 
 /**
@@ -697,6 +705,17 @@ export interface GameEventPayloads {
   "agent.approval": {
     requestId: string; kind: AgentApprovalKind; description: string;
     status: "pending" | "approved" | "denied" | "expired";
+  };
+  /** The player reached a marker overlay's target. `cleared` says whether the marker removed itself. */
+  "overlay.arrived": { id: string; position: Vec3; cleared: boolean };
+  /**
+   * A proposed plan's cursor moved. `completed` is the step that just finished (0-based) and `via`
+   * says how; `step`/`text` is the step that is current now, null once the plan is finished.
+   */
+  "agent.guide": {
+    change: "advanced" | "finished" | "cleared";
+    completed: number | null; via: "arrived" | "agent" | "player" | null;
+    step: number | null; text: string | null; stepCount: number;
   };
 }
 
@@ -933,6 +952,14 @@ export interface ShopView {
 
 export interface DocHit { docId: string; title: string; section: string; snippet: string; score: number }
 
+/**
+ * One assistance overlay.
+ *
+ * `highlight` is "this thing": a ground ring at the target. `marker` is "go here": a pin, a ground
+ * route from the player to it that follows them as they walk, and an optional label; it clears
+ * itself when the player arrives (`overlay.arrived`) unless `persist` is set. `path` is a raw
+ * polyline for callers that already have one. `label` is text alone.
+ */
 export interface OverlaySpec {
   id: string;
   kind: "highlight" | "path" | "marker" | "label";
@@ -941,11 +968,18 @@ export interface OverlaySpec {
   locationId?: string;
   position?: Vec3;
   path?: Vec3[];
+  /** Label text. On a marker this floats above the pin. */
   text?: string;
   /** "#rrggbb" */
   colour?: string;
   /** Default 0, meaning until cleared. */
   ttlMs?: number;
+  /** Marker only: stay after the player arrives. Default false. */
+  persist?: boolean;
+  /** Marker only: metres from the target that count as arriving. Defaults by target kind. */
+  arriveRadius?: number;
+  /** Marker only: draw the ground route from the player. Default true. */
+  route?: boolean;
 }
 
 export type MoveTarget = { entityId: EntityId } | { position: Vec3 } | { locationId: string };
