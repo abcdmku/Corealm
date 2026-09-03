@@ -1,108 +1,152 @@
-# Lean 3D game-building harness
+# Corealm
 
-This is an uninitialized template for an agent-built Three.js browser game. It contains the workflow, agent instructions, browser driver, state-backed playtests, screenshot support, and critic handoffs. It does not contain a game, a game brief, or a completed run.
+A persistent 3D browser RPG in the classic-MMO tradition: gather, craft, fight, quest, bank, unlock the next tier. The twist is that an AI agent can play the same character through the same actions a human uses, exposed to the browser through [WebMCP](https://webmachinelearning.github.io/webmcp/). There is no scripting backdoor. If a human can do something, an agent can; if a human can't, neither can the agent.
 
-## Start from a brief
+Play it at **https://abcdmku.github.io/Corealm/**. The generated player guide (skills, recipes, regions, quests, XP table) lives at **https://abcdmku.github.io/Corealm/docs**.
 
-Use Node 24 (other Node majors are rejected), then install the harness once:
+Built with TypeScript, Vite, Three.js, Rapier, and recast-navigation. All content is original; models come from the free Quaternius packs plus a handful of ledgered Unity-store assets.
+
+## The game
+
+- **Ten skills, 1–99 each.** Melee and Magic for combat; Mining, Woodcutting, and Fishing for gathering; Smithing, Crafting, Cooking, and Fletching for production; Agility for shortcuts and alternate routes. Gathering feeds production, production feeds combat, combat and exploration reward both.
+- **One connected world, currently tiers 1–20.** Fallowmarch (frontier plains, the starting town of Coldbrace), Vellenwood (deep woodland), Karrowmoor (stone highlands with the Highcairn terraces and the Gravelmaw dungeon and boss), and Kilnhalt (ember foothills, the Emberfast settlement, four regional minibosses). Borders are open; difficulty is the gate.
+- **Click-to-move over a real navmesh** plus keyboard movement, an elevated third-person camera, hover and selection feedback, and contextual actions.
+- **Continuing activities.** One click on an ore node starts mining and keeps yielding until the node depletes, your pack fills, you move, or you cancel. Nodes visibly deplete and respawn on timers.
+- **28-slot inventory, banks as geographic anchors, one currency, shops.** Capacity and bank distance drive real route decisions.
+- **Melee and Magic combat** with readable MMO pacing, enemy families that get more interesting by tier, and bosses with telegraphs and phases. Magic runs on wands and staffs fuelled by elemental Essence; boss-dropped Orbs awaken regional altars that charge elemental weapons.
+- **Quests** are the most authored content, including multi-stage chains an external agent can complete end to end.
+- **Death** keeps progression but drops carried items into a recoverable container.
+- **Persistence** is browser-local: skills, inventory, equipment, bank, quests, discovered locations, and settings survive a reload.
+- **The optimisation metagame.** The highest-tier resource is not always the best one. Tier 5 Corven ore 38 m from the Rootfall bank beats tier 10 Kaldite ore 188 m from Highcairn on XP/hour, until Agility 10 opens the Sunder Ledge shortcut and flips the comparison. Working this out from observable data is the point of writing a better agent.
+
+Everything in the world is a semantic entity (id, archetype, tier, region, state, requirements, interactions) that the renderer merely draws. Gameplay, UI, quests, persistence, tests, and the agent surface all read the same state.
+
+## Playing it with an agent over WebMCP
+
+WebMCP is a W3C-track browser API that lets a page publish structured tools to an AI agent instead of having the agent scrape the DOM. Corealm registers 34 tools with `document.modelContext` (falling back to the older `navigator.modelContext` spelling) at boot. Each tool has a title, a description, a strict JSON Schema, and a `readOnlyHint`, and returns MCP content blocks whose text is the tool's JSON result.
+
+### What you need
+
+- A browser with WebMCP enabled. As of September 2026 that means a Chromium build with the feature on (`--enable-features=WebMachineLearningModelContext,WebMCP,AIModelContext`, or the Early Preview flag in `chrome://flags`) and a WebMCP-capable agent extension or client attached to it. The page must be a secure context; `localhost` counts.
+- Corealm open in that browser, either the deployed site or `npm run dev` locally.
+
+Open the in-game agent panel to see whether the browser bound. It reports the container it found, or says no WebMCP was available. You can also ask from the console:
+
+```js
+window.corealm.agent.webmcp();
+// { binding: "document.modelContext", native: true, method: "registerTool", toolCount: 34 }
+```
+
+`binding: "none"` means the browser has no WebMCP. The game does not install a polyfill; a page that fills the gap itself can never tell you the gap exists.
+
+### The same tools without WebMCP
+
+`window.corealm.agent` is present in every browser and drives the identical handlers, validation, and session rules. It is how the Playwright proofs, the internal assistant, and a quick console session reach the game:
+
+```js
+const agent = window.corealm.agent;
+await agent.listTools();                           // name, title, description, schema, access
+await agent.call("corealm_context");               // the whole situation, one atomic snapshot
+await agent.call("corealm_manual", { topic: "overview" });
+```
+
+`call` never throws. Failures come back as data with an `error` code (`NOT_FOUND`, `OUT_OF_RANGE`, `REQUIREMENTS_NOT_MET`, `INVENTORY_FULL`, `NOT_PERMITTED`, `APPROVAL_REQUIRED`, and so on) and a human-readable `message`.
+
+### How a session works
+
+The player decides how much the agent may do, and the agent panel shows it:
+
+| Mode | The agent may |
+| --- | --- |
+| `guide` | read state, answer, explain, recommend |
+| `assist` | also draw markers, routes, and highlights, and propose step-by-step plans |
+| `play` | also act, while it holds control and is not paused |
+
+An agent starts in guide mode. `corealm_session {op:"request_control", objective}` asks for play mode; the panel shows the request with Allow and Deny, and the player can Pause, Stop, or Take control at any time. Shop trades in play mode ask for per-call approval unless the player pre-approves them.
+
+Agents are meant to be event-driven, not polling. `corealm_events` long-polls a monotonic event stream (`activity.stopped`, `inventory.full`, `resource.depleted`, `level.gained`, `combat.ended`, `quest.updated`, ...), and `corealm_wait` blocks on a condition. Bounded operations such as `corealm_navigate`, `corealm_gather`, `corealm_fight`, and `corealm_craft` each replace a dozen primitive calls and return when done.
+
+A whole Mining 1→10 climb, including bank trips, is about a dozen tool calls:
+
+```js
+const agent = window.corealm.agent;
+const asked = await agent.call("corealm_session", {
+  op: "request_control", objective: "Train Mining to 10 at the Bracken Pit", timeoutMs: 25000,
+});
+if (asked.status !== "granted") return;
+
+while ((await agent.call("corealm_skills")).mining.level < 10) {
+  await agent.call("corealm_navigate", { locationId: "bracken_pit" });
+  const free = (await agent.call("corealm_inventory")).freeSlots;
+  const mined = await agent.call("corealm_gather", { interaction: "mine", quantity: free });
+  if (mined.error === "CANCELLED") return;            // the player stopped us
+  await agent.call("corealm_navigate", { entityId: "coldbrace_bank" });
+  await agent.call("corealm_bank", { op: "depositAll" });
+}
+
+await agent.call("corealm_session", { op: "release_control" });
+```
+
+### Information parity
+
+The agent discovers the world the way a player does. `corealm_observe` returns what is visible now or the places the character has actually found; `corealm_inspect` on something never seen is `NOT_FOUND`; `corealm_quests` shows only what a journal would; `corealm_search_docs` returns public documentation and never quest solutions.
+
+### Read next
+
+- [docs/agent-api.md](./docs/agent-api.md) — the full tool list, event types, error codes, session rules, and efficiency notes. Written so that someone who has never seen Corealm can build a working autonomous player from it alone.
+- `corealm_manual` in-game — the same material, by topic, from the running build.
+- [docs/webmcp-audit.md](./docs/webmcp-audit.md) — the ten end-to-end scenarios that exercise the surface through `document.modelContext.getTools()` / `executeTool()` exactly as a browser agent would.
+
+## Running it locally
+
+Node 24 is required (other majors are rejected).
 
 ```bash
-node --version # v24.x
+node --version      # v24.x
 npm ci
-npx playwright install chromium
+npx playwright install chromium   # only for the browser checks below
+npm run dev
 ```
 
-Write a short Markdown brief, then create a run:
+Useful commands:
 
 ```bash
-npm run game-agent -- build briefs/my-game.md --id my-game
+npm run check                # typecheck, unit tests, game and guide production builds
+npm run test:watch
+npm run lab:preview          # the feature lab, a compact deterministic scene
+npm run lab:test
+npm run smoke -- --run runs/corealm
+npm run agent-proof -- --run runs/corealm    # the Mining 1→10 and quest proofs through the agent surface
+npm run webmcp:audit -- --run runs/corealm --scale 100
+npm run play -- --run runs/corealm --scenario tools/scenarios/<name>.json
+npm run screenshot -- --run runs/corealm --name checkpoint
+npm run docs:dev             # the player guide, regenerated from canonical content
 ```
 
-That command records the brief under `runs/my-game/`. It does not call a model or invent the game. Give the repository to a root coding agent and ask it to follow [AGENTS.md](./AGENTS.md):
+Playwright's Chromium ships no WebMCP, so the audit and proofs inject a test stand-in before the page loads (`tools/lib/webmcp-polyfill.ts`). The game recognises it and reports `binding: "polyfill", native: false`, and the audit refuses to run if the adapter ever mistakes the stand-in for a real browser.
 
-1. Use a fresh-context PRD agent with `skills/prd.md`.
-2. Review and approve `runs/my-game/PRD.md`.
-3. Build the minimal browser foundation, freeze only the shared contracts the PRD needs, and boot the production-backed feature lab.
-4. Pass the Chromium foundation smoke before delegating disjoint specialist files.
-5. Build each isolatable feature in the lab, inspect browser state and screenshots, and have the root accept it there.
-6. Wire accepted features into the final world, keep the integration smoke shallow, and use a fresh read-only critic.
-7. Convert concrete criticism into a lab fix round, reaccept it, then repeat the final-world integration check.
-
-Durable context belongs in the run directory, not in a long orchestration transcript.
+Development builds also expose `window.__gameDebug` (`teleport`, `setSkillLevel`, `giveItem`, `advanceGameTime`, `reset`, ...) for setting up deterministic tests. It is for setup only; nothing reachable through WebMCP or `window.corealm.agent` can bypass the session gate.
 
 ## Repository shape
 
 ```text
-game/                 uninitialized until a PRD is approved
-skills/               PRD, builder, and critic role instructions
-tools/                browser driver and small command-line utilities
-runs/<run-id>/        brief, PRD, architecture, evidence, and critique
-docs/                 architecture and source-pattern notes
+game/            the Vite app: src/agent is the tool surface and WebMCP adapter, src/content the canonical data
+docs/            agent API, feature-lab and world-authoring workflow, generated player guide (docs/game)
+docs-site/       the Starlight site that publishes the guide
+tools/           browser driver, smoke, proofs, audit, asset and docs generators
+tests/           vitest unit and integration tests
+runs/corealm/    brief, PRD, architecture, reports, critique, and test evidence
+skills/          builder and critic role instructions for the agent-driven workflow
 ```
 
-The game remains a normal Vite application and never imports the harness at runtime.
+The game never imports the build harness at runtime. Generated icons, world maps, and guide captures are committed; refresh text with `npm run docs:refresh` and visuals with `npm run docs:refresh:visuals` only when they should change. Pushes to `main` build the game and guide and publish them to GitHub Pages.
 
-## Commands after the foundation exists
+## How it was built
 
-```bash
-npm run dev
-npm run test:watch
-npm run structure:contracts:watch
-npm run structure:lint
-npm run structure:sweep
-npm run lab:preview
-npm run lab:building:preview
-npm run lab:test
-npm run check
-npm run smoke -- --run runs/my-game
-npm run play -- --run runs/my-game --scenario tools/scenarios/my-game.json
-npm run screenshot -- --run runs/my-game --name checkpoint
-npm run game-agent -- critic-pack --run runs/my-game
-```
+Corealm was built by coding agents following [AGENTS.md](./AGENTS.md): a fresh-context PRD, a frozen set of shared contracts, a production-backed feature lab where every isolatable feature is accepted from browser state and screenshots before it is wired into the world, and read-only critic passes between rounds. The run directory under `runs/corealm/` holds the brief, PRD, architecture decisions, phase reports, and evidence. See [docs/feature-lab.md](./docs/feature-lab.md) and [docs/world-authoring.md](./docs/world-authoring.md) for the workflow.
 
-`npm run check` is the local CI loop: typecheck, all unit tests, and the game and guide production builds. `dev`, `build`, and browser commands intentionally stop with a clear message while `game/index.html` is absent.
+## License
 
-Use the persistent realtime feature lab as the default development environment for every feature that can run in a compact deterministic scene. This includes structures, actors, animation, combat, effects, resources, interactables, pickups, UI, equipment, inventory, crafting, shops, quest interactions, input, camera behavior, and local collision or navigation. When the lab lacks a fixture or control, extend it as part of the feature. After focused checks and `npm run lab:test` pass and the root accepts the visual evidence, wire the feature into the final world and verify only its loading, real data flow, placement, and representative interaction.
+The code, content data, and documentation are [MIT licensed](./LICENSE).
 
-The lab-first gate may be skipped only when isolation would remove the authored full-world behavior under test, such as terrain, biome, coast, water, world-scale scatter, world layout, or long-distance navigation. Record the exception. Reusable assets, effects, UI, controls, and local interactions still belong in the lab. See the authoritative [feature-lab workflow and budgets](./docs/feature-lab.md) and [world-authoring workflow](./docs/world-authoring.md).
-
-Generated icons, world maps, and guide captures are committed inputs to normal development and CI. Refresh text with `npm run docs:refresh`; use `npm run assets:refresh` or `npm run docs:refresh:visuals` only when those generated visuals intentionally need to change. The visual commands boot Chromium and are deliberately not part of `dev`, `build`, `check`, or deployment.
-
-## Runtime testing contract
-
-Development builds expose a synchronous, JSON-safe `window.__gameDebug` with:
-
-```text
-getState()
-getPlayer()
-getPlayerPosition()
-getCamera()
-getEntities()
-getCurrentActivity()
-getObjectives()
-getNavigationState()
-reset()
-```
-
-Games may add development-only helpers such as `teleport()` or `setScenario()` when they make tests deterministic. Gameplay tests record state before and after every action; source inspection alone is not proof that a feature works.
-
-## Scripted play
-
-A scenario is JSON with a name and up to 50 actions. Supported actions include key presses, mouse input, waits, debug calls, semantic inspections, screenshots, reset, and reload.
-
-```json
-{
-  "name": "movement-proof",
-  "actions": [
-    { "key": "w", "holdMs": 1000, "label": "Move forward" },
-    { "inspect": "getPlayerPosition", "label": "Read the result" },
-    { "screenshot": "after-move" }
-  ]
-}
-```
-
-Reports and screenshots are written into the selected run directory.
-
-GLB assets belong under `game/public/assets/` with a small metadata manifest. `npm run inspect-glb -- game/public/assets/model.glb` reports scenes, nodes, meshes, and animations without introducing an asset database.
-
-The harness keeps the useful mechanisms from [WorldBuild Bench](https://github.com/sebnado/worldbuild-bench) and [Sunburst Isle](https://github.com/djtoon/sunburst_isle), summarized in [docs/reference-patterns.md](./docs/reference-patterns.md). It deliberately omits model-provider adapters, workflow databases, queues, plugins, benchmark scoring, and other infrastructure that does not help build and inspect the next game.
+Not everything under `game/public/assets/` is. The 222 Quaternius models are CC0-1.0. The magic, altar, and miniboss GLBs listed in [game/public/assets/UNITY_ASSET_SOURCES.md](./game/public/assets/UNITY_ASSET_SOURCES.md) were converted from free Unity Asset Store packages and remain under the Unity Asset Store EULA; they are here so the game runs, not as a redistributable asset pack. `game/public/assets/manifest.json` records the source and license of every pack.
