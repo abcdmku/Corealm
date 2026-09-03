@@ -37,8 +37,14 @@ class FakeEntityAssets {
   private readonly failFirst = new Set<string>();
   readonly attempts = new Map<string, number>();
 
-  constructor(ids: readonly string[], failFirst: readonly string[] = []) {
+  constructor(
+    ids: readonly string[],
+    failFirst: readonly string[] = [],
+    /** Footprint in metres per asset; a 1 m cube otherwise. */
+    sizes: Readonly<Record<string, number>> = {},
+  ) {
     for (const id of ids) {
+      const size = sizes[id] ?? 1;
       this.entries.set(id, {
         id,
         file: `${id}.glb`,
@@ -47,13 +53,13 @@ class FakeEntityAssets {
         is: "test-prop",
         tags: ["test"],
         bytes: 100,
-        size: { x: 1, y: 1, z: 1 },
+        size: { x: size, y: 1, z: size },
         animations: [],
         materials: [],
       });
       const source = new THREE.Group();
       source.add(new THREE.Mesh(
-        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.BoxGeometry(size, 1, size),
         new THREE.MeshStandardMaterial({ name: `material:${id}` }),
       ));
       this.sources.set(id, source);
@@ -320,6 +326,46 @@ describe("EntityViews streaming", () => {
       failedAssets: [],
     });
     expect(assets.attempts.get("cold-asset")).toBe(2);
+
+    views.dispose();
+    materials.dispose();
+    assets.dispose();
+  });
+});
+
+describe("EntityViews picking", () => {
+  /** A ray straight down through the entity's position, from well above the tallest mesh. */
+  function downAt(position: Vec3): THREE.Raycaster {
+    return new THREE.Raycaster(
+      new THREE.Vector3(position[0], 50, position[2]),
+      new THREE.Vector3(0, -1, 0),
+    );
+  }
+
+  it("skips wide inspect-only structures but keeps wide gatherables and small landmarks", async () => {
+    const ruin = entity("ruin", "fallowmarch", [0, 0, 0], "ruin-asset");
+    const marker = entity("marker", "fallowmarch", [40, 0, 0], "marker-asset");
+    const tree: SemanticEntity = {
+      ...entity("tree", "fallowmarch", [-40, 0, 0], "tree-asset"),
+      archetype: "tree",
+      interactions: ["inspect", "chop"],
+    };
+    const assets = new FakeEntityAssets(
+      ["ruin-asset", "marker-asset", "tree-asset"],
+      [],
+      { "ruin-asset": 20, "marker-asset": 2, "tree-asset": 20 },
+    );
+    const { views, materials } = entityViews(assets);
+
+    await views.prepare([ruin, marker, tree]);
+    views.updateActiveArea([0, 0, 0], 60, 120);
+    views.sync([ruin, marker, tree]);
+    expect(views.residencyStats()).toMatchObject({ resident: 3 });
+
+    expect(views.pick(downAt(ruin.position))).toBeNull();
+    expect(views.pickAll(downAt(ruin.position))).toEqual([]);
+    expect(views.pick(downAt(marker.position))).toBe("marker");
+    expect(views.pick(downAt(tree.position))).toBe("tree");
 
     views.dispose();
     materials.dispose();

@@ -893,6 +893,21 @@ const MAX_CHARACTER_PICK_RADIUS = 1.35;
 const CHARACTER_PICK_RADIUS_SCALE = 0.85;
 
 /**
+ * An inspect-only entity drawn wider than this (metres, highlight radius) is a place, not a thing.
+ *
+ * The altar ruins site is one 20 m mesh: hovering any of its arches lit an 11 m ring around the
+ * whole court and a click "selected" the ruins you were standing in. Nothing that only offers
+ * inspect needs a click target that big — the smaller pieces inside it (the altar, the essence
+ * nodes) are their own entities and keep theirs. Gatherable trees and climbable obstacles can be
+ * just as wide and stay pickable, because clicking them does something.
+ */
+const MAX_INSPECT_ONLY_PICK_RADIUS = 5;
+
+function isInspectOnly(entity: SemanticEntity): boolean {
+  return entity.interactions.every((interaction) => interaction === "inspect");
+}
+
+/**
  * How many syncs a character keeps walking after the last observed position change.
  *
  * `EnemyAI.stepToward` writes a position every 100 ms sim tick while `sync` runs at 250 ms, so a
@@ -1387,6 +1402,8 @@ interface ViewRecord {
   tilt: number;
   labelHeight: number;
   radius: number;
+  /** False for inspect-only entities past `MAX_INSPECT_ONLY_PICK_RADIUS`; `pick` skips them. */
+  pickable: boolean;
 }
 
 export interface EntityViewStats {
@@ -2216,6 +2233,7 @@ export class EntityViews {
       this.minHighlightRadius,
       this.assetRadius(view.assetId) * scale * record.build[0] * Math.max(...scaleAxes),
     );
+    record.pickable = !(isInspectOnly(entity) && record.radius > MAX_INSPECT_ONLY_PICK_RADIUS);
 
     const group = this.groups.get(groupKey);
     if (!group) return;
@@ -2331,6 +2349,7 @@ export class EntityViews {
       tilt: 0,
       labelHeight: view.labelHeight ?? 1.6,
       radius: this.minHighlightRadius,
+      pickable: true,
     };
 
     if (!ready || !this.buildUnique(record, group)) {
@@ -4920,6 +4939,9 @@ diffuseColor.rgb = mix( diffuseColor.rgb, gEssenceStoneTinted, 0.82 );`,
     for (const hit of raycaster.intersectObject(this.group, true)) {
       const entityId = this.entityOfHit(hit);
       if (!entityId) continue;
+      // A hit on a 20 m ruin is a hit on the place, not on a thing. Let it fall through to
+      // whatever is behind it — usually the ground, so the click walks there.
+      if (this.records.get(entityId)?.pickable === false) continue;
       const previous = nearest.get(entityId);
       if (previous === undefined || hit.distance < previous) nearest.set(entityId, hit.distance);
     }
