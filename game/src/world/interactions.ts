@@ -64,7 +64,7 @@ const DEFAULT_RANGES: Partial<Record<InteractionId, number>> = {
 
 /** Gathering verbs, so a depleted node is refused with DEPLETED rather than a vague failure. */
 const GATHER_INTERACTIONS: ReadonlySet<InteractionId> = new Set<InteractionId>([
-  "mine", "chop", "fish", "harvest",
+  "mine", "chop", "fish",
 ]);
 
 const COMBAT_INTERACTIONS: ReadonlySet<InteractionId> = new Set<InteractionId>(["attack", "cast"]);
@@ -208,16 +208,6 @@ function checkState(entity: SemanticEntity, interaction: InteractionId): StatePr
 
   if ((interaction === "climb" || interaction === "vault") && entity.archetype !== "obstacle") {
     return { code: "INVALID_ARGUMENT", message: `${entity.name} is not an obstacle.` };
-  }
-
-  if (interaction === "plant" && entity.state !== "raked") {
-    return { code: "INVALID_ARGUMENT", message: `${entity.name} has to be raked first.` };
-  }
-  if (interaction === "harvest" && entity.archetype === "farm_plot" && entity.state !== "ready") {
-    return { code: "INVALID_ARGUMENT", message: `${entity.name} is not ready to harvest.` };
-  }
-  if (interaction === "rake" && entity.archetype === "farm_plot" && entity.state !== "empty") {
-    return { code: "INVALID_ARGUMENT", message: `${entity.name} already has something in it.` };
   }
 
   return undefined;

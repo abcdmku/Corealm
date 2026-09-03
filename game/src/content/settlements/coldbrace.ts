@@ -100,7 +100,7 @@ import type { SettlementDef } from "../regions.js";
 export const COLDBRACE: SettlementDef = {
   id: "coldbrace",
   name: "Coldbrace",
-  // Lime-washed plaster, fired pantiles, a steep pitch. A river-plain farming village.
+  // Lime-washed plaster, fired pantiles, and a steep pitch on the river plain.
   kit: "plaster",
   centre: [-160, -80],
   respawnPointId: "coldbrace",
@@ -296,7 +296,7 @@ export const COLDBRACE: SettlementDef = {
     { id: "coldbrace_prop_bench_w", assetId: "bench", position: [-166, -74.5], rotationY: 0 },
     { id: "coldbrace_prop_flowers", assetId: "flower_a_group", position: [-165, -83], rotationY: 0.4, scale: 0.35 },
 
-    // ---- Under the market row: what a general store in a farming village actually sells.
+    // ---- Under the market row: produce and general-store stock.
     { id: "coldbrace_prop_market_apples", assetId: "barrel_apples", position: [-170.6, -78.4], rotationY: 0.3, solid: true },
     { id: "coldbrace_prop_market_crate", assetId: "crate_village", position: [-170.4, -83], rotationY: 1.2, solid: true },
     { id: "coldbrace_prop_market_sack", assetId: "sack", position: [-169.6, -77.2], rotationY: 0.8 },

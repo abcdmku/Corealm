@@ -21,7 +21,7 @@ export const CONTEXT_SECTIONS = [
 ] as const;
 export type ContextSection = (typeof CONTEXT_SECTIONS)[number];
 
-export const GATHER_INTERACTIONS = ["mine", "chop", "fish", "harvest"] as const;
+export const GATHER_INTERACTIONS = ["mine", "chop", "fish"] as const;
 export type GatherInteraction = (typeof GATHER_INTERACTIONS)[number];
 
 export const MAX_TIMEOUT_MS = 600_000;
@@ -41,7 +41,7 @@ export const TOOL_SPECS = {
       "Read the player's current state: position, region, health, whether they are in combat, "
       + "moving, dead, and what activity is running, plus the sim clock. Cheap. Prefer "
       + "corealm_context for a first read; use this for a quick re-check. Every deadline the game "
-      + "reports — a recovery cache's expiry, a crop's growth — is stamped in the same sim "
+      + "reports, including a recovery cache's expiry, is stamped in the same sim "
       + "milliseconds as `time.simMs`, never in wall time.",
     inputSchema: obj({}),
   },
@@ -50,7 +50,7 @@ export const TOOL_SPECS = {
     title: "Read skills",
     access: "read",
     description:
-      "Read all 11 skill levels with current XP and XP remaining to the next level. Use this to "
+      "Read all 10 skill levels with current XP and XP remaining to the next level. Use this to "
       + "decide what content the player qualifies for.",
     inputSchema: obj({}),
   },
@@ -149,7 +149,7 @@ export const TOOL_SPECS = {
     title: "Interact with an entity",
     access: "act",
     description:
-      "Perform an interaction on an entity: mine, chop, fish, rake, plant, harvest, talk, open, "
+      "Perform an interaction on an entity: mine, chop, fish, talk, open, "
       + "climb, vault, loot, take, awaken, produce, recharge, bank, trade, inspect. If the character is out of "
       + "range this walks them into range first, exactly as a human click does, and returns "
       + "{ started: \"walking to ...\" }; wait for navigation.completed and the interaction runs "
@@ -181,10 +181,9 @@ export const TOOL_SPECS = {
     name: "corealm_use_item",
     title: "Use an item",
     access: "act",
-    description: "Use a carried item: eat food, equip gear, or apply a matching seed to a farm plot.",
+    description: "Use a carried item to eat food or equip gear.",
     inputSchema: obj({
       itemId: STR("Item to use", { minLength: 1 }),
-      targetEntityId: STR("Optional farm plot entity to plant the seed in"),
     }, ["itemId"]),
   },
   corealm_equip: {
@@ -418,7 +417,7 @@ export const TOOL_SPECS = {
     title: "Gather a quantity",
     access: "act",
     description:
-      "Mine, chop, fish or harvest until `quantity` items have been received, then stop. "
+      "Mine, chop, or fish until `quantity` items have been received, then stop. "
       + "Give entityId for a specific node, or omit it and the nearest visible node offering "
       + "`interaction` that the player qualifies for is used, moving to another when one "
       + "depletes. Walks into range first. Returns early with `reason` on a full pack, a death, "

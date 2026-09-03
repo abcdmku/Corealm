@@ -167,7 +167,7 @@ objective is drawn the same way for the player, and follows the quest's stages. 
 One call each, interruptible by Pause, Stop, Take control, or the caller's own AbortSignal.
 - `corealm_navigate` — walk and wait for arrival.
 - `corealm_follow_route` — several waypoints in order.
-- `corealm_gather` — mine, chop, fish or harvest until `quantity` items arrive; picks the nearest
+- `corealm_gather` — mine, chop, or fish until `quantity` items arrive; picks the nearest
   qualifying node and moves on when one depletes.
 - `corealm_fight` — attack, wait for the outcome, optionally retreat below a health fraction, loot.
 - `corealm_loot_nearby` — open and empty every pile within reach.

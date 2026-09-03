@@ -60,7 +60,7 @@ function fixture() {
     position: [...BOX.position],
     items: [
       { itemId: "grithe_ore", quantity: 2 },
-      { itemId: "cairnleaf", quantity: 1 },
+      { itemId: "pale_quartz", quantity: 1 },
     ],
     expiresAtMs: 5_000,
     ownerOnly: true,
@@ -91,7 +91,7 @@ describe("loot reveal", () => {
       position: BOX.position,
       items: [
         { itemId: "grithe_ore", quantity: 2 },
-        { itemId: "cairnleaf", quantity: 1 },
+        { itemId: "pale_quartz", quantity: 1 },
       ],
     }]);
     expect(h.received).toEqual([]);
@@ -106,7 +106,7 @@ describe("loot reveal", () => {
       ok: true,
       value: {
         taken: [{ itemId: "grithe_ore", quantity: 2 }],
-        remaining: [{ itemId: "cairnleaf", quantity: 1 }],
+        remaining: [{ itemId: "pale_quartz", quantity: 1 }],
         containerEmpty: false,
       },
     });
@@ -116,7 +116,7 @@ describe("loot reveal", () => {
     expect(h.death.take(BOX.id, 0)).toEqual({
       ok: true,
       value: {
-        taken: [{ itemId: "cairnleaf", quantity: 1 }],
+        taken: [{ itemId: "pale_quartz", quantity: 1 }],
         remaining: [],
         containerEmpty: true,
       },

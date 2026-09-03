@@ -25,7 +25,7 @@ import {
 } from "../game/src/content/index.js";
 import { ALL_ITEMS } from "../game/src/content/items.js";
 import { GATHERING_PRODUCTION_TIERS } from "../game/src/content/gatheringProductionTiers.js";
-import { CROPS, RESOURCES, RESOURCE_ARCHETYPES } from "../game/src/content/resources.js";
+import { RESOURCES, RESOURCE_ARCHETYPES } from "../game/src/content/resources.js";
 import { RECIPES } from "../game/src/content/recipes.js";
 import { SPELLS } from "../game/src/content/spells.js";
 import { ENEMIES, ENEMY_BLOCKS } from "../game/src/content/enemies.js";
@@ -99,16 +99,6 @@ export function resourceGuideLifecycle(resourceId: string): {
   recovery: string;
 } {
   const resource = resourceForGuide(resourceId);
-  if (resource.archetype === "farm_plot") {
-    const crop = CROPS.find((candidate) => candidate.cropItemId === resource.itemId);
-    if (!crop) throw new Error(`Farm plot ${resource.id} has no crop lifecycle for ${resource.itemId}.`);
-    return {
-      xpEach: crop.harvestXp,
-      perNode: `${crop.yieldRange[0]}-${crop.yieldRange[1]} per harvest`,
-      recovery: `${crop.stages * crop.secondsPerStage} s wall-clock growth`,
-    };
-  }
-
   const [low, high] = resource.yieldRange ?? yieldRange(resource.tier);
   return {
     xpEach: gatherXp(resource.tier),
@@ -1404,7 +1394,7 @@ function resourcesDoc(): string {
       ];
     });
   return page("Resources", "Gathering nodes, requirements, yields, respawns, and authored presentation from the live resource table.", table(
-    ["Node", "Skill", "Tier", "Level", "Primary", "Secondary", "XP each", "Per node", "Respawn / growth", "Available assets", "Depleted asset", "Target size"],
+    ["Node", "Skill", "Tier", "Level", "Primary", "Secondary", "XP each", "Per node", "Respawn", "Available assets", "Depleted asset", "Target size"],
     rows,
   ));
 }

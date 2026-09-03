@@ -145,10 +145,6 @@ put("silt_minnow", [primitive("fish", 0x7f98a3, 0xc4d4d7)]);
 put("bramble_trout", [primitive("fish", 0x4f5962, 0x9d6d54)]);
 put("cragfin", [primitive("fish", 0x53697b, 0xb9c4c5)]);
 put("ashfin", [primitive("fish", 0x574a44, 0xd88a56)]);
-put("bittergrain", [asset("grass_wispy_tall", 0xc6a75a)]);
-put("duskberry", [asset("bush_common", 0x644477)]);
-put("cairnleaf", [asset("plant_broad_large", 0x8e978d)]);
-put("coalroot", [primitive("gland", 0x352c26, 0x6b4a34)]);
 
 // Processed resources and components.
 for (const id of ["grithe_bar", "corven_bar", "kaldite_bar", "emberite_bar"] as const) {
@@ -226,10 +222,6 @@ put("roast_ember_haunch", [primitive("meat", 0x84431f, 0xe2d3b6)]);
 put("burnt_ember_haunch", [primitive("meat", 0x241f1d, 0x4f4841)]);
 
 // Seeds and food. Raw and cooked fish share a model, while colour carries preparation state.
-put("bittergrain_seed", [primitive("seed", 0xc9a65a, 0x765829)]);
-put("duskberry_seed", [primitive("seed", 0x6a477e, 0x9d7ab0)]);
-put("cairnleaf_seed", [primitive("seed", 0x9aa397, 0x56645e)]);
-put("coalroot_seed", [primitive("seed", 0x453a30, 0x8a6a3e)]);
 put("seared_minnow", [primitive("fish", 0xc58a54, 0xf0c781)]);
 put("burnt_minnow", [primitive("fish", 0x3b3029, 0x72533d)]);
 put("seared_trout", [primitive("fish", 0xa76a48, 0xdfad70)]);

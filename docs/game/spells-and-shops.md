@@ -60,7 +60,6 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Grithe Hatchet](./items/#grithe-hatchet) | 5 | 55 |
 | [Palewood Rod](./items/#palewood-rod) | 5 | 45 |
 | [Seared Minnow](./items/#seared-minnow) | 30 | 22 |
-| [Bittergrain Seed](./items/#bittergrain-seed) | 50 | 6 |
 | [Air Essence](./items/#air-essence) | 200 | 9 |
 | [Palewood Shaft](./items/#palewood-shaft) | 100 | 4 |
 | [Coarse Hide](./items/#coarse-hide) | 15 | 16 |
@@ -87,7 +86,6 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Duskoak Rod](./items/#duskoak-rod) | 4 | 190 |
 | [Seared Trout](./items/#seared-trout) | 25 | 62 |
 | [Seared Minnow](./items/#seared-minnow) | 20 | 22 |
-| [Duskberry Seed](./items/#duskberry-seed) | 30 | 22 |
 | [Earth Essence](./items/#earth-essence) | 200 | 24 |
 | [Duskoak Shaft](./items/#duskoak-shaft) | 80 | 14 |
 | [Bramble Hide](./items/#bramble-hide) | 12 | 55 |
@@ -102,7 +100,6 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Cairnpine Rod](./items/#cairnpine-rod) | 3 | 480 |
 | [Seared Cragfin](./items/#seared-cragfin) | 40 | 70 |
 | [Seared Trout](./items/#seared-trout) | 20 | 62 |
-| [Cairnleaf Seed](./items/#cairnleaf-seed) | 30 | 52 |
 | [Water Essence](./items/#water-essence) | 300 | 55 |
 | [Cairnpine Shaft](./items/#cairnpine-shaft) | 60 | 32 |
 | [Cairn Pelt](./items/#cairn-pelt) | 8 | 130 |
@@ -130,7 +127,6 @@ A matching weapon charge pays for the cast first. At zero charge, the weapon kee
 | [Cinderpine Rod](./items/#cinderpine-rod) | 3 | 1100 |
 | [Seared Ashfin](./items/#seared-ashfin) | 40 | 150 |
 | [Seared Cragfin](./items/#seared-cragfin) | 20 | 70 |
-| [Coalroot Seed](./items/#coalroot-seed) | 30 | 115 |
 | [Fire Essence](./items/#fire-essence) | 300 | 120 |
 | [Cinderpine Shaft](./items/#cinderpine-shaft) | 60 | 70 |
 | [Charhide](./items/#charhide) | 8 | 290 |

@@ -118,7 +118,7 @@ export interface RegionBounds {
 }
 
 export type LocationKind =
-  | "settlement" | "bank" | "seam" | "grove" | "water" | "farm"
+  | "settlement" | "bank" | "seam" | "grove" | "water"
   | "gate" | "landmark" | "camp" | "junction" | "dungeon";
 
 /**
@@ -785,8 +785,8 @@ const FALLOWMARCH: RegionDef = {
       blurb: "Where Corven Brook runs thin over red silt. Minnow water." },
     { id: "corven_ford", name: "Corven Ford", position: [-72, -146], kind: "junction", routeNode: true,
       blurb: "The only cart crossing of Corven Brook, well south of the shallows." },
-    { id: "marchfield_farm", name: "Marchfield", position: [-96, -22], kind: "farm", routeNode: true,
-      blurb: "Six plots inside the old wall line. Bittergrain, mostly." },
+    { id: "marchfield", name: "Marchfield", position: [-96, -22], kind: "landmark", routeNode: true,
+      blurb: "A weathered homestead with two fenced yards inside the old wall line." },
     { id: "west_track", name: "West Track", position: [-230, -60], kind: "junction", routeNode: true,
       blurb: "Where the copse track leaves the town road." },
     { id: "open_march_camp", name: "The Open March", position: [-250, 30], kind: "camp", routeNode: true,
@@ -804,8 +804,8 @@ const FALLOWMARCH: RegionDef = {
     { from: "town_center", to: "bank_interior" },
     { from: "town_center", to: "coldbrace_east_gate" },
     { from: "coldbrace_east_gate", to: "north_milestone" },
-    { from: "coldbrace_east_gate", to: "marchfield_farm" },
-    { from: "north_milestone", to: "marchfield_farm" },
+    { from: "coldbrace_east_gate", to: "marchfield" },
+    { from: "north_milestone", to: "marchfield" },
     { from: "north_milestone", to: "bracken_pit" },
     { from: "bracken_pit", to: "fallowmarch_north_gate" },
     { from: "bracken_pit", to: "fallowmarch_kiln_road" },
@@ -848,13 +848,6 @@ const FALLOWMARCH: RegionDef = {
       // Fish schools render below the canonical solved water surface. The semantic entity remains
       // the surface interaction proxy, so cluster placement must stay inside the authored pond.
       locationId: "redsill_shallows",
-    },
-    {
-      id: "marchfield_plots", resourceId: "plot_bittergrain",
-      count: 6, centre: [-96, -22], radius: 7,
-      // No soil-plot or scarecrow mesh (asset-report gap 5). The crop is the clickable thing; the
-      // dirt quad and its fence border are render-layer geometry.
-      locationId: "marchfield_farm",
     },
     {
       id: "fallowmarch_air_essence_cache", resourceId: "essence_air",
@@ -913,10 +906,10 @@ const FALLOWMARCH: RegionDef = {
       assetId: "animal_frog", scale: 2.2,
     },
     {
-      // The Marchfield, 90 m north-east of Coldbrace and the open ground a new character crosses
-      // first. Passive at 3 m, so you walk through the flock and fight only what you swing at.
+      // The smaller gated pen inside the Marchfield farm yard. Twelve hens make it read as a real
+      // flock at a glance; passive at 3 m, so the enclosure stays harmless unless attacked.
       id: "marchfield_hens", family: "hen", name: "Marchfield Hen", tier: 1,
-      count: 5, centre: [-88, -30], radius: 18,
+      count: 12, centre: [-93, -21], radius: 2.1,
       assetId: "animal_chicken", scale: 1.0,
     },
     {
@@ -935,11 +928,10 @@ const FALLOWMARCH: RegionDef = {
       assetId: "animal_goat", scale: 0.85,
     },
     {
-      // Pasture south of the shallows. Territorial at 5 m and off the road: at Melee 1 this fight
-      // is unwinnable (65.9 s, 32.8 damage against 23 health) and the whole point is that it never
-      // starts. A cow is also the largest thing in Fallowmarch, which does that warning visually.
-      id: "redsill_cattle", family: "cattle", name: "Redsill Cow", tier: 1,
-      count: 3, centre: [-70, -92], radius: 16,
+      // A few cattle graze south-west of the homestead, clear of the road and close enough to read
+      // as part of the same yard. Territorial at 5 m, so they do not start an early-game fight.
+      id: "redsill_cattle", family: "cattle", name: "Marchfield Cow", tier: 1,
+      count: 4, centre: [-110, -34], radius: 5,
       // 1.57 m native, drawn at 1.41 m. Shorter than the player and roughly three times the mass.
       assetId: "animal_cattle", scale: 1.0,
     },
@@ -1035,13 +1027,13 @@ const FALLOWMARCH: RegionDef = {
       blurb: "One dead Palewood at the top of the rise. Every direction from here looks the same.",
     },
     {
-      // Marchfield is a resource cluster rather than a settlement, so the farmstead has to enter
-      // through the landmark composition hook. The empty crate is a quiet semantic anchor; the
-      // composition supplies the barn, paddock fence, gate, and yard dressing around the plots.
+      // Farming gameplay stays retired. The old composition is useful scenery on its own: a
+      // farmhouse, an outer paddock, a second gated chicken pen, and ordinary yard clutter. Crop
+      // beds were separate resource entities and remain absent from the authored clusters above.
       id: "marchfield_farmstead", name: "Marchfield Farmstead", position: [-96, -22],
       assetId: "farm_crate_empty", scale: 0.8, rotationY: 0,
       composition: "farm_yard",
-      blurb: "A working yard around six bittergrain plots, with a barn backed into the old wall line.",
+      blurb: "A weathered farmhouse with two fenced yards, a crowded hen pen, and cattle nearby.",
     },
   ],
 
@@ -1398,8 +1390,6 @@ const KARROWMOOR: RegionDef = {
       blurb: "Terrace two. A quarry camp with a wall around it and a crane it no longer uses." },
     { id: "highcairn_bank", name: "Highcairn Bank", position: [150, -70], kind: "bank", routeNode: true,
       blurb: "One counter. 188 m from the Upper Karrow Seam by road, 46 m over Sunder Ledge." },
-    { id: "highcairn_plots", name: "Highcairn Plots", position: [128, -58], kind: "farm", routeNode: true,
-      blurb: "Four plots in the lee of the wall. Cairnleaf takes fifteen minutes to come up." },
     { id: "karrow_ramp_two", name: "Second Ramp", position: [100, -80], kind: "junction", routeNode: true,
       blurb: "The slate ramp from terrace two to terrace three." },
     { id: "karrow_ramp_three", name: "Third Ramp", position: [118, -138], kind: "junction", routeNode: true,
@@ -1427,7 +1417,6 @@ const KARROWMOOR: RegionDef = {
     { from: "moor_road_bend", to: "highcairn_outpost" },
     { from: "karrowmoor_terraces", to: "highcairn_outpost" },
     { from: "highcairn_outpost", to: "highcairn_bank" },
-    { from: "highcairn_outpost", to: "highcairn_plots" },
     { from: "highcairn_bank", to: "karrow_ramp_two" },
     { from: "karrow_ramp_two", to: "karrow_ramp_three" },
     { from: "karrow_ramp_three", to: "upper_karrow_seam" },
@@ -1466,11 +1455,6 @@ const KARROWMOOR: RegionDef = {
       id: "far_tarn_spots", resourceId: "fish_cragfin",
       count: 2, centre: [284, -110], radius: 7,
       locationId: "far_tarn",
-    },
-    {
-      id: "highcairn_plot_beds", resourceId: "plot_cairnleaf",
-      count: 4, centre: [128, -58], radius: 6,
-      locationId: "highcairn_plots",
     },
     {
       id: "karrowmoor_water_essence_cache", resourceId: "essence_water",
@@ -1761,8 +1745,8 @@ const KARROWMOOR: RegionDef = {
  * from Vellenwood); they are guidance, not doors.
  *
  * Layout, per the amendment: Emberfast at the centre with the complete station set, the Emberite
- * quarry west, the Cinderpine stand east, the Ashfin springs south-east, the Coalroot plots
- * beside town, and the Fire altar ruins and Cinderwake's arena in the north-east.
+ * quarry west, the Cinderpine stand east, the Ashfin springs south-east, and the Fire altar ruins
+ * and Cinderwake's arena in the north-east.
  */
 const KILNHALT: RegionDef = {
   id: "kilnhalt",
@@ -1806,8 +1790,6 @@ const KILNHALT: RegionDef = {
       blurb: "The east gatehouse. Carts to the stand and the springs leave this way." },
     { id: "emberfast_west_postern", name: "Quarry Postern", position: [-24, 333], kind: "gate", routeNode: true,
       blurb: "The west gatehouse, opening onto the plots and the quarry road." },
-    { id: "emberfast_plots", name: "Coalroot Plots", position: [-32, 326], kind: "farm", routeNode: true,
-      blurb: "Four beds in the warm soil against the west wall. Coalroot takes twenty minutes." },
     { id: "clinker_quarry", name: "Clinker Quarry", position: [-250, 330], kind: "seam", routeNode: true,
       blurb: "Six Emberite seams and two Kilnstone faces, still warm at the break." },
     { id: "ashfin_springs", name: "Ashfin Springs", position: [210, 250], kind: "water", routeNode: true,
@@ -1830,7 +1812,6 @@ const KILNHALT: RegionDef = {
     { from: "emberfast_east_gate", to: "emberfast_town" },
     { from: "emberfast_town", to: "emberfast_bank" },
     { from: "emberfast_town", to: "emberfast_west_postern" },
-    { from: "emberfast_west_postern", to: "emberfast_plots" },
     { from: "emberfast_west_postern", to: "clinker_quarry" },
     { from: "emberfast_east_gate", to: "cinderpine_stand" },
     { from: "emberfast_south_bend", to: "ashfin_springs" },
@@ -1860,11 +1841,6 @@ const KILNHALT: RegionDef = {
       id: "ashfin_spring_spots", resourceId: "fish_ashfin",
       count: 4, centre: [210, 250], radius: 9,
       locationId: "ashfin_springs",
-    },
-    {
-      id: "emberfast_plot_beds", resourceId: "plot_coalroot",
-      count: 4, centre: [-32, 326], radius: 6,
-      locationId: "emberfast_plots",
     },
     {
       id: "kilnhalt_fire_essence_cache", resourceId: "essence_fire",

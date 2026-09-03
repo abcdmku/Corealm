@@ -54,10 +54,7 @@ describe("Corealm audio catalog", () => {
     expect(catalogText).not.toContain("c:\\users\\");
   });
 
-  it("keeps ambiguous farming, smelting, consumption, and traversal selections explicit", () => {
-    expect(cueForActivity({ kind: "farming", op: "rake" })).toBe("farm.rake");
-    expect(cueForActivity({ kind: "farming", op: "plant" })).toBe("farm.plant");
-    expect(cueForActivity({ kind: "farming", op: "harvest" })).toBe("farm.harvest");
+  it("keeps ambiguous smelting, consumption, and traversal selections explicit", () => {
     expect(cueForActivity({ kind: "production", skill: "smithing", op: "smelt", phase: "started" })).toBeNull();
     expect(cueForActivity({ kind: "production", skill: "smithing", op: "smelt", phase: "completed" })).toBe("production.smelt");
     expect(cueForActivity({ kind: "production", skill: "smithing", op: "smith", phase: "completed" })).toBe("production.smith");

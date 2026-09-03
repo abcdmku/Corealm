@@ -8,6 +8,28 @@ Everything here is meant to be implemented literally. Where a number appears, it
 
 ---
 
+## Approved amendment: retire farming
+
+The project owner approved this amendment on September 2, 2026 by directing removal of farming and
+all farming-related quests. It supersedes every farming requirement elsewhere in this document.
+
+- Farming is not a skill. The shipped game has 10 skills.
+- Crop resources, seeds, farm plots, their interactions, growth state, audio cues, agent operations,
+  and generated documentation are removed.
+- Bright Water is removed because its objectives and rewards depend on farming. The shipped game has
+  9 quests, including the 7-stage Long Cairn.
+- Existing saves migrate to version 7. Migration removes retired farming state, skill and quest
+  progress, and crop or seed stacks from inventory, bank, equipment, loot, and recovery caches.
+- Ranger Syb remains as an ordinary NPC. Decorative produce and agrarian building props may remain
+  where they do not expose farming gameplay.
+- Crooked Grain remains: its objectives concern Woodcutting and the name refers to wood grain.
+
+Acceptance requires typecheck, the full unit suite, production build, generated docs, feature-lab
+gate, real-game Chromium smoke, and screenshot inspection. Regression tests must prove the public
+contracts and authored world expose no farming and that version-6 saves migrate cleanly.
+
+---
+
 ## Approved amendment: regional essence altar rites
 
 The project owner approved this amendment on August 30, 2026 by directing the altar move, the Altar Ruins Free art swap, and the boss-Orb activation loop. It replaces the earlier rule that town altars only recharge weapons and that a crafting table consumes one Orb per elemental weapon.
@@ -124,7 +146,6 @@ The project owner approved this amendment on September 1, 2026 by directing impl
 | Clinker Quarry | West, near `[-250, 330]` | 6 Emberite ore nodes (tier 20), 2 Kilnstone nodes |
 | Cinderpine Stand | East, near `[240, 340]` | 8 Cinderpine trees (tier 20) |
 | Ashfin Springs | South-east, near `[210, 250]` | 4 fishing spots, Ashfin (tier 20) |
-| Coalroot Terrace | Beside Emberfast | 4 farm plots, Coalroot seeds |
 | Kilnhalt Altar Ruins | North-east, near `[290, 400]` | The Fire altar on its ruined court, 5 Fire Essence nodes ringing it |
 | Cinderwake Arena | North-east, near `[286, 420]` | Cinderwake, the tier-20 miniboss |
 | The Kilnroads | Open ground | Tier-20 enemy groups |
@@ -144,11 +165,10 @@ One `defineTier` row extends the canonical table; adding it must not require a g
 | Hide | Charhide | `charhide` |
 | Fish | Ashfin | `ashfin`, `seared_ashfin`, `burnt_ashfin` |
 | Meat | Ember Haunch | `raw_ember_haunch`, `roast_ember_haunch`, `burnt_ember_haunch` |
-| Crop | Coalroot | `coalroot`, `coalroot_seed`, plot `plot_coalroot` |
 
 - Smelting: one Emberite bar consumes 3 ore plus 2 Kilnstone, continuing the 1+1 / 2+1 / 2+2 escalation. Kilnstone is the tier-20 flux; March Stone remains the flux for tiers 1–10.
 - Emberite produces the full metal set: dagger, sword, helm, plate, greaves, boots, gauntlets, pickaxe, hatchet, ring, pendant (`emberite_*`), using Cinderpine handles. Cinderpine produces staff, wand, rod, and shield; Charhide produces the magic set `charhide_hood/robe/leggings/boots/wraps`; magic jewellery is `cinder_ring` and `cinder_charm`. Stats follow the existing per-tier balance derivation in `content/equipment.ts` so that a full tier-20 melee kit lands near the PRD 2.4 checkpoint of +45 gearPower at level 20.
-- Recipes generate from the existing craft-weight table (bar 42 XP, sword 182 XP, body 260 XP, cooked Ashfin 78 XP, and so on). Seared Ashfin heals 19. Coalroot: 5 stages at 240 s, yield 2–5, harvest 52 XP, plant 10 XP.
+- Recipes generate from the existing craft-weight table (bar 42 XP, sword 182 XP, body 260 XP, cooked Ashfin 78 XP, and so on). Seared Ashfin heals 19.
 - Cinderpine campfires burn 300 s and award 10 Fletching and 10 Crafting XP, from the existing formulas.
 - Shops `emberfast_general` and `emberfast_smith` mirror the Highcairn pair at tier 20, including Fire Essence stocked locally like the other elements. Skill guides, icons, and equipment visuals extend automatically from the canonical row plus one icon appearance per new item and tier-20 entries in the tier-keyed icon tables.
 
@@ -206,7 +226,7 @@ No dungeon, quest chain, new spell ids, ranged combat, or elemental melee-damage
 
 ### In scope
 
-All 11 skills, movement and camera, click-to-move over a real navmesh, keyboard movement, Rapier collision, semantic entities, 28-slot inventory, 9-slot equipment, bank, currency, shops, gathering with depletion and respawn, four production skills, melee and magic combat, enemies with three behaviours, loot, derived health, death and item recovery, NPCs, dialogue, 10 quests including one 7-stage chain, one dungeon, one boss, browser-local persistence, generated documentation, the WebMCP tool set, the agent event queue, four overlay kinds, and `window.__gameDebug`.
+All 10 skills, movement and camera, click-to-move over a real navmesh, keyboard movement, Rapier collision, semantic entities, 28-slot inventory, 9-slot equipment, bank, currency, shops, gathering with depletion and respawn, four production skills, melee and magic combat, enemies with three behaviours, loot, derived health, death and item recovery, NPCs, dialogue, 9 quests including one 7-stage chain, one dungeon, one boss, browser-local persistence, generated documentation, the WebMCP tool set, the agent event queue, four overlay kinds, and `window.__gameDebug`.
 
 ### Cut from Phase 1
 
@@ -221,7 +241,7 @@ These appear in the brief but do not serve the Phase 1 gate. Each is listed with
 | Bank tabs, fuzzy search, custom ordering, placeholders | A plain substring filter over item names covers every Phase 1 test case. | Phase 2. |
 | Shop restocking simulation, price drift, stock decay | Fixed stock, fixed prices. The Phase 1 economy loop is sell-resources / buy-supplies, and drift makes tests non-deterministic for no gain across three regions. | Phase 2. |
 | Overlay kinds beyond four (hazard markers, quest-target auto-tracking, requirement badges) | Highlight, path line, world marker, and world label cover the screenshot requirement and let an agent draw a complete assistant experience. | Phase 2. |
-| Ranged combat, prayer-style systems, special attacks, multiple weapon styles | Not among the brief's 11 skills. | Never. |
+| Ranged combat, prayer-style systems, special attacks, multiple weapon styles | Not among the shipped skill set. | Never. |
 | Day/night, weather, ambient audio, music | Not gate-checked, and each is a full system. | Phase 2 at the earliest. |
 | Multiplayer, accounts, server persistence | The brief says browser-local for this roadmap. | Out of roadmap. |
 | Item degradation, repair, charges (except magic essence shards) | No gate criterion. | Out of scope. |
@@ -229,7 +249,7 @@ These appear in the brief but do not serve the Phase 1 gate. Each is listed with
 
 ### Deliberate simplifications that need root sign-off
 
-1. **No separate Defence skill.** The brief lists Melee as covering "physical accuracy, damage, defense", so physical defence level equals the Melee level and magical defence level equals the Magic level. That keeps the skill count at exactly 11.
+1. **No separate Defence skill.** The brief lists Melee as covering "physical accuracy, damage, defense", so physical defence level equals the Melee level and magical defence level equals the Magic level. Farming's retirement leaves the skill count at exactly 10.
 2. **Death drops inventory only, not equipment.** The brief asks for consequence while keeping experimentation practical. Dropping worn gear makes the agent recovery loop much harder to test and much harsher for new players. Equipment stays worn through death.
 3. **Magic needs a consumable.** Attack spells consume one Essence Shard per cast. Without a cost, magic beats melee at every tier because it has no upkeep. Shards come from Crafting (gem plus log) and from shops, which wires Magic into Mining and Crafting.
 
@@ -238,7 +258,7 @@ These appear in the brief but do not serve the Phase 1 gate. Each is listed with
 The August 29, 2026 audio brief reverses the Phase 1 cut for ambient audio and music. The shipped game now includes:
 
 - A rights-traced SFX library plus owner-supplied local music, curated to Corealm's grounded medieval-fantasy tone. Files that read as modern, sci-fi, cartoon, firearm, vehicle, electronic, or otherwise outside that tone are excluded.
-- SFX for player footsteps and every shipped interaction family: mining, woodcutting, fishing, farming, smithing, smelting, crafting, cooking, fletching, melee, magic, damage, death, looting, doors, portals, agility, equipment, banking, shops, dialogue, and UI feedback.
+- SFX for player footsteps and every shipped interaction family: mining, woodcutting, fishing, smithing, smelting, crafting, cooking, fletching, melee, magic, damage, death, looting, doors, portals, agility, equipment, banking, shops, dialogue, and UI feedback.
 - Repeated cue variants play in a fixed round-robin order at a fixed playback rate. Footsteps read the rendered ground material, with distinct families for grass, dirt and mud, stone and gravel, wood, forest floor, and cave floor.
 - Region ambience for the three surface regions and the Gravelmaw interior. Ambience changes with semantic player region and never changes game state.
 - Region music only where the supplied `C:\Users\Borg\Music\corealm` library names a shipped region theme. Fallowmarch uses plains music, Vellenwood uses `Deep Woodland`, Karrowmoor uses `Stone city`, and Gravelmaw has no music until a matching track is supplied. Desert, jungle, goblin-village, mire, and swamp tracks are reserved for future regions.
@@ -336,7 +356,6 @@ Exactly 11, each 1 to 99, each starting at level 1 with 0 XP.
 | `mining` | Mining | gathering | `#8d8d94` |
 | `woodcutting` | Woodcutting | gathering | `#6b8f3a` |
 | `fishing` | Fishing | gathering | `#3aa0c4` |
-| `farming` | Farming | gathering | `#a3c44a` |
 | `smithing` | Smithing | production | `#b5651d` |
 | `crafting` | Crafting | production | `#a86fc4` |
 | `cooking` | Cooking | production | `#d98c2b` |
@@ -439,7 +458,7 @@ Ordrun deals about 1.02 damage/s through tier 10 armour, so a 165 s fight costs 
 
 ### 2.5 Gathering formulas
 
-One shared model across Mining, Woodcutting, Fishing, and the harvest step of Farming.
+One shared model across Mining, Woodcutting, and Fishing.
 
 ```
 gatherTickMs   = 1800
@@ -550,23 +569,9 @@ Before Agility 10, tier 5 ore next to a bank beats tier 10 ore across the moor b
 
 Phase 1 has 9 obstacles: 2 in Fallowmarch (req 1 and 3), 3 in Vellenwood (req 5, 6, 8), 4 in Karrowmoor (req 10 for Sunder Ledge, plus 12, 14, 14).
 
-### 2.9 Farming
+### 2.9 Inventory, bank, currency
 
-Persistent across sessions and reloads. Growth advances from wall-clock deltas, so a plot planted before a reload keeps growing.
-
-| Crop | Tier | Farming req | Stages | Seconds per stage | Total | Yield | Harvest XP each | Plant XP |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Bittergrain | 1 | 1 | 4 | 60 | 240 s | 3 to 6 | 10 | 2 |
-| Duskberry | 5 | 5 | 5 | 120 | 600 s | 3 to 6 | 24 | 5 |
-| Cairnleaf | 10 | 10 | 5 | 180 | 900 s | 2 to 5 | 35 | 7 |
-
-Plot lifecycle: `empty -> raked -> planted -> growing(stage 1..n) -> ready -> harvested -> empty`. Raking takes 1.8 s and gives 3 Farming XP. Six plots in Fallowmarch, four in Karrowmoor. Plots are per-save, not per-session.
-
-`__gameDebug.advanceGameTime(seconds)` fast-forwards growth timers and node respawns for tests. It is never exposed to WebMCP.
-
-### 2.10 Inventory, bank, currency
-
-- Inventory: 28 slots. Stackable kinds are currency, essence shards, seeds, shafts, and gems. Everything else takes one slot per item, including every ore, log, fish, bar, and equipment piece.
+- Inventory: 28 slots. Stackable kinds are currency, essence shards, shafts, and gems. Everything else takes one slot per item, including every ore, log, fish, bar, and equipment piece.
 - Bank: 400 slots, every slot stacks to 2,147,483,647. Deposit, withdraw, deposit-all, quantity selection (1 / 5 / 10 / all / custom), and a substring name filter.
 - Currency: **marks**. Stackable, carried in inventory, dropped by enemies, paid by quests, earned by selling.
 
@@ -588,7 +593,7 @@ Reference prices. Shop buy price to the player and sell price from the player, a
 
 Enemy mark drops are `randomInt(round(tier * 3), round(tier * 11))`, so tier 1 drops 3 to 11 and tier 10 drops 30 to 110. Ordrun drops 900 to 1,400 plus a guaranteed Kaldite piece.
 
-### 2.11 Death and recovery
+### 2.10 Death and recovery
 
 On death, every inventory item drops into a **Recovery Cache** semantic entity at the death position, snapped to the navmesh. Equipped items stay equipped. No XP or levels are lost. The player respawns at the last settlement respawn point they have visited (Coldbrace, Rootfall, or Highcairn) at full health.
 
@@ -622,12 +627,12 @@ Order is load-bearing. A worker who reorders this breaks tests.
 | 3 | Command dispatch | `api/gameApi.ts` | Validates and applies one command per actor per tick. Rejections become errors and events. |
 | 4 | Navigation | `systems/navigation.ts` | Advances path following, recomputes on blockage, emits `navigation.completed` / `navigation.failed`. |
 | 5 | Physics | `systems/physics.ts` | Rapier step. Character controller resolves collision and grounding for the player and all enemies. |
-| 6 | Activity | `systems/gathering.ts`, `production.ts`, `farming.ts`, `agility.ts` | Advances the single active player activity. Rolls only on combat ticks. |
+| 6 | Activity | `systems/gathering.ts`, `production.ts`, `agility.ts` | Advances the single active player activity. Rolls only on combat ticks. |
 | 7 | Enemy AI | `systems/enemyAI.ts` | Aggro checks, leash checks, chase, retreat, boss phase transitions and telegraphs. |
 | 8 | Combat | `systems/combat.ts` | Resolves attack timers for the player and every engaged enemy, applies damage, awards XP. |
 | 9 | Health | `systems/health.ts` | Regeneration, low-health threshold crossing, food effects. |
 | 10 | Death | `systems/death.ts` | Detects zero health, builds the Recovery Cache, teleports and resets. Also expires stale caches. |
-| 11 | World | `world/entities.ts` | Node respawn timers, crop growth, loot despawn, spawner repopulation. |
+| 11 | World | `world/entities.ts` | Node respawn timers, loot despawn, spawner repopulation. |
 | 12 | Quests | `systems/quests.ts` | Evaluates stage predicates against the state snapshot, advances stages, emits `quest.updated`. |
 | 13 | Discovery | `api/observation.ts` | Marks newly visible entities and locations as discovered, emits `entity.discovered`. |
 | 14 | Event flush | `agent/events.ts` | Appends the tick's events to the ring buffer, wakes any blocked `corealm_events` waiters. |
@@ -717,7 +722,7 @@ Fallowmarch is the last surveyed land before the maps stop being useful. Two gen
 | Bracken Pit | 160 m north of town | 6 Grithe ore nodes (tier 1), 2 stone nodes |
 | Palewood Copse | 190 m west | 8 Palewood trees (tier 1) |
 | Redsill Shallows | 120 m east, on Corven Brook | 4 fishing spots, Silt minnow (tier 1) |
-| Marchfield | 90 m north-east, inside the wall line | 6 farm plots, Bittergrain seeds |
+| Marchfield | 90 m north-east, inside the wall line | Abandoned March Company fieldworks and a route landmark |
 | The Open March | Everywhere outside the road | Rill Skitterlings, Marchwolf pups |
 | Brookvault Planks (Agility 1) | Across Corven Brook | Cuts the bank-to-Redsill trip from 205 m to 130 m |
 | Wall Vault (Agility 3) | North wall | Cuts bank-to-Bracken from 178 m to 118 m |
@@ -757,7 +762,7 @@ Karrowmoor is what Fallowmarch would be if you tilted it sixty degrees and took 
 
 | Feature | Contents |
 | --- | --- |
-| Highcairn outpost | Terrace 2. Bank, general shop, smith shop, furnace, anvil, cooking range, 4 quest NPCs, 4 farm plots |
+| Highcairn outpost | Terrace 2. Bank, general shop, smith shop, furnace, anvil, cooking range, 4 quest NPCs |
 | Lower Quarry | Terrace 1. 5 Kaldite ore nodes (tier 10), the Gravelmaw entrance |
 | Upper Karrow Seam | Terrace 4. 3 Kaldite ore nodes, 190 m from the bank by road |
 | Ridge Pines | Terrace 3. 8 Cairnpine trees (tier 10) |
@@ -905,15 +910,6 @@ interface GameState {
     speaker: string;
     options: { id: string; text: string; enabled: boolean; disabledReason?: string }[];
   } | null;
-  farming: Record<string, {            // plotId -> plot
-    plotId: string;
-    regionId: RegionId;
-    cropId: ItemId | null;
-    stage: number;
-    stageCount: number;
-    stageStartedAtMs: number;          // wall clock, survives reload
-    state: "empty" | "raked" | "growing" | "ready";
-  }>;
   world: {
     nodes: Record<EntityId, {
       remaining: number;
@@ -967,7 +963,6 @@ type ActivityState =
   | { kind: "production"; skill: SkillId; recipeId: RecipeId; stationId: EntityId;
       remaining: number; completed: number; nextCompleteAtMs: number }
   | { kind: "traversing"; obstacleId: EntityId; endsAtMs: number }
-  | { kind: "farming";    op: "rake" | "plant" | "harvest"; plotId: string; endsAtMs: number }
   | { kind: "eating";     itemId: ItemId; endsAtMs: number };
 ```
 
@@ -1040,7 +1035,6 @@ game/src/
     enemyAI.ts                   D2
     health.ts                    D2
     death.ts                     D2
-    farming.ts                   B3
     agility.ts                   A3
     quests.ts                    E2
     dialogue.ts                  E2
@@ -1097,7 +1091,7 @@ These signatures are the contract the root reviews and freezes before any parall
 export type Vec3 = readonly [number, number, number];
 export type SkillId =
   | "melee" | "magic"
-  | "mining" | "woodcutting" | "fishing" | "farming"
+  | "mining" | "woodcutting" | "fishing"
   | "smithing" | "crafting" | "cooking" | "fletching"
   | "agility";
 
@@ -1114,12 +1108,12 @@ export type SpellId  = "emberlash" | "stonebrand" | "voltrend";
 export type QuestId  = string;
 
 export type Archetype =
-  | "ore" | "tree" | "fishing_spot" | "farm_plot"
+  | "ore" | "tree" | "fishing_spot"
   | "enemy" | "boss" | "npc" | "station" | "bank" | "shop"
   | "obstacle" | "door" | "portal" | "loot" | "recovery_cache" | "landmark";
 
 export type InteractionId =
-  | "inspect" | "mine" | "chop" | "fish" | "rake" | "plant" | "harvest"
+  | "inspect" | "mine" | "chop" | "fish"
   | "attack" | "cast" | "talk" | "open" | "enter" | "climb" | "vault"
   | "loot" | "take" | "produce" | "bank" | "trade" | "equip" | "unequip";
 
@@ -1144,7 +1138,7 @@ export interface ItemDef {
   description: string;
   stackable: boolean;
   value: number;                      // shop buy price; sell is round(value * 0.6)
-  category: "resource" | "bar" | "equipment" | "food" | "tool" | "seed" | "quest" | "currency" | "component";
+  category: "resource" | "bar" | "equipment" | "food" | "tool" | "quest" | "currency" | "component";
   equip?: {
     slot: EquipSlot;
     bonuses: EquipmentBonuses;
@@ -1153,7 +1147,6 @@ export interface ItemDef {
   };
   food?: { healAmount: number };
   tool?: { skill: SkillId; gatherBonus: number };
-  seed?: { cropId: ItemId };
 }
 
 // ---------- semantic entity, the shared world object ----------
@@ -1441,7 +1434,7 @@ Movement always runs at 4.2 m/s on the navmesh. There is no fast path.
 
 **6. `corealm_interact`**
 Args: `{ entityId: string, interaction: InteractionId }`.
-Returns: `{ started: "gathering"|"production"|"traversing"|"farming"|"dialogue"|"bank"|"shop"|"loot"|"door", activity?: ActivitySummary }`.
+Returns: `{ started: "gathering"|"production"|"traversing"|"dialogue"|"bank"|"shop"|"loot"|"door", activity?: ActivitySummary }`.
 Errors: `NOT_FOUND`, `OUT_OF_RANGE` (with the required distance in the message), `REQUIREMENTS_NOT_MET`, `DEPLETED`, `INVENTORY_FULL`, `BUSY`, `DEAD`, `UNAVAILABLE`.
 One call starts exactly the continuing activity one human click starts.
 
@@ -1455,7 +1448,7 @@ Returns: `{ targetId: string, attackSpeedMs: number, targetHealth: number, targe
 Errors: `NOT_FOUND`, `OUT_OF_RANGE`, `REQUIREMENTS_NOT_MET` (spell level), `NOT_ENOUGH_ITEMS` (no essence shards), `DEAD`, `UNAVAILABLE` (target already dead or non-hostile).
 
 **9. `corealm_use_item`**
-Args: `{ itemId: string, on?: { itemId: string } | { entityId: string } }`.
+Args: `{ itemId: string, on?: { itemId: string } }`.
 Returns: `{ effect: string, healed?: number, consumed?: ItemStack }`.
 Errors: `NOT_ENOUGH_ITEMS`, `NOT_FOUND`, `OUT_OF_RANGE`, `BUSY`, `UNAVAILABLE`, `DEAD`.
 
@@ -1518,7 +1511,7 @@ If the shipping WebMCP implementation supports server-initiated notifications, `
 | `activity.stopped` | `{ kind: string, reason: "completed"\|"depleted"\|"inventory_full"\|"moved"\|"combat"\|"cancelled"\|"missing_items"\|"died", completed: number }` |
 | `resource.depleted` | `{ entityId: string, itemId: string, respawnInSeconds: number, yieldsTaken: number }` |
 | `inventory.full` | `{ blockedItemId: string }` |
-| `item.received` | `{ itemId: string, quantity: number, source: "gather"\|"loot"\|"produce"\|"quest"\|"shop"\|"bank"\|"harvest" }` |
+| `item.received` | `{ itemId: string, quantity: number, source: "gather"\|"loot"\|"produce"\|"quest"\|"shop"\|"bank" }` |
 | `item.lost` | `{ itemId: string, quantity: number, reason: "consumed"\|"sold"\|"banked"\|"died"\|"burnt" }` |
 | `combat.started` | `{ targetId: string, targetName: string, targetLevel: number, initiator: "player"\|"enemy" }` |
 | `combat.ended` | `{ targetId: string, outcome: "killed"\|"escaped"\|"died"\|"leashed", xpGained: number }` |
@@ -1556,7 +1549,7 @@ Never called by game code. Installed by `debug/gameDebug.ts` at boot, and it wra
 | Method | Signature | Purpose |
 | --- | --- | --- |
 | `setTimeScale` | `(scale: number) => void` | 0.1 to 100. Multiplies the sim clock only. Render stays real time. |
-| `advanceGameTime` | `(seconds: number) => void` | Jumps node respawn timers, crop growth, loot expiry, and the recovery cache clock forward without simulating the frames between. The only way to test a 900 s Cairnleaf. |
+| `advanceGameTime` | `(seconds: number) => void` | Jumps node respawn timers, loot expiry, and the recovery cache clock forward without simulating the frames between. |
 | `teleport` | `(to: Vec3 \| { entityId: string } \| { locationId: string }) => void` | Snaps the player to the navmesh at the target. Test setup only, never exposed to WebMCP. |
 | `grantXp` | `(skill: SkillId, amount: number) => void` | Adds XP through the real level-up path so `level.gained` still fires. |
 | `setSkillLevel` | `(skill: SkillId, level: number) => void` | Sets XP to `totalXpAt(level)` exactly. Used to set up tier 10 scenarios without an hour of grinding. |
@@ -1565,7 +1558,7 @@ Never called by game code. Installed by `debug/gameDebug.ts` at boot, and it wra
 | `setCurrency` | `(marks: number) => void` | Sets the mark balance. |
 | `setHealth` | `(health: number) => void` | Clamped to `[0, maxHealth]`. Setting 0 runs the real death path. |
 | `setSeed` | `(seed: number) => void` | Reseeds every RNG stream. Combined with `setPaused` and `step`, makes combat rolls reproducible. |
-| `loadScenario` | `(name: string) => Promise<void>` | Applies a named fixture from `debug/scenarios.ts`. Phase 1 ships: `fresh`, `tier1_ready`, `tier5_ready`, `tier10_ready`, `boss_ready`, `bank_full`, `farming_planted`, `quest_longcairn_stage4`, `dead_with_cache`. |
+| `loadScenario` | `(name: string) => Promise<void>` | Applies a named fixture from `debug/scenarios.ts`. Phase 1 ships: `fresh`, `tier1_ready`, `tier5_ready`, `tier10_ready`, `boss_ready`, `bank_full`, `quest_longcairn_stage4`, `dead_with_cache`. |
 | `forceRespawn` | `(entityId: EntityId) => void` | Immediately respawns a node or enemy. |
 | `depleteNode` | `(entityId: EntityId) => void` | Sets `remaining` to 0 and runs the real depletion path. |
 | `setQuestStage` | `(questId: QuestId, stage: number) => void` | Jumps a quest to a stage, applying prior-stage flags. |
@@ -1659,7 +1652,7 @@ Every test ends by asserting `__gameDebug.getErrors()` has length 0.
 | E9 | `advanceGameTime(901)` on a live cache. The cache becomes null and the items are gone. |
 | E10 | `loadScenario("boss_ready")`, fight Ordrun. At health fraction 0.55, `getState().world.enemies.ordrun.bossPhase` changes from 1 to 2. A telegraph overlay exists for 1600 ms before the slam, and standing in it costs exactly 22 health. |
 
-### 8.6 Quests, dialogue, agility, farming, persistence, agent
+### 8.6 Quests, dialogue, agility, persistence, agent
 
 | # | Check |
 | --- | --- |
@@ -1669,24 +1662,22 @@ Every test ends by asserting `__gameDebug.getErrors()` has length 0.
 | F4 | Selecting a disabled dialogue option returns `INVALID_ARGUMENT` and does not change `getState().dialogue.nodeId`. |
 | F5 | `setSkillLevel("agility", 10)`, traverse Sunder Ledge. Agility XP increases by exactly 63, and the player's post-traversal position is within 1 m of the obstacle's `exitPosition`. `getNavPath` from the bank via the shortcut is under 60 m against 185 m to 200 m without it. |
 | F6 | `setSkillLevel("agility", 10)` and fail-force by seed: on failure, health drops by 2 to 6, Agility XP is unchanged, and the player is at `failPoint`. |
-| F7 | Rake, plant Bittergrain, `advanceGameTime(240)`, harvest. Yield is 3 to 6, Farming XP is `2 + 3 + yield * 10`, and the plot returns to `"empty"`. |
-| F8 | Plant a crop, `saveNow()`, `page.reload()`, wait for `ready()`. The plot's `stageStartedAtMs` and `cropId` survive, and growth continued across the reload. |
-| F9 | Full persistence: after a session that levels 4 skills, banks 30 items, completes 2 quests, and discovers 2 regions, `page.reload()` reproduces `skills`, `bank`, `quests`, `discovery`, `equipment`, and `currency` exactly. |
-| F10 | `getSaveBlob()` parses as JSON under 100 KB. `reset()` then `loadSaveBlob(blob)` restores an identical `getState()` apart from `meta.lastSavedAtMs`. |
-| F11 | Parity: `callTool("corealm_interact", { entityId: ore, interaction: "mine" })` and a real mouse click on the same node produce the same `activity.started` event payload and the same `ActivityState` shape. |
-| F12 | Information parity: `corealm_inspect` on an entity the player has never seen returns `NOT_FOUND`. After the player walks within 40 m with line of sight, `entity.discovered` fires and `corealm_inspect` succeeds. |
-| F13 | `corealm_search_docs({ query: "kaldite" })` returns hits covering the ore, the bar, and at least one recipe, and returns nothing from an unstarted quest's hidden stages. |
-| F14 | `corealm_events` with `timeoutMs: 5000` while idle returns `{ events: [], nextSeq }` after roughly 5 s without throwing. The same call while gathering returns within one gather tick. |
-| F15 | Event-efficiency budget: a scripted agent that mines 1 to 10 using `interact` plus `corealm_events` makes fewer than 60 tool calls total, counted by a `callTool` wrapper. |
-| F16 | Overlays: `corealm_overlay({ op: "set", overlays: [{ id: "x", kind: "highlight", entityId }] })` returns `activeCount: 1`, the screenshot shows the outline, and `getState()` is unchanged apart from nothing (overlays live outside canonical state). |
-| F17 | Agent gate proof: a scripted agent using only WebMCP tools raises Mining from 1 to 10 and ends with at least 40 ore in the bank, with no `__gameDebug` call other than `setTimeScale`. |
-| F18 | Agent quest proof: a scripted agent using only WebMCP tools takes The Long Cairn from unstarted to `"complete"` across all 7 stages. |
+| F7 | Full persistence: after a session that levels 4 skills, banks 30 items, completes 2 quests, and discovers 2 regions, `page.reload()` reproduces `skills`, `bank`, `quests`, `discovery`, `equipment`, and `currency` exactly. |
+| F8 | `getSaveBlob()` parses as JSON under 100 KB. `reset()` then `loadSaveBlob(blob)` restores an identical `getState()` apart from `meta.lastSavedAtMs`. |
+| F9 | Parity: `callTool("corealm_interact", { entityId: ore, interaction: "mine" })` and a real mouse click on the same node produce the same `activity.started` event payload and the same `ActivityState` shape. |
+| F10 | Information parity: `corealm_inspect` on an entity the player has never seen returns `NOT_FOUND`. After the player walks within 40 m with line of sight, `entity.discovered` fires and `corealm_inspect` succeeds. |
+| F11 | `corealm_search_docs({ query: "kaldite" })` returns hits covering the ore, the bar, and at least one recipe, and returns nothing from an unstarted quest's hidden stages. |
+| F12 | `corealm_events` with `timeoutMs: 5000` while idle returns `{ events: [], nextSeq }` after roughly 5 s without throwing. The same call while gathering returns within one gather tick. |
+| F13 | Event-efficiency budget: a scripted agent that mines 1 to 10 using `interact` plus `corealm_events` makes fewer than 60 tool calls total, counted by a `callTool` wrapper. |
+| F14 | Overlays: `corealm_overlay({ op: "set", overlays: [{ id: "x", kind: "highlight", entityId }] })` returns `activeCount: 1`, the screenshot shows the outline, and `getState()` is unchanged apart from nothing (overlays live outside canonical state). |
+| F15 | Agent gate proof: a scripted agent using only WebMCP tools raises Mining from 1 to 10 and ends with at least 40 ore in the bank, with no `__gameDebug` call other than `setTimeScale`. |
+| F16 | Agent quest proof: a scripted agent using only WebMCP tools takes The Long Cairn from unstarted to `"complete"` across all 7 stages. |
 
 ### 8.7 Screenshot set, 18 repeatable shots
 
 Every id is a `focusCamera` pose in `debug/shots.ts`, captured after `waitForIdle()` at a fixed seed, so two runs produce comparable images.
 
-`spawn`, `town_entrance`, `town_center`, `bank_interior`, `palewood_copse`, `bracken_pit`, `marchfield_farm`, `redsill_shallows`, `vellenwood_canopy`, `rootfall_hamlet`, `karrowmoor_terraces`, `highcairn_outpost`, `gravelmaw_entrance`, `gravelmaw_chamber2`, `combat_normal`, `boss_ordrun_phase2`, `ui_inventory_skills`, `overlay_showcase`.
+`spawn`, `town_entrance`, `town_center`, `bank_interior`, `palewood_copse`, `bracken_pit`, `marchfield`, `redsill_shallows`, `vellenwood_canopy`, `rootfall_hamlet`, `karrowmoor_terraces`, `highcairn_outpost`, `gravelmaw_entrance`, `gravelmaw_chamber2`, `combat_normal`, `boss_ordrun_phase2`, `ui_inventory_skills`, `overlay_showcase`.
 
 Each shot must show: correct tier materials, readable silhouettes at the default camera pitch, no z-fighting, no floating props, no navmesh gaps under the player.
 
@@ -1743,17 +1734,16 @@ Exit: D1 to D9.
 
 Exit: E1 to E10. Screenshots `combat_normal`, `boss_ordrun_phase2`.
 
-**Round 5, proof 5: quests, dialogue, farming, agility.**
+**Round 5, proof 5: quests, dialogue, agility.**
 
 | Worker | Files | Deliverable |
 | --- | --- | --- |
-| E1 | `content/npcs.ts`, `content/quests.ts`, `content/dialogue.ts` | 12 NPCs, 10 quests including the 7-stage Long Cairn, all dialogue trees |
+| E1 | `content/npcs.ts`, `content/quests.ts`, `content/dialogue.ts` | 12 NPCs, 9 quests including the 7-stage Long Cairn, all dialogue trees |
 | E2 | `systems/quests.ts`, `systems/dialogue.ts` | Stage predicates, reward application, dialogue traversal |
 | E3 | `ui/dialoguePanel.ts`, `ui/questPanel.ts` | Dialogue and quest UI |
 | A3 | `systems/agility.ts` | 9 obstacles, success roll, fail damage, traversal |
-| B3 | `systems/farming.ts` | Plot lifecycle, wall-clock growth, harvest yields |
 
-Exit: F1 to F9. Screenshots `marchfield_farm`, `rootfall_hamlet`, `karrowmoor_terraces`, `highcairn_outpost`, `gravelmaw_entrance`, `gravelmaw_chamber2`.
+Exit: F1 to F7. Screenshots `marchfield`, `rootfall_hamlet`, `karrowmoor_terraces`, `highcairn_outpost`, `gravelmaw_entrance`, `gravelmaw_chamber2`.
 
 **Round 6, proof 6: agent interface.**
 
@@ -1763,11 +1753,11 @@ Exit: F1 to F9. Screenshots `marchfield_farm`, `rootfall_hamlet`, `karrowmoor_te
 | F2 | `render/overlays.ts` | Highlight, path, marker, label |
 | F3 | `api/docs.ts`, `ui/journalPanel.ts` | Generated docs plus the search index, Locations panel |
 
-Exit: F11 to F16. Screenshot `overlay_showcase`.
+Exit: F9 to F14. Screenshot `overlay_showcase`.
 
 **Round 7, integration, root-led with two workers.**
 Everything wired together, content balance passes against the section 2 tables, the dungeon and boss integrated with The Long Cairn, and the two gate proofs run end to end.
-Exit: F10, F17, F18, the full screenshot set, and the whole acceptance suite green.
+Exit: F8, F15, F16, the full screenshot set, and the whole acceptance suite green.
 
 **Ownership rules for every round.**
 No two workers in the same round touch the same file. A worker who needs a `contracts.ts` change stops and reports rather than editing it. Content files are owned by exactly one worker per round, so `content/items.ts` belongs to C1 in round 3 and is read-only for everyone else afterwards. Only the root runs whole-game checks while a round is active.
@@ -1782,7 +1772,7 @@ No two workers in the same round touch the same file. A worker who needs a `cont
 The brief calls Phase 1 "prove Corealm" and then lists 30+ systems as required, including quests, a dungeon, a boss, documentation, WebMCP, agent events, and overlays. Building all of that at content depth for three regions is not a proof, it is most of the game. My reading: Phase 1 builds every system's *architecture* at tier 1/5/10 content depth, and content breadth is what Phases 2 and 3 add. Section 0 cuts what does not test that. The root should confirm this reading before round 1, because if Phase 1 is meant to be broader, the round plan needs a fourth and fifth worker per round.
 
 **C2. "Melee (physical accuracy, damage, defense)" versus a separate defence stat.**
-The brief gives Melee three jobs and lists exactly 11 skills. Any implementation with a separate Defence skill breaks the count. I resolved this by making physical defence level equal Melee level and magical defence level equal Magic level. Consequence worth flagging: a pure-Magic character has low physical defence, which makes them fragile against melee enemies. That is a real balance property, not an accident, and Ordrun's magicArmour of only 18 exists so a magic build has a viable route through the boss.
+The brief gives Melee three jobs and originally listed exactly 11 skills. The farming-retirement amendment makes the shipped count 10. Any implementation with a separate Defence skill would add an unapproved eleventh skill. Physical defence therefore equals Melee level and magical defence equals Magic level. Consequence worth flagging: a pure-Magic character has low physical defence, which makes them fragile against melee enemies. That is a real balance property, not an accident, and Ordrun's magicArmour of only 18 exists so a magic build has a viable route through the boss.
 
 **C3. Health is derived, but the brief also wants food and death to matter.**
 Derived health from `(melee + magic) / 2` means a level 1 magic-only character has 23 HP and dies to almost anything. That is fine and classic, but it means the tier 1 enemies must be genuinely weak. Rill Skitterling at 6 HP with maxHit 2 is calibrated for exactly that.

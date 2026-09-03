@@ -33,13 +33,13 @@ const PAN_KEY_PIXELS = 48;
 
 const KIND_LABEL: Record<LocationKind, string> = {
   settlement: "Town", bank: "Bank", seam: "Ore seam", grove: "Grove", water: "Water",
-  farm: "Farm", gate: "Gate", landmark: "Landmark", camp: "Camp", junction: "Junction",
+  gate: "Gate", landmark: "Landmark", camp: "Camp", junction: "Junction",
   dungeon: "Dungeon",
 };
 
 const KIND_RANK: Record<LocationKind, number> = {
   settlement: 0, bank: 1, dungeon: 1, gate: 2, seam: 3, grove: 3, water: 3,
-  farm: 3, camp: 4, landmark: 5, junction: 6,
+  camp: 4, landmark: 5, junction: 6,
 };
 
 const DEFAULT_KIND: LocationKind = "landmark";

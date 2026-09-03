@@ -69,7 +69,7 @@ export async function buildContext(api: GameApi, session: AgentSession, version:
   const out: Record<string, unknown> = {
     game: {
       name: "Corealm",
-      summary: "A browser RPG: eleven skills, five regions, quests, crafting and combat, played by a human and any WebMCP agent through the same actions. Read corealm_manual for the rules.",
+      summary: "A browser RPG: ten skills, five regions, quests, crafting and combat, played by a human and any WebMCP agent through the same actions. Read corealm_manual for the rules.",
       version,
     },
     revision,

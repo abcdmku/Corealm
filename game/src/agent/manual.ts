@@ -17,12 +17,12 @@ export const EVENT_CATALOGUE: Record<GameEventType, { about: string; fields: str
   "navigation.started": { about: "The character began walking.", fields: "etaMs, pathLength?, points?, legs?, route?" },
   "navigation.completed": { about: "The character arrived.", fields: "position" },
   "navigation.failed": { about: "The walk ended early. reason is unreachable, cancelled, or movement-disabled.", fields: "reason, to?" },
-  "activity.started": { about: "A gathering, production, traversal, farming, eating or campfire activity began; banking and shopping also announce themselves here.", fields: "kind, skill?, entityId?, interaction?, recipeId?" },
+  "activity.started": { about: "A gathering, production, traversal, eating or campfire activity began; banking and shopping also announce themselves here.", fields: "kind, skill?, entityId?, interaction?, recipeId?" },
   "activity.stopped": { about: "That activity ended. reason names why: complete, depleted, inventory-full, cancelled, moved, damaged.", fields: "kind, reason, skill?, entityId?, completed?, remaining?" },
-  "resource.depleted": { about: "A node ran out. It respawns after respawnInSeconds.", fields: "entityId?, itemId?, tier?, respawnInSeconds?, plotId?" },
+  "resource.depleted": { about: "A node ran out. It respawns after respawnInSeconds.", fields: "entityId?, itemId?, tier?, respawnInSeconds?" },
   "inventory.full": { about: "Something could not be carried.", fields: "itemId?, name?, attempted?, added?, recipeId?" },
-  "item.received": { about: "Items or marks entered the pack. source says how: gather, harvest, loot, buy, production. A loot pile drop lists items instead.", fields: "itemId?, name?, quantity?, source?, skill?, from?, currency?, pileId?, items?" },
-  "item.lost": { about: "Items or marks left the pack: consumed, sold, planted, dropped on death.", fields: "itemId?, name?, quantity?, reason?, cacheId?, items?" },
+  "item.received": { about: "Items or marks entered the pack. source says how: gather, loot, buy, production. A loot pile drop lists items instead.", fields: "itemId?, name?, quantity?, source?, skill?, from?, currency?, pileId?, items?" },
+  "item.lost": { about: "Items or marks left the pack: consumed, sold, or dropped on death.", fields: "itemId?, name?, quantity?, reason?, cacheId?, items?" },
   "item.equipped": { about: "Gear moved from the pack to a worn slot. Not an item.lost; replaced names what came off.", fields: "itemId, name, slot, replaced" },
   "item.unequipped": { about: "Gear moved from a worn slot to the pack. Not an item.received.", fields: "itemId, name, slot, quantity" },
   "combat.started": { about: "A fight began (initiator player or enemy). Boss choreography reuses this type with event = boss.phase, boss.telegraph, boss.slam.", fields: "initiator?, targetId?, by?, name?, spellId?, event?, enemyId?, phase?, centre?, radius?, firesAtMs?, damage?, hit?" },
@@ -33,7 +33,7 @@ export const EVENT_CATALOGUE: Record<GameEventType, { about: string; fields: str
   "health.low": { about: "Health crossed below the low threshold.", fields: "health, maxHealth, fraction, threshold" },
   "player.died": { about: "The character died and will respawn. Carried items drop into a Recovery Cache at the death position.", fields: "position, regionId, respawnPointId, respawnPosition" },
   "level.gained": { about: "A skill levelled up.", fields: "skill, level, levelsGained" },
-  "production.completed": { about: "One unit of a recipe finished, or a crop matured (kind = crop).", fields: "recipeId?, recipeName?, skill?, kind?, cropId?, plotId?, tier?" },
+  "production.completed": { about: "One unit of a recipe finished.", fields: "recipeId?, recipeName?, skill?, kind?, tier?" },
   "campfire.built": { about: "A portable cooking fire was placed.", fields: "logItemId, tier, lifetimeMs, expiresAtPlaySeconds" },
   "campfire.replaced": { about: "A new campfire replaced the previous one.", fields: "previousLogItemId, previousTier, logItemId, tier" },
   "campfire.expired": { about: "The campfire burned out.", fields: "logItemId, tier, position" },
@@ -72,7 +72,7 @@ export const ERROR_CATALOGUE: Record<GameErrorCode, string> = {
 function overview(version: ToolDeps["version"]): string {
   return [
     "Corealm is a single-player browser RPG played by a human and an AI agent together, through one set of actions.",
-    "The player walks a character across five regions (Fallowmarch, Vellenwood, Karrowmoor, Kilnhalt, and the Gravelmaw dungeon), trains eleven skills, accepts quests from NPCs, gathers resources, crafts at stations, fights enemies and bosses, banks, and trades.",
+    "The player walks a character across five regions (Fallowmarch, Vellenwood, Karrowmoor, Kilnhalt, and the Gravelmaw dungeon), trains ten skills, accepts quests from NPCs, gathers resources, crafts at stations, fights enemies and bosses, banks, and trades.",
     "Every tool you have calls the same game function a click does. There is no privileged path and no cheat: if a human cannot do it, neither can you. Movement takes real time at 4.2 m/s; gathering rolls every 1.8 s; a fight lasts as long as it lasts.",
     `Versions: build ${version.build}, contracts ${version.contracts}, content ${version.content}. Cache what you learn from corealm_search_docs against the content version.`,
     "Start with corealm_context. It returns the session, the player, the surroundings, and suggested next actions as exact tool calls. Then act in the mode the player has given you (see topic modes).",
@@ -101,7 +101,7 @@ const CONTROL = [
 ].join("\n");
 
 const RULES = [
-  "Skills: melee, magic, mining, woodcutting, fishing, farming, smithing, crafting, cooking, fletching, agility. Levels 1 to 99 on an exponential XP table (corealm_search_docs \"xp table\").",
+  "Skills: melee, magic, mining, woodcutting, fishing, smithing, crafting, cooking, fletching, agility. Levels 1 to 99 on an exponential XP table (corealm_search_docs \"xp table\").",
   "Gathering: one corealm_interact on a node keeps yielding until the node depletes, the pack fills, the character moves, or you stop. Success per 1.8 s attempt is 0.30 + 0.016 × (effective level − required level), capped at 0.95. Higher tier is not always better XP per hour: distance to the bank matters.",
   "Inventory: 28 slots. Most resources do not stack. Bank at a bank entity (corealm_interact {interaction:\"bank\"}, then corealm_bank).",
   "Production: at the right station with the ingredients in the pack. corealm_craft runs a batch and waits. Recipes and stations are in corealm_search_docs.",
@@ -116,8 +116,8 @@ const RULES = [
 const TERMINOLOGY = [
   "entityId — a world object the player can see or has seen: nodes, NPCs, enemies, stations, banks, shops, loot piles. From corealm_observe.",
   "locationId — a place on the route graph, e.g. bracken_pit. From corealm_search_docs or corealm_observe {scope:\"known\"}. A bank entity coldbrace_bank stands at location bank_interior; only the location id goes to navigate {locationId}.",
-  "archetype — what kind of entity: ore, tree, fishing_spot, farm_plot, enemy, boss, npc, station, bank, shop, obstacle, door, portal, loot, recovery_cache, landmark.",
-  "interaction — a verb an entity offers: mine, chop, fish, rake, plant, harvest, attack, talk, open, enter, climb, vault, loot, take, awaken, produce, recharge, bank, trade, inspect.",
+  "archetype — what kind of entity: ore, tree, fishing_spot, enemy, boss, npc, station, bank, shop, obstacle, door, portal, loot, recovery_cache, landmark.",
+  "interaction — a verb an entity offers: mine, chop, fish, attack, talk, open, enter, climb, vault, loot, take, awaken, produce, recharge, bank, trade, inspect.",
   "tier — content tier (1, 5, 10, 20). Higher tier needs a higher level and gives more XP per gather.",
   "marks — the currency.",
   "Essence — carried spell fuel by element (Air, Earth, Water, Fire). The internal element name for Air is wind.",

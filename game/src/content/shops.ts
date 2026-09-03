@@ -39,7 +39,6 @@ export const SHOPS: readonly ShopDef[] = [
       { itemId: "grithe_hatchet", quantity: 5 },
       { itemId: "palewood_rod", quantity: 5 },
       { itemId: "seared_minnow", quantity: 30 },
-      { itemId: "bittergrain_seed", quantity: 50 },
       { itemId: "air_essence", quantity: 200 },
       { itemId: "palewood_shaft", quantity: 100 },
       { itemId: "coarse_hide", quantity: 15 },
@@ -72,7 +71,6 @@ export const SHOPS: readonly ShopDef[] = [
       { itemId: "duskoak_rod", quantity: 4 },
       { itemId: "seared_trout", quantity: 25 },
       { itemId: "seared_minnow", quantity: 20 },
-      { itemId: "duskberry_seed", quantity: 30 },
       { itemId: "earth_essence", quantity: 200 },
       { itemId: "duskoak_shaft", quantity: 80 },
       { itemId: "bramble_hide", quantity: 12 },
@@ -93,7 +91,6 @@ export const SHOPS: readonly ShopDef[] = [
       // pool, which is 8 Seared Cragfin at healAmount(10) = 12 plus eat time.
       { itemId: "seared_cragfin", quantity: 40 },
       { itemId: "seared_trout", quantity: 20 },
-      { itemId: "cairnleaf_seed", quantity: 30 },
       { itemId: "water_essence", quantity: 300 },
       { itemId: "cairnpine_shaft", quantity: 60 },
       { itemId: "cairn_pelt", quantity: 8 },
@@ -129,7 +126,6 @@ export const SHOPS: readonly ShopDef[] = [
       // pool, which is ten Seared Ashfin at healAmount(20) = 19 plus eat time.
       { itemId: "seared_ashfin", quantity: 40 },
       { itemId: "seared_cragfin", quantity: 20 },
-      { itemId: "coalroot_seed", quantity: 30 },
       // Fire Essence sells locally like the other elements at their region stores.
       { itemId: "fire_essence", quantity: 300 },
       { itemId: "cinderpine_shaft", quantity: 60 },

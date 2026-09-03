@@ -3,15 +3,15 @@
     "dungeon": 3,
     "other": 116,
     "road": 0,
-    "solid-carve": 417,
+    "solid-carve": 429,
     "terrain": 49,
     "water": 0
   },
-  "fingerprint": "f01248e5686d46311dc021aed71e362105bc535cd1887d72e71efabe2076e022",
+  "fingerprint": "8602580982600d0085b473af1dc43fa3c256fd09ff8ebf3f8ad57503f19362cf",
   "format": "corealm-navmesh",
   "formatVersion": 1,
-  "navDataSha256": "fded2b3b2743d16b74913fd6999f42708a370735e20494b11aed4323d8a9d74c",
-  "polyCount": 6429,
+  "navDataSha256": "5005404ac0da84c4e506ada0cf5bd02c4aed708704c7617b96f6280c1e2b1842",
+  "polyCount": 6377,
   "recastVersion": "0.43.1",
   "settings": {
     "ch": 0.2,
@@ -24,19 +24,19 @@
     "walkableRadius": 1,
     "walkableSlopeAngle": 78
   },
-  "sourceMeshes": 585,
-  "sourceTriangles": 297320,
+  "sourceMeshes": 597,
+  "sourceTriangles": 297416,
   "tileCount": 1,
   "path": "generated/corealm-navmesh.bin",
-  "bytes": 1283301,
+  "bytes": 1274085,
   "worldSeed": "1337",
   "authoredInputs": {
     "terrainGeometry": "408cbc550dde9f934b0a9007d53e5d8264f3e2c88bf39bafba86fc3f9673fb09",
-    "roads": "38738ea1ed94fec0b34bbfe4ca5cdef8b1022ad4cedc62c2d6c4ceec3a2d42b8",
+    "roads": "089984439659b604a8e300293e9496ff1cef1e824538cc5ed20b65921363363b",
     "water": "1528ff9b690f9cb02922b38bb40d2f8116aac204db62b56714dab83423567409",
-    "solidCarves": "ad1ef18eaf45be1da981af5aa991500ea3a1e2188306b0a923afb35e4e2d8ed0",
-    "dungeonGeometry": "014f3cba60b0fed0908f8ff826dedee900458e1f06f70c8b6167234e5cddcdbc",
-    "seedDependentInputs": "6a40da1f32c3df52d73a5b7a565c57dbe19bb19e399ba56359a834f3f933cb3e",
+    "solidCarves": "5adb1cb7f37a5a3f6b1b4dd0a4e7daea6e483342e19506e6b02d15a3926c3fd6",
+    "dungeonGeometry": "35db1cce0533e2c8578cbf529b4b1ffc7db38923a14b43a5153d7463ec25bbb8",
+    "seedDependentInputs": "362d1721d7cbbf77ebc535b428eba3c74b9b19496bbd2b4fc2fb22a738a179d2",
     "navigationSettings": "84f7357b9aaacb739862d1f4de1dcdd72022e5b5a5bb72ff07e61d2ae39a6a8a"
   }
 }

@@ -13,7 +13,6 @@ description: "Corealm skills, gathering rules, and combat rules."
 - **Mining:** Breaks ore, stone, and gems out of seams and outcrops.
 - **Woodcutting:** Fells trees for logs and specialty wood.
 - **Fishing:** Takes fish and aquatic materials from shallows, pools, and deep water.
-- **Farming:** Grows crops, herbs, and fibres on plots that keep growing between sessions.
 
 ## Production
 

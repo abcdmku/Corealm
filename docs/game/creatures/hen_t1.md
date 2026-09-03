@@ -10,7 +10,7 @@ description: "Marchfield Hen spawn locations, combat stats, and drops."
 <div class="corealm-map-viewport" data-map-viewport role="region" tabindex="0" aria-label="Spawn map for Marchfield Hen">
 <div class="corealm-map-stage" data-map-stage>
 <img src="../../assets/world-map.webp" alt="Overhead map rendered from the Corealm game world" draggable="false" />
-<a class="corealm-map-marker" href="../../regions/#marchfield" style="--map-x:42.6667%;--map-y:61.2500%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Marchfield Hen, Marchfield, Fallowmarch" title="Marchfield Hen, Marchfield, Fallowmarch"><span>Marchfield Hen<small>Marchfield, Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="../../regions/#marchfield" style="--map-x:42.2500%;--map-y:60.6875%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Marchfield Hen, Marchfield, Fallowmarch" title="Marchfield Hen, Marchfield, Fallowmarch"><span>Marchfield Hen<small>Marchfield, Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="../../regions/#bracken-pit" style="--map-x:37.3333%;--map-y:56.6250%" data-map-side="right" data-map-kind="enemy" data-map-marker aria-label="Bracken Hen, Bracken Pit, Fallowmarch" title="Bracken Hen, Bracken Pit, Fallowmarch"><span>Bracken Hen<small>Bracken Pit, Fallowmarch</small></span></a>
 </div>
 <span class="corealm-map-north" aria-hidden="true">N</span>
@@ -29,7 +29,7 @@ description: "Marchfield Hen spawn locations, combat stats, and drops."
 
 | Region | Nearest place | Spawn group | Count |
 | --- | --- | --- | --- |
-| [Fallowmarch](../../regions/#marchfield) | [Marchfield](../../regions/#marchfield) | Marchfield Hen | 5 |
+| [Fallowmarch](../../regions/#marchfield) | [Marchfield](../../regions/#marchfield) | Marchfield Hen | 12 |
 | [Fallowmarch](../../regions/#bracken-pit) | [Bracken Pit](../../regions/#bracken-pit) | Bracken Hen | 4 |
 
 ## Stats
@@ -48,4 +48,3 @@ description: "Marchfield Hen spawn locations, combat stats, and drops."
 | [Hen Feather](../../items/#hen-feather) | 1-3 | 55% |
 | [Raw Game Meat](../../items/#raw-game-meat) | 1 | 35% |
 | [Hen Egg](../../items/#hen-egg) | 1-2 | 25% |
-| [Bittergrain Seed](../../items/#bittergrain-seed) | 1-2 | 20% |

@@ -152,7 +152,7 @@ export class Vfx {
     switch (event.type) {
       case "item.received": {
         // What this event actually carries, verified against all seven emit sites: `itemId`,
-        // `quantity`, sometimes `name`, sometimes `source`. Gathering, harvesting and production
+        // `quantity`, sometimes `name`, sometimes `source`. Gathering and production
         // attach the node or station as `entityId`; a shop purchase, a loot sweep and a quest
         // reward do not. Keying on `entityId` is therefore what separates "a yield came out of that
         // rock" from "your pack changed", and only the first is worth a number in the world.

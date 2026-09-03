@@ -84,12 +84,12 @@ export const NPCS: readonly NpcDef[] = [
     name: "Ranger Syb",
     regionId: "fallowmarch",
     settlementId: "coldbrace",
-    role: "Walks the march. Knows where the water is and has not had a hot meal in some time.",
+    role: "Walks the march and knows where the water is.",
     voice:
       "Deadpan and outdoorsy. Describes weather and terrain in the same flat tone she uses for "
       + "her own hunger. Dry, never bitter.",
     dialogueRootId: "syb_root",
-    questIds: ["bright_water"],
+    questIds: [],
     locationId: "town_center",
   },
   {

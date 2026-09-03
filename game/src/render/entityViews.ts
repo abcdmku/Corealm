@@ -23,7 +23,7 @@
  *
  * ```text
  *   pose                  before  after      pose                  before  after
- *   town_entrance            517    284      marchfield_farm          347    199
+ *   town_entrance            517    284      marchfield               347    199
  *   spawn                    505    249      vellenwood_canopy        321    205
  *   hollowcut_seam           491    299      march_road               309    184
  *   highcairn                470    290      sunder_ledge             240    142
@@ -283,7 +283,7 @@ export function corpseLinger(deathClipSeconds: number | null): number {
  * readability signal for things you gather from and fight; it is not a size rule for architecture.
  */
 const TIERED_ARCHETYPES = new Set<Archetype>([
-  "ore", "tree", "fishing_spot", "farm_plot", "enemy", "boss",
+  "ore", "tree", "fishing_spot", "enemy", "boss",
 ]);
 
 /** How far a given archetype's art is pulled toward its tier palette, and toward which swatch. */
@@ -306,7 +306,6 @@ const APPEARANCE: Partial<Record<Archetype, Appearance>> = {
   ore: { swatch: "body", strength: 0.88 },
   tree: { swatch: "body", strength: 0.55 },
   fishing_spot: { swatch: "accent", strength: 0.7 },
-  farm_plot: { swatch: "accent", strength: 0.45 },
   enemy: { swatch: "metal", strength: 0.45 },
   boss: { swatch: "metal", strength: 0.55 },
 };
@@ -325,9 +324,8 @@ const TIER_BLIND_ARCHETYPES: ReadonlySet<Archetype> = new Set<Archetype>(["npc"]
 /** Canopy materials follow the tier ACCENT, not the rock body a trunk shares its swatch with. */
 const LEAF_MATERIAL = /leaf|leaves|foliage|canopy/i;
 
-/** Local-space bend at full height. Trunks and the below-ground crop root stay fixed. */
+/** Local-space bend at full height. Trunks stay fixed while their foliage moves. */
 const TREE_FOLIAGE_WIND = 0.055;
-const CROP_WIND = 0.04;
 
 /**
  * Materials a tier tint must never touch. Eyes, teeth and the pure black/white trims on the
@@ -746,9 +744,7 @@ const NO_BUILD: readonly [number, number, number] = [1, 1, 1];
  *   ore 0.85        A rock IS bedded into the hill it came out of.
  *   obstacle 0.50   Fallen logs and boulders: same argument as ore, less of it, because several are
  *                   authored as climbable and a hard tilt moves the climb line.
- *   fishing_spot,
- *   farm_plot 1.0   Flat things. A lily pad or a furrow that does not lie in the ground is not a
- *                   lily pad. This is the "flat plants and pebbles" row.
+ *   fishing_spot 1.0 Flat things. A lily pad that does not lie in the ground is not a lily pad.
  *
  * Verified by measurement, not by argument (runs/corealm/audit/ev2-sink.ts). The world layer clamps
  * the normal it hands over to 20 degrees off vertical, so the applied tilt is
@@ -802,7 +798,6 @@ const DEFAULT_TILT: Partial<Record<Archetype, number>> = {
   ore: 0.85,
   obstacle: 0.5,
   fishing_spot: 1,
-  farm_plot: 1,
 };
 
 /**
@@ -1005,9 +1000,6 @@ const FISH_MARKER_TIER_FALLOFF = 0.07;
  * place, obviously cut.
  */
 const TREE_STUMP_FRACTION = 0.22;
-
-/** Same trick for a harvested plot: the crop is cut back to stubble rather than swapped for a crate. */
-const CROP_STUBBLE_FRACTION = 0.3;
 
 /**
  * Fraction of the chosen clip to freeze at for the instanced fallback, per motion.
@@ -2747,7 +2739,6 @@ export class EntityViews {
    *   ore        the rock, minus its vein. The vein is already a separate part (see `seamPart`),
    *              so dropping it is exactly the change the player made by mining it.
    *   tree       the trunk, clipped to `TREE_STUMP_FRACTION` of its height: a stump.
-   *   farm_plot  the crop cut back to `CROP_STUBBLE_FRACTION`: stubble.
    *
    * Everything else falls back to the live geometry under the spent material.
    */
@@ -2773,9 +2764,8 @@ export class EntityViews {
       if (rock.length > 0) return [...rock, ...this.workedOutOreParts(group, rock)];
     }
 
-    if (group.archetype === "tree" || group.archetype === "farm_plot") {
-      const fraction = group.archetype === "tree" ? TREE_STUMP_FRACTION : CROP_STUBBLE_FRACTION;
-      const clipped = clipPartsBelow(live, fraction);
+    if (group.archetype === "tree") {
+      const clipped = clipPartsBelow(live, TREE_STUMP_FRACTION);
       if (clipped.length > 0) return clipped;
     }
 
@@ -3249,8 +3239,6 @@ export class EntityViews {
     if (archetype === "tree" && LEAF_MATERIAL.test(base.name)) {
       return this.materials.wind(variant, TREE_FOLIAGE_WIND);
     }
-    // Farm beds and rails are separate landmark entities. A farm_plot material is the live crop.
-    if (archetype === "farm_plot") return this.materials.wind(variant, CROP_WIND);
     return variant;
   }
 

@@ -50,12 +50,11 @@ export interface GatheringInventoryPort extends InventoryPort {
   addItem(itemId: ItemId, quantity: number, options?: ItemMoveOptions): Result<number>;
 }
 
-/** The gathering verbs and the skill each one trains. `harvest` is farming's, and lives there. */
+/** The gathering verbs and the skill each one trains. */
 const GATHER_SKILL: Readonly<Record<string, SkillId>> = {
   mine: "mining",
   chop: "woodcutting",
   fish: "fishing",
-  harvest: "farming",
 };
 
 /**

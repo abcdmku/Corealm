@@ -17,7 +17,7 @@ import { STARTING_EQUIPMENT, STARTING_INVENTORY } from "../content/items.js";
 
 export const INVENTORY_SLOTS = 28;
 export const BANK_CAPACITY = 400;
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export type ActivityState =
   | {
@@ -27,25 +27,13 @@ export type ActivityState =
   | {
       kind: "production"; skill: SkillId; recipeId: RecipeId; stationId: EntityId;
       remaining: number; completed: number; nextCompleteAtMs: number;
-    }
+  }
   | { kind: "traversing"; obstacleId: EntityId; endsAtMs: number }
-  | { kind: "farming"; op: "rake" | "plant" | "harvest"; plotId: string; endsAtMs: number }
   | { kind: "eating"; itemId: ItemId; endsAtMs: number }
   | {
       kind: "building_campfire"; logItemId: ItemId; tier: number; regionId: RegionId; position: Vec3;
       buildTimeMs: number; lifetimeMs: number; endsAtMs: number;
     };
-
-export interface FarmPlotState {
-  plotId: string;
-  regionId: RegionId;
-  cropId: ItemId | null;
-  stage: number;
-  stageCount: number;
-  /** Wall clock, so crops keep growing between sessions. */
-  stageStartedAtMs: number;
-  state: "empty" | "raked" | "growing" | "ready";
-}
 
 /** Persisted lifecycle state for one authored gathering node. */
 export interface ResourceNodeState {
@@ -125,7 +113,6 @@ export interface GameState {
     speaker: string;
     options: { id: string; text: string; enabled: boolean; disabledReason?: string }[];
   } | null;
-  farming: Record<string, FarmPlotState>;
   world: {
     nodes: Record<EntityId, ResourceNodeState>;
     enemies: Record<EntityId, {
@@ -220,7 +207,6 @@ export function createInitialState(seed = 1337, nowMs = 0): GameState {
     },
     quests: {},
     dialogue: null,
-    farming: {},
     world: { nodes: {}, enemies: {}, obstaclesUsed: {}, lootPiles: {}, recoveryCache: null, campfire: null },
     discovery: { entities: {}, locations: {}, regions: [DEFAULT_REGION] },
     settings: { cameraDistance: 18, cameraPitchRad: 0.72, overlaysVisible: true, uiScale: 1 },

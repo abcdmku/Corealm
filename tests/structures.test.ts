@@ -136,4 +136,19 @@ describe("isolated structure constructors", () => {
       .filter((assetId) => !manifestIds.has(assetId));
     expect(missing).toEqual([]);
   });
+
+  it("keeps the Marchfield farm yard decorative and gives the chicken pen its own gate", () => {
+    const parts = buildComposition("farm_yard", 1337, "plaster");
+    const tags = parts.map((part) => part.tag);
+    const assets = parts.map((part) => part.assetId);
+
+    expect(tags.some((tag) => tag.startsWith("barn_"))).toBe(true);
+    expect(tags.some((tag) => /^fence\d+$/.test(tag))).toBe(true);
+    expect(tags.filter((tag) => tag.startsWith("fence_hen_"))).toHaveLength(12);
+    expect(tags.filter((tag) => tag.startsWith("post_hen_gate_"))).toHaveLength(2);
+    expect(parts.filter((part) => part.tag.startsWith("fence_hen_west_"))
+      .map((part) => part.dz)).toEqual([-2, 4]);
+    expect(assets).not.toContain("floor_brick");
+    expect(assets.some((assetId) => assetId.startsWith("crop_"))).toBe(false);
+  });
 });

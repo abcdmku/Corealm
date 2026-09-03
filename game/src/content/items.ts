@@ -7,7 +7,7 @@
  *
  * Conventions this file holds to, all from PRD 2.10:
  *  - `value` is the shop BUY price. Selling pays `sellPrice(value)` = round(value * 0.6).
- *  - Stackable kinds are currency, elemental essence, seeds, shafts, handles and gems. Everything else takes a
+ *  - Stackable kinds are currency, elemental essence, shafts, handles and gems. Everything else takes a
  *    slot per unit, including every ore, log, fish, bar and equipment piece.
  *  - Reference prices from the PRD's table are reproduced exactly in `value`. Two of the PRD's
  *    quoted SELL prices used a floor where `sellPrice()` rounds, so Duskoak log sells for 23 (PRD
@@ -109,27 +109,6 @@ const RESOURCE_ITEMS: readonly ItemDef[] = [
     id: "ashfin", name: "Ashfin", tier: 20,
     description: "A dark-finned spring fish that thrives where the water runs warm. Oily and rich.",
     stackable: false, value: 215, category: "resource",
-  },
-  // farming crops
-  {
-    id: "bittergrain", name: "Bittergrain", tier: 1,
-    description: "Hardy march grain. Bitter is not a review, it is the name.",
-    stackable: false, value: 9, category: "resource",
-  },
-  {
-    id: "duskberry", name: "Duskberry", tier: 5,
-    description: "A deep-purple berry that only sets under closed canopy. No Phase 1 plot grows it yet.",
-    stackable: false, value: 30, category: "resource",
-  },
-  {
-    id: "cairnleaf", name: "Cairnleaf", tier: 10,
-    description: "Broad grey leaves off the Highcairn beds. Chewed by quarry crews against the cold.",
-    stackable: false, value: 74, category: "resource",
-  },
-  {
-    id: "coalroot", name: "Coalroot", tier: 20,
-    description: "A black tuber out of the warm Kilnhalt soil. Roasts to something close to sweet.",
-    stackable: false, value: 165, category: "resource",
   },
 ];
 
@@ -490,31 +469,6 @@ const GAME_MEAT: readonly ItemDef[] = [
   },
 ];
 
-// ------------------------------------------------------------------------------ seeds
-
-const SEEDS: readonly ItemDef[] = [
-  {
-    id: "bittergrain_seed", name: "Bittergrain Seed", tier: 1,
-    description: "Four minutes from raked dirt to a harvest, and it keeps growing while you are logged out.",
-    stackable: true, value: 6, category: "seed", seed: { cropId: "bittergrain" },
-  },
-  {
-    id: "duskberry_seed", name: "Duskberry Seed", tier: 5,
-    description: "Needs closed canopy. Rootfall sells them anyway, out of habit.",
-    stackable: true, value: 22, category: "seed", seed: { cropId: "duskberry" },
-  },
-  {
-    id: "cairnleaf_seed", name: "Cairnleaf Seed", tier: 10,
-    description: "Fifteen minutes to a Highcairn harvest. Plant it and go do something else.",
-    stackable: true, value: 52, category: "seed", seed: { cropId: "cairnleaf" },
-  },
-  {
-    id: "coalroot_seed", name: "Coalroot Seed", tier: 20,
-    description: "Twenty minutes in warm Kilnhalt soil. The beds beside Emberfast run on nothing else.",
-    stackable: true, value: 115, category: "seed", seed: { cropId: "coalroot" },
-  },
-];
-
 // ------------------------------------------------------------------------------ food
 // healAmount() from content/index.ts, never a literal: 3 / 7 / 12 at tiers 1 / 5 / 10.
 // Burnt variants deliberately carry NO `food` block, so an eat handler that checks `def.food`
@@ -653,7 +607,7 @@ const TOOLS: readonly ItemDef[] = [
   },
 ];
 
-/** Everything except equipment. 102 rows: 68 base, plus 22 animal trophies and 12 game meats. */
+/** Everything except equipment. */
 export const ITEMS: readonly ItemDef[] = [
   ...CURRENCY,
   ...RESOURCE_ITEMS,
@@ -662,7 +616,6 @@ export const ITEMS: readonly ItemDef[] = [
   ...ESSENCES,
   ...TROPHIES,
   ...GAME_MEAT,
-  ...SEEDS,
   ...FOOD,
   ...TOOLS,
 ];

@@ -32,6 +32,38 @@ const TWO_HANDED_STAFFS = new Set([
   "galeskin_staff", "mossbound_staff", "tideworn_staff", "cinderwake_staff",
 ]);
 
+const REMOVED_FARMING_ITEMS = new Set([
+  "bittergrain", "duskberry", "cairnleaf", "coalroot",
+  "bittergrain_seed", "duskberry_seed", "cairnleaf_seed", "coalroot_seed",
+]);
+
+function removeFarmingContent(state: GameState): void {
+  if (state.inventory?.slots) {
+    state.inventory.slots = state.inventory.slots.map((stack, slotIndex) =>
+      stack && !REMOVED_FARMING_ITEMS.has(stack.itemId) ? { ...stack, slotIndex } : null,
+    );
+  }
+  if (state.bank?.slots) {
+    state.bank.slots = state.bank.slots.filter((stack) => !REMOVED_FARMING_ITEMS.has(stack.itemId));
+  }
+  for (const slot of Object.keys(state.equipment ?? {}) as (keyof GameState["equipment"])[]) {
+    const stack = state.equipment[slot];
+    if (stack && REMOVED_FARMING_ITEMS.has(stack.itemId)) state.equipment[slot] = null;
+  }
+  if (state.world?.recoveryCache) {
+    state.world.recoveryCache.items = state.world.recoveryCache.items.filter(
+      (stack) => !REMOVED_FARMING_ITEMS.has(stack.itemId),
+    );
+  }
+  for (const pile of Object.values(state.world?.lootPiles ?? {})) {
+    pile.items = pile.items.filter((stack) => !REMOVED_FARMING_ITEMS.has(stack.itemId));
+  }
+
+  delete (state.skills as Record<string, unknown> | undefined)?.farming;
+  delete (state.quests as Record<string, unknown> | undefined)?.bright_water;
+  delete (state as unknown as Record<string, unknown>).farming;
+}
+
 function isReleasedOrb(itemId: string): boolean {
   return /^(air|earth|water|fire)_orb$/.test(itemId);
 }
@@ -166,7 +198,8 @@ function migrateProductionWorld(state: GameState, sourceVersion: number): void {
 }
 
 /**
- * Migrates the production foundation, elemental weapons, and regional altar rites into v6.
+ * Migrates the production foundation, elemental weapons, regional altar rites, and the v7 removal
+ * of the retired farming feature.
  * shape. V3 existed independently on both branches, so field presence is normalized as well as
  * the numeric version; that keeps either ancestry loadable after the rebase.
  */
@@ -194,6 +227,7 @@ export function migrate(raw: unknown): MigrationResult {
   }
   migrateMagicItems(state);
   migrateProductionWorld(state, version);
+  removeFarmingContent(state);
   state.meta.saveVersion = SAVE_VERSION;
   return { ok: true, state, fromVersion: version };
 }

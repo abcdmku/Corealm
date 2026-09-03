@@ -8,10 +8,10 @@ description: "Every creature in Corealm, with a separate spawn, stats, and drops
 | [Galeskin](./galeskin_t1/) | 1 | Fallowmarch |
 | [March Road Reaver](./reaver_t1/) | 1 | Fallowmarch |
 | [Marchfield Coney](./coney_t1/) | 1 | Fallowmarch |
+| [Marchfield Cow](./cattle_t1/) | 1 | Fallowmarch |
 | [Marchfield Hen](./hen_t1/) | 1 | Fallowmarch |
 | [Open March Billy](./goat_t1/) | 1 | Fallowmarch |
 | [Palewood Adder](./viper_t1/) | 1 | Fallowmarch |
-| [Redsill Cow](./cattle_t1/) | 1 | Fallowmarch |
 | [Redsill Frog](./frog_t1/) | 1 | Fallowmarch |
 | [Tempest Roc](./tempest_roc_t1/) | 1 | Fallowmarch |
 | [Blackwater Frog](./frog_t5/) | 5 | Vellenwood |

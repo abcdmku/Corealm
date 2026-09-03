@@ -4,7 +4,7 @@
  * Exactly one activity at a time, held in `state.activity` (see `ActivityState` in state/store.ts).
  * This file owns the *lifecycle*: starting, stopping with a reason, the universal interruptions,
  * and the `ActivitySummary` the API hands to the UI and to an agent. The per-kind rules live in
- * drivers registered by `systems/gathering.ts`, `systems/farming.ts` and `systems/agility.ts`.
+ * drivers registered by gathering, production, agility, eating, and campfire systems.
  *
  * Why this shape matters: one human click and one agent tool call both land in
  * `GameApi.interact -> InteractionDispatcher.run -> handler -> ActivitySystem.start`. There is no
@@ -77,8 +77,8 @@ export interface EntityLookup {
 }
 
 /**
- * The inventory seam. `systems/inventory.ts` belongs to another worker, so gathering, farming and
- * harvesting talk to it through this port and the root wires the real thing at integration.
+ * The inventory seam. Gathering and production talk to it through this port and the root wires
+ * the real thing at integration.
  *
  * `addItem` returns the quantity actually added, so a partial stack fill is visible rather than
  * silently lost.
@@ -99,7 +99,7 @@ export interface InventoryPort {
  * because PRD 2.7 has eating block attacks for 1.8 s, not pin the player in place.
  */
 const CANCELLED_BY_MOVEMENT: ReadonlySet<ActivityKind> = new Set<ActivityKind>([
-  "gathering", "production", "farming", "building_campfire",
+  "gathering", "production", "building_campfire",
 ]);
 
 /**
@@ -107,7 +107,7 @@ const CANCELLED_BY_MOVEMENT: ReadonlySet<ActivityKind> = new Set<ActivityKind>([
  * halfway would leave the player in a state the obstacle never defines.
  */
 const CANCELLED_BY_DAMAGE: ReadonlySet<ActivityKind> = new Set<ActivityKind>([
-  "gathering", "production", "farming", "building_campfire",
+  "gathering", "production", "building_campfire",
 ]);
 
 export class ActivitySystem implements TickSystem {
@@ -305,7 +305,6 @@ export function entityIdOf(activity: ActivityState): EntityId | undefined {
     case "gathering": return activity.entityId;
     case "production": return activity.stationId;
     case "traversing": return activity.obstacleId;
-    case "farming": return activity.plotId;
     case "building_campfire": return "player_campfire";
     case "eating": return undefined;
   }
@@ -317,7 +316,6 @@ export function skillOf(activity: ActivityState): SkillId | undefined {
     case "gathering": return activity.skill;
     case "production": return activity.skill;
     case "traversing": return "agility";
-    case "farming": return "farming";
     case "building_campfire": return "fletching";
     case "eating": return undefined;
   }

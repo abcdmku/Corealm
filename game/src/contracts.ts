@@ -15,13 +15,13 @@ export type Vec3 = readonly [number, number, number];
 
 export type SkillId =
   | "melee" | "magic"
-  | "mining" | "woodcutting" | "fishing" | "farming"
+  | "mining" | "woodcutting" | "fishing"
   | "smithing" | "crafting" | "cooking" | "fletching"
   | "agility";
 
 export const SKILL_IDS: readonly SkillId[] = [
   "melee", "magic",
-  "mining", "woodcutting", "fishing", "farming",
+  "mining", "woodcutting", "fishing",
   "smithing", "crafting", "cooking", "fletching",
   "agility",
 ] as const;
@@ -63,7 +63,6 @@ export const AUDIO_CUE_IDS = [
   "gather.mining_swing", "gather.mining_impact", "gather.rock_break",
   "gather.wood_swing", "gather.wood_impact", "gather.tree_fall",
   "gather.fishing_cast", "gather.fishing_reel", "gather.fishing_catch",
-  "farm.rake", "farm.plant", "farm.harvest",
   "production.smith", "production.smelt", "production.craft",
   "production.cook", "production.fletch",
   "combat.melee_swing", "combat.melee_hit", "combat.melee_miss",
@@ -151,24 +150,24 @@ export type SpellId =
   | "squallsurge" | "tidesurge" | "scarpsurge" | "kilnsurge";
 
 export type Archetype =
-  | "ore" | "tree" | "fishing_spot" | "farm_plot"
+  | "ore" | "tree" | "fishing_spot"
   | "enemy" | "boss" | "npc" | "station" | "bank" | "shop"
   | "obstacle" | "door" | "portal" | "loot" | "recovery_cache" | "landmark";
 
 export type InteractionId =
-  | "inspect" | "mine" | "chop" | "fish" | "rake" | "plant" | "harvest"
+  | "inspect" | "mine" | "chop" | "fish"
   | "attack" | "cast" | "talk" | "open" | "enter" | "climb" | "vault"
   | "loot" | "take" | "awaken" | "produce" | "recharge" | "bank" | "trade" | "equip" | "unequip";
 
 /** The unions above as values, so a tool schema can enumerate them instead of accepting any string. */
 export const ARCHETYPES: readonly Archetype[] = [
-  "ore", "tree", "fishing_spot", "farm_plot",
+  "ore", "tree", "fishing_spot",
   "enemy", "boss", "npc", "station", "bank", "shop",
   "obstacle", "door", "portal", "loot", "recovery_cache", "landmark",
 ];
 
 export const INTERACTION_IDS: readonly InteractionId[] = [
-  "inspect", "mine", "chop", "fish", "rake", "plant", "harvest",
+  "inspect", "mine", "chop", "fish",
   "attack", "cast", "talk", "open", "enter", "climb", "vault",
   "loot", "take", "awaken", "produce", "recharge", "bank", "trade", "equip", "unequip",
 ];
@@ -240,7 +239,7 @@ export interface EquipmentBonuses {
 
 export type ItemCategory =
   | "resource" | "bar" | "equipment" | "food" | "tool"
-  | "seed" | "quest" | "currency" | "component";
+  | "quest" | "currency" | "component";
 
 export type MagicWeaponKind = "wand" | "staff";
 
@@ -291,7 +290,6 @@ export interface ItemDef {
   orb?: EssenceOrbSpec;
   food?: { healAmount: number };
   tool?: { skill: SkillId; gatherBonus: number };
-  seed?: { cropId: ItemId };
 }
 
 // ------------------------------------------------------- the semantic entity
@@ -682,7 +680,7 @@ export interface GameEventPayloads {
   "health.low": { health: number; maxHealth: number; fraction: number; threshold: number };
   "player.died": { position: Vec3; regionId: RegionId; respawnPointId: string; respawnPosition: Vec3; [key: string]: unknown };
   "level.gained": { skill: SkillId; level: number; levelsGained: number };
-  "production.completed": { recipeId?: RecipeId; recipeName?: string; skill?: SkillId; kind?: string; cropId?: ItemId; plotId?: EntityId; tier?: number; [key: string]: unknown };
+  "production.completed": { recipeId?: RecipeId; recipeName?: string; skill?: SkillId; kind?: string; tier?: number; [key: string]: unknown };
   "campfire.built": { logItemId: ItemId; tier: number; lifetimeMs: number; expiresAtPlaySeconds: number; [key: string]: unknown };
   "campfire.replaced": { previousLogItemId: ItemId; previousTier: number; logItemId: ItemId; tier: number; [key: string]: unknown };
   "campfire.expired": { logItemId: ItemId; tier: number; position: Vec3 };
@@ -1248,7 +1246,7 @@ export interface GameApi {
   interact(entityId: EntityId, interaction: InteractionId): Result<{ started: string }>;
   /** Takes one displayed stack from a world loot container. Omit `stackIndex` to take all. */
   takeLoot(entityId: EntityId, stackIndex?: number): Result<LootTakeResult>;
-  useItem(itemId: ItemId, target?: { itemId: ItemId } | { entityId: EntityId }): Result<{ effect: string }>;
+  useItem(itemId: ItemId, target?: { itemId: ItemId }): Result<{ effect: string }>;
   equipItem(itemId: ItemId): Result<{ slot: EquipSlot; replaced: ItemId | null }>;
   unequipItem(slot: EquipSlot): Result<{ itemId: ItemId }>;
   /** Compatibility command: uses the nearest valid station. */

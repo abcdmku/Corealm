@@ -1,5 +1,5 @@
 /**
- * The ten Phase 1 quests, as pure data.
+ * The nine Phase 1 quests, as pure data.
  *
  * Design rules this file is written against, from the brief and PRD 7.3:
  *
@@ -325,91 +325,6 @@ const DORNS_TALLY: QuestDef = {
 // ------------------------------------------------------------------ quest 3
 
 /**
- * Three skill introductions in one tier-1 quest: farming, fishing, cooking. The seeds are handed
- * over at the start so a fresh character never has to find a shop that sells them first.
- */
-const BRIGHT_WATER: QuestDef = {
-  id: "bright_water",
-  name: "Bright Water",
-  regionId: "fallowmarch",
-  kind: "skill",
-  summary:
-    "Ranger Syb has walked the march for eleven weeks and eaten cold things for eleven weeks. "
-    + "She has stopped complaining about it, which everyone agrees is worse.",
-  giverNpcId: "npc_ranger_syb",
-  requirements: {},
-  prerequisiteQuestIds: [],
-  onStart: {
-    items: [{ itemId: "bittergrain_seed", quantity: 4 }],
-    unlocks: ["Syb hands you four Bittergrain seeds."],
-  },
-  stages: [
-    {
-      index: 0,
-      objective:
-        "Rake a plot at Marchfield, plant a Bittergrain seed, and harvest 3 Bittergrain.",
-      refs: [{ kind: "location", id: "marchfield_farm" }, { kind: "item", id: "bittergrain" }],
-      hint:
-        "Six plots sit inside the old wall line. `interact(<plot>, \"rake\")`, then `\"plant\"`, "
-        + "then wait for the plot to read `ready` and `\"harvest\"`. Bittergrain takes about four "
-        + "minutes of game time.",
-      completion: { kind: "have", itemId: "bittergrain", quantity: 3 },
-      grants: { xp: { farming: 45 } },
-    },
-    {
-      index: 1,
-      objective:
-        "Catch 4 Silt Minnow at Redsill Shallows.",
-      refs: [{ kind: "item", id: "silt_minnow" }, { kind: "location", id: "redsill_shallows" }],
-      hint:
-        "Four fishing spots on the red silt, 120 m east of town. `interact(<spot>, \"fish\")`. "
-        + "Fishing 1 is enough; a rod is not required, only slower without one.",
-      completion: { kind: "gather", itemId: "silt_minnow", count: 4 },
-      grants: { xp: { fishing: 45 } },
-    },
-    {
-      index: 2,
-      objective:
-        "Cook 2 Seared Minnow at the Coldbrace Cooking Range.",
-      refs: [
-        { kind: "item", id: "seared_minnow" },
-        { kind: "entity", id: "coldbrace_range" },
-        { kind: "location", id: "town_center" },
-      ],
-      hint:
-        "At Cooking 1 nearly half of them burn. That is the rule, not bad luck - cook spares. "
-        + "Burnt Minnow does not count.",
-      completion: { kind: "have", itemId: "seared_minnow", quantity: 2 },
-      grants: { xp: { cooking: 45 } },
-    },
-    {
-      index: 3,
-      objective:
-        "Give Ranger Syb 2 Seared Minnow and 3 Bittergrain, and watch her eat a hot meal.",
-      refs: [
-        { kind: "entity", id: "npc_ranger_syb" },
-        { kind: "item", id: "seared_minnow" },
-        { kind: "item", id: "bittergrain" },
-        { kind: "location", id: "town_center" },
-      ],
-      hint: "She is in Coldbrace Square. The handover takes the food out of your bag.",
-      completion: { kind: "talk", npcId: "npc_ranger_syb", dialogueNodeId: "syb_meal_eaten" },
-    },
-  ],
-  rewards: {
-    xp: { farming: 90, fishing: 120, cooking: 120 },
-    items: [
-      { itemId: "palewood_rod", quantity: 1 },
-      { itemId: "bittergrain_seed", quantity: 6 },
-    ],
-    currency: 180,
-    unlocks: ["Syb will tell you where the water is in every region she has walked."],
-  },
-};
-
-// ------------------------------------------------------------------ quest 4
-
-/**
  * The comedy, and the Agility introduction.
  *
  * Stage 1 completes on **Agility 3**, not on a fixed number of traversals: the Brookvault Planks
@@ -435,7 +350,7 @@ const THE_CARTERS_WAGER: QuestDef = {
         "Train Agility to level 3 on the Brookvault Planks - vault them until the skill comes up.",
       refs: [
         { kind: "entity", id: "brookvault_planks" },
-        { kind: "location", id: "marchfield_farm" },
+        { kind: "location", id: "marchfield" },
       ],
       hint:
         "The planks cross Corven Brook at (-78, -30) and need Agility 1. Every successful vault "
@@ -483,7 +398,7 @@ const THE_CARTERS_WAGER: QuestDef = {
   },
 };
 
-// ------------------------------------------------------------------ quest 5
+// ------------------------------------------------------------------ quest 4
 
 const CROOKED_GRAIN: QuestDef = {
   id: "crooked_grain",
@@ -544,7 +459,7 @@ const CROOKED_GRAIN: QuestDef = {
   },
 };
 
-// ------------------------------------------------------------------ quest 6
+// ------------------------------------------------------------------ quest 5
 
 const KNOTS_AND_NAMES: QuestDef = {
   id: "knots_and_names",
@@ -618,7 +533,7 @@ const KNOTS_AND_NAMES: QuestDef = {
   },
 };
 
-// ------------------------------------------------------------------ quest 7
+// ------------------------------------------------------------------ quest 6
 
 /**
  * The exploration quest, and the second joke. Four `reach` predicates in one stage: the objective
@@ -700,7 +615,7 @@ const ELEVEN_EMPTY_DAYS: QuestDef = {
   },
 };
 
-// ------------------------------------------------------------------ quest 8
+// ------------------------------------------------------------------ quest 7
 
 /**
  * The route-optimisation quest. PRD 2.8's flip, made explicit: the same sixteen ore, once by road
@@ -777,7 +692,7 @@ const BAD_GROUND: QuestDef = {
   },
 };
 
-// ------------------------------------------------------------------ quest 9
+// ------------------------------------------------------------------ quest 8
 
 /**
  * The Magic introduction. Essence powers the starter wand directly. Vess supplies raw palewood,
@@ -887,7 +802,7 @@ const SPARKING_STONE: QuestDef = {
   },
 };
 
-// ----------------------------------------------------------------- quest 10
+// ------------------------------------------------------------------ quest 9
 
 /**
  * THE LONG CAIRN - the seven-stage chain, and the only quest an external agent is graded on end to
@@ -1092,11 +1007,10 @@ const LONG_CAIRN: QuestDef = {
 
 // ------------------------------------------------------------------ registry
 
-/** The ten quests, in the order the quest panel lists them. */
+/** The nine quests, in the order the quest panel lists them. */
 export const QUESTS: readonly QuestDef[] = [
   COLD_IRON,
   DORNS_TALLY,
-  BRIGHT_WATER,
   THE_CARTERS_WAGER,
   CROOKED_GRAIN,
   KNOTS_AND_NAMES,

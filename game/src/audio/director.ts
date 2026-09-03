@@ -145,8 +145,6 @@ export function cueForActivity(observation: ActivityAudioObservation): AudioCueI
     if (op === "climb" || op === "shortcut") return "interaction.climb";
     return null;
   }
-  if (kind === "farming") return farmCue(op || skill, phase);
-
   if (kind === "gathering" || GATHER_SKILLS.has(skill)) {
     switch (skill) {
       case "mining":
@@ -158,7 +156,6 @@ export function cueForActivity(observation: ActivityAudioObservation): AudioCueI
       case "fishing":
         return phase === "started" ? "gather.fishing_cast"
           : phase === "impact" ? "gather.fishing_reel" : "gather.fishing_catch";
-      case "farming": return farmCue(op, phase);
       default: return null;
     }
   }
@@ -178,9 +175,6 @@ export function cueForActivity(observation: ActivityAudioObservation): AudioCueI
   }
 
   switch (kind || op) {
-    case "rake": return "farm.rake";
-    case "plant": return "farm.plant";
-    case "harvest": return "farm.harvest";
     case "door":
     case "open": return "interaction.door_open";
     case "portal":
@@ -388,7 +382,7 @@ export class AudioDirector {
   }
 }
 
-const GATHER_SKILLS = new Set(["mining", "woodcutting", "fishing", "farming"]);
+const GATHER_SKILLS = new Set(["mining", "woodcutting", "fishing"]);
 const PRODUCTION_SKILLS = new Set(["smithing", "crafting", "cooking", "fletching"]);
 
 function dataAsActivity(data: Record<string, unknown>, phase: ActivityAudioObservation["phase"]): ActivityAudioObservation {
@@ -399,13 +393,6 @@ function dataAsActivity(data: Record<string, unknown>, phase: ActivityAudioObser
     op: typeof operation === "string" ? operation : null,
     phase,
   };
-}
-
-function farmCue(op: string, phase: ActivityAudioObservation["phase"]): AudioCueId | null {
-  if (op === "rake") return "farm.rake";
-  if (op === "plant") return "farm.plant";
-  if (op === "harvest" || phase === "completed") return "farm.harvest";
-  return null;
 }
 
 function defaultSurface(regionId: RegionId): FootstepSurface {

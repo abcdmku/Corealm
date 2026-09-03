@@ -254,10 +254,6 @@ export function createOperationTools({ api, session }: ToolDeps): ToolDef[] {
                 const quantity = asNumber(event.data.quantity, 1);
                 received += quantity;
                 items[event.data.itemId] = (items[event.data.itemId] ?? 0) + quantity;
-              } else if (event.type === "item.received" && event.data.source === "harvest" && typeof event.data.itemId === "string") {
-                const quantity = asNumber(event.data.quantity, 1);
-                received += quantity;
-                items[event.data.itemId] = (items[event.data.itemId] ?? 0) + quantity;
               } else if (event.type === "inventory.full") {
                 api.stop();
                 return finish("inventory-full");

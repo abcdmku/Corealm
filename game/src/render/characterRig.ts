@@ -53,7 +53,7 @@ import {
 /** What the character is doing, which decides the clip. */
 export type CharacterPose =
   | "idle" | "walk" | "run"
-  | "mine" | "chop" | "fish" | "farm"
+  | "mine" | "chop" | "fish"
   | "attack_melee" | "cast" | "hit" | "death"
   | "eat" | "climb" | "produce" | "bank";
 
@@ -137,7 +137,6 @@ const POSE_CLIPS: Record<CharacterPose, readonly string[]> = {
   mine: ["TreeChopping_Loop"],
   chop: ["TreeChopping_Loop"],
   fish: ["Idle_Rail_Loop", "Idle_Loop"],
-  farm: ["Farm_Harvest", "Farm_PlantSeed"],
   attack_melee: ["Sword_Attack", "Sword_Regular_A", "Punch_Jab"],
   // MIRRORED. The library's only cast raises the LEFT hand and a staff is a main-hand item held in
   // the right, so played as authored the caster raised an empty hand while the staff hung at their
@@ -824,7 +823,6 @@ export class CharacterRig {
       return "mine";
     }
     if (input.activityKind === "production" || input.activityKind === "building_campfire") return "produce";
-    if (input.activityKind === "farming") return "farm";
     if (input.activityKind === "eating") return "eat";
     if (input.activityKind === "traversing") return "climb";
     if (input.moving) return input.speed > MOVEMENT.walkPoseThreshold ? "run" : "walk";

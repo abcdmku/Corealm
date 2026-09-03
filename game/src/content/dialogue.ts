@@ -126,8 +126,8 @@ const ILSE: DialogueNodeDef[] = [
     text:
       "Four people. Harrow the Smith, entity npc_smith_harrow, east side of the square, will not "
       + "sell you a weapon until you have made one. Pitmaster Dorn, npc_pitmaster_dorn, has a "
-      + "ledger problem he calls a pit problem. Ranger Syb, npc_ranger_syb, has not eaten "
-      + "properly since the spring. Carter Bel, npc_carter_bel, is at the south gate and is "
+      + "ledger problem he calls a pit problem. Ranger Syb, npc_ranger_syb, knows every useful "
+      + "water source in the region. Carter Bel, npc_carter_bel, is at the south gate and is "
       + "wrong.",
     options: [
       { id: "ilse_directory#back", text: "Something else.", next: "ilse_root" },
@@ -503,92 +503,12 @@ const SYB: DialogueNodeDef[] = [
   {
     id: "syb_root",
     text:
-      "Wind off the moor, cold, steady, been like it for eleven weeks. I have eaten cold food for "
-      + "eleven weeks as well. Both facts. Neither improving.",
-    variants: [
-      {
-        when: [{ kind: "questStatus", questId: "bright_water", status: "complete", reason: "" }],
-        text:
-          "I have eaten something hot in the last month. It has changed my opinion of the month. "
-          + "Ask me where the water is anywhere and I will tell you.",
-      },
-      {
-        when: [{ kind: "questStatus", questId: "bright_water", status: "active", reason: "" }],
-        text: "Still cold. Still steady. Still waiting.",
-      },
-    ],
+      "Wind off the moor, cold, steady, been like it for eleven weeks. The shallows are running "
+      + "clear enough to fish. That is the useful part.",
     options: [
-      {
-        id: "syb_root#offer",
-        text: "Why has nobody cooked for you?",
-        showIf: [{ kind: "questStatus", questId: "bright_water", status: "unstarted", reason: "" }],
-        next: "syb_meal_offer",
-      },
-      {
-        id: "syb_root#deliver",
-        text: "Sit down. Food.",
-        showIf: [{ kind: "questStatus", questId: "bright_water", status: "active", reason: "" }],
-        requires: [
-          {
-            kind: "questStage", questId: "bright_water", min: 3,
-            reason: "Syb wants the whole meal at once: grain grown, fish caught, fish cooked.",
-          },
-          {
-            kind: "item", itemId: "seared_minnow", quantity: 2,
-            reason: "You need 2 Seared Minnow in your bag. Burnt ones do not count.",
-          },
-          {
-            kind: "item", itemId: "bittergrain", quantity: 3,
-            reason: "You need 3 Bittergrain in your bag.",
-          },
-        ],
-        effects: [
-          { kind: "takeItem", itemId: "seared_minnow", quantity: 2 },
-          { kind: "takeItem", itemId: "bittergrain", quantity: 3 },
-        ],
-        next: "syb_meal_eaten",
-      },
       { id: "syb_root#water", text: "Where is the water around here?", next: "syb_water" },
       { id: "syb_root#march", text: "What is out on the open march?", next: "syb_march" },
       LEAVE("syb_root#bye"),
-    ],
-  },
-  {
-    id: "syb_meal_offer",
-    text:
-      "Because everyone here is busy and I am not anyone's problem. If you want to make me your "
-      + "problem: grain out of Marchfield, locationId marchfield_farm, four seeds, take these. "
-      + "Fish out of Redsill Shallows, locationId redsill_shallows. Cook them on Harrow's range, "
-      + "entity coldbrace_range. Bring the lot back here.",
-    options: [
-      {
-        id: "syb_meal_offer#accept",
-        text: "Grain, fish, fire. I can do that.",
-        effects: [{ kind: "startQuest", questId: "bright_water" }],
-        next: "syb_meal_accepted",
-      },
-      { id: "syb_meal_offer#no", text: "I would burn it.", next: null },
-    ],
-  },
-  {
-    id: "syb_meal_accepted",
-    text:
-      "You will burn about half of them at Cooking 1. That is the rule, not your hands. Cook "
-      + "spares. Bittergrain takes about four minutes in the ground and does not care whether you "
-      + "are watching it.",
-    options: [
-      { id: "syb_meal_accepted#back", text: "Back shortly.", next: "syb_root" },
-      LEAVE("syb_meal_accepted#bye"),
-    ],
-  },
-  {
-    id: "syb_meal_eaten",
-    text:
-      "Hm. Right. That is, yes. Good. Take the rod, it was my father's and it is better than "
-      + "anything the stall sells, and take the seeds, and stop looking at me like that.",
-    options: [
-      { id: "syb_meal_eaten#back", text: "Where is the water in Vellenwood?", next: "syb_water" },
-      LEAVE("syb_meal_eaten#bye"),
     ],
   },
   {

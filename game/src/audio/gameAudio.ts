@@ -88,11 +88,6 @@ export class CorealmAudioBridge implements TickSystem {
     }
     if (deadline === null || this.activityDeadline === null || deadline === this.activityDeadline) return;
 
-    // A debug time jump can advance thousands of rolls in one sim tick. One impact states the
-    // result without turning catch-up into an audio burst.
-    if (activity.kind === "farming" && activity.op === "harvest") {
-      this.play("farm.harvest");
-    }
     this.activityDeadline = deadline;
   }
 
@@ -134,7 +129,6 @@ export class CorealmAudioBridge implements TickSystem {
         return;
       }
       case "production.completed": {
-        if (stringField(data, "kind") === "crop") return;
         const recipe = content.recipe(stringField(data, "recipeId"));
         if (!recipe) return;
         this.deps.director.observeActivity({
@@ -155,8 +149,6 @@ export class CorealmAudioBridge implements TickSystem {
         } else if (entity?.archetype === "tree") {
           this.deps.director.observeActivity({ kind: "gathering", skill: "woodcutting", phase: "impact" });
           this.deps.director.observeActivity({ kind: "gathering", skill: "woodcutting", depleted: true, phase: "completed" });
-        } else if (stringField(data, "plotId")) {
-          this.play("farm.harvest");
         }
         return;
       }
@@ -385,9 +377,6 @@ function interactionCue(interaction: InteractionId): AudioCueId | null {
     case "mine":
     case "chop": return null;
     case "fish": return "gather.fishing_cast";
-    case "rake": return "farm.rake";
-    case "plant": return "farm.plant";
-    case "harvest": return "farm.harvest";
     case "open": return "interaction.door_open";
     case "enter": return "interaction.portal";
     case "climb": return "interaction.climb";
@@ -403,7 +392,6 @@ function interactionCue(interaction: InteractionId): AudioCueId | null {
 
 function activityBackedInteraction(interaction: InteractionId): boolean {
   return interaction === "mine" || interaction === "chop" || interaction === "fish"
-    || interaction === "rake" || interaction === "plant" || interaction === "harvest"
     || interaction === "climb" || interaction === "vault";
 }
 
@@ -411,7 +399,6 @@ function activityIdentity(activity: ReturnType<Store["get"]>["activity"]): strin
   if (!activity) return null;
   switch (activity.kind) {
     case "gathering": return `gathering:${activity.entityId}:${activity.startedAtMs}`;
-    case "farming": return `farming:${activity.plotId}:${activity.op}`;
     case "production": return `production:${activity.recipeId}:${activity.nextCompleteAtMs - activity.completed}`;
     case "traversing": return `traversing:${activity.obstacleId}:${activity.endsAtMs}`;
     case "eating": return `eating:${activity.itemId}:${activity.endsAtMs}`;
@@ -421,7 +408,6 @@ function activityIdentity(activity: ReturnType<Store["get"]>["activity"]): strin
 
 function activityDeadline(activity: NonNullable<ReturnType<Store["get"]>["activity"]>): number | null {
   if (activity.kind === "gathering") return activity.nextRollAtMs;
-  if (activity.kind === "farming" && activity.op === "harvest") return activity.endsAtMs;
   return null;
 }
 

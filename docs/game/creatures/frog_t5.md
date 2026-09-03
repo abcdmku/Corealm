@@ -44,5 +44,4 @@ description: "Blackwater Frog spawn locations, combat stats, and drops."
 | Marks | 15-55 | Always |
 | [Marsh Gland](../../items/#marsh-gland) | 1-2 | 45% |
 | [Raw Venison](../../items/#raw-venison) | 1 | 25% |
-| [Duskberry Seed](../../items/#duskberry-seed) | 1-2 | 20% |
 | [Vell Amber](../../items/#vell-amber) | 1 | 5% |

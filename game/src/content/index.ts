@@ -18,7 +18,7 @@ import type {
 
 // ---------------------------------------------------------------- resources
 
-export type GatheringResourceArchetype = "ore" | "tree" | "fishing_spot" | "farm_plot";
+export type GatheringResourceArchetype = "ore" | "tree" | "fishing_spot";
 
 /** Authored visual rules shared by every cluster that references a resource. */
 export interface ResourcePresentationDef {

@@ -35,7 +35,7 @@ async function main(): Promise<void> {
 
     const representative = [
       "grithe_ore", "palewood_log", "silt_minnow", "grithe_bar", "coarse_hide",
-      "bittergrain_seed", "grithe_pickaxe", "grithe_sword", "grithe_helm", "grithe_ring",
+      "grithe_pickaxe", "grithe_sword", "grithe_helm", "grithe_ring",
       "basic_wooden_wand", "palewood_staff", "cairnpine_wand", "marchhide_robe",
       "air_orb", "earth_orb", "water_orb",
       "air_essence", "earth_essence", "water_essence",

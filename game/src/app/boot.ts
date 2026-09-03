@@ -65,7 +65,6 @@ import { EatingSystem } from "../systems/eating.js";
 import { CAMPFIRE_ENTITY_ID, CampfireSystem, campfireFuelLookup } from "../systems/campfire.js";
 import { GatheringSystem } from "../systems/gathering.js";
 import { EssenceSystem } from "../systems/essence.js";
-import { FarmingSystem } from "../systems/farming.js";
 import { AgilitySystem } from "../systems/agility.js";
 import { CombatSystem } from "../systems/combat.js";
 import { EnemyAiSystem } from "../systems/enemyAI.js";
@@ -892,11 +891,6 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
     entities: entityStore,
     syncViews: () => entityViews.sync(entityStore.all()),
     now,
-  });
-  const farmingSystem = new FarmingSystem({
-    store, events, clock, rng, entities: entityStore,
-    inventory: inventorySystem, activity: activitySystem, dispatcher: interactions,
-    gathering: gatheringSystem,
   });
   const agilitySystem = new AgilitySystem({
     store, events, clock, rng, entities: entityStore,
@@ -1881,7 +1875,6 @@ export async function boot(canvas: HTMLCanvasElement, options: BootOptions = {})
   loop.addSystem(activitySystem);
   loop.addSystem(agilitySystem);
   loop.addSystem(gatheringSystem);
-  loop.addSystem(farmingSystem);
   loop.addSystem(enemyAiSystem);
   loop.addSystem(combatSystem);
   loop.addSystem(healthSystem);

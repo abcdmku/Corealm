@@ -1,14 +1,12 @@
 /**
  * The concise, level-grouped unlock view used by the Skills panel.
  *
- * Items, resources, recipes and spells come from the registered content tables. Crops and
- * traversal shortcuts live in their own canonical content files, so this module joins them here
- * instead of making the UI carry a second unlock catalog.
+ * Items, resources, recipes and spells come from the registered content tables. Traversal
+ * shortcuts live in their own canonical content file, so this module joins them here.
  */
 import type { ItemDef, ItemId, SkillId } from "../contracts.js";
 import { content } from "./index.js";
 import type { RecipeDef } from "./index.js";
-import { CROPS } from "./resources.js";
 import { REGIONS } from "./regions.js";
 
 export type SkillUnlockKind = "resource" | "recipe" | "spell" | "gear" | "shortcut";
@@ -82,25 +80,6 @@ function addResources(skill: SkillId, add: (unlock: SkillUnlock) => void): void 
     });
   }
 
-  if (skill !== "farming") return;
-
-  // Duskberry is present in the crop table but has no Phase 1 plot row. Bittergrain and Cairnleaf
-  // already appear above through their active plot resources, so do not show either twice.
-  const representedCrops = new Set(
-    resources
-      .filter((resource) => resource.skill === "farming")
-      .map((resource) => `${resource.reqLevel}|${resource.itemId}`),
-  );
-  for (const crop of CROPS) {
-    const key = `${crop.reqLevel}|${crop.cropItemId}`;
-    if (representedCrops.has(key)) continue;
-    add({
-      level: crop.reqLevel,
-      kind: "resource",
-      name: itemLabel(crop.cropItemId as ItemId),
-      detail: "no Phase 1 plot",
-    });
-  }
 }
 
 function addRecipes(skill: SkillId, add: (unlock: SkillUnlock) => void): void {

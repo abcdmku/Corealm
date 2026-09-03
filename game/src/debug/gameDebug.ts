@@ -164,7 +164,7 @@ export interface DebugDeps {
  * `checkBuildingFooting()` already covers whether those parents stand level.
  */
 const GROUND_PLACED_ARCHETYPES: readonly string[] = [
-  "ore", "tree", "fishing_spot", "farm_plot",
+  "ore", "tree", "fishing_spot",
   "enemy", "boss", "npc", "station", "bank", "shop",
   "obstacle", "door", "portal", "loot", "recovery_cache",
 ];
@@ -592,8 +592,7 @@ export function installGameDebug(deps: DebugDeps): void {
      * library have |bbox.min.y| > 2 cm, so the visible gap came out as exactly
      * `glbMinY x scale x tierSilhouetteScale(tier)` — verified to three decimals across 159 surface
      * entities. That is why the Fallen Duskoak hovered 5.773 m (a `roof_log` at scale 1.5), the
-     * Coldbrace fletching bench hovered 1.411 m, and all ten farm plots drew with their TOP 7.7 cm
-     * underground.
+     * Coldbrace fletching bench hovered 1.411 m.
      *
      * `gap` is `drawnMinY - groundY`: positive floats, negative sinks. Anything past a few
      * centimetres is visible in a screenshot, so a gate line can assert `worst < 0.05`.

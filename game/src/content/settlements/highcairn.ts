@@ -50,16 +50,8 @@
  * `highcairn_outpost` route node is a separate location and still sits at (144,-66), inside the
  * yard and 2.5 m north of the forge mouth.
  *
- * WHAT IS AUTHORED AROUND RATHER THAN FIXED. Two things this settlement has to live with belong to
- * `content/regions.ts`, which this file does not own:
- *  - `highcairn_plot_beds` spirals four 2 x 2 m beds inside a 6 m radius of (128,-58). Measured
- *    off `buildWorld`: (129.76,-57.82), (125.23,-55.87), (127.72,-62.43), (130.36,-53.06), so with
- *    their rails the garden occupies x [124.2,131.4] z [-63.5,-52.0]. The diagnosis wanted the
- *    cluster moved to (127,-53) r5; instead nothing is built inside that footprint, the yard
- *    paving starts at x = 134, and the garden is fenced on its south and east sides with the gate
- *    on the authored `highcairn_outpost -> highcairn_plots` road line (it crosses x = 133.2 at
- *    z = -60.6). That also makes the location blurb — "four plots in the lee of the wall" — true.
- *  - The `highcairn_crane` landmark is fixed at (156,-64) with rotationY 0.3. Measured part
+ * WHAT IS AUTHORED AROUND RATHER THAN FIXED. The `highcairn_crane` landmark belongs to
+ * `content/regions.ts` and is fixed at (156,-64) with rotationY 0.3. Measured part
  *    positions: jib (156.89,-61.13), drum (158.11,-61.93), rope (157.21,-58.72), crate
  *    (154.12,-61.95), barrel (158.62,-63.97) — so it occupies x [153.6,159.1] z [-64.4,-58.4].
  *    The diagnosis wanted it moved to (140,-60); instead the east half of the yard is left to it
@@ -334,23 +326,6 @@ export const HIGHCAIRN: SettlementDef = {
     { id: "highcairn_bank_torch_r", assetId: "torch", position: [152, -69.5], rotationY: 0, scale: 2.2, dy: 1.55 },
     { id: "highcairn_bank_bench", assetId: "bench", position: [151, -67], rotationY: 0 },
     { id: "highcairn_bank_sack", assetId: "sack", position: [152.3, -70.3], rotationY: 0.7 },
-
-    // --- The garden. Five rails along z = -65 and five up x = 133.2, with the gate left open at
-    // z [-61.5,-59.5] where the highcairn_outpost -> highcairn_plots road crosses the line. The
-    // rails are NOT solid: the farming gate line has to walk in to four beds inside this fence.
-    { id: "highcairn_garden_fence_s1", assetId: "fence_wood_single", position: [124, -65], rotationY: 0 },
-    { id: "highcairn_garden_fence_s2", assetId: "fence_wood_single", position: [126, -65], rotationY: 0 },
-    { id: "highcairn_garden_fence_s3", assetId: "fence_wood_single", position: [128, -65], rotationY: 0 },
-    { id: "highcairn_garden_fence_s4", assetId: "fence_wood_single", position: [130, -65], rotationY: 0 },
-    { id: "highcairn_garden_fence_s5", assetId: "fence_wood_single", position: [132, -65], rotationY: 0 },
-    { id: "highcairn_garden_fence_e1", assetId: "fence_wood_single", position: [133.2, -64.5], rotationY: Math.PI / 2 },
-    { id: "highcairn_garden_fence_e2", assetId: "fence_wood_single", position: [133.2, -62.5], rotationY: Math.PI / 2 },
-    { id: "highcairn_garden_fence_e3", assetId: "fence_wood_single", position: [133.2, -58.5], rotationY: Math.PI / 2 },
-    { id: "highcairn_garden_fence_e4", assetId: "fence_wood_single", position: [133.2, -56.5], rotationY: Math.PI / 2 },
-    { id: "highcairn_garden_fence_e5", assetId: "fence_wood_single", position: [133.2, -54.5], rotationY: Math.PI / 2 },
-    { id: "highcairn_garden_crate_1", assetId: "farm_crate_carrot", position: [131.9, -64], rotationY: 0.5 },
-    { id: "highcairn_garden_crate_2", assetId: "farm_crate_carrot", position: [132.3, -56.6], rotationY: 2.1 },
-    { id: "highcairn_garden_barrel", assetId: "barrel", position: [132.4, -58.8], rotationY: 0 },
 
     // --- The woodpile, in the 1.25 m alley between the Long Hut's west gable and the west wall.
     // `roof_log` at 0.26 draws 0.30 x 2.78, and `emitProp` puts an asset's bbox floor on the

@@ -299,13 +299,6 @@ export class Tooltip {
       nodes.push(tool);
     }
 
-    if (def.seed) {
-      const seed = document.createElement("div");
-      seed.className = "tooltip__body";
-      seed.textContent = `Grows into ${content.item(def.seed.cropId)?.name ?? def.seed.cropId}.`;
-      nodes.push(seed);
-    }
-
     for (const requirement of this.requirementLines(def)) {
       const line = document.createElement("div");
       line.className = requirement.met ? "tooltip__requirement" : "tooltip__requirement is-unmet";

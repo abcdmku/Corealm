@@ -33,10 +33,6 @@ export const SKILLS: Record<SkillId, SkillDef> = {
     id: "fishing", name: "Fishing", group: "gathering", colour: "#4a8fa8",
     blurb: "Takes fish and aquatic materials from shallows, pools, and deep water.",
   },
-  farming: {
-    id: "farming", name: "Farming", group: "gathering", colour: "#a8913f",
-    blurb: "Grows crops, herbs, and fibres on plots that keep growing between sessions.",
-  },
   smithing: {
     id: "smithing", name: "Smithing", group: "production", colour: "#9a6b3f",
     blurb: "Smelts ore into bars and forges melee equipment, tools, and metal components.",
@@ -60,7 +56,7 @@ export const SKILLS: Record<SkillId, SkillDef> = {
 };
 
 export const COMBAT_SKILLS: readonly SkillId[] = ["melee", "magic"] as const;
-export const GATHERING_SKILLS: readonly SkillId[] = ["mining", "woodcutting", "fishing", "farming"] as const;
+export const GATHERING_SKILLS: readonly SkillId[] = ["mining", "woodcutting", "fishing"] as const;
 export const PRODUCTION_SKILLS: readonly SkillId[] = ["smithing", "crafting", "cooking", "fletching"] as const;
 
 export function allSkills(): readonly SkillId[] {

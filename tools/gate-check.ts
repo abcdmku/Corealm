@@ -4,7 +4,7 @@
  * Written because three separate false greens got through in three rounds: a scenario step that
  * could not fail, a performance budget that only sampled the cheapest frame, and a suite that
  * reported 7/7 while never completing a quest, never killing the boss, and never touching eight of
- * the eleven skills. A green suite that skips the gate is worse than no suite.
+ * the ten skills. A green suite that skips the gate is worse than no suite.
  *
  * Two rules make this different from a scenario:
  *
@@ -465,24 +465,6 @@ function playthroughSource(): string {
         : node.id + " draws NOTHING once depleted";
     }
     note("spent-node", spentOk, spentEvidence);
-  }
-
-  // ------------------------------------------------------------- farming
-  {
-    const before = (await skills()).farming.xp;
-    const plot = await findNear(["farm_plot"], null, "farm|field|plot|marchfield");
-    let evidence = "no plot found";
-    if (plot) {
-      dbg.giveItem("bittergrain_seed", 4);
-      await doInteract(plot.id, "rake", ["activity.stopped"], 30000);
-      await doInteract(plot.id, "plant", ["activity.stopped"], 30000);
-      dbg.advanceGameTime(900);
-      await sleep(800);
-      await doInteract(plot.id, "harvest", ["item.received", "activity.stopped"], 40000);
-      await sleep(800);
-      evidence = "farming xp " + before + " -> " + (await skills()).farming.xp;
-    }
-    note("farming", (await skills()).farming.xp > before, evidence);
   }
 
   // ---------------------------------------------------------- production
@@ -1184,14 +1166,13 @@ function playthroughSource(): string {
 
 const GATE_LINES: Record<string, string> = {
   navigation: "Click-to-move computes a real navmesh path and the player walks it",
-  mining: "All 11 skills gain XP correctly (Mining)",
-  woodcutting: "All 11 skills gain XP correctly (Woodcutting)",
-  fishing: "All 11 skills gain XP correctly (Fishing)",
-  farming: "All 11 skills gain XP correctly (Farming)",
-  smithing: "All 11 skills gain XP correctly (Smithing)",
-  cooking: "All 11 skills gain XP correctly (Cooking)",
-  crafting: "All 11 skills gain XP correctly (Crafting)",
-  fletching: "All 11 skills gain XP correctly (Fletching)",
+  mining: "All 10 skills gain XP correctly (Mining)",
+  woodcutting: "All 10 skills gain XP correctly (Woodcutting)",
+  fishing: "All 10 skills gain XP correctly (Fishing)",
+  smithing: "All 10 skills gain XP correctly (Smithing)",
+  cooking: "All 10 skills gain XP correctly (Cooking)",
+  crafting: "All 10 skills gain XP correctly (Crafting)",
+  fletching: "All 10 skills gain XP correctly (Fletching)",
   melee: "Melee is useful and a normal enemy gives meaningful combat",
   magic: "Magic is useful",
   agility: "Agility unlocks traversal",

@@ -430,7 +430,7 @@ export class GameLoop {
     // 3. physics (static world for now; keeps the collider set warm and ground queries valid)
     physics.step();
 
-    // 4..12. registered systems: gathering, production, combat, enemy AI, health, farming, quests
+    // 4..11. registered systems: gathering, production, combat, enemy AI, health, quests
     for (const system of this.systems) system.tick(SIM_TICK_MS, atMs);
 
     // 13. clock commit

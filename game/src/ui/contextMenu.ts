@@ -94,7 +94,7 @@ export const INTERACTION_PRIORITY: readonly InteractionId[] = [
   // names a specific spell, so it keeps a label below — nothing routes it into a menu.
   "attack",
   "talk", "trade", "bank", "awaken", "recharge", "produce",
-  "mine", "chop", "fish", "harvest", "plant", "rake",
+  "mine", "chop", "fish",
   "loot", "take",
   "open", "enter", "climb", "vault",
   "equip", "unequip",
@@ -106,9 +106,6 @@ export const INTERACTION_LABELS: Record<InteractionId, string> = {
   mine: "Mine",
   chop: "Chop",
   fish: "Fish",
-  rake: "Rake",
-  plant: "Plant",
-  harvest: "Harvest",
   attack: "Attack",
   cast: "Cast at",  // unreachable from a menu; see INTERACTION_PRIORITY
   talk: "Talk to",
@@ -157,7 +154,7 @@ export function defaultSkillLabel(skill: SkillId): string {
 }
 
 /** Verbs that a spent or felled node cannot serve. */
-const HARVEST_VERBS: readonly InteractionId[] = ["mine", "chop", "fish", "harvest"];
+const HARVEST_VERBS: readonly InteractionId[] = ["mine", "chop", "fish"];
 const COMBAT_VERBS: readonly InteractionId[] = ["attack", "cast"];
 
 export interface Availability {

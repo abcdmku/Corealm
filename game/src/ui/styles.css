@@ -120,7 +120,6 @@
   --skill-mining: #8d8579;
   --skill-woodcutting: #6b8f47;
   --skill-fishing: #4a8fa8;
-  --skill-farming: #a8913f;
   --skill-smithing: #9a6b3f;
   --skill-crafting: #a0679a;
   --skill-cooking: #c98a3d;
@@ -454,7 +453,6 @@ html, body {
 [data-skill="mining"] { --skill-colour: var(--skill-mining); }
 [data-skill="woodcutting"] { --skill-colour: var(--skill-woodcutting); }
 [data-skill="fishing"] { --skill-colour: var(--skill-fishing); }
-[data-skill="farming"] { --skill-colour: var(--skill-farming); }
 [data-skill="smithing"] { --skill-colour: var(--skill-smithing); }
 [data-skill="crafting"] { --skill-colour: var(--skill-crafting); }
 [data-skill="cooking"] { --skill-colour: var(--skill-cooking); }

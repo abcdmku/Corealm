@@ -158,7 +158,6 @@
 .map__place--seam .map__pip { fill: var(--skill-mining); }
 .map__place--grove .map__pip { fill: var(--skill-woodcutting); }
 .map__place--water .map__pip { fill: var(--skill-fishing); }
-.map__place--farm .map__pip { fill: var(--skill-farming); }
 .map__place--camp .map__pip { fill: var(--danger-dim); }
 .map__place--landmark .map__pip { fill: var(--ink-dim); }
 

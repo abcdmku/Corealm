@@ -1,5 +1,5 @@
 /**
- * The eleven skills, grouped the way the design groups them: combat, gathering, production,
+ * The ten skills, grouped the way the design groups them: combat, gathering, production,
  * utility. Each row carries its own colour from `content/skills.ts` — the same colour the floating
  * XP number uses — so "that green number was woodcutting" is learnable without reading a word.
  *

@@ -74,12 +74,12 @@
     {
       "debug": "focusCamera",
       "args": [
-        "marchfield_farm"
+        "marchfield"
       ],
-      "label": "pose: marchfield_farm"
+      "label": "pose: marchfield"
     },
     {
-      "screenshot": "r2-marchfield_farm"
+      "screenshot": "r2-marchfield"
     },
     {
       "debug": "focusCamera",

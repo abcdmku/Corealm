@@ -1,7 +1,7 @@
 /**
  * The Quests panel.
  *
- * Phase 1 shipped ten quests, 82 dialogue nodes and no way for a player to read any of it: the
+ * Phase 1 shipped nine quests and no way for a player to read any of it: the
  * only place an objective appeared was a toast that scrolled away. This is that missing surface.
  *
  * The one rule this panel enforces is that a player never sees a developer id. `QuestSummary`

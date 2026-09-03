@@ -119,12 +119,11 @@ assets must stay empty, and density increases must fit the available triangle an
 Wind is shader movement, not authored animation. Use `MaterialLibrary.wind(source, strength)`, which
 preserves the source shader hook and reuses the patched material. `MaterialLibrary.setTime()` advances
 it. Target flexible material families such as grass, `Leaves`, `Leaves_NormalTree`, `Leaves_Pine`,
-`Leaves_TwistedTree`, `Flowers`, and `MI_Vine`. Select live farm plots by entity or asset identity
-because crop material names are shared with rigid props.
+`Leaves_TwistedTree`, `Flowers`, and `MI_Vine`.
 
 Keep roots and trunks fixed. Displacement should grow with vertex height and vary phase by world,
 instance, or batch position. Flowers and grass can move more than a tree crown. Rocks, buildings,
-mushrooms, dead wood, spent trees, harvested crops, and collision never move. If code clones or
+mushrooms, dead wood, spent trees, and collision never move. If code clones or
 replaces a material, apply `wind()` after that step.
 
 ## Seeds
@@ -205,7 +204,7 @@ Open the Vite game in Chromium and inspect the view, not only source or the SVG.
   readable paths and doors; mixed cover and accents should stay restrained.
 - Check every lake. Its rings should share lobes, water should be closed, and the bank should be dry
   enough to read without a circular mud halo.
-- Watch grass, leaves, flowers, vines, and crops for several seconds. Motion should be slight, rooted,
+- Watch grass, leaves, flowers, and vines for several seconds. Motion should be slight, rooted,
   and out of phase. Trunks and rigid props should stay still.
 
 Capture a coast/map edge, a biome seam, a curved path, a foliage field, and a lake. Before accepting,

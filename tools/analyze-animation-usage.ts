@@ -170,7 +170,6 @@ const COVERAGE_DOMAINS: Record<string, string[]> = {
     "game/src/systems/agility.ts",
     "game/src/systems/campfire.ts",
     "game/src/systems/eating.ts",
-    "game/src/systems/farming.ts",
     "game/src/systems/gathering.ts",
     "game/src/systems/production.ts",
   ],

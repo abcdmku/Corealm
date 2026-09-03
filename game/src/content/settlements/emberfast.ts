@@ -10,7 +10,7 @@
  * the browser, so Emberfast reuses that arithmetic instead of re-deriving it and only documents
  * what differs. Differences:
  *
- *  - No crane and no garden. Kilnhalt's farm plots live OUTSIDE the wall at `emberfast_plots`
+ *  - No crane and no garden.
  *    (regions.ts), so the garden fence is gone; the crane's working half of the yard instead
  *    holds the WORKS ROW, a second arcade carrying the crafting table and fletching bench.
  *    Emberfast is the first settlement with the complete production set inside one wall: bank,

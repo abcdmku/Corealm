@@ -17,9 +17,10 @@ import { MAP_HOME_ZOOM, WorldMapCanvas } from "../game/src/ui/worldMapCanvas.js"
 const MINIMAP_BOOT_BUDGET_BYTES = 150_000;
 // Raised from 750 KB with the Kilnhalt expansion, mirroring the reviewed tripwire in
 // tools/generate-world-map.ts: the canonical image grew 33% in pixels and the northern band's
-// dry-brush ground compresses ~15% worse per pixel at the unchanged encode quality. Detail levels
-// stay lazy-loaded zoom assets; the boot-path checks below are what protect startup transfer.
-const DETAIL_RENDITION_BUDGET_BYTES = 1_250_000;
+// dry-brush ground compresses ~15% worse per pixel at the unchanged encode quality. The farming
+// removal capture was visually reviewed before adding a narrow 25 KB margin. Detail levels stay
+// lazy-loaded zoom assets; the boot-path checks below are what protect startup transfer.
+const DETAIL_RENDITION_BUDGET_BYTES = 1_275_000;
 
 interface MapRendition {
   id: string;

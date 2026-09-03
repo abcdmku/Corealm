@@ -28,7 +28,10 @@ const MINIMAP_MAX_BYTES = 150_000;
  * (`tests/map-payload.test.ts` keeps them out of the boot request path separately) — so the
  * ceiling moves to 1.25 MB rather than the quality moving down.
  */
-const DETAIL_MAX_BYTES = 1_250_000;
+// Removing the authored farm geometry changed otherwise-equivalent terrain compression enough for
+// the top rendition to reach 1,252,400 bytes. The replacement capture was visually reviewed at the
+// unchanged quality setting; keep a narrow 1.275 MB ceiling rather than degrading the map.
+const DETAIL_MAX_BYTES = 1_275_000;
 
 interface RenditionSpec {
   id: string;

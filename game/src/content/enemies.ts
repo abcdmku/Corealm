@@ -157,7 +157,6 @@ const BLOCKS: readonly EnemyDef[] = [
       { itemId: "hen_feather", quantity: [1, 3], chance: 0.55 },
       { itemId: "raw_game_meat", quantity: [1, 1], chance: 0.35 },
       { itemId: "hen_egg", quantity: [1, 2], chance: 0.25 },
-      { itemId: "bittergrain_seed", quantity: [1, 2], chance: 0.20 },
     ],
   },
   {
@@ -179,13 +178,13 @@ const BLOCKS: readonly EnemyDef[] = [
     ],
   },
   {
-    id: "cattle_t1", name: "Redsill Cow", family: "cattle", tier: 1,
+    id: "cattle_t1", name: "Marchfield Cow", family: "cattle", tier: 1,
     // The bulwark: armour 35 against magicArmour 0, the widest split at tier 1, so a staff is the
     // right answer and a dagger is the wrong one. 3600 ms is the slowest cadence in the game and
     // max hit 5 is the biggest single blow at the tier, which is a cow exactly: it ignores you, and
-    // then it does not. Territorial at 5 m, standing in the shallows the Fishing tutorial sends you
-    // to. At Melee 1 this fight is unwinnable (65.9 s, 32.8 damage against 23 health) and the whole
-    // point of territorial is that it never starts.
+    // then it does not. Territorial at 5 m, grazing beside the Marchfield farmstead. At Melee 1
+    // this fight is unwinnable (65.9 s, 32.8 damage against 23 health) and the whole point of
+    // territorial is that it never starts.
     maxHealth: 16, attackLevel: 5, defenceLevel: 3,
     accuracy: 6, armour: 35, magicArmour: 0,
     maxHit: 5, attackSpeedMs: 3600, aggroRadius: 5, moveSpeedMps: 2.64, walkSpeedMps: 0.51, behaviour: "territorial",
@@ -344,7 +343,6 @@ const BLOCKS: readonly EnemyDef[] = [
     drops: [
       { itemId: "marsh_gland", quantity: [1, 2], chance: 0.45 },
       { itemId: "raw_venison", quantity: [1, 1], chance: 0.25 },
-      { itemId: "duskberry_seed", quantity: [1, 2], chance: 0.20 },
       { itemId: "vell_amber", quantity: [1, 1], chance: 0.05 },
     ],
   },

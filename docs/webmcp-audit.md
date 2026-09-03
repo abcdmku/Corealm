@@ -32,13 +32,11 @@ requested scale, clamped to 1x through 100x. Waits go through the event stream o
 attempts, production, combat, respawns, and event ordering still run through their production
 systems.
 
-The two fixture-backed scenarios say so in their JSON results. The boss camp installs a combat
-kit because the test concerns repeated boss kills and loot custody, not the hours of combat
-progression needed to reach the boss. The farming scenario installs one seed and advances the
-persistent crop clock by five minutes. Neither fixture grants the state that its scenario
-accepts.
+The fixture-backed boss scenario says so in its JSON result. The boss camp installs a combat kit
+because the test concerns repeated boss kills and loot custody, not the hours of combat progression
+needed to reach the boss. The fixture does not grant the state that its scenario accepts.
 
-## The eleven scenarios
+## The ten scenarios
 
 1. `surface-contract` checks every advertised descriptor against `listTools()` (title, strict
    schema, `readOnlyHint` consistent with access), success and error envelopes, schema rejection
@@ -60,10 +58,9 @@ accepts.
 7. `fish-cook-bank` fishes, cooks the catch, and banks cooked and burnt results.
 8. `woodcut-fletch-equip` cuts Palewood, builds a campfire, makes and equips a staff through both
    the primitive and the bounded production path, then checks the spellbook.
-9. `farm-harvest-bank` rakes, plants, matures, harvests, and banks Bittergrain.
-10. `shop-buy-sell` sells starter gear and buys stock. The first sale raises a trade approval;
+9. `shop-buy-sell` sells starter gear and buys stock. The first sale raises a trade approval;
     the harness ticks "Always allow trades" in the panel.
-11. `magic-combat-stop-overlay` cancels a route, selects a spell, marks a target, and checks
+10. `magic-combat-stop-overlay` cancels a route, selects a spell, marks a target, and checks
     `spell.launched`.
 
 Tool coverage counts a tool only when its call ran: a schema rejection, a session refusal, or an

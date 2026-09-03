@@ -15,14 +15,12 @@ import {
   gatherXp, healAmount, respawnSeconds, toolBonus, yieldRange,
 } from "../game/src/content/index.js";
 import { CAMPFIRE_FUELS, GATHERING_PRODUCTION_TIERS } from "../game/src/content/gatheringProductionTiers.js";
-import { CROPS } from "../game/src/content/resources.js";
 import { REGIONS, REGIONAL_ESSENCE_ALTARS, WORLD_BOUNDS, getRegion } from "../game/src/content/regions.js";
 import { SHOPS } from "../game/src/content/shops.js";
 import {
   ESSENCE_BY_ELEMENT, ORB_BY_ELEMENT, RELEASED_MAGIC_ELEMENTS,
 } from "../game/src/systems/essence.js";
 import { migrate } from "../game/src/persistence/migrate.js";
-import { cropProfile } from "../game/src/systems/farming.js";
 import { SAVE_VERSION, Store } from "../game/src/state/store.js";
 import { buildWorld } from "../game/src/world/regionBuilder.js";
 import { tierSilhouetteScale } from "../game/src/core/math.js";
@@ -113,30 +111,6 @@ describe("tier-20 formulas", () => {
     expect(fuel.tier).toBe(20);
     expect(fuel.lifetimeMs).toBe(300_000);
     expect(fuel.buildXp).toEqual({ fletching: 10, crafting: 10 });
-  });
-
-  it("grows Coalroot in five 240-second stages for 52/10 XP", () => {
-    const crop = CROPS.find((row) => row.cropItemId === "coalroot")!;
-    expect(crop).toMatchObject({
-      seedItemId: "coalroot_seed", tier: 20, reqLevel: 20,
-      stages: 5, secondsPerStage: 240, yieldRange: [2, 5], harvestXp: 52, plantXp: 10,
-    });
-  });
-
-  it("grows every authored crop at exactly its authored profile in the runtime", () => {
-    // The Kilnhalt world proof caught the farming system re-deriving stage length and yields from
-    // formulas that drifted from the CROPS table at tier 20. The runtime now reads the table; this
-    // pins every authored row against it so the two can never disagree again.
-    for (const crop of CROPS) {
-      expect(cropProfile(crop.tier)).toEqual({
-        tier: crop.tier,
-        stageCount: crop.stages,
-        stageSeconds: crop.secondsPerStage,
-        yieldRange: [crop.yieldRange[0], crop.yieldRange[1]],
-        plantXp: crop.plantXp,
-        harvestXp: crop.harvestXp,
-      });
-    }
   });
 
   it("smelts an Emberite bar from 3 ore and 2 Kilnstone", () => {

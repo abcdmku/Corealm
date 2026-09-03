@@ -657,37 +657,6 @@ async function scenarioWoodcutFletch({ mcp }: ScenarioContext): Promise<JsonObje
   return { logs, weapon: "palewood_staff", activeSpellId: asObject(spellbook)["activeSpellId"], chargedMagicWeapon: asObject(spellbook)["equippedWeapon"] !== null };
 }
 
-async function scenarioFarm({ page, mcp, fixture }: ScenarioContext): Promise<JsonObject> {
-  fixture.push("One Bittergrain seed is installed; raking, planting, timed growth, harvesting, and banking use production game paths.");
-  await page.evaluate(() => {
-    const debug = window.__gameDebug as unknown as { giveItem(itemId: string, quantity: number, to: "inventory" | "bank"): void };
-    debug.giveItem("bittergrain_seed", 1, "inventory");
-  });
-  await mcp.navigate({ locationId: "marchfield_farm" });
-  const plots = asArray(expectOk(await mcp.call("corealm_observe", { scope: "visible", archetypes: ["farm_plot"], radius: 140, limit: 20 }), "observe farm plots")).map(asObject);
-  const plot = plots.find((row) => row["state"] === "empty") ?? plots[0];
-  if (!plot) throw new Error("No Marchfield plot was visible");
-  if (plot["state"] === "empty") {
-    await mcp.interact(String(plot["id"]), "rake");
-    await mcp.waitForIdle();
-  }
-  expectOk(await mcp.call("corealm_use_item", { itemId: "bittergrain_seed", targetEntityId: plot["id"] }), "plant Bittergrain");
-  await mcp.waitForIdle();
-  fixture.push("The test clock advances five minutes so the persistent crop timer matures without a wall-clock wait.");
-  await mcp.startCursor();
-  await page.evaluate(() => {
-    const debug = window.__gameDebug as unknown as { advanceGameTime(seconds: number): void };
-    debug.advanceGameTime(300);
-  });
-  await mcp.wait(["production.completed"], 10_000);
-  const harvested = numberAt(expectOk(await mcp.call("corealm_gather", { interaction: "harvest", entityId: plot["id"], quantity: 1, timeoutMs: 60_000 }), "harvest"), "received");
-  if (harvested < 1) throw new Error("The mature Bittergrain plot yielded nothing");
-  await mcp.navigate({ entityId: "coldbrace_bank" });
-  expectOk(await mcp.call("corealm_bank", { op: "depositAll" }), "bank Bittergrain");
-  const bank = expectOk(await mcp.call("corealm_bank", { op: "list" }), "read crop bank");
-  return { harvested, banked: bankCount(bank, "bittergrain") };
-}
-
 async function scenarioShop({ page, mcp }: ScenarioContext): Promise<JsonObject> {
   await mcp.navigate({ entityId: "coldbrace_general" });
   const stock = expectOk(await mcp.call("corealm_shop", { op: "list", shopId: "coldbrace_general" }), "list shop");
@@ -741,7 +710,6 @@ export const WEBMCP_SCENARIOS: readonly ScenarioDef[] = [
   { id: "tempest-roc-loot-camp", title: "Camp the Tempest Roc until Pale Quartz drops", run: scenarioBossCamp },
   { id: "fish-cook-bank", title: "Fish, cook the catch, and bank every result", run: scenarioFishCookBank },
   { id: "woodcut-fletch-equip", title: "Cut Palewood, fletch a staff, and equip it", run: scenarioWoodcutFletch },
-  { id: "farm-harvest-bank", title: "Rake, plant, grow, harvest, and bank Bittergrain", run: scenarioFarm },
   { id: "shop-buy-sell", title: "Sell starter gear and buy stock through a real shop, with trade approval", run: scenarioShop },
   { id: "magic-combat-stop-overlay", title: "Cancel navigation, choose a spell, cast, and explain the target", run: scenarioMagicStop },
 ] as const;

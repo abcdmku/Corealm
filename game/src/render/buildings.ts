@@ -824,7 +824,7 @@ function gatePostScale(kit: BuildingKit): number {
  * made of.
  *
  * Phase 1 built every settlement out of one kit. Highcairn is a tier-10 quarry town forty metres
- * up a slate terrace and Coldbrace is a tier-1 farming village on a river plain, and they were the
+ * up a slate terrace and Coldbrace is a tier-1 frontier village on a river plain, and they were the
  * same eight cottages with the same plaster panels under the same orange pantiles; only the ground
  * colour told them apart. Nine more regions on top of that would have multiplied the problem by
  * nine, which is why the Phase 1 report put this before Phase 2 rather than in it.
@@ -1668,8 +1668,8 @@ function quarryHut(width: number, depth: number, rng: Rng, kit: BuildingKit): Pa
  * A barn. One tall storey of solid wall under the kit's LARGE roof, cart doors on the entry face,
  * and the yard clutter a working farm leaves outside them.
  *
- * WHY IT EXISTS. `marchfield_farm`'s stated shot intent is "plots, fence, and a building that reads
- * as a farmstead" and the library ships no farm building at all - the asset report's gap 5. What it
+ * WHY IT EXISTS. The structure lab needs a barn silhouette, and the library ships no farm building
+ * at all - the asset report's gap 5. What it
  * does ship is the same modular kit every other building here is made of, so a barn is a `hall`
  * plan (long roof, one storey) with the hall's civic dressing taken off and a cart, crates, sacks
  * and a fodder barrel put in front of the doors instead. `roofLarge` rather than `roofSmall` is the
@@ -2952,14 +2952,12 @@ function garden(rng: Rng): PartPlacement[] {
 }
 
 /**
- * A whole farmstead as ONE placeable composition: a paddock fence, a barn at the back of it, and
- * the yard between them.
+ * A whole farmstead as ONE placeable composition: a paddock fence, a barn at the back of it, the
+ * yard between them, and a smaller gated chicken pen inside the paddock.
  *
- * This is the answer to `marchfield_farm`, which is six crop frames on open grass. Marchfield is a
- * resource cluster, not a settlement, so `RegionDef.settlement.buildings` cannot reach it and the
- * only hook the content layer has there is a landmark with a `composition`. A composition that
- * emits only dressing would still leave the farm without a farm, so this one emits the barn too,
- * through `buildPrefab("farmstead", ...)` rotated half a turn so its cart doors face the yard.
+ * Marchfield uses this as scenery after farming was retired. Crop beds are deliberately absent:
+ * the composition is a house, fences, gates, and yard dressing, with no farm-plot entities or crop
+ * lifecycle attached to it.
  *
  * SIZED TO THE GROUND IT STANDS ON, measured at Marchfield (-96, -22) with
  * `__gameDebug.groundHeight`: dead level out to 4 m, +-0.21 m at 8 m, and -0.62..+1.26 m at 12 m.
@@ -2969,9 +2967,9 @@ function garden(rng: Rng): PartPlacement[] {
  * of the arc it has to cover at that radius - and the barn sits at local z -6.4, on the one bearing
  * that measures +-0.06 m at 12 m. Every part is inside 9.1 m of the origin.
  *
- * The six Marchfield plots reach 6.55 m from the cluster centre, so they all fall inside the ring
- * with the barn clear of the nearest by 0.5 m. Local +Z is the way in: five panels are left out
- * there for a 10 m gate, and three more behind, where the barn closes the ring itself.
+ * Local +Z is the way in: five panels are left out there for a 10 m gate, and three more behind,
+ * where the barn closes the ring itself. The chicken pen fits inside the level eight-metre core,
+ * so its rails share the same ground plane without floating over the surrounding slope.
  */
 function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
   const out: PartPlacement[] = [];
@@ -3004,6 +3002,27 @@ function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
     ));
   }
 
+  // A second, smaller enclosure inside the main paddock. It occupies the east half of the yard,
+  // with a four-metre opening toward the house. Two short corner posts make that opening read as a
+  // gate without introducing a fake interactive door. The north-east and south-east corners stay
+  // just inside the outer ring: hypot(6, 5) = 7.81 m against the ring's 7.9 m radius.
+  for (const [edge, z] of [["south", -3], ["north", 5]] as const) {
+    for (const [index, x] of [1, 3, 5].entries()) {
+      out.push(loose(`fence_hen_${edge}_${index}`, "fence_wood_single", x, -0.1, z, 0));
+    }
+  }
+  for (const [index, z] of [-2, 0, 2, 4].entries()) {
+    out.push(loose(`fence_hen_east_${index}`, "fence_wood_single", 6, -0.1, z, Math.PI / 2));
+  }
+  // The west rail is the pen entrance. Leaving out the two middle panels gives the navmesh and a
+  // player enough room to pass through instead of turning the decorative gate into a sealed box.
+  for (const [index, z] of [-2, 4].entries()) {
+    out.push(loose(`fence_hen_west_${index}`, "fence_wood_single", 0, -0.1, z, Math.PI / 2));
+  }
+  for (const [index, z] of [-0.8, 2.8].entries()) {
+    out.push(loose(`post_hen_gate_${index}`, kit.corner, 0, 0, z, 0, 0.32));
+  }
+
   // The barn, turned to face the yard. (-dx, -dz) with PI added to the yaw is a half turn about the
   // composition origin; the translation then puts its centre at local (0, -6.4). The standalone
   // farmstead recipes include their own workyard, but this composition authors a larger yard below,
@@ -3033,7 +3052,7 @@ function farmYard(rng: Rng, kit: BuildingKit): PartPlacement[] {
   // The yard. `training_dummy` is a post with a stuffed body and outstretched arms - the closest
   // thing in the library to the scarecrow the asset report lists as gap 5.
   out.push(loose("scarecrow", "training_dummy", -3.4, 0, 2.6, rng.float(0, Math.PI * 2), 1.15));
-  out.push(loose("trough", "barrel_rack", 3.9, 0, -2.2, rng.float(2.9, 3.4), 1.1));
+  out.push(loose("trough", "barrel_rack", 3.9, 0, -0.8, rng.float(2.9, 3.4), 1.1));
   out.push(loose("yard_crate", "farm_crate_empty", 2.4, 0, -3.4, rng.float(0, Math.PI)));
   out.push(loose("yard_sack", "sack", 1.6, 0, -3.9, rng.float(0, Math.PI)));
   out.push(loose("yard_barrel", "barrel", -2.2, 0, -3.6, rng.float(0, Math.PI)));

@@ -506,7 +506,7 @@ type Placer = (spot: Spot, assetId: string, scale: number) => Vec3;
  * `tierSilhouetteScale` runs 0.90 at tier 1 to 1.15 at tier 10.
  */
 const TIERED_ARCHETYPES = new Set<Archetype>([
-  "ore", "tree", "fishing_spot", "farm_plot", "enemy", "boss",
+  "ore", "tree", "fishing_spot", "enemy", "boss",
 ]);
 
 /** The scale an entity is drawn at, which is not always the scale written into `view.scale`. */
@@ -713,8 +713,6 @@ const PAVING_LIFT_METRES = 0.02;
  * `floor_brick` is exactly 2.00 x 0.02 x 2.00 m (one module); `fence_wood_single` is 2.064 m long,
  * so the rails overlap their neighbours by 3 cm at the corners rather than leaving a gap.
  */
-const PLOT_BED_ASSET = "floor_brick";
-const PLOT_RAIL_ASSET = "fence_wood_single";
 
 /** Building collision, in both the legacy `BuildingBox` shape and the frozen `SolidVolume` one. */
 function emitBuildingCollision(
@@ -1840,38 +1838,6 @@ function buildCluster(
       ? [spot[0], round2(ctx.heightAt(regionId, spot[0], spot[1]) + WATER_FILL_DEPTH), spot[1]]
       : grounded;
 
-    if (resource.archetype === "farm_plot") {
-      // Plots are not gather nodes: their lifecycle lives in `state.farming` and advances off the
-      // wall clock so a crop planted before a reload keeps growing (PRD 2.9). No `resource` block.
-      const rotationY = presentationRotation(id);
-      preserveLegacyResourceRotationDraw(rng);
-      out.push({
-        id,
-        archetype: "farm_plot",
-        name: resource.name,
-        tier: resource.tier,
-        regionId,
-        position,
-        state: "empty",
-        requirements: { farming: resource.reqLevel },
-        interactions: ["inspect", "rake", "plant", "harvest"],
-        view: {
-          assetId,
-          depletedAssetId: resource.presentation.depletedAssetId,
-          scale: viewScale,
-          rotationY,
-          materialTier: resource.presentation.materialTier,
-          labelHeight: 1.2,
-        },
-        meta: {
-          plotId: id, cropItemId: resource.itemId, resourceId: resource.id,
-          clusterId: cluster.id, locationId: cluster.locationId,
-        },
-      });
-      emitPlotBed(ctx, regionId, cluster, resource, id, spot);
-      continue;
-    }
-
     const [yieldMin, yieldMax] = resource.yieldRange ?? yieldRange(resource.tier);
     const maxYields = rng.int(yieldMin, yieldMax);
     const rotationY = presentationRotation(id);
@@ -1919,57 +1885,6 @@ function buildCluster(
       },
     });
     pushClusterSolid(ctx, id, position, resource, assetId, scale);
-  }
-}
-
-/**
- * A tilled bed under a farm plot, so an unplanted plot is a thing on the ground rather than
- * nothing at all.
- *
- * All 10 plots in the game were 100% invisible. They spawn `state: "empty"`, `entityViews`'
- * `SPENT_STATES` counts that as spent, and the spent build for `farm_plot` clips `crop_carrot` to
- * its bottom `CROP_STUBBLE_FRACTION` = 0.3 - which for that GLB is entirely below its own origin
- * (`base.y` -0.2378 of a 0.566 m mesh, so the bottom 42% is taproot). Measured before the fix:
- * `getDrawnBounds("marchfield_plots_1")` max.y -2.017 against a ground of -1.940, i.e. the TOP of
- * the drawn mesh 7.7 cm underground; Highcairn 9.9 cm. Marchfield Farm was an empty green field.
- *
- * Two things fix it and both are here. Base-aligned placement lifts the stubble to 0..0.137 m
- * above ground on its own, and this bed gives the empty state a silhouette: one `floor_brick`
- * module (exactly 2.00 x 0.02 x 2.00 m, origin centred, so it needs no base correction) with four
- * `fence_wood_single` panels (2.064 x 0.838 m, `base.y` -0.028) around it. Both assets ship in the
- * manifest and were used by nothing.
- *
- * Cost is 5 entities per plot, 50 world-wide, in 2 instanced groups per settlement tier.
- */
-function emitPlotBed(
-  ctx: BuildContext,
-  regionId: RegionId,
-  cluster: ResourceClusterDef,
-  resource: ResourceDef,
-  plotId: string,
-  spot: Spot,
-): void {
-  const meta = { plotId, clusterId: cluster.id, scenery: true };
-  const ground = ctx.heightAt(regionId, spot[0], spot[1]);
-  ctx.out.push(sceneryEntity(
-    `${plotId}#bed`, resource.name, resource.tier, regionId,
-    [round2(spot[0]), round2(ground + PAVING_LIFT_METRES), round2(spot[1])],
-    PLOT_BED_ASSET, 1, 0, 0.3, meta,
-  ));
-  // The four rails sit on the module edge, long axis along it, facing out.
-  const half = MODULE_METRES / 2;
-  const rails: readonly (readonly [number, number, number])[] = [
-    [0, half, 0], [0, -half, Math.PI], [half, 0, Math.PI / 2], [-half, 0, -Math.PI / 2],
-  ];
-  for (let index = 0; index < rails.length; index += 1) {
-    const rail = rails[index]!;
-    const x = spot[0] + rail[0];
-    const z = spot[1] + rail[1];
-    ctx.out.push(sceneryEntity(
-      `${plotId}#rail${index}`, resource.name, resource.tier, regionId,
-      [round2(x), round2(ctx.heightAt(regionId, x, z) - ctx.baseY(PLOT_RAIL_ASSET)), round2(z)],
-      PLOT_RAIL_ASSET, 1, rail[2], 0.9, meta,
-    ));
   }
 }
 
@@ -2122,7 +2037,6 @@ function gatherInteraction(archetype: GatheringResourceArchetype): InteractionId
     case "ore": return "mine";
     case "tree": return "chop";
     case "fishing_spot": return "fish";
-    default: return "harvest";
   }
 }
 

@@ -83,9 +83,9 @@ export const SHOTS: readonly CameraShot[] = [
     intent: "Fishing spots on real water.",
   },
   {
-    id: "marchfield_farm", locationId: "marchfield_farm", regionId: "fallowmarch",
+    id: "marchfield", locationId: "marchfield", regionId: "fallowmarch",
     yaw: WEST, pitch: 0.6, distance: 22,
-    intent: "The farm: plots, fence, and a building that reads as a farmstead.",
+    intent: "The restored farmhouse, outer paddock, gated hen pen, and nearby cattle.",
   },
   {
     id: "rootfall", locationId: "rootfall_hamlet", regionId: "vellenwood",

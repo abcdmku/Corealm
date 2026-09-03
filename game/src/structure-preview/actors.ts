@@ -112,7 +112,7 @@ export const LAB_SKILLS: readonly { id: SkillId; label: string }[] = SKILL_IDS.m
 }));
 
 export const PLAYER_POSES: readonly CharacterPose[] = [
-  "idle", "walk", "run", "attack_melee", "cast", "hit", "death", "mine", "chop", "fish", "produce", "farm", "eat", "climb", "bank",
+  "idle", "walk", "run", "attack_melee", "cast", "hit", "death", "mine", "chop", "fish", "produce", "eat", "climb", "bank",
 ];
 
 export interface ActorLabState {

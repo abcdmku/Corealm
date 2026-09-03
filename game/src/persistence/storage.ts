@@ -120,11 +120,16 @@ export class SaveService {
 function recompute(state: GameState): GameState {
   const fresh = createInitialState(state.meta?.seed ?? 1337, Date.now());
 
-  state.skills = state.skills ?? fresh.skills;
+  const rawSkills = (state as unknown as Record<string, unknown>).skills;
+  if (rawSkills !== undefined && !isRecord(rawSkills)) throw new Error("Invalid skills slice");
+  const savedSkills: Record<string, unknown> = isRecord(rawSkills) ? rawSkills : {};
+  state.skills = { ...fresh.skills };
   for (const skill of SKILL_IDS) {
-    const entry = state.skills[skill];
+    const entry = savedSkills[skill] as { xp?: unknown; level?: unknown } | undefined;
     if (entry && typeof entry.xp === "number") entry.level = levelForXp(entry.xp);
-    else state.skills[skill] = { xp: 0, level: 1 };
+    state.skills[skill] = entry && typeof entry.xp === "number"
+      ? { xp: entry.xp, level: entry.level as number }
+      : { xp: 0, level: 1 };
   }
 
   // Slices added after a save was written.
@@ -148,7 +153,6 @@ function recompute(state: GameState): GameState {
   state.discovery.entities = state.discovery.entities ?? {};
   state.discovery.locations = state.discovery.locations ?? {};
   state.discovery.regions = state.discovery.regions ?? fresh.discovery.regions;
-  state.farming = state.farming ?? {};
   state.quests = state.quests ?? {};
   state.bank = state.bank ?? fresh.bank;
   state.bank.slots = state.bank.slots ?? [];

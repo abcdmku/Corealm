@@ -43,13 +43,13 @@ Coldbrace's smith. Sells metal, teaches the material loop, says very little.
 
 ![Ranger Syb](./assets/captures/npcs/npc_ranger_syb.webp)
 
-Walks the march. Knows where the water is and has not had a hot meal in some time.
+Walks the march and knows where the water is.
 
 **Found at:** Coldbrace Square, Fallowmarch
 
 ### Quests
 
-- [Bright Water](../quests/bright_water/)
+_No quest._
 
 ## Carter Bel
 

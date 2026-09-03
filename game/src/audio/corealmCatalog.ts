@@ -60,10 +60,6 @@ const cues = {
   "gather.fishing_reel": { variants: [tom("fishing-splash-01"), tom("fishing-splash-02")], gain: 0.32, playbackRate: [0.96, 1.04], minIntervalMs: 240 },
   "gather.fishing_catch": { variants: [cow1("fishing-fish-flop-01")], gain: 0.48, maxConcurrent: 1 },
 
-  "farm.rake": { variants: [cow1("rake-wood-scrape-01")], gain: 0.45, playbackRate: 0.95, maxConcurrent: 1 },
-  "farm.plant": { variants: [cow1("rake-wood-scrape-01")], gain: 0.3, playbackRate: 1.18, maxConcurrent: 1 },
-  "farm.harvest": { variants: [cow1("cloth-movement-01"), cow1("cloth-ruffle-01")], gain: 0.32, playbackRate: [1.0, 1.08], minIntervalMs: 220 },
-
   "production.smith": { variants: [oga("smithing-anvil"), oga("smithing-metal-hit-01"), oga("smithing-metal-hit-02")], gain: 0.55, playbackRate: [0.96, 1.03], minIntervalMs: 220 },
   "production.smelt": { variants: [oga("metal-sheet"), oga("smithing-metal-hit-01")], gain: 0.42, playbackRate: [0.9, 0.98], minIntervalMs: 320 },
   "production.craft": { variants: [oga("building-hammer-01"), oga("building-hammer-02"), oga("craft-hammer")], gain: 0.45, playbackRate: [0.96, 1.04], minIntervalMs: 220 },

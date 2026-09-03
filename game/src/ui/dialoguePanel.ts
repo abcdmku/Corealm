@@ -1,10 +1,10 @@
 /**
  * The conversation window.
  *
- * Phase 1 shipped 12 NPCs, 82 dialogue nodes, and no way for a human to see any of it. Every one of
- * the ten quests is started or finished through dialogue — including `cold_iron`, the tutorial — so
+ * Phase 1 shipped 12 NPCs, a broad dialogue tree, and no way for a human to see any of it. Every one
+ * of the nine quests is started or finished through dialogue — including `cold_iron`, the tutorial — so
  * until this panel exists a human player can gather, craft, fight, bank, shop and reach level 10 in
- * all eleven skills without being able to begin a single quest. An agent could talk the whole time,
+ * all ten skills without being able to begin a single quest. An agent could talk the whole time,
  * through `corealm_dialogue`. This is the missing half of that surface.
  *
  * The root opens and closes it from the `dialogue.opened` / `dialogue.closed` events, so a

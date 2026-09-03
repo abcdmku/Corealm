@@ -89,7 +89,7 @@ export interface SystemHooks {
   inventory?: {
     slots(): (InventorySlot | null)[];
     freeSlots(): number;
-    use(itemId: ItemId, target?: { itemId: ItemId } | { entityId: EntityId }): Result<{ effect: string }>;
+    use(itemId: ItemId, target?: { itemId: ItemId }): Result<{ effect: string }>;
   };
   equipment?: {
     slots(): Record<EquipSlot, ItemStack | null>;
@@ -560,32 +560,10 @@ export class CorealmGameApi implements GameApiContract {
     return hook.take(entityId, stackIndex);
   }
 
-  useItem(itemId: ItemId, target?: { itemId: ItemId } | { entityId: EntityId }): Result<{ effect: string }> {
+  useItem(itemId: ItemId, target?: { itemId: ItemId }): Result<{ effect: string }> {
     const hook = this.hooks.inventory;
     if (!hook) return err("UNAVAILABLE", "Inventory system is not available yet");
 
-    // Targeted seed use is the item-first form of the same production interaction used by the
-    // world menu's Plant action. Keep it here, at the canonical API boundary, so WebMCP does not
-    // advertise an affordance that InventorySystem cannot perform on its own.
-    if (target && "entityId" in target) {
-      const item = content.item(itemId);
-      if (item?.seed) {
-        if (countIn(hook.slots(), itemId) < 1) {
-          return err("NOT_ENOUGH_ITEMS", `You have no ${item.name}.`);
-        }
-        const entity = this.hooks.entities?.get(target.entityId);
-        if (!entity) return err("NOT_FOUND", `No entity with id ${target.entityId}`, target.entityId);
-        const cropItemId = typeof entity.meta?.cropItemId === "string"
-          ? entity.meta.cropItemId
-          : entity.resource?.itemId;
-        if (entity.archetype !== "farm_plot" || cropItemId !== item.seed.cropId) {
-          return err("INVALID_ARGUMENT", `${item.name} cannot be planted in ${entity.name}.`, entity.id);
-        }
-        const planted = this.interact(entity.id, "plant");
-        if (!planted.ok) return planted;
-        return ok({ effect: planted.value.started });
-      }
-    }
     return hook.use(itemId, target);
   }
 

@@ -8,7 +8,7 @@ const SEED = 12_345;
 const FLAT_GROUND = (): number => 0;
 
 function resourceEntities(world: BuiltWorld) {
-  return world.entities.filter((entity) => entity.resource || entity.archetype === "farm_plot");
+  return world.entities.filter((entity) => entity.resource);
 }
 
 function expectedRotation(entityId: string): number {
@@ -32,13 +32,12 @@ function placementAndYieldFingerprint(world: BuiltWorld): string {
 }
 
 describe("resource presentation stability", () => {
-  it("derives gathering and farm-plot rotation from stable node ids", () => {
+  it("derives gathering rotation from stable node ids", () => {
     const baseline = buildWorld(SEED, FLAT_GROUND);
     const baselineEntities = resourceEntities(baseline);
     const baselineIds = new Set(baselineEntities.map((entity) => entity.id));
 
     expect(baselineEntities.some((entity) => entity.resource)).toBe(true);
-    expect(baselineEntities.some((entity) => entity.archetype === "farm_plot")).toBe(true);
     for (const entity of baselineEntities) {
       expect(entity.view?.rotationY, entity.id).toBe(expectedRotation(entity.id));
     }
@@ -79,15 +78,13 @@ describe("resource presentation stability", () => {
   // one region's clusters and the next region's. So this hash moves whenever a group's `count`
   // changes, even though no resource was touched: swapping the monster roster for animals changed
   // Vellenwood and Karrowmoor yields while Fallowmarch, which is built before the first changed
-  // group, stayed byte-identical. Node ids and the node count (114) are the invariant here; when
+  // group, stayed byte-identical. Node ids and the node count are the invariant here; when
   // this hash moves, check those first, and only rebaseline once they have not.
   it("keeps the authored placement and yield stream aligned", () => {
-    // Rebaselined for the Kilnhalt expansion: the count moved 85 -> 114, and the 29 additions are
-    // exactly the authored Kilnhalt clusters (6+2 quarry, 8 cinderpine, 4 springs, 4 plots,
-    // 5 fire essence) with every pre-existing node id unchanged — checked before rebaselining,
-    // per the rule above.
+    // Rebaselined after restoring the decorative Marchfield homestead and expanding its animal
+    // groups. The farm plots remain retired; the animal counts advance the shared world stream.
     expect(placementAndYieldFingerprint(buildWorld(SEED, FLAT_GROUND))).toBe(
-      "f15aad5b4a2958a50e92a8069eb10a377a2c7a9756d214ce3df5dbb1fa35fb88",
+      "0a723a29fbb1a704d0a5ae90254969f577bdd9148a1aa4b1eac860464429ff8a",
     );
   });
 });

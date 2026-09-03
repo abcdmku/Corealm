@@ -12,7 +12,6 @@
  *   1. The southern border at z=200 is OPEN: five walked crossings (x -300..300) go from
  *      fallowmarch/vellenwood straight into kilnhalt, continuously, on real navmesh.
  *   2. Tier-20 gathering: emberite ore, kilnstone, cinderpine log, ashfin, fire essence.
- *   3. Farming: coalroot at the Emberfast plots (rake/plant/harvest by playing, growth by clock).
  *   4. Production at Emberfast: smelt, smith, cook, craft, fletch, plus bank and shop sanity.
  *   5. Both tier-20 armour styles equip and fill their slots.
  *   6. Cinderwake dies to a real fight, drops the singleton Fire Orb, the Orb awakens the Fire
@@ -228,44 +227,6 @@ function playthroughSource(): string {
     await gatherOne("chop-cinderpine", "cinderpine_stand", "cinderpine_stand_trees", "chop", "cinderpine_log");
     await gatherOne("fish-ashfin", "ashfin_springs", "ashfin_spring_spots", "fish", "ashfin");
     await gatherOne("mine-fire-essence", "kilnhalt_fire_cache", "kilnhalt_fire_essence_cache", "mine", "fire_essence");
-  }
-
-  // ================================================================== 3. FARMING
-  // Coalroot: 5 stages x 240 s. The seed and the clock jump are setup; rake, plant and harvest
-  // all go through the agent surface and the check is coalroot in the pack.
-  {
-    dbg.setSkillLevel("farming", 25);
-    dbg.teleport({ locationId: "emberfast_plots" });
-    await sleep(400);
-    dbg.giveItem("coalroot_seed", 4);
-    const before = await count("coalroot");
-    const plots = await agent.call("corealm_observe", { archetypes: ["farm_plot"], radius: 40, limit: 8 });
-    let evidence = "no farm plot visible at emberfast_plots";
-    if (plots && plots[0]) {
-      const plot = plots[0];
-      await drain();
-      const raked = await doInteract(plot.id, "rake", ["activity.stopped"], 20000);
-      const planted = await doInteract(plot.id, "plant", ["activity.stopped"], 20000);
-      // systems/farming.ts cropProfile() interpolates 48 + 13.2 * tier = 312 s a stage at tier 20
-      // (1560 s total), while content/resources.ts CROPS authors 240 s (1200 s total). The system
-      // wins at runtime, so advance past the LONGER figure and wait for the plot to read ready.
-      dbg.advanceGameTime(1700);
-      let ripe = "never";
-      for (let i = 0; i < 20; i += 1) {
-        await sleep(250);
-        const now = dbg.getEntity(plot.id);
-        if (now && now.state === "ready") { ripe = "ready"; break; }
-        if (now) ripe = String(now.state);
-      }
-      const harvested = await doInteract(plot.id, "harvest", ["item.received", "activity.stopped"], 25000);
-      await sleep(400);
-      evidence = plot.id + " (plot " + ripe + " after +1700 s)"
-        + (raked.error ? " rake:" + raked.error : "")
-        + (planted.error ? " plant:" + planted.error : "")
-        + (harvested.error ? " harvest:" + harvested.error : "");
-    }
-    const after = await count("coalroot");
-    note("farm-coalroot", after > before, "coalroot " + before + " -> " + after + " :: " + evidence);
   }
 
   // ============================================================ 4. PRODUCTION AT EMBERFAST
@@ -681,7 +642,7 @@ function persistedStateSource(): string {
 
 const TIER20_ITEM_PREFIXES = [
   "emberite_", "cinderpine_", "charhide", "kilnstone", "fire_staff", "fire_wand",
-  "fire_opal", "fire_essence", "cinder_", "ashfin", "seared_ashfin", "coalroot", "cinderwake_",
+  "fire_opal", "fire_essence", "cinder_", "ashfin", "seared_ashfin", "cinderwake_",
 ];
 
 const CLAIMS: Record<string, string> = {
@@ -695,7 +656,6 @@ const CLAIMS: Record<string, string> = {
   "chop-cinderpine": "Chopping a Cinderpine at the stand yields cinderpine_log",
   "fish-ashfin": "Fishing an Ashfin Spring yields ashfin",
   "mine-fire-essence": "Mining the Fire Essence cache yields fire_essence",
-  "farm-coalroot": "Rake, plant and harvest at the Coalroot plots produces coalroot",
   "smelt-emberite-bar": "The Emberfast furnace smelts emberite_bar from 3 ore + 2 kilnstone",
   "smith-emberite-sword": "The Emberfast anvil smiths emberite_sword from 2 bars + a cinderpine handle",
   "cook-seared-ashfin": "The Emberfast range cooks seared_ashfin",

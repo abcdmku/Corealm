@@ -99,7 +99,7 @@ export class InventorySystem {
    * Use an item on itself or on a target. Today that means eating food, and equipping gear when the
    * equipment system is wired. Combination recipes (knife on logs) belong to production, not here.
    */
-  use(itemId: ItemId, target?: { itemId: ItemId } | { entityId: EntityId }): Result<{ effect: string }> {
+  use(itemId: ItemId, target?: { itemId: ItemId }): Result<{ effect: string }> {
     const def = content.item(itemId);
     if (!def) return err("NOT_FOUND", `No item with id ${itemId}`);
     if (target) {
@@ -251,7 +251,7 @@ export class InventorySystem {
   }
 
   // Aliases matching `InventoryPort` in systems/activity.ts, so the root can hand this system
-  // straight to the gathering, farming and production drivers without an adapter object.
+  // straight to the gathering and production drivers without an adapter object.
   countItem(itemId: ItemId): number {
     return this.countOf(itemId);
   }

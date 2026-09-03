@@ -88,7 +88,6 @@ function createWorldTools({ api, session }: ToolDeps): ToolDef[] {
 
     defineTool(TOOL_SPECS.corealm_use_item, (args) => {
       const itemId = asString(args.itemId);
-      if (typeof args.targetEntityId === "string") return unwrap(api.useItem(itemId, { entityId: args.targetEntityId }));
       return unwrap(api.useItem(itemId));
     }),
 

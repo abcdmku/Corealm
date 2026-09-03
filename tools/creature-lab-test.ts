@@ -39,7 +39,7 @@ const POLL_MS = 40;
 const CREATURES = {
   passive: { presetId: "marchfield_hens", label: "Marchfield Hen", aggroRadius: 3 },
   aggressive: { presetId: "open_march_goats", label: "Open March Billy", aggroRadius: 8 },
-  territorial: { presetId: "redsill_cattle", label: "Redsill Cow", aggroRadius: 5 },
+  territorial: { presetId: "redsill_cattle", label: "Marchfield Cow", aggroRadius: 5 },
   /** 12 health, the largest passive pool in the game. It survives long enough to be seen reacting. */
   tough: { presetId: "blackwater_frogs", label: "Blackwater Frog", aggroRadius: 4 },
 } as const;

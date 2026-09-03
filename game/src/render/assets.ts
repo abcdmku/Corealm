@@ -235,7 +235,7 @@ export class AssetRegistry {
    * Placing a GLB's origin at ground height leaves it floating or sunk by exactly
    * `baseY(id) * scale` — measured to 3 decimals across 159 world entities in the Phase 2
    * grounding sweep, where it left the Fallen Duskoak (roof_log, base.y +3.849) hovering 5.77 m
-   * and every farm plot (crop_carrot, base.y -0.238) fully underground. Ground-aligned placement
+   * and flat crop meshes such as crop_carrot (base.y -0.238) fully underground. Ground-aligned placement
    * is `y = groundHeight - baseY(id) * scale`; 117 of 213 assets need more than 2 cm of it.
    *
    * Synchronous by contract: it is a map lookup against the already-parsed manifest, so world
@@ -286,7 +286,7 @@ export class AssetRegistry {
   /**
    * Assets carrying every one of the given tags.
    *
-   * Correct for "anything to do with farming" and wrong for "a stump". Tags are associations, not
+   * Correct for "anything tagged as produce" and wrong for "a stump". Tags are associations, not
    * identity: see `is`.
    */
   byTags(...tags: string[]): AssetEntry[] {

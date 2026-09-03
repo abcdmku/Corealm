@@ -18,7 +18,7 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#palewood-copse" style="--map-x:22.1667%;--map-y:63.3750%" data-map-side="right" data-map-kind="grove" data-map-marker aria-label="Palewood Copse, Fallowmarch" title="Palewood Copse, Fallowmarch"><span>Palewood Copse<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#redsill-shallows" style="--map-x:46.6667%;--map-y:63.1250%" data-map-side="right" data-map-kind="water" data-map-marker aria-label="Redsill Shallows, Fallowmarch" title="Redsill Shallows, Fallowmarch"><span>Redsill Shallows<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#corven-ford" style="--map-x:44.0000%;--map-y:68.5000%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Corven Ford, Fallowmarch" title="Corven Ford, Fallowmarch"><span>Corven Ford<small>Fallowmarch</small></span></a>
-<a class="corealm-map-marker" href="#marchfield" style="--map-x:42.0000%;--map-y:60.7500%" data-map-side="right" data-map-kind="farm" data-map-marker aria-label="Marchfield, Fallowmarch" title="Marchfield, Fallowmarch"><span>Marchfield<small>Fallowmarch</small></span></a>
+<a class="corealm-map-marker" href="#marchfield" style="--map-x:42.0000%;--map-y:60.7500%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Marchfield, Fallowmarch" title="Marchfield, Fallowmarch"><span>Marchfield<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#west-track" style="--map-x:30.8333%;--map-y:63.1250%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="West Track, Fallowmarch" title="West Track, Fallowmarch"><span>West Track<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#the-open-march" style="--map-x:29.1667%;--map-y:57.5000%" data-map-side="right" data-map-kind="camp" data-map-marker aria-label="The Open March, Fallowmarch" title="The Open March, Fallowmarch"><span>The Open March<small>Fallowmarch</small></span></a>
 <a class="corealm-map-marker" href="#air-essence-cache" style="--map-x:29.1667%;--map-y:68.7500%" data-map-side="right" data-map-kind="landmark" data-map-marker aria-label="Air Essence Cache, Fallowmarch" title="Air Essence Cache, Fallowmarch"><span>Air Essence Cache<small>Fallowmarch</small></span></a>
@@ -43,7 +43,6 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#the-gravelmaw" style="--map-x:53.8333%;--map-y:60.8750%" data-map-side="right" data-map-kind="dungeon" data-map-marker aria-label="The Gravelmaw, Karrowmoor" title="The Gravelmaw, Karrowmoor"><span>The Gravelmaw<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#highcairn" style="--map-x:62.0000%;--map-y:63.5000%" data-map-side="right" data-map-kind="settlement" data-map-marker aria-label="Highcairn, Karrowmoor" title="Highcairn, Karrowmoor"><span>Highcairn<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#highcairn-bank" style="--map-x:62.5000%;--map-y:63.7500%" data-map-side="left" data-map-kind="bank" data-map-marker aria-label="Highcairn Bank, Karrowmoor" title="Highcairn Bank, Karrowmoor"><span>Highcairn Bank<small>Karrowmoor</small></span></a>
-<a class="corealm-map-marker" href="#highcairn-plots" style="--map-x:60.6667%;--map-y:63.0000%" data-map-side="right" data-map-kind="farm" data-map-marker aria-label="Highcairn Plots, Karrowmoor" title="Highcairn Plots, Karrowmoor"><span>Highcairn Plots<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#second-ramp" style="--map-x:58.3333%;--map-y:64.3750%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Second Ramp, Karrowmoor" title="Second Ramp, Karrowmoor"><span>Second Ramp<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#third-ramp" style="--map-x:59.8333%;--map-y:68.0000%" data-map-side="right" data-map-kind="junction" data-map-marker aria-label="Third Ramp, Karrowmoor" title="Third Ramp, Karrowmoor"><span>Third Ramp<small>Karrowmoor</small></span></a>
 <a class="corealm-map-marker" href="#upper-karrow-seam" style="--map-x:66.1667%;--map-y:67.6250%" data-map-side="left" data-map-kind="seam" data-map-marker aria-label="Upper Karrow Seam, Karrowmoor" title="Upper Karrow Seam, Karrowmoor"><span>Upper Karrow Seam<small>Karrowmoor</small></span></a>
@@ -62,7 +61,6 @@ description: "Corealm's regions, settlements, routes, landmarks, gathering sites
 <a class="corealm-map-marker" href="#emberfast-bank" style="--map-x:50.6667%;--map-y:39.3125%" data-map-side="right" data-map-kind="bank" data-map-marker aria-label="Emberfast Bank, Kilnhalt" title="Emberfast Bank, Kilnhalt"><span>Emberfast Bank<small>Kilnhalt</small></span></a>
 <a class="corealm-map-marker" href="#emberfast-gate" style="--map-x:52.0000%;--map-y:38.5625%" data-map-side="right" data-map-kind="gate" data-map-marker aria-label="Emberfast Gate, Kilnhalt" title="Emberfast Gate, Kilnhalt"><span>Emberfast Gate<small>Kilnhalt</small></span></a>
 <a class="corealm-map-marker" href="#quarry-postern" style="--map-x:48.0000%;--map-y:38.5625%" data-map-side="right" data-map-kind="gate" data-map-marker aria-label="Quarry Postern, Kilnhalt" title="Quarry Postern, Kilnhalt"><span>Quarry Postern<small>Kilnhalt</small></span></a>
-<a class="corealm-map-marker" href="#coalroot-plots" style="--map-x:47.3333%;--map-y:39.0000%" data-map-side="right" data-map-kind="farm" data-map-marker aria-label="Coalroot Plots, Kilnhalt" title="Coalroot Plots, Kilnhalt"><span>Coalroot Plots<small>Kilnhalt</small></span></a>
 <a class="corealm-map-marker" href="#clinker-quarry" style="--map-x:29.1667%;--map-y:38.7500%" data-map-side="right" data-map-kind="seam" data-map-marker aria-label="Clinker Quarry, Kilnhalt" title="Clinker Quarry, Kilnhalt"><span>Clinker Quarry<small>Kilnhalt</small></span></a>
 <a class="corealm-map-marker" href="#ashfin-springs" style="--map-x:67.5000%;--map-y:43.7500%" data-map-side="left" data-map-kind="water" data-map-marker aria-label="Ashfin Springs, Kilnhalt" title="Ashfin Springs, Kilnhalt"><span>Ashfin Springs<small>Kilnhalt</small></span></a>
 <a class="corealm-map-marker" href="#cinderpine-stand" style="--map-x:70.0000%;--map-y:38.1250%" data-map-side="left" data-map-kind="grove" data-map-marker aria-label="Cinderpine Stand, Kilnhalt" title="Cinderpine Stand, Kilnhalt"><span>Cinderpine Stand<small>Kilnhalt</small></span></a>
@@ -176,11 +174,11 @@ The only cart crossing of Corven Brook, well south of the shallows.
 
 ### Marchfield
 
-![Marchfield](./assets/captures/locations/marchfield_farm.webp)
 
-Six plots inside the old wall line. Bittergrain, mostly.
 
-**Tier:** 1 · **Type:** farm
+A weathered homestead with two fenced yards inside the old wall line.
+
+**Tier:** 1 · **Type:** landmark
 
 ### West Track
 
@@ -388,14 +386,6 @@ One counter. 188 m from the Upper Karrow Seam by road, 46 m over Sunder Ledge.
 
 **Tier:** 10 · **Type:** bank
 
-### Highcairn Plots
-
-![Highcairn Plots](./assets/captures/locations/highcairn_plots.webp)
-
-Four plots in the lee of the wall. Cairnleaf takes fifteen minutes to come up.
-
-**Tier:** 10 · **Type:** farm
-
 ### Second Ramp
 
 ![Second Ramp](./assets/captures/locations/karrow_ramp_two.webp)
@@ -580,14 +570,6 @@ The east gatehouse. Carts to the stand and the springs leave this way.
 The west gatehouse, opening onto the plots and the quarry road.
 
 **Tier:** 20 · **Type:** gate
-
-### Coalroot Plots
-
-
-
-Four beds in the warm soil against the west wall. Coalroot takes twenty minutes.
-
-**Tier:** 20 · **Type:** farm
 
 ### Clinker Quarry
 

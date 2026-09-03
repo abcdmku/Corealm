@@ -2,7 +2,7 @@
  * The quest system: stage predicates, reward application, and the `talk`-adjacent world writes.
  *
  * Satisfies `SystemHooks.quests` (`summaries(): QuestSummary[]`) and PRD section 3 row 12, so its
- * tick order is 120: after gathering (110) and farming (111), before the event flush that the loop
+ * tick order is 120: after gathering (110), before the event flush that the loop
  * deliberately runs last. That ordering is why a `level.gained` and the `quest.updated` it causes
  * land in the same tick and in causal order.
  *
@@ -24,7 +24,7 @@
  *
  * Evaluation runs when dirty, plus a 500 ms heartbeat so that walking somewhere with WASD - which
  * emits nothing - still satisfies a `reach` stage. That is the whole polling budget: eight
- * predicates across at most ten quests, twice a second, in the worst case.
+ * predicates across at most nine quests, twice a second, in the worst case.
  *
  * Counters are monotonic per quest. A stage that counts something snapshots a baseline when it
  * begins (`@base:<counter>`), so "kill 4 rats" in stage 4 and "kill 2 bears" in stage 7
@@ -130,7 +130,7 @@ function counterKeysOf(predicate: QuestPredicate, into: string[]): void {
 export class QuestSystem implements TickSystem {
   readonly name = "quests";
 
-  /** PRD section 3 row 12. After gathering (110) and farming (111), before the event flush. */
+  /** PRD section 3 row 12. After gathering (110), before the event flush. */
   readonly order = 120;
 
   private dirty = true;
@@ -420,7 +420,7 @@ export class QuestSystem implements TickSystem {
         // `{ reason: "killed", enemyId, name, xp }`. So the guard never passed, no `kill:<family>`
         // counter was ever incremented, and EVERY kill predicate in the game was unsatisfiable —
         // Cold Iron stage 4, the Long Cairn stages 4 and 7, Eleven Empty Days stage 1. Four of the
-        // ten quests could not be finished by anybody, human or agent.
+        // nine quests could not be finished by anybody, human or agent.
         //
         // It survived three rounds because nothing had played a quest past its opening stages: the
         // gate proved Cold Iron to stage 0 and the Long Cairn to stage 2, and both of those sit
